@@ -1,6 +1,6 @@
 
 #ifdef _WIN32
-#include <WinSock2.h>
+#include <Windows.h>
 #define LastSocketError() WSAGetLastError()
 #else
 #define SOCKET int
@@ -13,3 +13,4 @@
 #define IP_ADDRESS unsigned int
 
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
+int enableNoDelay(SOCKET s);

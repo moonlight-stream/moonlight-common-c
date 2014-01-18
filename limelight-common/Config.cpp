@@ -92,10 +92,15 @@ const int UNKNOWN_CONFIG [] = {
 	(int) 0xFE000000
 };
 
-const int CONFIG_SIZE = sizeof(UNKNOWN_CONFIG) +(8 * 4) + 3;
+const int CONFIG_SIZE = sizeof(UNKNOWN_CONFIG) + (8 * 4) + 3;
+
+int getConfigDataSize(PSTREAM_CONFIGURATION streamConfig) {
+	return CONFIG_SIZE;
+}
 
 char* allocateConfigDataForStreamConfig(PSTREAM_CONFIGURATION streamConfig) {
 	BYTE_BUFFER bb;
+	int i;
 	char* config = (char *)malloc(CONFIG_SIZE);
 	if (config == NULL) {
 		return NULL;
@@ -103,4 +108,28 @@ char* allocateConfigDataForStreamConfig(PSTREAM_CONFIGURATION streamConfig) {
 
 	BbInitializeWrappedBuffer(&bb, config, 0, CONFIG_SIZE, BYTE_ORDER_LITTLE);
 
+	BbPutShort(&bb, 0x1204);
+	BbPutShort(&bb, 0x0004);
+	BbPutInt(&bb, streamConfig->width);
+
+	BbPutShort(&bb, 0x1205);
+	BbPutShort(&bb, 0x0004);
+	BbPutInt(&bb, streamConfig->height);
+
+	BbPutShort(&bb, 0x1206);
+	BbPutShort(&bb, 0x0004);
+	BbPutInt(&bb, 1);
+
+	BbPutShort(&bb, 0x120A);
+	BbPutShort(&bb, 0x0004);
+	BbPutInt(&bb, streamConfig->fps);
+
+	for (i = 0; i < sizeof(UNKNOWN_CONFIG) / sizeof(int); i++) {
+		BbPutInt(&bb, UNKNOWN_CONFIG[i]);
+	}
+
+	BbPutShort(&bb, 0x0013);
+	BbPut(&bb, 0x00);
+
+	return config;
 }

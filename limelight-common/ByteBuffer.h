@@ -5,10 +5,10 @@
 
 typedef struct _BYTE_BUFFER {
 	char* buffer;
-	int offset;
-	int length;
-	int position;
-	int byteOrder;
+	unsigned int offset;
+	unsigned int length;
+	unsigned int position;
+	unsigned int byteOrder;
 } BYTE_BUFFER, *PBYTE_BUFFER;
 
 void BbInitializeWrappedBuffer(PBYTE_BUFFER buff, char* data, int offset, int length, int byteOrder);

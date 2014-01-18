@@ -73,6 +73,22 @@
   <ItemGroup>
     <Text Include="ReadMe.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ByteBuffer.cpp" />
+    <ClCompile Include="Config.cpp" />
+    <ClCompile Include="ControlStream.cpp" />
+    <ClCompile Include="Handshake.cpp" />
+    <ClCompile Include="PlatformSockets.cpp" />
+    <ClCompile Include="PlatformThreads.cpp" />
+    <ClCompile Include="VideoDepacketizer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ByteBuffer.h" />
+    <ClInclude Include="Limelight.h" />
+    <ClInclude Include="Platform.h" />
+    <ClInclude Include="PlatformSockets.h" />
+    <ClInclude Include="PlatformThreads.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -20,3 +20,16 @@ SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
 
 	return s;
 }
+
+int enableNoDelay(SOCKET s) {
+	int err;
+	int val;
+
+	val = 1;
+	err = setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char*)&val, sizeof(val));
+	if (err == SOCKET_ERROR) {
+		return LastSocketError();
+	}
+
+	return 0;
+}
