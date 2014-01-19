@@ -14,4 +14,5 @@
 #define IP_ADDRESS unsigned int
 
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
+SOCKET bindUdpSocket(unsigned short port);
 int enableNoDelay(SOCKET s);

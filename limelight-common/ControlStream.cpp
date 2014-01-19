@@ -12,6 +12,7 @@ STREAM_CONFIGURATION streamConfig;
 PLT_THREAD heartbeatThread;
 PLT_THREAD jitterThread;
 PLT_THREAD resyncThread;
+PLT_EVENT resyncEvent;
 
 const short PTYPE_KEEPALIVE = 0x13ff;
 const short PPAYLEN_KEEPALIVE = 0x0000;
@@ -42,7 +43,7 @@ int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfigP
 }
 
 void requestIdrFrame(void) {
-
+	PltSetEvent(resyncEvent);
 }
 
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
@@ -97,7 +98,7 @@ static void heartbeatThreadFunc(void* context) {
 			return;
 		}
 
-		Sleep(3000);
+		PltSleepMs(3000);
 	}
 }
 
@@ -126,11 +127,37 @@ static void jitterThreadFunc(void* context) {
 			return;
 		}
 
-		Sleep(100);
+		PltSleepMs(100);
 	}
 }
 
 static void resyncThreadFunc(void* context) {
+	long payload[2];
+	NVCTL_PACKET_HEADER header;
+	int err;
+
+	header.type = PTYPE_RESYNC;
+	header.payloadLength = PPAYLEN_RESYNC;
+	for (;;) {
+		PltWaitForEvent(resyncEvent);
+
+		err = send(ctlSock, (char*) &header, sizeof(header), 0);
+		if (err != sizeof(header)) {
+			Limelog("Resync thread terminating #1\n");
+			return;
+		}
+
+		payload[0] = 0;
+		payload[1] = 0xFFFFF;
+
+		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
+		if (err != sizeof(payload)) {
+			Limelog("Resync thread terminating #2\n");
+			return;
+		}
+
+		PltClearEvent(resyncEvent);
+	}
 }
 
 int stopControlStream(void) {

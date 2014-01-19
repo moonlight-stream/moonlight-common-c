@@ -33,6 +33,7 @@ int getConfigDataSize(PSTREAM_CONFIGURATION streamConfig);
 int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig);
 int startControlStream(void);
 int stopControlStream(void);
+void requestIdrFrame(void);
 
 int performHandshake(IP_ADDRESS host);
 
@@ -41,3 +42,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
 PDECODE_UNIT getNextDecodeUnit(void);
 void freeDecodeUnit(PDECODE_UNIT decodeUnit);
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length);
+
+void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks);
+int startVideoStream(void* rendererContext, int drFlags);

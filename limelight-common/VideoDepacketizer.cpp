@@ -99,7 +99,7 @@ static void reassembleFrame(void) {
 
 				clearAvcNalState();
 
-				// FIXME: IDR frame!!!
+				requestIdrFrame();
 			}
 		}
 	}
@@ -213,7 +213,7 @@ void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
 
 		clearAvcNalState();
 
-		// FIXME: IDR frame here!!!
+		requestIdrFrame();
 	}
 
 	lastSequenceNumber = rtpPacket->sequenceNumber;

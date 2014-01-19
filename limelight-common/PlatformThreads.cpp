@@ -19,6 +19,13 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 #error POSIX threads not implemented
 #endif
 
+void PltSleepMs(int ms) {
+#ifdef _WIN32
+	Sleep(ms);
+#else
+#endif
+}
+
 int PltCreateMutex(PLT_MUTEX *mutex) {
 #ifdef _WIN32
 	*mutex = CreateMutex(NULL, FALSE, NULL);

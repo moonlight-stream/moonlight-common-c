@@ -1,11 +1,5 @@
 #pragma once
 
-typedef void(*RequestIdrFrame)(void);
-
-typedef struct _CONTROL_STATUS_LISTENER {
-	RequestIdrFrame requestIdrFrame;
-} CONTROL_STATUS_LISTENER, *PCONTROL_STATUS_LISTENER;
-
 typedef struct _LENTRY {
 	struct _LENTRY *next;
 	char* data;

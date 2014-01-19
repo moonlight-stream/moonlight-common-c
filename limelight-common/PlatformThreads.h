@@ -26,3 +26,5 @@ void PltSetEvent(PLT_EVENT event);
 void PltClearEvent(PLT_EVENT event);
 void PltPulseEvent(PLT_EVENT event);
 void PltWaitForEvent(PLT_EVENT event);
+
+void PltSleepMs(int ms);
