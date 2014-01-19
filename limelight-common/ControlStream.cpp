@@ -39,6 +39,8 @@ int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfigP
 
 	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
 
+	PltCreateEvent(&resyncEvent);
+
 	return 0;
 }
 
@@ -62,10 +64,12 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 	}
 
 	memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
+	if (staticHeader.payloadLength != 0) {
 	err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
 	if (err != staticHeader.payloadLength) {
 		free(fullPacket);
 		return NULL;
+	}
 	}
 
 	return fullPacket;
@@ -150,6 +154,7 @@ static void resyncThreadFunc(void* context) {
 		payload[0] = 0;
 		payload[1] = 0xFFFFF;
 
+		printf("Sending resync packet\n");
 		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
 		if (err != sizeof(payload)) {
 			Limelog("Resync thread terminating #2\n");
@@ -183,27 +188,27 @@ int startControlStream(void) {
 	configSize = getConfigDataSize(&streamConfig);
 	config = allocateConfigDataForStreamConfig(&streamConfig);
 	if (config == NULL) {
-		return NULL;
+		return -1;
 	}
 
 	// Send config
 	err = send(ctlSock, config, configSize, 0);
 	free(config);
 	if (err != configSize) {
-		return NULL;
+		return LastSocketError();
 	}
 
 	// Ping pong
-	response = sendNoPayloadAndReceive(PTYPE_HEARTBEAT, PPAYLEN_HEARTBEAT);
+	response = sendNoPayloadAndReceive(PTYPE_KEEPALIVE, PPAYLEN_KEEPALIVE);
 	if (response == NULL) {
-		return NULL;
+		return LastSocketError();
 	}
 	free(response);
 
 	// 1405
 	response = sendNoPayloadAndReceive(PTYPE_1405, PPAYLEN_1405);
 	if (response == NULL) {
-		return NULL;
+		return LastSocketError();
 	}
 	free(response);
 

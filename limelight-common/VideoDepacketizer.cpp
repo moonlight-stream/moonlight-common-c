@@ -178,6 +178,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 		if (decodingAvc) {
 			PLENTRY entry = (PLENTRY) malloc(sizeof(*entry));
 			if (entry != NULL) {
+				entry->next = NULL;
 				entry->length = currentPos.offset - start;
 				entry->data = (char*) malloc(entry->length);
 				if (entry->data == NULL) {

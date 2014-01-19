@@ -1,5 +1,6 @@
 
 #include "PlatformSockets.h"
+#include "PlatformThreads.h"
 
 const char HELLO [] = {
 	0x07, 0x00, 0x00, 0x00,
@@ -35,6 +36,8 @@ int performHandshake(IP_ADDRESS host) {
 	if (s == INVALID_SOCKET) {
 		return LastSocketError();
 	}
+
+	enableNoDelay(s);
 
 	err = send(s, HELLO, sizeof(HELLO), 0);
 	if (err == SOCKET_ERROR) {
