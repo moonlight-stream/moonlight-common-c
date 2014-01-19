@@ -60,11 +60,14 @@ static void ReceiveThreadProc(void* context) {
 			Limelog("Receive thread terminating #2\n");
 			return;
 		}
+
+		queueRtpPacket((PRTP_PACKET) &buffer[sizeof(int)], err);
 		
 		memcpy(buffer, &err, sizeof(err));
 
 		if (!offerQueueItem(&packetQueue, buffer)) {
 			free(buffer);
+			Limelog("Packet queue overflow\n");
 		}
 	}
 }
@@ -101,6 +104,7 @@ int readFirstFrame(void) {
 		return LastSocketError();
 	}
 
+	Limelog("Waiting for first frame\n");
 	for (;;) {
 		err = recv(s, &firstFrame[offset], sizeof(firstFrame) - offset, 0);
 		if (err <= 0) {
@@ -109,6 +113,7 @@ int readFirstFrame(void) {
 
 		offset += err;
 	}
+	Limelog("Read %d bytes\n", offset);
 
 	processRtpPayload((PNV_VIDEO_PACKET) firstFrame, offset);
 

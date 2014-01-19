@@ -1,8 +1,10 @@
 #include "PlatformSockets.h"
+#include "Limelight.h"
 
 SOCKET bindUdpSocket(unsigned short port) {
 	SOCKET s;
 	struct sockaddr_in addr;
+	int val;
 
 	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == INVALID_SOCKET) {
@@ -16,6 +18,9 @@ SOCKET bindUdpSocket(unsigned short port) {
 		closesocket(s);
 		return INVALID_SOCKET;
 	}
+
+	val = 65536;
+	int err = setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &val, sizeof(val));
 
 	return s;
 }

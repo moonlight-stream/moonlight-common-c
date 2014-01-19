@@ -208,6 +208,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 }
 
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
+
+	rtpPacket->sequenceNumber = htons(rtpPacket->sequenceNumber);
+
 	if (lastSequenceNumber != 0 &&
 		(unsigned short) (lastSequenceNumber + 1) != rtpPacket->sequenceNumber) {
 		Limelog("Received OOS video data (expected %d, but got %d)\n", lastSequenceNumber + 1, rtpPacket->sequenceNumber);

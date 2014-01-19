@@ -27,23 +27,23 @@ static int byteSwapShort(PBYTE_BUFFER buff, short s) {
 }
 
 int BbGet(PBYTE_BUFFER buff, char *c) {
-	if (buff->position + sizeof(c) >= buff->length) {
+	if (buff->position + sizeof(*c) > buff->length) {
 		return 0;
 	}
 
 	memcpy(c, &buff->buffer[buff->position], sizeof(*c));
-	buff->position += sizeof(c);
+	buff->position += sizeof(*c);
 
 	return 1;
 }
 
 int BbGetShort(PBYTE_BUFFER buff, short *s) {
-	if (buff->position + sizeof(s) >= buff->length) {
+	if (buff->position + sizeof(*s) >= buff->length) {
 		return 0;
 	}
 
 	memcpy(s, &buff->buffer[buff->position], sizeof(*s));
-	buff->position += sizeof(s);
+	buff->position += sizeof(*s);
 
 	*s = byteSwapShort(buff, *s);
 
@@ -51,12 +51,12 @@ int BbGetShort(PBYTE_BUFFER buff, short *s) {
 }
 
 int BbGetInt(PBYTE_BUFFER buff, int *i) {
-	if (buff->position + sizeof(i) >= buff->length) {
+	if (buff->position + sizeof(*i) > buff->length) {
 		return 0;
 	}
 
 	memcpy(i, &buff->buffer[buff->position], sizeof(*i));
-	buff->position += sizeof(i);
+	buff->position += sizeof(*i);
 
 	*i = byteSwapInt(buff, *i);
 
@@ -64,7 +64,7 @@ int BbGetInt(PBYTE_BUFFER buff, int *i) {
 }
 
 int BbPutInt(PBYTE_BUFFER buff, int i) {
-	if (buff->position + sizeof(i) >= buff->length) {
+	if (buff->position + sizeof(i) > buff->length) {
 		return 0;
 	}
 
@@ -77,7 +77,7 @@ int BbPutInt(PBYTE_BUFFER buff, int i) {
 }
 
 int BbPutShort(PBYTE_BUFFER buff, short s) {
-	if (buff->position + sizeof(s) >= buff->length) {
+	if (buff->position + sizeof(s) > buff->length) {
 		return 0;
 	}
 
@@ -90,7 +90,7 @@ int BbPutShort(PBYTE_BUFFER buff, short s) {
 }
 
 int BbPut(PBYTE_BUFFER buff, char c) {
-	if (buff->position + sizeof(c) >= buff->length) {
+	if (buff->position + sizeof(c) > buff->length) {
 		return 0;
 	}
 
