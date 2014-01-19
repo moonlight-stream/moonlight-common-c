@@ -82,6 +82,7 @@
     <ClCompile Include="PlatformSockets.cpp" />
     <ClCompile Include="PlatformThreads.cpp" />
     <ClCompile Include="VideoDepacketizer.cpp" />
+    <ClCompile Include="VideoStream.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h" />
@@ -90,6 +91,7 @@
     <ClInclude Include="Platform.h" />
     <ClInclude Include="PlatformSockets.h" />
     <ClInclude Include="PlatformThreads.h" />
+    <ClInclude Include="Video.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

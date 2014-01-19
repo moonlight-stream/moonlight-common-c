@@ -2,18 +2,16 @@
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 
-typedef struct _CONTROL_STREAM {
-	SOCKET s;
-	STREAM_CONFIGURATION streamConfig;
-	PLT_THREAD heartbeatThread;
-	PLT_THREAD jitterThread;
-	PLT_THREAD resyncThread;
-} CONTROL_STREAM, *PCONTROL_STREAM;
-
 typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short type;
 	unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
+
+SOCKET ctlSock;
+STREAM_CONFIGURATION streamConfig;
+PLT_THREAD heartbeatThread;
+PLT_THREAD jitterThread;
+PLT_THREAD resyncThread;
 
 const short PTYPE_KEEPALIVE = 0x13ff;
 const short PPAYLEN_KEEPALIVE = 0x0000;
@@ -30,33 +28,29 @@ const short PPAYLEN_RESYNC = 16;
 const short PTYPE_JITTER = 0x140c;
 const short PPAYLEN_JITTER = 0x10;
 
-void* initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig) {
-	PCONTROL_STREAM ctx;
-
-	ctx = (PCONTROL_STREAM) malloc(sizeof(*ctx));
-	if (ctx == NULL) {
-		return NULL;
+int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfigPtr) {
+	ctlSock = connectTcpSocket(host, 47995);
+	if (ctlSock == INVALID_SOCKET) {
+		return LastSocketError();
 	}
 
-	ctx->s = connectTcpSocket(host, 47995);
-	if (ctx->s == INVALID_SOCKET) {
-		free(ctx);
-		return NULL;
-	}
+	enableNoDelay(ctlSock);
 
-	enableNoDelay(ctx->s);
+	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
 
-	memcpy(&ctx->streamConfig, streamConfig, sizeof(*streamConfig));
-
-	return ctx;
+	return 0;
 }
 
-static PNVCTL_PACKET_HEADER readNvctlPacket(PCONTROL_STREAM stream) {
+void requestIdrFrame(void) {
+
+}
+
+static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 	NVCTL_PACKET_HEADER staticHeader;
 	PNVCTL_PACKET_HEADER fullPacket;
 	int err;
 
-	err = recv(stream->s, (char*) &staticHeader, sizeof(staticHeader), 0);
+	err = recv(ctlSock, (char*) &staticHeader, sizeof(staticHeader), 0);
 	if (err != sizeof(staticHeader)) {
 		return NULL;
 	}
@@ -67,7 +61,7 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(PCONTROL_STREAM stream) {
 	}
 
 	memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
-	err = recv(stream->s, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
+	err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
 	if (err != staticHeader.payloadLength) {
 		free(fullPacket);
 		return NULL;
@@ -76,29 +70,28 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(PCONTROL_STREAM stream) {
 	return fullPacket;
 }
 
-static PNVCTL_PACKET_HEADER sendNoPayloadAndReceive(PCONTROL_STREAM stream, short ptype, short paylen) {
+static PNVCTL_PACKET_HEADER sendNoPayloadAndReceive(short ptype, short paylen) {
 	NVCTL_PACKET_HEADER header;
 	int err;
 
 	header.type = ptype;
 	header.payloadLength = paylen;
-	err = send(stream->s, (char*) &header, sizeof(header), 0);
+	err = send(ctlSock, (char*) &header, sizeof(header), 0);
 	if (err != sizeof(header)) {
 		return NULL;
 	}
 
-	return readNvctlPacket(stream);
+	return readNvctlPacket();
 }
 
 static void heartbeatThreadFunc(void* context) {
-	PCONTROL_STREAM stream = (PCONTROL_STREAM) context;
 	int err;
 	NVCTL_PACKET_HEADER header;
 
 	for (;;) {
 		header.type = PTYPE_HEARTBEAT;
 		header.payloadLength = PPAYLEN_HEARTBEAT;
-		err = send(stream->s, (char*) &header, sizeof(header), 0);
+		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Heartbeat thread terminating\n");
 			return;
@@ -109,7 +102,6 @@ static void heartbeatThreadFunc(void* context) {
 }
 
 static void jitterThreadFunc(void* context) {
-	PCONTROL_STREAM stream = (PCONTROL_STREAM) context;
 	int payload[4];
 	NVCTL_PACKET_HEADER header;
 	int err;
@@ -117,7 +109,7 @@ static void jitterThreadFunc(void* context) {
 	header.type = PTYPE_JITTER;
 	header.payloadLength = PPAYLEN_JITTER;
 	for (;;) {
-		err = send(stream->s, (char*) &header, sizeof(header), 0);
+		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Jitter thread terminating #1\n");
 			return;
@@ -128,7 +120,7 @@ static void jitterThreadFunc(void* context) {
 		payload[2] = 888;
 		payload[3] = 0; // FIXME: Sequence number?
 
-		err = send(stream->s, (char*) payload, sizeof(payload), 0);
+		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
 		if (err != sizeof(payload)) {
 			Limelog("Jitter thread terminating #2\n");
 			return;
@@ -139,70 +131,66 @@ static void jitterThreadFunc(void* context) {
 }
 
 static void resyncThreadFunc(void* context) {
-	PCONTROL_STREAM stream = (PCONTROL_STREAM) context;
 }
 
-int stopControlStream(void* context) {
-	PCONTROL_STREAM stream = (PCONTROL_STREAM) context;
+int stopControlStream(void) {
+	closesocket(ctlSock);
 
-	closesocket(stream->s);
+	PltJoinThread(heartbeatThread);
+	PltJoinThread(jitterThread);
+	PltJoinThread(resyncThread);
 
-	PltJoinThread(stream->heartbeatThread);
-	PltJoinThread(stream->jitterThread);
-	PltJoinThread(stream->resyncThread);
-
-	PltCloseThread(stream->heartbeatThread);
-	PltCloseThread(stream->jitterThread);
-	PltCloseThread(stream->resyncThread);
+	PltCloseThread(heartbeatThread);
+	PltCloseThread(jitterThread);
+	PltCloseThread(resyncThread);
 
 	return 0;
 }
 
-int startControlStream(void* context) {
-	PCONTROL_STREAM stream = (PCONTROL_STREAM) context;
+int startControlStream(void) {
 	int err;
 	char* config;
 	int configSize;
 	PNVCTL_PACKET_HEADER response;
 
-	configSize = getConfigDataSize(&stream->streamConfig);
-	config = allocateConfigDataForStreamConfig(&stream->streamConfig);
+	configSize = getConfigDataSize(&streamConfig);
+	config = allocateConfigDataForStreamConfig(&streamConfig);
 	if (config == NULL) {
 		return NULL;
 	}
 
 	// Send config
-	err = send(stream->s, config, configSize, 0);
+	err = send(ctlSock, config, configSize, 0);
 	free(config);
 	if (err != configSize) {
 		return NULL;
 	}
 
 	// Ping pong
-	response = sendNoPayloadAndReceive(stream, PTYPE_HEARTBEAT, PPAYLEN_HEARTBEAT);
+	response = sendNoPayloadAndReceive(PTYPE_HEARTBEAT, PPAYLEN_HEARTBEAT);
 	if (response == NULL) {
 		return NULL;
 	}
 	free(response);
 
 	// 1405
-	response = sendNoPayloadAndReceive(stream, PTYPE_1405, PPAYLEN_1405);
+	response = sendNoPayloadAndReceive(PTYPE_1405, PPAYLEN_1405);
 	if (response == NULL) {
 		return NULL;
 	}
 	free(response);
 
-	err = PltCreateThread(heartbeatThreadFunc, context, &stream->heartbeatThread);
+	err = PltCreateThread(heartbeatThreadFunc, NULL, &heartbeatThread);
 	if (err != 0) {
 		return err;
 	}
 
-	err = PltCreateThread(jitterThreadFunc, context, &stream->jitterThread);
+	err = PltCreateThread(jitterThreadFunc, NULL, &jitterThread);
 	if (err != 0) {
 		return err;
 	}
 
-	err = PltCreateThread(resyncThreadFunc, context, &stream->resyncThread);
+	err = PltCreateThread(resyncThreadFunc, NULL, &resyncThread);
 	if (err != 0) {
 		return err;
 	}

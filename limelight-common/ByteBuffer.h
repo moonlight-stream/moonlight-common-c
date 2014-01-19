@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Platform.h"
 
 #define BYTE_ORDER_LITTLE 1
