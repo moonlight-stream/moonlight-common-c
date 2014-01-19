@@ -43,9 +43,9 @@ int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 		lastEntry->next = entry;
 	}
 
-	PltSetEvent(&queueHead->containsDataEvent);
-
 	PltUnlockMutex(&queueHead->mutex);
+
+	PltSetEvent(&queueHead->containsDataEvent);
 
 	return 1;
 }

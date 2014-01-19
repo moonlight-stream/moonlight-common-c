@@ -153,10 +153,8 @@ void PltSetEvent(PLT_EVENT *event) {
 #ifdef _WIN32
 	SetEvent(*event);
 #else
-    pthread_mutex_lock(&event->mutex);
     event->signalled = 1;
-    pthread_cond_signal(&event->cond);
-    pthread_mutex_unlock(&event->mutex);
+    pthread_cond_broadcast(&event->cond);
 #endif
 }
 
@@ -164,9 +162,7 @@ void PltClearEvent(PLT_EVENT *event) {
 #ifdef _WIN32
 	ResetEvent(*event);
 #else
-    pthread_mutex_lock(&event->mutex);
     event->signalled = 0;
-    pthread_mutex_unlock(&event->mutex);
 #endif
 }
 
@@ -176,7 +172,7 @@ void PltPulseEvent(PLT_EVENT *event) {
 #else
     pthread_mutex_lock(&event->mutex);
     event->signalled = 1;
-    pthread_cond_signal(&event->cond);
+    pthread_cond_broadcast(&event->cond);
     event->signalled = 0;
     pthread_mutex_unlock(&event->mutex);
 #endif
