@@ -78,6 +78,8 @@ static void DepacketizerThreadProc(void* context) {
 
 		memcpy(&length, data, sizeof(int));
 		queueRtpPacket((PRTP_PACKET) &data[sizeof(int)], length);
+
+		free(data);
 	}
 }
 
