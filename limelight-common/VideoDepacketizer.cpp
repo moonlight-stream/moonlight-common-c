@@ -127,7 +127,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	
 	currentPos.data = (char*) (videoPacket + 1);
 	currentPos.offset = 0;
-	currentPos.length = length;
+	currentPos.length = length - sizeof(*videoPacket);
 
 	if (currentPos.length == 968) {
 		if (videoPacket->packetIndex < videoPacket->totalPackets) {
