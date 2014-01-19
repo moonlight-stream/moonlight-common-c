@@ -78,6 +78,7 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="ControlStream.cpp" />
     <ClCompile Include="Handshake.cpp" />
+    <ClCompile Include="LinkedBlockingQueue.cpp" />
     <ClCompile Include="PlatformSockets.cpp" />
     <ClCompile Include="PlatformThreads.cpp" />
     <ClCompile Include="VideoDepacketizer.cpp" />
@@ -85,6 +86,7 @@
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h" />
     <ClInclude Include="Limelight.h" />
+    <ClInclude Include="LinkedBlockingQueue.h" />
     <ClInclude Include="Platform.h" />
     <ClInclude Include="PlatformSockets.h" />
     <ClInclude Include="PlatformThreads.h" />

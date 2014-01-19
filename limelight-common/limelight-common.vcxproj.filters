@@ -39,6 +39,9 @@
     <ClCompile Include="VideoDepacketizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="LinkedBlockingQueue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PlatformSockets.h">
@@ -54,6 +57,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="PlatformThreads.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LinkedBlockingQueue.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -7,6 +7,10 @@ typedef struct _STREAM_CONFIGURATION {
 	int fps;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
+typedef struct _LENTRY {
+	struct _LENTRY *next;
+} LENTRY, *PLENTRY;
+
 #include <stdio.h>
 #define Limelog printf
 

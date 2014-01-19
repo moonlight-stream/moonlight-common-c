@@ -30,23 +30,23 @@ int PltCreateMutex(PLT_MUTEX *mutex) {
 #endif
 }
 
-void PltDeleteMutex(PLT_MUTEX *mutex) {
+void PltDeleteMutex(PLT_MUTEX mutex) {
 #ifdef _WIN32
-	CloseHandle(*mutex);
+	CloseHandle(mutex);
 #else
 #endif
 }
 
-void PltLockMutex(PLT_MUTEX *mutex) {
+void PltLockMutex(PLT_MUTEX mutex) {
 #ifdef _WIN32
-	WaitForSingleObject(*mutex, INFINITE);
+	WaitForSingleObject(mutex, INFINITE);
 #else
 #endif
 }
 
-void PltUnlockMutex(PLT_MUTEX *mutex) {
+void PltUnlockMutex(PLT_MUTEX mutex) {
 #ifdef _WIN32
-	ReleaseMutex(*mutex);
+	ReleaseMutex(mutex);
 #else
 #endif
 }
@@ -94,3 +94,53 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 
 	return err;
 }
+
+int PltCreateEvent(PLT_EVENT *event) {
+#ifdef _WIN32
+	*event = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!*event) {
+		return -1;
+	}
+
+	return 0;
+#else
+#endif
+}
+
+void PltCloseEvent(PLT_EVENT event) {
+#ifdef _WIN32
+	CloseHandle(event);
+#else
+#endif
+}
+
+void PltSetEvent(PLT_EVENT event) {
+#ifdef _WIN32
+	SetEvent(event);
+#else
+#endif
+}
+
+void PltClearEvent(PLT_EVENT event) {
+#ifdef _WIN32
+	ResetEvent(event);
+#else
+#endif
+}
+
+void PltPulseEvent(PLT_EVENT event) {
+#ifdef _WIN32
+	PulseEvent(event);
+#else
+#endif
+}
+
+void PltWaitForEvent(PLT_EVENT event) {
+#ifdef _WIN32
+	WaitForSingleObject(event, INFINITE);
+#else
+#endif
+}
+
+
+
