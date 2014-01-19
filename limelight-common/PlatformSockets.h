@@ -4,6 +4,11 @@
 #include <Windows.h>
 #define LastSocketError() WSAGetLastError()
 #else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <errno.h>
 #define SOCKET int
 #define LastSocketError() errno
 #define INVALID_SOCKET -1

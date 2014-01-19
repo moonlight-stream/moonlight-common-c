@@ -30,7 +30,7 @@ int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 	entry->next = NULL;
 	entry->data = data;
 
-	PltLockMutex(queueHead->mutex);
+	PltLockMutex(&queueHead->mutex);
 
 	if (queueHead->head == NULL) {
 		queueHead->head = entry;
@@ -43,9 +43,9 @@ int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 		lastEntry->next = entry;
 	}
 
-	PltSetEvent(queueHead->containsDataEvent);
+	PltSetEvent(&queueHead->containsDataEvent);
 
-	PltUnlockMutex(queueHead->mutex);
+	PltUnlockMutex(&queueHead->mutex);
 
 	return 1;
 }
@@ -55,12 +55,12 @@ void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead) {
 	void* data;
 
 	for (;;) {
-		PltWaitForEvent(queueHead->containsDataEvent);
+		PltWaitForEvent(&queueHead->containsDataEvent);
 
-		PltLockMutex(queueHead->mutex);
+		PltLockMutex(&queueHead->mutex);
 
 		if (queueHead->head == NULL) {
-			PltUnlockMutex(queueHead->mutex);
+			PltUnlockMutex(&queueHead->mutex);
 			continue;
 		}
 
@@ -72,10 +72,10 @@ void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead) {
 		free(entry);
 
 		if (queueHead->head == NULL) {
-			PltClearEvent(queueHead->containsDataEvent);
+			PltClearEvent(&queueHead->containsDataEvent);
 		}
 
-		PltUnlockMutex(queueHead->mutex);
+		PltUnlockMutex(&queueHead->mutex);
 
 		break;
 	}

@@ -20,7 +20,7 @@ SOCKET bindUdpSocket(unsigned short port) {
 	}
 
 	val = 65536;
-	int err = setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &val, sizeof(val));
+	setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &val, sizeof(val));
 
 	return s;
 }

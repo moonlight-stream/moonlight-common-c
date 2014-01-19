@@ -1,4 +1,5 @@
 #include "PlatformThreads.h"
+#include "Platform.h"
 
 struct thread_context {
 	ThreadEntry entry;
@@ -16,13 +17,23 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	return 0;
 }
 #else
-#error POSIX threads not implemented
+void* ThreadProc(void* context) {
+    struct thread_context *ctx = (struct thread_context *)context;
+
+    ctx->entry(ctx->context);
+    
+	free(ctx);
+    
+	return NULL;
+}
 #endif
 
 void PltSleepMs(int ms) {
 #ifdef _WIN32
 	Sleep(ms);
 #else
+    long usecs = (long)ms * 1000;
+    usleep(usecs);
 #endif
 }
 
@@ -34,40 +45,45 @@ int PltCreateMutex(PLT_MUTEX *mutex) {
 	}
 	return 0;
 #else
+    return pthread_mutex_init(mutex, NULL);
 #endif
 }
 
-void PltDeleteMutex(PLT_MUTEX mutex) {
+void PltDeleteMutex(PLT_MUTEX *mutex) {
 #ifdef _WIN32
-	CloseHandle(mutex);
+	CloseHandle(*mutex);
 #else
+    pthread_mutex_destroy(mutex);
 #endif
 }
 
-void PltLockMutex(PLT_MUTEX mutex) {
+void PltLockMutex(PLT_MUTEX *mutex) {
 #ifdef _WIN32
-	WaitForSingleObject(mutex, INFINITE);
+	WaitForSingleObject(*mutex, INFINITE);
 #else
+    pthread_mutex_lock(mutex);
 #endif
 }
 
-void PltUnlockMutex(PLT_MUTEX mutex) {
+void PltUnlockMutex(PLT_MUTEX *mutex) {
 #ifdef _WIN32
-	ReleaseMutex(mutex);
+	ReleaseMutex(*mutex);
 #else
+    pthread_mutex_unlock(mutex);
 #endif
 }
 
-void PltJoinThread(PLT_THREAD thread) {
+void PltJoinThread(PLT_THREAD *thread) {
 #ifdef _WIN32
-	WaitForSingleObject(thread, INFINITE);
+	WaitForSingleObject(*thread, INFINITE);
 #else
+    pthread_join(*thread, NULL);
 #endif
 }
 
-void PltCloseThread(PLT_THREAD thread) {
+void PltCloseThread(PLT_THREAD *thread) {
 #ifdef _WIN32
-	CloseHandle(thread);
+	CloseHandle(*thread);
 #else
 #endif
 }
@@ -97,6 +113,12 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 		}
 	}
 #else
+    {
+        err = pthread_create(thread, NULL, ThreadProc, ctx);
+        if (err != 0) {
+            free(ctx);
+        }
+    }
 #endif
 
 	return err;
@@ -111,41 +133,62 @@ int PltCreateEvent(PLT_EVENT *event) {
 
 	return 0;
 #else
+    pthread_mutex_init(&event->mutex, NULL);
+    pthread_cond_init(&event->cond, NULL);
+    event->signalled = 0;
+    return 0;
 #endif
 }
 
-void PltCloseEvent(PLT_EVENT event) {
+void PltCloseEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	CloseHandle(event);
+	CloseHandle(*event);
 #else
+    pthread_mutex_destroy(&event->mutex);
+    pthread_cond_destroy(&event->cond);
 #endif
 }
 
-void PltSetEvent(PLT_EVENT event) {
+void PltSetEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	SetEvent(event);
+	SetEvent(*event);
 #else
+    pthread_mutex_lock(&event->mutex);
+    event->signalled = 1;
+    pthread_cond_signal(&event->cond);
+    pthread_mutex_unlock(&event->mutex);
 #endif
 }
 
-void PltClearEvent(PLT_EVENT event) {
+void PltClearEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	ResetEvent(event);
+	ResetEvent(*event);
 #else
+    pthread_mutex_lock(&event->mutex);
+    event->signalled = 0;
+    pthread_mutex_unlock(&event->mutex);
 #endif
 }
 
-void PltPulseEvent(PLT_EVENT event) {
+void PltPulseEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	PulseEvent(event);
+	PulseEvent(*event);
 #else
+    pthread_mutex_lock(&event->mutex);
+    event->signalled = 1;
+    pthread_cond_signal(&event->cond);
+    event->signalled = 0;
+    pthread_mutex_unlock(&event->mutex);
 #endif
 }
 
-void PltWaitForEvent(PLT_EVENT event) {
+void PltWaitForEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	WaitForSingleObject(event, INFINITE);
+	WaitForSingleObject(*event, INFINITE);
 #else
+    while (!event->signalled) {
+        pthread_cond_wait(&event->cond, &event->mutex);
+    }
 #endif
 }
 

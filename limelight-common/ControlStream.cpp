@@ -45,7 +45,7 @@ int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfigP
 }
 
 void requestIdrFrame(void) {
-	PltSetEvent(resyncEvent);
+	PltSetEvent(&resyncEvent);
 }
 
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
@@ -143,7 +143,7 @@ static void resyncThreadFunc(void* context) {
 	header.type = PTYPE_RESYNC;
 	header.payloadLength = PPAYLEN_RESYNC;
 	for (;;) {
-		PltWaitForEvent(resyncEvent);
+		PltWaitForEvent(&resyncEvent);
 
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
@@ -161,20 +161,20 @@ static void resyncThreadFunc(void* context) {
 			return;
 		}
 
-		PltClearEvent(resyncEvent);
+		PltClearEvent(&resyncEvent);
 	}
 }
 
 int stopControlStream(void) {
 	closesocket(ctlSock);
 
-	PltJoinThread(heartbeatThread);
-	PltJoinThread(jitterThread);
-	PltJoinThread(resyncThread);
+	PltJoinThread(&heartbeatThread);
+	PltJoinThread(&jitterThread);
+	PltJoinThread(&resyncThread);
 
-	PltCloseThread(heartbeatThread);
-	PltCloseThread(jitterThread);
-	PltCloseThread(resyncThread);
+	PltCloseThread(&heartbeatThread);
+	PltCloseThread(&jitterThread);
+	PltCloseThread(&resyncThread);
 
 	return 0;
 }
