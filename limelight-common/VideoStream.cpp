@@ -60,8 +60,6 @@ static void ReceiveThreadProc(void* context) {
 			Limelog("Receive thread terminating #2\n");
 			return;
 		}
-
-		queueRtpPacket((PRTP_PACKET) &buffer[sizeof(int)], err);
 		
 		memcpy(buffer, &err, sizeof(err));
 
