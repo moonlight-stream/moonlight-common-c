@@ -166,7 +166,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
 		while (currentPos.length != 0) {
 			if (getSpecialSeq(&currentPos, &specialSeq)) {
-				if (decodingAvc || isSeqPadding(&specialSeq)) {
+				if (decodingAvc || !isSeqPadding(&specialSeq)) {
 					break;
 				}
 			}
