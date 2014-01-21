@@ -18,34 +18,34 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Handshake.cpp">
+    <ClCompile Include="ByteBuffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PlatformSockets.cpp">
+    <ClCompile Include="Config.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Config.cpp">
+    <ClCompile Include="Connection.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ByteBuffer.cpp">
+    <ClCompile Include="Handshake.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PlatformThreads.cpp">
+    <ClCompile Include="ControlStream.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ControlStream.cpp">
+    <ClCompile Include="LinkedBlockingQueue.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VideoDepacketizer.cpp">
+    <ClCompile Include="PlatformSockets.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="LinkedBlockingQueue.cpp">
+    <ClCompile Include="PlatformThreads.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VideoStream.cpp">
+    <ClCompile Include="VideoDepacketizer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Connection.cpp">
+    <ClCompile Include="VideoStream.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

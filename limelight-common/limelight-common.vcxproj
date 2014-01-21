@@ -74,16 +74,16 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ByteBuffer.cpp" />
-    <ClCompile Include="Config.cpp" />
-    <ClCompile Include="Connection.cpp" />
-    <ClCompile Include="ControlStream.cpp" />
-    <ClCompile Include="Handshake.cpp" />
-    <ClCompile Include="LinkedBlockingQueue.cpp" />
-    <ClCompile Include="PlatformSockets.cpp" />
-    <ClCompile Include="PlatformThreads.cpp" />
-    <ClCompile Include="VideoDepacketizer.cpp" />
-    <ClCompile Include="VideoStream.cpp" />
+    <ClCompile Include="ByteBuffer.c" />
+    <ClCompile Include="Config.c" />
+    <ClCompile Include="Connection.c" />
+    <ClCompile Include="ControlStream.c" />
+    <ClCompile Include="Handshake.c" />
+    <ClCompile Include="LinkedBlockingQueue.c" />
+    <ClCompile Include="PlatformSockets.c" />
+    <ClCompile Include="PlatformThreads.c" />
+    <ClCompile Include="VideoDepacketizer.c" />
+    <ClCompile Include="VideoStream.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h" />
