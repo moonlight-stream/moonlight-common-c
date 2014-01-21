@@ -93,12 +93,12 @@ static void heartbeatThreadFunc(void* context) {
 	int err;
 	NVCTL_PACKET_HEADER header;
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&heartbeatThread)) {
 		header.type = PTYPE_HEARTBEAT;
 		header.payloadLength = PPAYLEN_HEARTBEAT;
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
-			Limelog("Heartbeat thread terminating\n");
+			Limelog("Heartbeat thread terminating #1\n");
 			return;
 		}
 
@@ -113,7 +113,7 @@ static void jitterThreadFunc(void* context) {
 
 	header.type = PTYPE_JITTER;
 	header.payloadLength = PPAYLEN_JITTER;
-	for (;;) {
+	while (!PltIsThreadInterrupted(&jitterThread)) {
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Jitter thread terminating #1\n");
@@ -166,43 +166,22 @@ static void resyncThreadFunc(void* context) {
 }
 
 int stopControlStream(void) {
-	if (heartbeatThread != NULL) {
-		PltInterruptThread(&heartbeatThread);
-	}
-	if (jitterThread != NULL) {
-		PltInterruptThread(&jitterThread);
-	}
-	if (resyncThread != NULL) {
-		PltInterruptThread(&resyncThread);
-	}
+	PltInterruptThread(&heartbeatThread);
+	PltInterruptThread(&jitterThread);
+	PltInterruptThread(&resyncThread);
 
 	if (ctlSock != INVALID_SOCKET) {
 		closesocket(ctlSock);
 		ctlSock = INVALID_SOCKET;
 	}
 
-	if (heartbeatThread != NULL) {
-		PltJoinThread(&heartbeatThread);
-	}
-	if (jitterThread != NULL) {
-		PltJoinThread(&jitterThread);
-	}
-	if (resyncThread != NULL) {
-		PltJoinThread(&resyncThread) ;
-	}
+	PltJoinThread(&heartbeatThread);
+	PltJoinThread(&jitterThread);
+	PltJoinThread(&resyncThread);
 
-	if (heartbeatThread != NULL) {
-		PltCloseThread(&heartbeatThread);
-		heartbeatThread = NULL;
-	}
-	if (jitterThread != NULL) {
-		PltCloseThread(&jitterThread);
-		jitterThread = NULL;
-	}
-	if (resyncThread != NULL) {
-		PltCloseThread(&resyncThread);
-		resyncThread = NULL;
-	}
+	PltCloseThread(&heartbeatThread);
+	PltCloseThread(&jitterThread);
+	PltCloseThread(&resyncThread);
 
 	return 0;
 }

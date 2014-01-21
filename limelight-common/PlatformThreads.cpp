@@ -6,6 +6,12 @@ struct thread_context {
 	void* context;
 };
 
+#if defined(LC_WINDOWS)
+VOID WINAPI ApcFunc(ULONG_PTR parameter) {
+	return;
+}
+#endif
+
 #ifdef LC_WINDOWS
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	struct thread_context *ctx = (struct thread_context *)lpParameter;
@@ -75,7 +81,7 @@ void PltUnlockMutex(PLT_MUTEX *mutex) {
 
 void PltJoinThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	WaitForSingleObjectEx(*thread, INFINITE, FALSE);
+	WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
     pthread_join(*thread, NULL);
 #endif
@@ -83,14 +89,23 @@ void PltJoinThread(PLT_THREAD *thread) {
 
 void PltCloseThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	CloseHandle(*thread);
+	CloseHandle(thread->handle);
+#else
+#endif
+}
+
+int PltIsThreadInterrupted(PLT_THREAD *thread) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	return thread->cancelled;
 #else
 #endif
 }
 
 void PltInterruptThread(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	CloseHandle(*thread);
+#if defined(LC_WINDOWS)
+	thread->cancelled = 1;
+	QueueUserAPC(ApcFunc, thread->handle, 0);
+#elif defined(LC_WINDOWS_PHONE)
 #else
 	pthread_cancel(*thread);
 #endif
@@ -110,13 +125,13 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 
 #ifdef _WIN32
 	{
-		HANDLE hThread = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
-		if (hThread == NULL) {
+		thread->cancelled = 0;
+		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
+		if (thread->handle == NULL) {
 			free(ctx);
 			return -1;
 		}
 		else {
-			CloseHandle(hThread);
 			err = 0;
 		}
 	}
@@ -176,7 +191,7 @@ void PltClearEvent(PLT_EVENT *event) {
 
 int PltWaitForEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	DWORD error = WaitForSingleObjectEx(*event, INFINITE, FALSE);
+	DWORD error = WaitForSingleObjectEx(*event, INFINITE, TRUE);
 	if (error == STATUS_WAIT_0) {
 		return PLT_WAIT_SUCCESS;
 	}

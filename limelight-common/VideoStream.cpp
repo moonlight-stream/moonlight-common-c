@@ -52,10 +52,10 @@ static void UdpPingThreadProc(void *context) {
 	saddr.sin_port = htons(47998);
 	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&udpPingThread)) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
-			Limelog("UDP ping thread terminating\n");
+			Limelog("UDP ping thread terminating #1\n");
 			return;
 		}
 
@@ -157,18 +157,10 @@ int readFirstFrame(void) {
 }
 
 void stopVideoStream(void) {
-	if (udpPingThread != NULL) {
-		PltInterruptThread(&udpPingThread);
-	}
-	if (receiveThread != NULL) {
-		PltInterruptThread(&receiveThread);
-	}
-	if (depacketizerThread != NULL) {
-		PltInterruptThread(&depacketizerThread);
-	}
-	if (decoderThread != NULL) {
-		PltInterruptThread(&decoderThread);
-	}
+	PltInterruptThread(&udpPingThread);
+	PltInterruptThread(&receiveThread);
+	PltInterruptThread(&depacketizerThread);
+	PltInterruptThread(&decoderThread);
 
 	if (firstFrameSocket != INVALID_SOCKET) {
 		closesocket(firstFrameSocket);
@@ -179,31 +171,15 @@ void stopVideoStream(void) {
 		rtpSocket = INVALID_SOCKET;
 	}
 
-	if (udpPingThread != NULL) {
-		PltJoinThread(&udpPingThread);
-	}
-	if (receiveThread != NULL) {
-		PltJoinThread(&receiveThread);
-	}
-	if (depacketizerThread != NULL) {
-		PltJoinThread(&depacketizerThread);
-	}
-	if (decoderThread != NULL) {
-		PltJoinThread(&decoderThread);
-	}
+	PltJoinThread(&udpPingThread);
+	PltJoinThread(&receiveThread);
+	PltJoinThread(&depacketizerThread);
+	PltJoinThread(&decoderThread);
 
-	if (udpPingThread != NULL) {
-		PltCloseThread(&udpPingThread);
-	}
-	if (receiveThread != NULL) {
-		PltCloseThread(&receiveThread);
-	}
-	if (depacketizerThread != NULL) {
-		PltCloseThread(&depacketizerThread);
-	}
-	if (decoderThread != NULL) {
-		PltCloseThread(&decoderThread);
-	}
+	PltCloseThread(&udpPingThread);
+	PltCloseThread(&receiveThread);
+	PltCloseThread(&depacketizerThread);
+	PltCloseThread(&decoderThread);
 }
 
 int startVideoStream(void* rendererContext, int drFlags) {
