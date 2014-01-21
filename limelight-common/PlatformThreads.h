@@ -4,11 +4,11 @@
 
 typedef void (*ThreadEntry)(void *context);
 
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 typedef HANDLE PLT_THREAD;
 typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
-#else
+#elif defined (LC_POSIX)
 typedef pthread_t PLT_THREAD;
 typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {
@@ -16,6 +16,8 @@ typedef struct _PLT_EVENT {
     pthread_cond_t cond;
     int signalled;
 } PLT_EVENT;
+#else
+#error Unsupported platform
 #endif
 
 int PltCreateMutex(PLT_MUTEX *mutex);
@@ -25,13 +27,16 @@ void PltUnlockMutex(PLT_MUTEX *mutex);
 
 int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread);
 void PltCloseThread(PLT_THREAD *thread);
+void PltInterruptThread(PLT_THREAD *thread);
 void PltJoinThread(PLT_THREAD *thread);
 
 int PltCreateEvent(PLT_EVENT *event);
 void PltCloseEvent(PLT_EVENT *event);
 void PltSetEvent(PLT_EVENT *event);
 void PltClearEvent(PLT_EVENT *event);
-void PltPulseEvent(PLT_EVENT *event);
-void PltWaitForEvent(PLT_EVENT *event);
+int PltWaitForEvent(PLT_EVENT *event);
+
+#define PLT_WAIT_SUCCESS 0
+#define PLT_WAIT_INTERRUPTED 1
 
 void PltSleepMs(int ms);

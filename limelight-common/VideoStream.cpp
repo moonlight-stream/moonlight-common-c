@@ -1,4 +1,4 @@
-#include "Limelight.h"
+#include "Limelight-internal.h"
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 #include "LinkedBlockingQueue.h"
@@ -8,6 +8,7 @@ PSTREAM_CONFIGURATION configuration;
 IP_ADDRESS remoteHost;
 
 SOCKET rtpSocket;
+SOCKET firstFrameSocket;
 
 LINKED_BLOCKING_QUEUE packetQueue;
 
@@ -21,7 +22,24 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 	configuration = streamConfig;
 	remoteHost = host;
 
-	initializeLinkedBlockingQueue(&packetQueue, 15);
+	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
+
+	initializeVideoDepacketizer();
+}
+
+void destroyVideoStream(void) {
+	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
+
+	destroyVideoDepacketizer();
+	
+	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
+
+	while (entry != NULL) {
+		nextEntry = entry->next;
+		free(entry->data);
+		free(entry);
+		entry = nextEntry;
+	}
 }
 
 static void UdpPingThreadProc(void *context) {
@@ -58,23 +76,38 @@ static void ReceiveThreadProc(void* context) {
 		err = recv(rtpSocket, &buffer[sizeof(int)], 1500, 0);
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
+			free(buffer);
 			return;
 		}
 		
 		memcpy(buffer, &err, sizeof(err));
 
-		if (!offerQueueItem(&packetQueue, buffer)) {
+		err = LbqOfferQueueItem(&packetQueue, buffer);
+		if (err != LBQ_SUCCESS) {
 			free(buffer);
-			Limelog("Packet queue overflow\n");
+		}
+
+		if (err == LBQ_BOUND_EXCEEDED) {
+			Limelog("Video packet queue overflow\n");
+		}
+		else if (err == LBQ_INTERRUPTED) {
+			Limelog("Receive thread terminating #2\n");
+			return;
 		}
 	}
 }
 
 static void DepacketizerThreadProc(void* context) {
 	int length;
+	int err;
+	char *data;
 
 	for (;;) {
-		char* data = (char*) waitForQueueElement(&packetQueue);
+		err = LbqWaitForQueueElement(&packetQueue, (void**)&data);
+		if (err != LBQ_SUCCESS) {
+			Limelog("Depacketizer thread terminating\n");
+			return;
+		}
 
 		memcpy(&length, data, sizeof(int));
 		queueRtpPacket((PRTP_PACKET) &data[sizeof(int)], length);
@@ -84,8 +117,12 @@ static void DepacketizerThreadProc(void* context) {
 }
 
 static void DecoderThreadProc(void* context) {
+	PDECODE_UNIT du;
 	for (;;) {
-		PDECODE_UNIT du = getNextDecodeUnit();
+		if (!getNextDecodeUnit(&du)) {
+			printf("Decoder thread terminating\n");
+			return;
+		}
 
 		callbacks->submitDecodeUnit(du);
 
@@ -97,16 +134,15 @@ int readFirstFrame(void) {
 	char firstFrame[1000];
 	int err;
 	int offset = 0;
-	SOCKET s;
 
-	s = connectTcpSocket(remoteHost, 47996);
-	if (s == INVALID_SOCKET) {
+	firstFrameSocket = connectTcpSocket(remoteHost, 47996);
+	if (firstFrameSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}
 
 	Limelog("Waiting for first frame\n");
 	for (;;) {
-		err = recv(s, &firstFrame[offset], sizeof(firstFrame) - offset, 0);
+		err = recv(firstFrameSocket, &firstFrame[offset], sizeof(firstFrame) - offset, 0);
 		if (err <= 0) {
 			break;
 		}
@@ -120,6 +156,56 @@ int readFirstFrame(void) {
 	return 0;
 }
 
+void stopVideoStream(void) {
+	if (udpPingThread != NULL) {
+		PltInterruptThread(&udpPingThread);
+	}
+	if (receiveThread != NULL) {
+		PltInterruptThread(&receiveThread);
+	}
+	if (depacketizerThread != NULL) {
+		PltInterruptThread(&depacketizerThread);
+	}
+	if (decoderThread != NULL) {
+		PltInterruptThread(&decoderThread);
+	}
+
+	if (firstFrameSocket != INVALID_SOCKET) {
+		closesocket(firstFrameSocket);
+		firstFrameSocket = INVALID_SOCKET;
+	}
+	if (rtpSocket != INVALID_SOCKET) {
+		closesocket(rtpSocket);
+		rtpSocket = INVALID_SOCKET;
+	}
+
+	if (udpPingThread != NULL) {
+		PltJoinThread(&udpPingThread);
+	}
+	if (receiveThread != NULL) {
+		PltJoinThread(&receiveThread);
+	}
+	if (depacketizerThread != NULL) {
+		PltJoinThread(&depacketizerThread);
+	}
+	if (decoderThread != NULL) {
+		PltJoinThread(&decoderThread);
+	}
+
+	if (udpPingThread != NULL) {
+		PltCloseThread(&udpPingThread);
+	}
+	if (receiveThread != NULL) {
+		PltCloseThread(&receiveThread);
+	}
+	if (depacketizerThread != NULL) {
+		PltCloseThread(&depacketizerThread);
+	}
+	if (decoderThread != NULL) {
+		PltCloseThread(&decoderThread);
+	}
+}
+
 int startVideoStream(void* rendererContext, int drFlags) {
 	int err;
 
@@ -127,8 +213,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		callbacks->setup(configuration->width,
 			configuration->height, 60, rendererContext, drFlags);
 	}
-
-	initializeVideoDepacketizer();
 
 	// FIXME: Set socket options here
 	rtpSocket = bindUdpSocket(47998);

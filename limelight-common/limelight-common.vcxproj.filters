@@ -45,15 +45,15 @@
     <ClCompile Include="VideoStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Connection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PlatformSockets.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Platform.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Limelight.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="ByteBuffer.h">
@@ -66,6 +66,12 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Video.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Limelight-internal.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Limelight.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

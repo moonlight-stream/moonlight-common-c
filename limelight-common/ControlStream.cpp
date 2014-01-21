@@ -1,4 +1,4 @@
-#include "Limelight.h"
+#include "Limelight-internal.h"
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 
@@ -7,6 +7,7 @@ typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
 
+IP_ADDRESS host;
 SOCKET ctlSock;
 STREAM_CONFIGURATION streamConfig;
 PLT_THREAD heartbeatThread;
@@ -29,19 +30,18 @@ const short PPAYLEN_RESYNC = 16;
 const short PTYPE_JITTER = 0x140c;
 const short PPAYLEN_JITTER = 0x10;
 
-int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfigPtr) {
-	ctlSock = connectTcpSocket(host, 47995);
-	if (ctlSock == INVALID_SOCKET) {
-		return LastSocketError();
-	}
-
-	enableNoDelay(ctlSock);
-
+int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
 	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
 
 	PltCreateEvent(&resyncEvent);
 
+	host = addr;
+
 	return 0;
+}
+
+void destroyControlStream(void) {
+	PltCloseEvent(&resyncEvent);
 }
 
 void requestIdrFrame(void) {
@@ -166,15 +166,43 @@ static void resyncThreadFunc(void* context) {
 }
 
 int stopControlStream(void) {
-	closesocket(ctlSock);
+	if (heartbeatThread != NULL) {
+		PltInterruptThread(&heartbeatThread);
+	}
+	if (jitterThread != NULL) {
+		PltInterruptThread(&jitterThread);
+	}
+	if (resyncThread != NULL) {
+		PltInterruptThread(&resyncThread);
+	}
 
-	PltJoinThread(&heartbeatThread);
-	PltJoinThread(&jitterThread);
-	PltJoinThread(&resyncThread);
+	if (ctlSock != INVALID_SOCKET) {
+		closesocket(ctlSock);
+		ctlSock = INVALID_SOCKET;
+	}
 
-	PltCloseThread(&heartbeatThread);
-	PltCloseThread(&jitterThread);
-	PltCloseThread(&resyncThread);
+	if (heartbeatThread != NULL) {
+		PltJoinThread(&heartbeatThread);
+	}
+	if (jitterThread != NULL) {
+		PltJoinThread(&jitterThread);
+	}
+	if (resyncThread != NULL) {
+		PltJoinThread(&resyncThread) ;
+	}
+
+	if (heartbeatThread != NULL) {
+		PltCloseThread(&heartbeatThread);
+		heartbeatThread = NULL;
+	}
+	if (jitterThread != NULL) {
+		PltCloseThread(&jitterThread);
+		jitterThread = NULL;
+	}
+	if (resyncThread != NULL) {
+		PltCloseThread(&resyncThread);
+		resyncThread = NULL;
+	}
 
 	return 0;
 }
@@ -184,6 +212,13 @@ int startControlStream(void) {
 	char* config;
 	int configSize;
 	PNVCTL_PACKET_HEADER response;
+
+	ctlSock = connectTcpSocket(host, 47995);
+	if (ctlSock == INVALID_SOCKET) {
+		return LastSocketError();
+	}
+
+	enableNoDelay(ctlSock);
 
 	configSize = getConfigDataSize(&streamConfig);
 	config = allocateConfigDataForStreamConfig(&streamConfig);

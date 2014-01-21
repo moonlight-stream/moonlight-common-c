@@ -1,11 +1,5 @@
 #pragma once
 
-typedef struct _LENTRY {
-	struct _LENTRY *next;
-	char* data;
-	int length;
-} LENTRY, *PLENTRY;
-
 typedef struct _NV_VIDEO_PACKET {
 	int frameIndex;
 	int packetIndex;
@@ -21,8 +15,3 @@ typedef struct _RTP_PACKET {
 	unsigned short sequenceNumber;
 	char reserved[8];
 } RTP_PACKET, *PRTP_PACKET;
-
-typedef struct _DECODE_UNIT {
-	int fullLength;
-	PLENTRY bufferList;
-} DECODE_UNIT, *PDECODE_UNIT;

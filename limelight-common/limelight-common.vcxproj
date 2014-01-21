@@ -76,6 +76,7 @@
   <ItemGroup>
     <ClCompile Include="ByteBuffer.cpp" />
     <ClCompile Include="Config.cpp" />
+    <ClCompile Include="Connection.cpp" />
     <ClCompile Include="ControlStream.cpp" />
     <ClCompile Include="Handshake.cpp" />
     <ClCompile Include="LinkedBlockingQueue.cpp" />
@@ -86,6 +87,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h" />
+    <ClInclude Include="Limelight-internal.h" />
     <ClInclude Include="Limelight.h" />
     <ClInclude Include="LinkedBlockingQueue.h" />
     <ClInclude Include="Platform.h" />

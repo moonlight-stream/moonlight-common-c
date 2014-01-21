@@ -1,6 +1,13 @@
 #include "LinkedBlockingQueue.h"
 
-int initializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
+PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead) {
+	PltDeleteMutex(&queueHead->mutex);
+	PltCloseEvent(&queueHead->containsDataEvent);
+	
+	return queueHead->head;
+}
+
+int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
 	int err;
 	
 	err = PltCreateEvent(&queueHead->containsDataEvent);
@@ -15,16 +22,17 @@ int initializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBoun
 
 	queueHead->head = NULL;
 	queueHead->sizeBound = sizeBound;
+	queueHead->currentSize = 0;
 
 	return 0;
 }
 
-int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
+int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, lastEntry;
 
 	entry = (PLINKED_BLOCKING_QUEUE_ENTRY) malloc(sizeof(*entry));
 	if (entry == NULL) {
-		return 0;
+		return LBQ_NO_MEMORY;
 	}
 
 	entry->next = NULL;
@@ -32,10 +40,18 @@ int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 
 	PltLockMutex(&queueHead->mutex);
 
+	if (queueHead->currentSize == queueHead->sizeBound) {
+		PltUnlockMutex(&queueHead->mutex);
+		free(entry);
+		return LBQ_BOUND_EXCEEDED;
+	}
+
 	if (queueHead->head == NULL) {
+		LC_ASSERT(queueHead->currentSize == 0);
 		queueHead->head = entry;
 	}
 	else {
+		LC_ASSERT(queueHead->currentSize >= 1);
 		lastEntry = queueHead->head;
 		while (lastEntry->next != NULL) {
 			lastEntry = lastEntry->next;
@@ -43,19 +59,24 @@ int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 		lastEntry->next = entry;
 	}
 
+	queueHead->currentSize++;
+
 	PltUnlockMutex(&queueHead->mutex);
 
 	PltSetEvent(&queueHead->containsDataEvent);
 
-	return 1;
+	return LBQ_SUCCESS;
 }
 
-void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead) {
+int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry;
-	void* data;
+	int err;
 
 	for (;;) {
-		PltWaitForEvent(&queueHead->containsDataEvent);
+		err = PltWaitForEvent(&queueHead->containsDataEvent);
+		if (err != PLT_WAIT_SUCCESS) {
+			return LBQ_INTERRUPTED;
+		}
 
 		PltLockMutex(&queueHead->mutex);
 
@@ -67,7 +88,7 @@ void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead) {
 		entry = queueHead->head;
 		queueHead->head = entry->next;
 
-		data = entry->data;
+		*data = entry->data;
 
 		free(entry);
 
@@ -80,5 +101,5 @@ void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead) {
 		break;
 	}
 
-	return data;
+	return LBQ_SUCCESS;
 }

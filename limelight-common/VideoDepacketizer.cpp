@@ -1,5 +1,5 @@
 #include "Platform.h"
-#include "Limelight.h"
+#include "Limelight-internal.h"
 #include "LinkedBlockingQueue.h"
 #include "Video.h"
 
@@ -18,7 +18,7 @@ typedef struct _BUFFER_DESC {
 } BUFFER_DESC, *PBUFFER_DESC;
 
 void initializeVideoDepacketizer(void) {
-	initializeLinkedBlockingQueue(&decodeUnitQueue, 15);
+	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 }
 
 static void clearAvcNalState(void) {
@@ -32,6 +32,20 @@ static void clearAvcNalState(void) {
 	}
 
 	nalChainDataLength = 0;
+}
+
+void destroyVideoDepacketizer(void) {
+	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
+	
+	entry = LbqDestroyLinkedBlockingQueue(&decodeUnitQueue);
+	while (entry != NULL) {
+		nextEntry = entry->next;
+		free(entry->data);
+		free(entry);
+		entry = nextEntry;
+	}
+
+	clearAvcNalState();
 }
 
 static int isSeqFrameStart(PBUFFER_DESC candidate) {
@@ -92,7 +106,7 @@ static void reassembleFrame(void) {
 			nalChainHead = NULL;
 			nalChainDataLength = 0;
 
-			if (!offerQueueItem(&decodeUnitQueue, du)) {
+			if (!LbqOfferQueueItem(&decodeUnitQueue, du)) {
 				nalChainHead = du->bufferList;
 				nalChainDataLength = du->fullLength;
 				free(du);
@@ -105,8 +119,14 @@ static void reassembleFrame(void) {
 	}
 }
 
-PDECODE_UNIT getNextDecodeUnit(void) {
-	return (PDECODE_UNIT) waitForQueueElement(&decodeUnitQueue);
+int getNextDecodeUnit(PDECODE_UNIT *du) {
+	int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)du);
+	if (err == LBQ_SUCCESS) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
 }
 
 void freeDecodeUnit(PDECODE_UNIT decodeUnit) {

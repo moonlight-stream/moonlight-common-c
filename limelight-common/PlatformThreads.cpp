@@ -6,7 +6,7 @@ struct thread_context {
 	void* context;
 };
 
-#ifdef _WIN32
+#ifdef LC_WINDOWS
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	struct thread_context *ctx = (struct thread_context *)lpParameter;
 
@@ -29,7 +29,7 @@ void* ThreadProc(void* context) {
 #endif
 
 void PltSleepMs(int ms) {
-#ifdef _WIN32
+#ifdef LC_WINDOWS
 	Sleep(ms);
 #else
     long usecs = (long)ms * 1000;
@@ -38,8 +38,8 @@ void PltSleepMs(int ms) {
 }
 
 int PltCreateMutex(PLT_MUTEX *mutex) {
-#ifdef _WIN32
-	*mutex = CreateMutex(NULL, FALSE, NULL);
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	*mutex = CreateMutexEx(NULL, NULL, 0, 0);
 	if (!*mutex) {
 		return -1;
 	}
@@ -50,7 +50,7 @@ int PltCreateMutex(PLT_MUTEX *mutex) {
 }
 
 void PltDeleteMutex(PLT_MUTEX *mutex) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	CloseHandle(*mutex);
 #else
     pthread_mutex_destroy(mutex);
@@ -58,15 +58,15 @@ void PltDeleteMutex(PLT_MUTEX *mutex) {
 }
 
 void PltLockMutex(PLT_MUTEX *mutex) {
-#ifdef _WIN32
-	WaitForSingleObject(*mutex, INFINITE);
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
 #else
     pthread_mutex_lock(mutex);
 #endif
 }
 
 void PltUnlockMutex(PLT_MUTEX *mutex) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	ReleaseMutex(*mutex);
 #else
     pthread_mutex_unlock(mutex);
@@ -74,17 +74,25 @@ void PltUnlockMutex(PLT_MUTEX *mutex) {
 }
 
 void PltJoinThread(PLT_THREAD *thread) {
-#ifdef _WIN32
-	WaitForSingleObject(*thread, INFINITE);
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	WaitForSingleObjectEx(*thread, INFINITE, FALSE);
 #else
     pthread_join(*thread, NULL);
 #endif
 }
 
 void PltCloseThread(PLT_THREAD *thread) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	CloseHandle(*thread);
 #else
+#endif
+}
+
+void PltInterruptThread(PLT_THREAD *thread) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	CloseHandle(*thread);
+#else
+	pthread_cancel(*thread);
 #endif
 }
 
@@ -125,8 +133,8 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 }
 
 int PltCreateEvent(PLT_EVENT *event) {
-#ifdef _WIN32
-	*event = CreateEvent(NULL, TRUE, FALSE, NULL);
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	*event = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
 	if (!*event) {
 		return -1;
 	}
@@ -166,25 +174,25 @@ void PltClearEvent(PLT_EVENT *event) {
 #endif
 }
 
-void PltPulseEvent(PLT_EVENT *event) {
+int PltWaitForEvent(PLT_EVENT *event) {
 #ifdef _WIN32
-	PulseEvent(*event);
+	DWORD error = WaitForSingleObjectEx(*event, INFINITE, FALSE);
+	if (error == STATUS_WAIT_0) {
+		return PLT_WAIT_SUCCESS;
+	}
+	else if (error == WAIT_IO_COMPLETION) {
+		return PLT_WAIT_INTERRUPTED;
+	}
+	else {
+		LC_ASSERT(0);
+		return -1;
+	}
 #else
-    pthread_mutex_lock(&event->mutex);
-    event->signalled = 1;
-    pthread_cond_broadcast(&event->cond);
-    event->signalled = 0;
-    pthread_mutex_unlock(&event->mutex);
-#endif
-}
-
-void PltWaitForEvent(PLT_EVENT *event) {
-#ifdef _WIN32
-	WaitForSingleObject(*event, INFINITE);
-#else
+	pthread_mutex_lock(&event->mutex);
     while (!event->signalled) {
         pthread_cond_wait(&event->cond, &event->mutex);
     }
+	pthread_mutex_unlock(&event->mutex);
 #endif
 }
 

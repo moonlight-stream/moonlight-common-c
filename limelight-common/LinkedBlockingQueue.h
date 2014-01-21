@@ -3,6 +3,11 @@
 #include "platform.h"
 #include "PlatformThreads.h"
 
+#define LBQ_SUCCESS 0
+#define LBQ_INTERRUPTED 1
+#define LBQ_BOUND_EXCEEDED 2
+#define LBQ_NO_MEMORY 3
+
 typedef struct _LINKED_BLOCKING_QUEUE_ENTRY {
 	struct _LINKED_BLOCKING_QUEUE_ENTRY *next;
 	void* data;
@@ -12,9 +17,11 @@ typedef struct _LINKED_BLOCKING_QUEUE {
 	PLT_MUTEX mutex;
 	PLT_EVENT containsDataEvent;
 	int sizeBound;
+	int currentSize;
 	PLINKED_BLOCKING_QUEUE_ENTRY head;
 } LINKED_BLOCKING_QUEUE, *PLINKED_BLOCKING_QUEUE;
 
-int initializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound);
-int offerQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data);
-void* waitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead);
+int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound);
+int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data);
+int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
+PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);

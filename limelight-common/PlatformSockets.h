@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Limelight.h"
+
 #ifdef _WIN32
 #include <Windows.h>
 #define LastSocketError() WSAGetLastError()
@@ -16,8 +18,8 @@
 #define closesocket(x) close(x)
 #endif
 
-#define IP_ADDRESS unsigned int
-
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
 SOCKET bindUdpSocket(unsigned short port);
 int enableNoDelay(SOCKET s);
+int initializePlatformSockets(void);
+void cleanupPlatformSockets(void);

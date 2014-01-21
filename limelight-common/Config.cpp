@@ -1,4 +1,4 @@
-#include "Limelight.h"
+#include "Limelight-internal.h"
 
 #include "ByteBuffer.h"
 

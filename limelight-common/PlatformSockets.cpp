@@ -1,5 +1,5 @@
 #include "PlatformSockets.h"
-#include "Limelight.h"
+#include "Limelight-internal.h"
 
 SOCKET bindUdpSocket(unsigned short port) {
 	SOCKET s;
@@ -57,4 +57,20 @@ int enableNoDelay(SOCKET s) {
 	}
 
 	return 0;
+}
+
+int initializePlatformSockets(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	WSADATA data;
+	return WSAStartup(MAKEWORD(2, 0), &data);
+#else
+	return 0;
+#endif
+}
+
+void cleanupPlatformSockets(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	WSACleanup();
+#else
+#endif
 }
