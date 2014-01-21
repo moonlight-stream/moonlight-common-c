@@ -43,4 +43,4 @@ int PltWaitForEvent(PLT_EVENT *event);
 #define PLT_WAIT_SUCCESS 0
 #define PLT_WAIT_INTERRUPTED 1
 
-int PltSleepMs(int ms);
+void PltSleepMs(int ms);
