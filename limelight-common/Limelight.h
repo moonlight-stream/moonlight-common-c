@@ -37,7 +37,7 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSubmitDecodeUnit submitDecodeUnit;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks);
+int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks, void* renderContext, int drFlags);
 void LiStopConnection(void);
 
 #ifdef __cplusplus

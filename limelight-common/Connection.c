@@ -50,7 +50,7 @@ void LiStopConnection(void) {
 	LC_ASSERT(stage == STAGE_NONE);
 }
 
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks) {
+int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks, void* renderContext, int drFlags) {
 	int err;
 
 	Limelog("Initializing platform...");
@@ -100,7 +100,7 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECO
 	Limelog("done\n");
 
 	Limelog("Starting video stream...");
-	err = startVideoStream(NULL, 0);
+	err = startVideoStream(renderContext, drFlags);
 	if (err != 0) {
 		Limelog("Video stream start failed: %d\n", err);
 		goto Cleanup;
