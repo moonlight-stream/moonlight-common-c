@@ -163,9 +163,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
 		if (getSpecialSeq(&currentPos, &specialSeq)) {
 			if (isSeqAvcStart(&specialSeq)) {
-				if (isSeqFrameStart(&specialSeq)) {
-					decodingAvc = 1;
+				decodingAvc = 1;
 
+				if (isSeqFrameStart(&specialSeq)) {
 					reassembleFrame();
 				}
 

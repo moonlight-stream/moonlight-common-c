@@ -136,7 +136,7 @@ static void jitterThreadFunc(void* context) {
 }
 
 static void resyncThreadFunc(void* context) {
-	long payload[2];
+	long long payload[2];
 	NVCTL_PACKET_HEADER header;
 	int err;
 
