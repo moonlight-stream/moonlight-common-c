@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IP_ADDRESS unsigned int
 
 typedef struct _STREAM_CONFIGURATION {
@@ -35,3 +39,7 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks);
 void LiStopConnection(void);
+
+#ifdef __cplusplus
+}
+#endif
