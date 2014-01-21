@@ -25,5 +25,5 @@
 #include <crtdbg.h>
 #define LC_ASSERT _ASSERTE
 #else
-#define LC_ASSERT
+#define LC_ASSERT(x)
 #endif

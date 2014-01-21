@@ -131,13 +131,18 @@ static void DecoderThreadProc(void* context) {
 }
 
 int readFirstFrame(void) {
-	char firstFrame[1000];
+	char* firstFrame;
 	int err;
 	int offset = 0;
 
 	firstFrameSocket = connectTcpSocket(remoteHost, 47996);
 	if (firstFrameSocket == INVALID_SOCKET) {
 		return LastSocketError();
+	}
+
+	firstFrame = (char*)malloc(1500);
+	if (firstFrame == NULL) {
+		return -1;
 	}
 
 	Limelog("Waiting for first frame\n");
