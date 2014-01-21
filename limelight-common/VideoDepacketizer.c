@@ -106,7 +106,9 @@ static void reassembleFrame(void) {
 			nalChainHead = NULL;
 			nalChainDataLength = 0;
 
-			if (!LbqOfferQueueItem(&decodeUnitQueue, du)) {
+			if (LbqOfferQueueItem(&decodeUnitQueue, du) == LBQ_BOUND_EXCEEDED) {
+				Limelog("Decode unit queue overflow\n");
+
 				nalChainHead = du->bufferList;
 				nalChainDataLength = du->fullLength;
 				free(du);
