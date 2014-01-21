@@ -37,7 +37,10 @@ void LiStopConnection(void) {
 		Limelog("done\n");
 	}
 	if (stage == STAGE_HANDSHAKE) {
+		Limelog("Terminating handshake...");
+		terminateHandshake();
 		stage--;
+		Limelog("done\n");
 	}
 	if (stage == STAGE_PLATFORM_INIT) {
 		Limelog("Cleaning up platform...");
@@ -70,12 +73,6 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECO
 	LC_ASSERT(stage == STAGE_HANDSHAKE);
 	Limelog("done\n");
 
-	Limelog("Initializing video stream...");
-	initializeVideoStream(host, streamConfig, drCallbacks);
-	stage++;
-	LC_ASSERT(stage == STAGE_VIDEO_STREAM_INIT);
-	Limelog("done\n");
-
 	Limelog("Initializing control stream...");
 	err = initializeControlStream(host, streamConfig);
 	if (err != 0) {
@@ -84,6 +81,12 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECO
 	}
 	stage++;
 	LC_ASSERT(stage == STAGE_CONTROL_STREAM_INIT);
+	Limelog("done\n");
+
+	Limelog("Initializing video stream...");
+	initializeVideoStream(host, streamConfig, drCallbacks);
+	stage++;
+	LC_ASSERT(stage == STAGE_VIDEO_STREAM_INIT);
 	Limelog("done\n");
 
 	Limelog("Starting control stream...");

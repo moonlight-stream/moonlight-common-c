@@ -18,6 +18,7 @@ void destroyControlStream(void);
 void requestIdrFrame(void);
 
 int performHandshake(IP_ADDRESS host);
+void terminateHandshake(void);
 
 void initializeVideoDepacketizer(void);
 void destroyVideoDepacketizer(void);

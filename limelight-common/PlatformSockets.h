@@ -4,6 +4,7 @@
 
 #ifdef _WIN32
 #include <Windows.h>
+#define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 #else
 #include <sys/types.h>
@@ -13,6 +14,7 @@
 #include <errno.h>
 #define SOCKET int
 #define LastSocketError() errno
+#define SetLastSocketError(x) errno = x
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(x) close(x)

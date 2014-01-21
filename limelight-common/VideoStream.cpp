@@ -7,8 +7,8 @@ PDECODER_RENDERER_CALLBACKS callbacks;
 PSTREAM_CONFIGURATION configuration;
 IP_ADDRESS remoteHost;
 
-SOCKET rtpSocket;
-SOCKET firstFrameSocket;
+SOCKET rtpSocket = INVALID_SOCKET;
+SOCKET firstFrameSocket = INVALID_SOCKET;
 
 LINKED_BLOCKING_QUEUE packetQueue;
 

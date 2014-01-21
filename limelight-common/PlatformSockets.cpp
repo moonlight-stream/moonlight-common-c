@@ -5,6 +5,7 @@ SOCKET bindUdpSocket(unsigned short port) {
 	SOCKET s;
 	struct sockaddr_in addr;
 	int val;
+	int err;
 
 	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == INVALID_SOCKET) {
@@ -15,7 +16,9 @@ SOCKET bindUdpSocket(unsigned short port) {
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	if (bind(s, (struct sockaddr*) &addr, sizeof(addr)) == SOCKET_ERROR) {
+		err = LastSocketError();
 		closesocket(s);
+		SetLastSocketError(err);
 		return INVALID_SOCKET;
 	}
 
@@ -28,6 +31,7 @@ SOCKET bindUdpSocket(unsigned short port) {
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
 	SOCKET s;
 	struct sockaddr_in addr;
+	int err;
 
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == INVALID_SOCKET) {
@@ -39,7 +43,9 @@ SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
 	addr.sin_port = htons(port);
 	memcpy(&addr.sin_addr, &dstaddr, sizeof(dstaddr));
 	if (connect(s, (struct sockaddr*) &addr, sizeof(addr)) == SOCKET_ERROR) {
+		err = LastSocketError();
 		closesocket(s);
+		SetLastSocketError(err);
 		return INVALID_SOCKET;
 	}
 

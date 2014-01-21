@@ -23,61 +23,75 @@ const char PACKET4 [] = {
 	0x01, 0x01, 0x00, 0x0
 };
 
+SOCKET sock = INVALID_SOCKET;
+
 static int waitAndDiscardResponse(SOCKET sock) {
 	char temp[256];
 	return recv(sock, temp, sizeof(temp), 0);
 }
 
+void terminateHandshake(void) {
+	if (sock != INVALID_SOCKET) {
+		closesocket(sock);
+		sock = INVALID_SOCKET;
+	}
+}
+
+#include <stdio.h>
+
 int performHandshake(IP_ADDRESS host) {
-	SOCKET s;
 	int err;
 
-	s = connectTcpSocket(host, 47991);
-	if (s == INVALID_SOCKET) {
+	sock = connectTcpSocket(host, 47991);
+	if (sock == INVALID_SOCKET) {
 		return LastSocketError();
 	}
 
-	enableNoDelay(s);
+	enableNoDelay(sock);
 
-	err = send(s, HELLO, sizeof(HELLO), 0);
+	err = send(sock, HELLO, sizeof(HELLO), 0);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = waitAndDiscardResponse(s);
+	err = waitAndDiscardResponse(sock);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = send(s, PACKET2, sizeof(PACKET2), 0);
+	err = send(sock, PACKET2, sizeof(PACKET2), 0);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = waitAndDiscardResponse(s);
+	err = waitAndDiscardResponse(sock);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = send(s, PACKET3, sizeof(PACKET3), 0);
+	err = send(sock, PACKET3, sizeof(PACKET3), 0);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = waitAndDiscardResponse(s);
+	err = waitAndDiscardResponse(sock);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	err = send(s, PACKET4, sizeof(PACKET4), 0);
+	err = send(sock, PACKET4, sizeof(PACKET4), 0);
 	if (err == SOCKET_ERROR) {
 		goto CleanupError;
 	}
 
-	closesocket(s);
+	closesocket(sock);
+	sock = INVALID_SOCKET;
+
 	return 0;
 
 CleanupError:
-	closesocket(s);
+	closesocket(sock);
+	sock = INVALID_SOCKET;
+
 	return LastSocketError();
 }
