@@ -3,6 +3,8 @@
 #include "PlatformThreads.h"
 #include "LinkedBlockingQueue.h"
 
+#define FIRST_FRAME_MAX 1500
+
 PDECODER_RENDERER_CALLBACKS callbacks;
 PSTREAM_CONFIGURATION configuration;
 IP_ADDRESS remoteHost;
@@ -140,14 +142,14 @@ int readFirstFrame(void) {
 		return LastSocketError();
 	}
 
-	firstFrame = (char*)malloc(1500);
+	firstFrame = (char*) malloc(FIRST_FRAME_MAX);
 	if (firstFrame == NULL) {
 		return -1;
 	}
 
 	Limelog("Waiting for first frame\n");
 	for (;;) {
-		err = recv(firstFrameSocket, &firstFrame[offset], sizeof(firstFrame) - offset, 0);
+		err = recv(firstFrameSocket, &firstFrame[offset], FIRST_FRAME_MAX - offset, 0);
 		if (err <= 0) {
 			break;
 		}
