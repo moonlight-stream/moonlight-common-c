@@ -87,12 +87,14 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
 		entry = queueHead->head;
 		queueHead->head = entry->next;
+		queueHead->currentSize--;
 
 		*data = entry->data;
 
 		free(entry);
 
 		if (queueHead->head == NULL) {
+			LC_ASSERT(queueHead->currentSize == 0);
 			PltClearEvent(&queueHead->containsDataEvent);
 		}
 
