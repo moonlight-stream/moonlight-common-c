@@ -6,6 +6,13 @@
 #include <Windows.h>
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
+
+#undef WINAPI_FAMILY
+#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
+#include <WinSock2.h>
+#undef WINAPI_FAMILY
+#define WINAPI_FAMILY WINAPI_FAMILY_PHONE_APP
+
 #else
 #include <sys/types.h>
 #include <sys/socket.h>

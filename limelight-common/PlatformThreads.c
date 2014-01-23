@@ -35,8 +35,10 @@ void* ThreadProc(void* context) {
 #endif
 
 void PltSleepMs(int ms) {
-#ifdef LC_WINDOWS
+#if defined(LC_WINDOWS)
 	Sleep(ms);
+#elif defined (LC_WINDOWS_PHONE)
+	WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
 #else
     long usecs = (long)ms * 1000;
     usleep(usecs);
