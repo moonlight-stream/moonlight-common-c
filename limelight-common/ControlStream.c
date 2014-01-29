@@ -154,7 +154,7 @@ static void resyncThreadFunc(void* context) {
 		payload[0] = 0;
 		payload[1] = 0xFFFFF;
 
-		printf("Sending resync packet\n");
+		Limelog("Sending resync packet\n");
 		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
 		if (err != sizeof(payload)) {
 			Limelog("Resync thread terminating #2\n");
