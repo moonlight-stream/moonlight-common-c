@@ -12,6 +12,10 @@ VOID WINAPI ApcFunc(ULONG_PTR parameter) {
 }
 #endif
 
+#if defined(LC_WINDOWS_PHONE)
+WCHAR DbgBuf[512];
+#endif
+
 #ifdef LC_WINDOWS
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	struct thread_context *ctx = (struct thread_context *)lpParameter;

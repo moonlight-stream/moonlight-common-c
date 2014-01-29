@@ -5,9 +5,6 @@
 #include "PlatformSockets.h"
 #include "Video.h"
 
-#include <stdio.h>
-#define Limelog printf
-
 char* allocateConfigDataForStreamConfig(PSTREAM_CONFIGURATION streamConfig);
 int getConfigDataSize(PSTREAM_CONFIGURATION streamConfig);
 

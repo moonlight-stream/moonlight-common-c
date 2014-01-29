@@ -21,6 +21,16 @@
 # define LC_POSIX
 #endif
 
+#include <stdio.h>
+#ifdef LC_WINDOWS_PHONE
+extern WCHAR DbgBuf[512];
+#define Limelog(s, ...) \
+	swprintf(DbgBuf, sizeof(DbgBuf) / sizeof(WCHAR), L ## s, ##__VA_ARGS__); \
+	OutputDebugString(DbgBuf)
+#else
+#define Limelog printf
+#endif
+
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 #include <crtdbg.h>
 #define LC_ASSERT _ASSERTE
