@@ -246,4 +246,3 @@ void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
 
 	processRtpPayload((PNV_VIDEO_PACKET) (rtpPacket + 1), length - sizeof(*rtpPacket));
 }
-

@@ -66,10 +66,10 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 	memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
 	if (staticHeader.payloadLength != 0) {
 	err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
-	if (err != staticHeader.payloadLength) {
-		free(fullPacket);
-		return NULL;
-	}
+		if (err != staticHeader.payloadLength) {
+			free(fullPacket);
+			return NULL;
+		}
 	}
 
 	return fullPacket;

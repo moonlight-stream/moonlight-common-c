@@ -216,6 +216,3 @@ int PltWaitForEvent(PLT_EVENT *event) {
 	pthread_mutex_unlock(&event->mutex);
 #endif
 }
-
-
-

@@ -231,4 +231,3 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
 	return 0;
 }
-

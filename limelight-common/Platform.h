@@ -10,7 +10,6 @@
 #include <pthread.h>
 #endif
 
-
 #ifdef _WIN32
 # if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
 #  define LC_WINDOWS_PHONE
