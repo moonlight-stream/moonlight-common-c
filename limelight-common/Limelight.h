@@ -37,7 +37,22 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSubmitDecodeUnit submitDecodeUnit;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks, void* renderContext, int drFlags);
+typedef void(*AudioRendererInit)(void);
+typedef void(*AudioRendererStart)(void);
+typedef void(*AudioRendererStop)(void);
+typedef void(*AudioRendererRelease)(void);
+typedef void(*AudioRendererDecodeAndPlaySample)(char* sampleData, int sampleLength);
+
+typedef struct _AUDIO_RENDERER_CALLBACKS {
+	AudioRendererInit init;
+	AudioRendererStart start;
+	AudioRendererStop stop;
+	AudioRendererRelease release;
+	AudioRendererDecodeAndPlaySample decodeAndPlaySample;
+} AUDIO_RENDERER_CALLBACKS, *PAUDIO_RENDERER_CALLBACKS;
+
+int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
+	PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 void LiStopConnection(void);
 
 #ifdef __cplusplus

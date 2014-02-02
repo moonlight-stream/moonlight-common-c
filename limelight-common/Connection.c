@@ -6,12 +6,20 @@
 #define STAGE_HANDSHAKE 2
 #define STAGE_CONTROL_STREAM_INIT 3
 #define STAGE_VIDEO_STREAM_INIT 4
-#define STAGE_CONTROL_STREAM_START 5
-#define STAGE_VIDEO_STREAM_START 6
+#define STAGE_AUDIO_STREAM_INIT 5
+#define STAGE_CONTROL_STREAM_START 6
+#define STAGE_VIDEO_STREAM_START 7
+#define STAGE_AUDIO_STREAM_START 8
 
 static int stage = STAGE_NONE;
 
 void LiStopConnection(void) {
+	if (stage == STAGE_AUDIO_STREAM_START) {
+		Limelog("Stopping audio stream...");
+		stopAudioStream();
+		stage--;
+		Limelog("done\n");
+	}
 	if (stage == STAGE_VIDEO_STREAM_START) {
 		Limelog("Stopping video stream...");
 		stopVideoStream();
@@ -21,6 +29,12 @@ void LiStopConnection(void) {
 	if (stage == STAGE_CONTROL_STREAM_START) {
 		Limelog("Stopping control stream...");
 		stopControlStream();
+		stage--;
+		Limelog("done\n");
+	}
+	if (stage == STAGE_AUDIO_STREAM_INIT) {
+		Limelog("Cleaning up audio stream...");
+		destroyAudioStream();
 		stage--;
 		Limelog("done\n");
 	}
@@ -50,7 +64,8 @@ void LiStopConnection(void) {
 	LC_ASSERT(stage == STAGE_NONE);
 }
 
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks, void* renderContext, int drFlags) {
+int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
+	PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags) {
 	int err;
 
 	Limelog("Initializing platform...");
@@ -89,6 +104,12 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECO
 	LC_ASSERT(stage == STAGE_VIDEO_STREAM_INIT);
 	Limelog("done\n");
 
+	Limelog("Initializing audio stream...");
+	initializeAudioStream(host, arCallbacks);
+	stage++;
+	LC_ASSERT(stage == STAGE_AUDIO_STREAM_INIT);
+	Limelog("done\n");
+
 	Limelog("Starting control stream...");
 	err = startControlStream();
 	if (err != 0) {
@@ -107,6 +128,16 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECO
 	}
 	stage++;
 	LC_ASSERT(stage == STAGE_VIDEO_STREAM_START);
+	Limelog("done\n");
+
+	Limelog("Starting audio stream...");
+	err = startAudioStream();
+	if (err != 0) {
+		Limelog("Audio stream start failed: %d\n", err);
+		goto Cleanup;
+	}
+	stage++;
+	LC_ASSERT(stage == STAGE_AUDIO_STREAM_START);
 	Limelog("done\n");
 
 Cleanup:

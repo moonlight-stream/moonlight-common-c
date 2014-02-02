@@ -130,6 +130,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AudioStream.c" />
     <ClCompile Include="ByteBuffer.c" />
     <ClCompile Include="Config.c" />
     <ClCompile Include="Connection.c" />

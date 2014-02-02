@@ -28,3 +28,8 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 void destroyVideoStream(void);
 int startVideoStream(void* rendererContext, int drFlags);
 void stopVideoStream(void);
+
+void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks);
+void destroyAudioStream(void);
+int startAudioStream(void);
+void stopAudioStream(void);
