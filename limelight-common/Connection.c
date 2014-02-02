@@ -60,6 +60,7 @@ void LiStopConnection(void) {
 		Limelog("Cleaning up platform...");
 		cleanupPlatformSockets();
 		stage--;
+		Limelog("done\n");
 	}
 	LC_ASSERT(stage == STAGE_NONE);
 }
