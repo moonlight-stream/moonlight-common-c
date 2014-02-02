@@ -3,13 +3,13 @@
 #include "LinkedBlockingQueue.h"
 #include "Video.h"
 
-PLENTRY nalChainHead;
-int nalChainDataLength;
-int decodingAvc;
+static PLENTRY nalChainHead;
+static int nalChainDataLength;
+static int decodingAvc;
 
-LINKED_BLOCKING_QUEUE decodeUnitQueue;
+static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 
-unsigned short lastSequenceNumber;
+static unsigned short lastSequenceNumber;
 
 typedef struct _BUFFER_DESC {
 	char* data;

@@ -7,28 +7,28 @@ typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
 
-IP_ADDRESS host;
-SOCKET ctlSock = INVALID_SOCKET;
-STREAM_CONFIGURATION streamConfig;
-PLT_THREAD heartbeatThread;
-PLT_THREAD jitterThread;
-PLT_THREAD resyncThread;
-PLT_EVENT resyncEvent;
+static IP_ADDRESS host;
+static SOCKET ctlSock = INVALID_SOCKET;
+static STREAM_CONFIGURATION streamConfig;
+static PLT_THREAD heartbeatThread;
+static PLT_THREAD jitterThread;
+static PLT_THREAD resyncThread;
+static PLT_EVENT resyncEvent;
 
-const short PTYPE_KEEPALIVE = 0x13ff;
-const short PPAYLEN_KEEPALIVE = 0x0000;
+static const short PTYPE_KEEPALIVE = 0x13ff;
+static const short PPAYLEN_KEEPALIVE = 0x0000;
 
-const short PTYPE_HEARTBEAT = 0x1401;
-const short PPAYLEN_HEARTBEAT = 0x0000;
+static const short PTYPE_HEARTBEAT = 0x1401;
+static const short PPAYLEN_HEARTBEAT = 0x0000;
 
-const short PTYPE_1405 = 0x1405;
-const short PPAYLEN_1405 = 0x0000;
+static const short PTYPE_1405 = 0x1405;
+static const short PPAYLEN_1405 = 0x0000;
 
-const short PTYPE_RESYNC = 0x1404;
-const short PPAYLEN_RESYNC = 16;
+static const short PTYPE_RESYNC = 0x1404;
+static const short PPAYLEN_RESYNC = 16;
 
-const short PTYPE_JITTER = 0x140c;
-const short PPAYLEN_JITTER = 0x10;
+static const short PTYPE_JITTER = 0x140c;
+static const short PPAYLEN_JITTER = 0x10;
 
 int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
 	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));

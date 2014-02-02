@@ -2,7 +2,7 @@
 
 #include "ByteBuffer.h"
 
-const int UNKNOWN_CONFIG [] = {
+static const int UNKNOWN_CONFIG[] = {
 	70151,
 	68291329,
 	1280,
@@ -92,7 +92,7 @@ const int UNKNOWN_CONFIG [] = {
 	(int) 0xFE000000
 };
 
-const int CONFIG_SIZE = sizeof(UNKNOWN_CONFIG) + (8 * 4) + 3;
+static const int CONFIG_SIZE = sizeof(UNKNOWN_CONFIG) +(8 * 4) + 3;
 
 int getConfigDataSize(PSTREAM_CONFIGURATION streamConfig) {
 	return CONFIG_SIZE;

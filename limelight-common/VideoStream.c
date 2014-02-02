@@ -5,19 +5,22 @@
 
 #define FIRST_FRAME_MAX 1500
 
-DECODER_RENDERER_CALLBACKS callbacks;
-STREAM_CONFIGURATION configuration;
-IP_ADDRESS remoteHost;
+#define RTP_PORT 47998
+#define FIRST_FRAME_PORT 47996
 
-SOCKET rtpSocket = INVALID_SOCKET;
-SOCKET firstFrameSocket = INVALID_SOCKET;
+static DECODER_RENDERER_CALLBACKS callbacks;
+static STREAM_CONFIGURATION configuration;
+static IP_ADDRESS remoteHost;
 
-LINKED_BLOCKING_QUEUE packetQueue;
+static SOCKET rtpSocket = INVALID_SOCKET;
+static SOCKET firstFrameSocket = INVALID_SOCKET;
 
-PLT_THREAD udpPingThread;
-PLT_THREAD receiveThread;
-PLT_THREAD depacketizerThread;
-PLT_THREAD decoderThread;
+static LINKED_BLOCKING_QUEUE packetQueue;
+
+static PLT_THREAD udpPingThread;
+static PLT_THREAD receiveThread;
+static PLT_THREAD depacketizerThread;
+static PLT_THREAD decoderThread;
 
 void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks) {
 	memcpy(&callbacks, drCallbacks, sizeof(callbacks));
@@ -51,7 +54,7 @@ static void UdpPingThreadProc(void *context) {
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
-	saddr.sin_port = htons(47998);
+	saddr.sin_port = htons(RTP_PORT);
 	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
 
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
@@ -137,7 +140,7 @@ int readFirstFrame(void) {
 	int err;
 	int offset = 0;
 
-	firstFrameSocket = connectTcpSocket(remoteHost, 47996);
+	firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);
 	if (firstFrameSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}
@@ -195,7 +198,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	callbacks.setup(configuration.width,
 		configuration.height, 60, rendererContext, drFlags);
 
-	rtpSocket = bindUdpSocket(47998);
+	rtpSocket = bindUdpSocket(RTP_PORT);
 
 	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
 	if (err != 0) {

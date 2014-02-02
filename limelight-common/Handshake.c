@@ -2,28 +2,28 @@
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 
-const char HELLO [] = {
+static const char HELLO [] = {
 	0x07, 0x00, 0x00, 0x00,
 	0x61, 0x6e, 0x64, 0x72,
 	0x6f, 0x69, 0x64, 0x03,
 	0x01, 0x00, 0x00
 };
 
-const char PACKET2 [] = {
+static const char PACKET2 [] = {
 	0x01, 0x03, 0x02, 0x00,
 	0x08, 0x00
 };
 
-const char PACKET3 [] = {
+static const char PACKET3 [] = {
 	0x04, 0x01, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00
 };
 
-const char PACKET4 [] = {
+static const char PACKET4 [] = {
 	0x01, 0x01, 0x00, 0x0
 };
 
-SOCKET sock = INVALID_SOCKET;
+static SOCKET sock = INVALID_SOCKET;
 
 static int waitAndDiscardResponse(SOCKET sock) {
 	char temp[256];

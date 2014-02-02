@@ -9,7 +9,7 @@
 #define STAGE_CONTROL_STREAM_START 5
 #define STAGE_VIDEO_STREAM_START 6
 
-int stage = STAGE_NONE;
+static int stage = STAGE_NONE;
 
 void LiStopConnection(void) {
 	if (stage == STAGE_VIDEO_STREAM_START) {
