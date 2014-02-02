@@ -26,6 +26,8 @@ void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallback
 void destroyAudioStream(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 
+	callbacks.release();
+
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
 
 	while (entry != NULL) {
@@ -133,6 +135,8 @@ static void DecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
+	callbacks.stop();
+
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);

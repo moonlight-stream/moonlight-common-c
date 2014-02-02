@@ -35,6 +35,8 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 void destroyVideoStream(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 
+	callbacks.release();
+
 	destroyVideoDepacketizer();
 	
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
@@ -167,6 +169,8 @@ int readFirstFrame(void) {
 }
 
 void stopVideoStream(void) {
+	callbacks.stop();
+
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&depacketizerThread);
