@@ -5,8 +5,8 @@
 
 #define FIRST_FRAME_MAX 1500
 
-PDECODER_RENDERER_CALLBACKS callbacks;
-PSTREAM_CONFIGURATION configuration;
+DECODER_RENDERER_CALLBACKS callbacks;
+STREAM_CONFIGURATION configuration;
 IP_ADDRESS remoteHost;
 
 SOCKET rtpSocket = INVALID_SOCKET;
@@ -20,8 +20,8 @@ PLT_THREAD depacketizerThread;
 PLT_THREAD decoderThread;
 
 void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks) {
-	callbacks = drCallbacks;
-	configuration = streamConfig;
+	memcpy(&callbacks, drCallbacks, sizeof(callbacks));
+	memcpy(&configuration, streamConfig, sizeof(configuration));
 	remoteHost = host;
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
@@ -126,7 +126,7 @@ static void DecoderThreadProc(void* context) {
 			return;
 		}
 
-		callbacks->submitDecodeUnit(du);
+		callbacks.submitDecodeUnit(du);
 
 		freeDecodeUnit(du);
 	}
@@ -192,12 +192,9 @@ void stopVideoStream(void) {
 int startVideoStream(void* rendererContext, int drFlags) {
 	int err;
 
-	if (callbacks != NULL) {
-		callbacks->setup(configuration->width,
-			configuration->height, 60, rendererContext, drFlags);
-	}
+	callbacks.setup(configuration.width,
+		configuration.height, 60, rendererContext, drFlags);
 
-	// FIXME: Set socket options here
 	rtpSocket = bindUdpSocket(47998);
 
 	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
@@ -210,24 +207,22 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		return err;
 	}
 
-	if (callbacks != NULL) {
-		err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
-		if (err != 0) {
-			return err;
-		}
-
-		err = PltCreateThread(DepacketizerThreadProc, NULL, &depacketizerThread);
-		if (err != 0) {
-			return err;
-		}
-
-		err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
-		if (err != 0) {
-			return err;
-		}
-
-		callbacks->start();
+	err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
+	if (err != 0) {
+		return err;
 	}
+
+	err = PltCreateThread(DepacketizerThreadProc, NULL, &depacketizerThread);
+	if (err != 0) {
+		return err;
+	}
+
+	err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
+	if (err != 0) {
+		return err;
+	}
+
+	callbacks.start();
 
 	return 0;
 }
