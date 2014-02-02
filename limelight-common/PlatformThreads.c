@@ -51,7 +51,7 @@ void PltSleepMs(int ms) {
 
 int PltCreateMutex(PLT_MUTEX *mutex) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	*mutex = CreateMutexEx(NULL, NULL, 0, 0);
+	*mutex = CreateMutexEx(NULL, NULL, 0, MUTEX_ALL_ACCESS);
 	if (!*mutex) {
 		return -1;
 	}
@@ -71,7 +71,11 @@ void PltDeleteMutex(PLT_MUTEX *mutex) {
 
 void PltLockMutex(PLT_MUTEX *mutex) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
+	int err;
+	err = WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
+	if (err != WAIT_OBJECT_0) {
+		LC_ASSERT(FALSE);
+	}
 #else
     pthread_mutex_lock(mutex);
 #endif
