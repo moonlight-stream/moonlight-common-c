@@ -16,7 +16,7 @@ VOID WINAPI ApcFunc(ULONG_PTR parameter) {
 WCHAR DbgBuf[512];
 #endif
 
-#ifdef LC_WINDOWS
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	struct thread_context *ctx = (struct thread_context *)lpParameter;
 
@@ -108,6 +108,9 @@ int PltIsThreadInterrupted(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	return thread->cancelled;
 #else
+	// The thread will die here if a cancellation was requested
+	pthread_testcancel();
+	return 0;
 #endif
 }
 
@@ -133,7 +136,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 	ctx->entry = entry;
 	ctx->context = context;
 
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	{
 		thread->cancelled = 0;
 		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
@@ -174,7 +177,7 @@ int PltCreateEvent(PLT_EVENT *event) {
 }
 
 void PltCloseEvent(PLT_EVENT *event) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	CloseHandle(*event);
 #else
     pthread_mutex_destroy(&event->mutex);
@@ -183,7 +186,7 @@ void PltCloseEvent(PLT_EVENT *event) {
 }
 
 void PltSetEvent(PLT_EVENT *event) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	SetEvent(*event);
 #else
     event->signalled = 1;
@@ -192,7 +195,7 @@ void PltSetEvent(PLT_EVENT *event) {
 }
 
 void PltClearEvent(PLT_EVENT *event) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	ResetEvent(*event);
 #else
     event->signalled = 0;
@@ -200,7 +203,7 @@ void PltClearEvent(PLT_EVENT *event) {
 }
 
 int PltWaitForEvent(PLT_EVENT *event) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	DWORD error = WaitForSingleObjectEx(*event, INFINITE, TRUE);
 	if (error == STATUS_WAIT_0) {
 		return PLT_WAIT_SUCCESS;
@@ -218,5 +221,6 @@ int PltWaitForEvent(PLT_EVENT *event) {
         pthread_cond_wait(&event->cond, &event->mutex);
     }
 	pthread_mutex_unlock(&event->mutex);
+	return PLT_WAIT_SUCCESS;
 #endif
 }
