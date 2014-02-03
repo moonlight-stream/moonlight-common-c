@@ -157,6 +157,8 @@ void stopAudioStream(void) {
 
 int startAudioStream(void) {
 	int err;
+    
+    callbacks.init();
 
 	rtpSocket = bindUdpSocket(RTP_PORT);
 
