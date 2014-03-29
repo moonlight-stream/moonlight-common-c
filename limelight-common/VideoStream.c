@@ -11,6 +11,7 @@
 static DECODER_RENDERER_CALLBACKS callbacks;
 static STREAM_CONFIGURATION configuration;
 static IP_ADDRESS remoteHost;
+static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 static SOCKET firstFrameSocket = INVALID_SOCKET;
@@ -22,10 +23,12 @@ static PLT_THREAD receiveThread;
 static PLT_THREAD depacketizerThread;
 static PLT_THREAD decoderThread;
 
-void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks) {
+void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
+	PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, drCallbacks, sizeof(callbacks));
 	memcpy(&configuration, streamConfig, sizeof(configuration));
 	remoteHost = host;
+	listenerCallbacks = clCallbacks;
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
@@ -63,6 +66,7 @@ static void UdpPingThreadProc(void *context) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
 			Limelog("UDP ping thread terminating #1\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -73,10 +77,11 @@ static void UdpPingThreadProc(void *context) {
 static void ReceiveThreadProc(void* context) {
 	int err;
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&receiveThread)) {
 		char* buffer = (char*) malloc(1500 + sizeof(int));
 		if (buffer == NULL) {
 			Limelog("Receive thread terminating\n");
+			listenerCallbacks->connectionTerminated(ERROR_OUTOFMEMORY);
 			return;
 		}
 
@@ -84,6 +89,7 @@ static void ReceiveThreadProc(void* context) {
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			free(buffer);
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 		
@@ -109,7 +115,7 @@ static void DepacketizerThreadProc(void* context) {
 	int err;
 	char *data;
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&depacketizerThread)) {
 		err = LbqWaitForQueueElement(&packetQueue, (void**)&data);
 		if (err != LBQ_SUCCESS) {
 			Limelog("Depacketizer thread terminating\n");
@@ -125,7 +131,7 @@ static void DepacketizerThreadProc(void* context) {
 
 static void DecoderThreadProc(void* context) {
 	PDECODE_UNIT du;
-	for (;;) {
+	while (!PltIsThreadInterrupted(&decoderThread)) {
 		if (!getNextDecodeUnit(&du)) {
 			printf("Decoder thread terminating\n");
 			return;

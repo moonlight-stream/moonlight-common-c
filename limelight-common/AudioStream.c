@@ -4,6 +4,7 @@
 #include "LinkedBlockingQueue.h"
 
 static AUDIO_RENDERER_CALLBACKS callbacks;
+static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static IP_ADDRESS remoteHost;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
@@ -16,9 +17,10 @@ static PLT_THREAD decoderThread;
 
 #define RTP_PORT 48000
 
-void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks) {
+void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, arCallbacks, sizeof(callbacks));
 	remoteHost = host;
+	listenerCallbacks = clCallbacks;
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 }
@@ -52,6 +54,7 @@ static void UdpPingThreadProc(void *context) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
 			Limelog("UDP ping thread terminating #1\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -62,10 +65,11 @@ static void UdpPingThreadProc(void *context) {
 static void ReceiveThreadProc(void* context) {
 	int err;
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&receiveThread)) {
 		char* buffer = (char*) malloc(1500 + sizeof(int));
 		if (buffer == NULL) {
 			Limelog("Receive thread terminating\n");
+			listenerCallbacks->connectionTerminated(ERROR_OUTOFMEMORY);
 			return;
 		}
 
@@ -73,6 +77,7 @@ static void ReceiveThreadProc(void* context) {
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			free(buffer);
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -100,7 +105,7 @@ static void DecoderThreadProc(void* context) {
 	char *data;
 	unsigned short lastSeq = 0;
 
-	for (;;) {
+	while (!PltIsThreadInterrupted(&decoderThread)) {
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &data);
 		if (err != LBQ_SUCCESS) {
 			Limelog("Decoder thread terminating\n");
@@ -111,7 +116,7 @@ static void DecoderThreadProc(void* context) {
 		rtp = (PRTP_PACKET) &data[sizeof(int)];
 
 		if (length < sizeof(RTP_PACKET)) {
-			Limelog("Runt packet\n");
+			// Runt packet
 			goto freeandcontinue;
 		}
 

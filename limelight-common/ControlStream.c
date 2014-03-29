@@ -14,6 +14,7 @@ static PLT_THREAD heartbeatThread;
 static PLT_THREAD jitterThread;
 static PLT_THREAD resyncThread;
 static PLT_EVENT resyncEvent;
+static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 
 static const short PTYPE_KEEPALIVE = 0x13ff;
 static const short PPAYLEN_KEEPALIVE = 0x0000;
@@ -30,12 +31,13 @@ static const short PPAYLEN_RESYNC = 16;
 static const short PTYPE_JITTER = 0x140c;
 static const short PPAYLEN_JITTER = 0x10;
 
-int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
+int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
 
 	PltCreateEvent(&resyncEvent);
 
 	host = addr;
+	listenerCallbacks = clCallbacks;
 
 	return 0;
 }
@@ -99,12 +101,13 @@ static void heartbeatThreadFunc(void* context) {
 	int err;
 	NVCTL_PACKET_HEADER header;
 
+	header.type = PTYPE_HEARTBEAT;
+	header.payloadLength = PPAYLEN_HEARTBEAT;
 	while (!PltIsThreadInterrupted(&heartbeatThread)) {
-		header.type = PTYPE_HEARTBEAT;
-		header.payloadLength = PPAYLEN_HEARTBEAT;
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Heartbeat thread terminating #1\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -123,6 +126,7 @@ static void jitterThreadFunc(void* context) {
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Jitter thread terminating #1\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -134,6 +138,7 @@ static void jitterThreadFunc(void* context) {
 		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
 		if (err != sizeof(payload)) {
 			Limelog("Jitter thread terminating #2\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -148,12 +153,13 @@ static void resyncThreadFunc(void* context) {
 
 	header.type = PTYPE_RESYNC;
 	header.payloadLength = PPAYLEN_RESYNC;
-	for (;;) {
+	while (!PltIsThreadInterrupted(&resyncThread)) {
 		PltWaitForEvent(&resyncEvent);
 
 		err = send(ctlSock, (char*) &header, sizeof(header), 0);
 		if (err != sizeof(header)) {
 			Limelog("Resync thread terminating #1\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 
@@ -164,6 +170,7 @@ static void resyncThreadFunc(void* context) {
 		err = send(ctlSock, (char*) payload, sizeof(payload), 0);
 		if (err != sizeof(payload)) {
 			Limelog("Resync thread terminating #2\n");
+			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
 

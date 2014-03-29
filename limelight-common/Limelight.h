@@ -51,9 +51,42 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 	AudioRendererDecodeAndPlaySample decodeAndPlaySample;
 } AUDIO_RENDERER_CALLBACKS, *PAUDIO_RENDERER_CALLBACKS;
 
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
-	PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
+// Subject to change in future releases
+// Use LiGetStageName() for stable stage names
+#define STAGE_NONE 0
+#define STAGE_PLATFORM_INIT 1
+#define STAGE_HANDSHAKE 2
+#define STAGE_CONTROL_STREAM_INIT 3
+#define STAGE_VIDEO_STREAM_INIT 4
+#define STAGE_AUDIO_STREAM_INIT 5
+#define STAGE_CONTROL_STREAM_START 6
+#define STAGE_VIDEO_STREAM_START 7
+#define STAGE_AUDIO_STREAM_START 8
+
+typedef void(*ConnListenerStageStarting)(int stage);
+typedef void(*ConnListenerStageComplete)(int stage);
+typedef void(*ConnListenerStageFailed)(int stage);
+
+typedef void(*ConnListenerConnectionStarted)(void);
+typedef void(*ConnListenerConnectionTerminated)(int errorCode);
+
+typedef void(*ConnListenerDisplayMessage)(char* message);
+typedef void(*ConnListenerDisplayTransientMessage)(char* message);
+
+typedef struct _CONNECTION_LISTENER_CALLBACKS {
+	ConnListenerStageStarting stageStarting;
+	ConnListenerStageComplete stageComplete;
+	ConnListenerStageFailed stageFailed;
+	ConnListenerConnectionStarted connectionStarted;
+	ConnListenerConnectionTerminated connectionTerminated;
+	ConnListenerDisplayMessage displayMessage;
+	ConnListenerDisplayTransientMessage displayTransientMessage;
+} CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
+
+int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 void LiStopConnection(void);
+const char* LiGetStageName(int stage);
 
 #ifdef __cplusplus
 }
