@@ -23,6 +23,21 @@ typedef struct _PLT_EVENT {
 #error Unsupported platform
 #endif
 
+#ifdef LC_WINDOWS_PHONE
+WINBASEAPI
+_Ret_maybenull_
+HANDLE
+WINAPI
+CreateThread(
+	_In_opt_ LPSECURITY_ATTRIBUTES lpThreadAttributes,
+	_In_ SIZE_T dwStackSize,
+	_In_ LPTHREAD_START_ROUTINE lpStartAddress,
+	_In_opt_ __drv_aliasesMem LPVOID lpParameter,
+	_In_ DWORD dwCreationFlags,
+	_Out_opt_ LPDWORD lpThreadId
+);
+#endif
+
 int PltCreateMutex(PLT_MUTEX *mutex);
 void PltDeleteMutex(PLT_MUTEX *mutex);
 void PltLockMutex(PLT_MUTEX *mutex);
