@@ -7,6 +7,12 @@ static PLENTRY nalChainHead;
 static int nalChainDataLength;
 static int decodingAvc;
 
+static int nextFrameNumber = 1;
+static int nextPacketNumber;
+static int startFrameNumber = 1;
+static int waitingForNextSuccessfulFrame;
+static int gotNextFrameStart;
+
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 
 static unsigned short lastSequenceNumber;
@@ -96,7 +102,7 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 	return 0;
 }
 
-static void reassembleFrame(void) {
+static void reassembleFrame(int frameNumber) {
 	if (nalChainHead != NULL) {
 		PDECODE_UNIT du = (PDECODE_UNIT) malloc(sizeof(*du));
 		if (du != NULL) {
@@ -115,7 +121,8 @@ static void reassembleFrame(void) {
 
 				clearAvcNalState();
 
-				requestIdrFrame();
+				// FIXME: Get proper lower bound
+				connectionSinkTooSlow(0, frameNumber);
 			}
 		}
 	}
@@ -144,105 +151,225 @@ void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
 	free(decodeUnit);
 }
 
-void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
-	BUFFER_DESC currentPos, specialSeq;
-	
-	currentPos.data = (char*) (videoPacket + 1);
-	currentPos.offset = 0;
-	currentPos.length = length - sizeof(*videoPacket);
-
-	if (currentPos.length == 968) {
-		if (videoPacket->packetIndex < videoPacket->totalPackets) {
-			currentPos.length = videoPacket->payloadLength;
-		}
-		else {
+void queueFragment(char *data, int offset, int length) {
+	PLENTRY entry = (PLENTRY) malloc(sizeof(*entry));
+	if (entry != NULL) {
+		entry->next = NULL;
+		entry->length = length;
+		entry->data = (char*) malloc(entry->length);
+		if (entry->data == NULL) {
+			free(entry);
 			return;
 		}
+
+		memcpy(entry->data, &data[offset], entry->length);
+
+		nalChainDataLength += entry->length;
+
+		if (nalChainHead == NULL) {
+			nalChainHead = entry;
+		}
+		else {
+			PLENTRY currentEntry = nalChainHead;
+
+			while (currentEntry->next != NULL) {
+				currentEntry = currentEntry->next;
+			}
+
+			currentEntry->next = entry;
+		}
 	}
+}
 
-	while (currentPos.length != 0) {
-		int start = currentPos.offset;
+void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
+	BUFFER_DESC specialSeq;
 
-		if (getSpecialSeq(&currentPos, &specialSeq)) {
+	while (currentPos->length != 0) {
+		int start = currentPos->offset;
+
+		if (getSpecialSeq(currentPos, &specialSeq)) {
 			if (isSeqAvcStart(&specialSeq)) {
 				decodingAvc = 1;
 
 				if (isSeqFrameStart(&specialSeq)) {
-					reassembleFrame();
+					reassembleFrame(videoPacket->frameIndex);
 				}
 
-				currentPos.length -= specialSeq.length;
-				currentPos.offset += specialSeq.length;
+				currentPos->length -= specialSeq.length;
+				currentPos->offset += specialSeq.length;
 			}
 			else {
-				if (decodingAvc && isSeqPadding(&currentPos)) {
-					reassembleFrame();
+				if (decodingAvc && isSeqPadding(currentPos)) {
+					reassembleFrame(videoPacket->frameIndex);
 				}
 
 				decodingAvc = 0;
 
-				currentPos.length--;
-				currentPos.offset++;
+				currentPos->length--;
+				currentPos->offset++;
 			}
 		}
 
-		while (currentPos.length != 0) {
-			if (getSpecialSeq(&currentPos, &specialSeq)) {
+		while (currentPos->length != 0) {
+			if (getSpecialSeq(currentPos, &specialSeq)) {
 				if (decodingAvc || !isSeqPadding(&specialSeq)) {
 					break;
 				}
 			}
 
-			currentPos.offset++;
-			currentPos.length--;
+			currentPos->offset++;
+			currentPos->length--;
 		}
 
 		if (decodingAvc) {
-			PLENTRY entry = (PLENTRY) malloc(sizeof(*entry));
-			if (entry != NULL) {
-				entry->next = NULL;
-				entry->length = currentPos.offset - start;
-				entry->data = (char*) malloc(entry->length);
-				if (entry->data == NULL) {
-					free(entry);
-					return;
-				}
-
-				memcpy(entry->data, &currentPos.data[start], entry->length);
-				
-				nalChainDataLength += entry->length;
-
-				if (nalChainHead == NULL) {
-					nalChainHead = entry;
-				}
-				else {
-					PLENTRY currentEntry = nalChainHead;
-
-					while (currentEntry->next != NULL) {
-						currentEntry = currentEntry->next;
-					}
-
-					currentEntry->next = entry;
-				}
-			}
+			queueFragment(currentPos->data, start, currentPos->offset - start);
 		}
 	}
 }
 
-void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
+void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
+	queueFragment(location.data, location.offset, location.length);
+}
 
-	rtpPacket->sequenceNumber = htons(rtpPacket->sequenceNumber);
+void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
+	BUFFER_DESC currentPos, specialSeq;
+	int isFirstPacket;
+	
+	currentPos.data = (char*) (videoPacket + 1);
+	currentPos.offset = 0;
+	currentPos.length = length - sizeof(*videoPacket);
 
-	if (lastSequenceNumber != 0 &&
-		(unsigned short) (lastSequenceNumber + 1) != rtpPacket->sequenceNumber) {
-		Limelog("Received OOS video data (expected %d, but got %d)\n", lastSequenceNumber + 1, rtpPacket->sequenceNumber);
-
-		clearAvcNalState();
-
-		requestIdrFrame();
+	if (currentPos.length < 968) {
+		processRtpPayloadSlow(videoPacket, &currentPos);
+		return;
 	}
 
-	lastSequenceNumber = rtpPacket->sequenceNumber;
+	// We can use FEC to correct single packet errors
+	// on single packet frames because we just get a
+	// duplicate of the original packet
+	if (videoPacket->totalPackets == 1 &&
+		videoPacket->packetIndex == 1 &&
+		nextPacketNumber == 0 &&
+		videoPacket->frameIndex == nextFrameNumber) {
+		Limelog("Using FEC for error correction\n");
+		nextPacketNumber = 1;
+	}
+	// Discard the rest of the FEC data until we know how to use it
+	else if (videoPacket->packetIndex >= videoPacket->totalPackets) {
+		return;
+	}
 
+	// Check that this is the next frame
+	isFirstPacket = (videoPacket->flags & FLAG_SOF) != 0;
+	if (videoPacket->frameIndex > nextFrameNumber) {
+		// Nope, but we can still work with it if it's
+		// the start of the next frame
+		if (isFirstPacket) {
+			Limelog("Got start of frame %d when expecting %d of frame %d\n",
+				videoPacket->frameIndex, nextPacketNumber, nextFrameNumber);
+
+			nextFrameNumber = videoPacket->frameIndex;
+			nextPacketNumber = 0;
+			clearAvcNalState();
+
+			// Tell the encoder when we're done decoding this frame
+			// that we lost some previous frames
+			waitingForNextSuccessfulFrame = 1;
+			gotNextFrameStart = 0;
+		}
+		else {
+			Limelog("Got packet %d of frame %d when expecting packet %d of frame %d\n",
+				videoPacket->packetIndex, videoPacket->frameIndex,
+				nextPacketNumber, nextFrameNumber);
+
+			// We dropped the start of this frame too
+			waitingForNextSuccessfulFrame = 1;
+			gotNextFrameStart = 0;
+
+			// Try to pickup on the next frame
+			nextFrameNumber = videoPacket->frameIndex + 1;
+			nextPacketNumber = 0;
+			clearAvcNalState();
+			return;
+		}
+	}
+	else if (videoPacket->frameIndex < nextFrameNumber) {
+		Limelog("Frame %d is behind our current frame number %d\n",
+			videoPacket->frameIndex, nextFrameNumber);
+		return;
+	}
+
+	// We know it's the right frame, now check the packet number
+	if (videoPacket->packetIndex != nextPacketNumber) {
+		Limelog("Frame %d: expected packet %d but got %d\n",
+			videoPacket->frameIndex, nextPacketNumber, videoPacket->packetIndex);
+
+		// At this point, we're guaranteed that it's not FEC data that we lost
+		waitingForNextSuccessfulFrame = 1;
+		gotNextFrameStart = 0;
+
+		// Skip this frame
+		nextFrameNumber++;
+		nextPacketNumber = 0;
+		clearAvcNalState();
+		return;
+	}
+
+	if (waitingForNextSuccessfulFrame) {
+		if (!gotNextFrameStart) {
+			if (!isFirstPacket) {
+				// We're waiting for the next frame, but this one is a fragment of a frame
+				// so we must discard it and wait for the next one
+				Limelog("Expected start of frame %d\n", videoPacket->frameIndex);
+
+				nextFrameNumber = videoPacket->frameIndex;
+				nextPacketNumber = 0;
+				clearAvcNalState();
+				return;
+			} {
+				gotNextFrameStart = 1;
+			}
+		}
+	}
+
+	nextPacketNumber++;
+
+	// Remove extra padding
+	currentPos.length = videoPacket->payloadLength;
+
+	if (isFirstPacket) {
+		if (getSpecialSeq(&currentPos, &specialSeq) &&
+			isSeqFrameStart(&specialSeq) &&
+			specialSeq.data[specialSeq.offset+specialSeq.length] == 0x67) {
+			// SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
+			clearAvcNalState();
+			processRtpPayloadSlow(videoPacket, &currentPos);
+			return;
+		}
+	}
+
+	processRtpPayloadFast(videoPacket, currentPos);
+
+	// We can't use the EOF flag here because real frames can be split across
+	// multiple "frames" when packetized to fit under the bandwidth ceiling
+	if (videoPacket->packetIndex + 1 >= videoPacket->totalPackets) {
+		nextFrameNumber++;
+		nextPacketNumber = 0;
+	}
+
+	if (videoPacket->flags & FLAG_EOF) {
+		reassembleFrame(videoPacket->frameIndex);
+
+		if (waitingForNextSuccessfulFrame) {
+			// This is the next successful frame after a loss event
+			connectionDetectedFrameLoss(startFrameNumber, nextFrameNumber - 1);
+			waitingForNextSuccessfulFrame = 0;
+		}
+
+		startFrameNumber = nextFrameNumber;
+	}
+}
+
+void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
 	processRtpPayload((PNV_VIDEO_PACKET) (rtpPacket + 1), length - sizeof(*rtpPacket));
 }

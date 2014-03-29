@@ -1,10 +1,13 @@
 #pragma once
 
+#define FLAG_EOF 0x2
+#define FLAG_SOF 0x4
+
 typedef struct _NV_VIDEO_PACKET {
 	int frameIndex;
 	int packetIndex;
 	int totalPackets;
-	int reserved1;
+	int flags;
 	int payloadLength;
 	char reserved2[36];
 } NV_VIDEO_PACKET, *PNV_VIDEO_PACKET;

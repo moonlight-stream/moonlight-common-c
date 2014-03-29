@@ -12,7 +12,8 @@ int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig)
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
-void requestIdrFrame(void);
+void connectionSinkTooSlow(int startFrame, int endFrame);
+void connectionDetectedFrameLoss(int startFrame, int endFrame);
 
 int performHandshake(IP_ADDRESS host);
 void terminateHandshake(void);

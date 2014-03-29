@@ -44,7 +44,13 @@ void destroyControlStream(void) {
 	PltCloseEvent(&resyncEvent);
 }
 
-void requestIdrFrame(void) {
+void connectionSinkTooSlow(int startFrame, int endFrame) {
+	// FIXME: Send ranges
+	PltSetEvent(&resyncEvent);
+}
+
+void connectionDetectedFrameLoss(int startFrame, int endFrame) {
+	// FIXME: Send ranges
 	PltSetEvent(&resyncEvent);
 }
 
