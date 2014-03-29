@@ -59,13 +59,16 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 #define STAGE_CONTROL_STREAM_INIT 3
 #define STAGE_VIDEO_STREAM_INIT 4
 #define STAGE_AUDIO_STREAM_INIT 5
-#define STAGE_CONTROL_STREAM_START 6
-#define STAGE_VIDEO_STREAM_START 7
-#define STAGE_AUDIO_STREAM_START 8
+#define STAGE_INPUT_STREAM_INIT 6
+#define STAGE_CONTROL_STREAM_START 7
+#define STAGE_VIDEO_STREAM_START 8
+#define STAGE_AUDIO_STREAM_START 9
+#define STAGE_INPUT_STREAM_START 10
+#define STAGE_MAX 11
 
 typedef void(*ConnListenerStageStarting)(int stage);
 typedef void(*ConnListenerStageComplete)(int stage);
-typedef void(*ConnListenerStageFailed)(int stage);
+typedef void(*ConnListenerStageFailed)(int stage, int errorCode);
 
 typedef void(*ConnListenerConnectionStarted)(void);
 typedef void(*ConnListenerConnectionTerminated)(int errorCode);
@@ -87,6 +90,22 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 void LiStopConnection(void);
 const char* LiGetStageName(int stage);
+
+int LiSendMouseMoveEvent(short deltaX, short deltaY);
+
+#define BUTTON_ACTION_PRESS 0x07
+#define BUTTON_ACTION_RELEASE 0x08
+#define BUTTON_LEFT 0x01
+#define BUTTON_MIDDLE 0x02
+#define BUTTON_RIGHT 0x03
+int LiSendMouseButtonEvent(char action, int button);
+
+#define KEY_ACTION_DOWN 0x03
+#define KEY_ACTION_UP 0x04
+#define MODIFIER_SHIFT 0x01
+#define MODIFIER_CTRL 0x02
+#define MODIFIER_ALT 0x04
+int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 #ifdef __cplusplus
 }

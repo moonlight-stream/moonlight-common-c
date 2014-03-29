@@ -34,3 +34,8 @@ void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallback
 void destroyAudioStream(void);
 int startAudioStream(void);
 void stopAudioStream(void);
+
+int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
+void destroyInputStream(void);
+int startInputStream(void);
+int stopInputStream(void);

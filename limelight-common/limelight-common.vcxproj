@@ -127,15 +127,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="AudioStream.c" />
     <ClCompile Include="ByteBuffer.c" />
     <ClCompile Include="Config.c" />
     <ClCompile Include="Connection.c" />
     <ClCompile Include="ControlStream.c" />
     <ClCompile Include="Handshake.c" />
+    <ClCompile Include="InputStream.c" />
     <ClCompile Include="LinkedBlockingQueue.c" />
     <ClCompile Include="PlatformSockets.c" />
     <ClCompile Include="PlatformThreads.c" />
@@ -144,6 +142,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h" />
+    <ClInclude Include="Input.h" />
     <ClInclude Include="Limelight-internal.h" />
     <ClInclude Include="Limelight.h" />
     <ClInclude Include="LinkedBlockingQueue.h" />
