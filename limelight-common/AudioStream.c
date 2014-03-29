@@ -112,12 +112,12 @@ static void DecoderThreadProc(void* context) {
 
 		if (length < sizeof(RTP_PACKET)) {
 			Limelog("Runt packet\n");
-			continue;
+			goto freeandcontinue;
 		}
 
 		if (rtp->packetType != 97) {
 			// Not audio
-			continue;
+			goto freeandcontinue;
 		}
 
 		rtp->sequenceNumber = htons(rtp->sequenceNumber);
@@ -131,6 +131,9 @@ static void DecoderThreadProc(void* context) {
 		lastSeq = rtp->sequenceNumber;
 
 		callbacks.decodeAndPlaySample((char *) (rtp + 1), length - sizeof(*rtp));
+
+	freeandcontinue:
+		free(data);
 	}
 }
 
