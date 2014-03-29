@@ -81,7 +81,7 @@ static void ReceiveThreadProc(void* context) {
 		char* buffer = (char*) malloc(1500 + sizeof(int));
 		if (buffer == NULL) {
 			Limelog("Receive thread terminating\n");
-			listenerCallbacks->connectionTerminated(ERROR_OUTOFMEMORY);
+			listenerCallbacks->connectionTerminated(-1);
 			return;
 		}
 
