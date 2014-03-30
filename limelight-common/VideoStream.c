@@ -66,7 +66,7 @@ static void UdpPingThreadProc(void *context) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
 			Limelog("UDP ping thread terminating #1\n");
-			listenerCallbacks->connectionTerminated(err);
+			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
 		}
 
@@ -89,7 +89,7 @@ static void ReceiveThreadProc(void* context) {
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			free(buffer);
-			listenerCallbacks->connectionTerminated(err);
+			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
 		}
 		
