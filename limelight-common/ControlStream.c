@@ -149,6 +149,7 @@ static void jitterThreadFunc(void* context) {
 static void resyncThreadFunc(void* context) {
 	long long payload[2];
 	NVCTL_PACKET_HEADER header;
+	PNVCTL_PACKET_HEADER response;
 	int err;
 
 	header.type = PTYPE_RESYNC;
@@ -173,6 +174,14 @@ static void resyncThreadFunc(void* context) {
 			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
+
+		response = readNvctlPacket();
+		if (response == NULL) {
+			Limelog("Resync thread terminating #3\n");
+			listenerCallbacks->connectionTerminated(LastSocketError());
+			return;
+		}
+		Limelog("Resync complete\n");
 
 		PltClearEvent(&resyncEvent);
 	}

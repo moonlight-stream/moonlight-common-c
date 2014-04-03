@@ -9,18 +9,6 @@
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 
-#ifdef LC_WINDOWS_PHONE
-#undef WINAPI_FAMILY
-#define WINAPI_FAMILY WINAPI_FAMILY_DESKTOP_APP
-#endif
-
-#include <WinSock2.h>
-
-#ifdef LC_WINDOWS_PHONE
-#undef WINAPI_FAMILY
-#define WINAPI_FAMILY WINAPI_FAMILY_PHONE_APP
-#endif
-
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
