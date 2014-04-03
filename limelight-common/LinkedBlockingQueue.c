@@ -21,6 +21,7 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 	}
 
 	queueHead->head = NULL;
+	queueHead->tail = NULL;
 	queueHead->sizeBound = sizeBound;
 	queueHead->currentSize = 0;
 
@@ -28,14 +29,14 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 }
 
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry, lastEntry;
+	PLINKED_BLOCKING_QUEUE_ENTRY entry;
 
 	entry = (PLINKED_BLOCKING_QUEUE_ENTRY) malloc(sizeof(*entry));
 	if (entry == NULL) {
 		return LBQ_NO_MEMORY;
 	}
 
-	entry->next = NULL;
+	entry->flink = NULL;
 	entry->data = data;
 
 	PltLockMutex(&queueHead->mutex);
@@ -48,15 +49,17 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 
 	if (queueHead->head == NULL) {
 		LC_ASSERT(queueHead->currentSize == 0);
+		LC_ASSERT(queueHead->tail == NULL);
 		queueHead->head = entry;
+		queueHead->tail = entry;
+		entry->blink = NULL;
 	}
 	else {
 		LC_ASSERT(queueHead->currentSize >= 1);
-		lastEntry = queueHead->head;
-		while (lastEntry->next != NULL) {
-			lastEntry = lastEntry->next;
-		}
-		lastEntry->next = entry;
+		LC_ASSERT(queueHead->head != NULL);
+		queueHead->tail->flink = entry;
+		entry->blink = queueHead->tail;
+		queueHead->tail = entry;
 	}
 
 	queueHead->currentSize++;
@@ -86,17 +89,21 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 		}
 
 		entry = queueHead->head;
-		queueHead->head = entry->next;
+		queueHead->head = entry->flink;
 		queueHead->currentSize--;
+		if (queueHead->head == NULL) {
+			LC_ASSERT(queueHead->currentSize == 0);
+			queueHead->tail = NULL;
+			PltClearEvent(&queueHead->containsDataEvent);
+		}
+		else {
+			LC_ASSERT(queueHead->currentSize != 0);
+			queueHead->head->blink = NULL;
+		}
 
 		*data = entry->data;
 
 		free(entry);
-
-		if (queueHead->head == NULL) {
-			LC_ASSERT(queueHead->currentSize == 0);
-			PltClearEvent(&queueHead->containsDataEvent);
-		}
 
 		PltUnlockMutex(&queueHead->mutex);
 

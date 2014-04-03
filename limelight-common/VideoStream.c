@@ -45,7 +45,7 @@ void destroyVideoStream(void) {
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
 
 	while (entry != NULL) {
-		nextEntry = entry->next;
+		nextEntry = entry->flink;
 		free(entry->data);
 		free(entry);
 		entry = nextEntry;

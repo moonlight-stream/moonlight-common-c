@@ -45,7 +45,7 @@ void destroyVideoDepacketizer(void) {
 	
 	entry = LbqDestroyLinkedBlockingQueue(&decodeUnitQueue);
 	while (entry != NULL) {
-		nextEntry = entry->next;
+		nextEntry = entry->flink;
 		free(entry->data);
 		free(entry);
 		entry = nextEntry;
