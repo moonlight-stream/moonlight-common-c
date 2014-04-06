@@ -6,17 +6,14 @@ struct thread_context {
 	void* context;
 };
 
-#if defined(LC_WINDOWS)
-VOID WINAPI ApcFunc(ULONG_PTR parameter) {
-	return;
-}
-#endif
-
 #if defined(LC_WINDOWS_PHONE)
 WCHAR DbgBuf[512];
 #endif
 
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+PLT_MUTEX thread_list_lock;
+PLT_THREAD *thread_head;
+
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	struct thread_context *ctx = (struct thread_context *)lpParameter;
 
@@ -39,9 +36,7 @@ void* ThreadProc(void* context) {
 #endif
 
 void PltSleepMs(int ms) {
-#if defined(LC_WINDOWS)
-	Sleep(ms);
-#elif defined (LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS) || defined (LC_WINDOWS_PHONE)
 	WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
 #else
     long usecs = (long)ms * 1000;
@@ -99,6 +94,25 @@ void PltJoinThread(PLT_THREAD *thread) {
 
 void PltCloseThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	PLT_THREAD *current_thread;
+	
+	PltLockMutex(&thread_list_lock);
+	current_thread = thread_head;
+	while (current_thread != NULL) {
+		if (current_thread->next == thread) {
+			break;
+		}
+
+		current_thread = current_thread->next;
+	}
+
+	LC_ASSERT(current_thread != NULL);
+
+	// Unlink this thread
+	current_thread->next = thread->next;
+	PltUnlockMutex(&thread_list_lock);
+
+	CloseHandle(thread->termevent);
 	CloseHandle(thread->handle);
 #else
 #endif
@@ -115,10 +129,9 @@ int PltIsThreadInterrupted(PLT_THREAD *thread) {
 }
 
 void PltInterruptThread(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	thread->cancelled = 1;
-	QueueUserAPC(ApcFunc, thread->handle, 0);
-#elif defined(LC_WINDOWS_PHONE)
+	SetEvent(thread->termevent);
 #else
 	pthread_cancel(*thread);
 #endif
@@ -138,13 +151,25 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	{
+		thread->termevent = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+		if (thread->termevent == NULL) {
+			free(ctx);
+			return -1;
+		}
 		thread->cancelled = 0;
-		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
+		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
 		if (thread->handle == NULL) {
+			CloseHandle(thread->termevent);
 			free(ctx);
 			return -1;
 		}
 		else {
+			// Add this thread to the thread list
+			PltLockMutex(&thread_list_lock);
+			thread->next = thread_head;
+			thread_head = thread;
+			PltUnlockMutex(&thread_list_lock);
+
 			err = 0;
 		}
 	}
@@ -204,11 +229,30 @@ void PltClearEvent(PLT_EVENT *event) {
 
 int PltWaitForEvent(PLT_EVENT *event) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	DWORD error = WaitForSingleObjectEx(*event, INFINITE, TRUE);
-	if (error == STATUS_WAIT_0) {
+	DWORD error;
+	PLT_THREAD *current_thread;
+	HANDLE objects[2];
+
+	PltLockMutex(&thread_list_lock);
+	current_thread = thread_head;
+	while (current_thread != NULL) {
+		if (current_thread->tid == GetCurrentThreadId()) {
+			break;
+		}
+
+		current_thread = current_thread->next;
+	}
+	PltUnlockMutex(&thread_list_lock);
+
+	LC_ASSERT(current_thread != NULL);
+
+	objects[0] = *event;
+	objects[1] = current_thread->termevent;
+	error = WaitForMultipleObjectsEx(2, objects, FALSE, INFINITE, FALSE);
+	if (error == WAIT_OBJECT_0) {
 		return PLT_WAIT_SUCCESS;
 	}
-	else if (error == WAIT_IO_COMPLETION) {
+	else if (error == WAIT_OBJECT_0 + 1) {
 		return PLT_WAIT_INTERRUPTED;
 	}
 	else {

@@ -8,6 +8,10 @@ typedef void (*ThreadEntry)(void *context);
 typedef struct _PLT_THREAD {
 	HANDLE handle;
 	int cancelled;
+	DWORD tid;
+	HANDLE termevent;
+
+	struct _PLT_THREAD *next;
 } PLT_THREAD;
 typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
