@@ -54,6 +54,9 @@ static void inputSendThreadProc(void* context) {
 			return;
 		}
 
+#ifdef _MSC_VER
+#pragma warning(suppress: 6001)
+#endif
 		err = send(inputSock, (const char*) &holder->packet, holder->packetLength, 0);
 		free(holder);
 		if (err <= 0) {

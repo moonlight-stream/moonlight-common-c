@@ -35,7 +35,8 @@ extern WCHAR DbgBuf[512];
 
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 #include <crtdbg.h>
-#define LC_ASSERT _ASSERTE
+#define LC_ASSERT(x) __analysis_assume(x); \
+                     _ASSERTE(x)
 #else
 #define LC_ASSERT(x)
 #endif
