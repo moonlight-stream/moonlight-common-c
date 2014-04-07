@@ -268,3 +268,18 @@ int PltWaitForEvent(PLT_EVENT *event) {
 	return PLT_WAIT_SUCCESS;
 #endif
 }
+
+int initializePlatformThreads(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	return PltCreateMutex(&thread_list_lock);
+#else
+	return 0;
+#endif
+}
+
+void cleanupPlatformThreads(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	PltDeleteMutex(&thread_list_lock);
+#else
+#endif
+}

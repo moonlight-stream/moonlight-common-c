@@ -80,6 +80,7 @@ void LiStopConnection(void) {
 	if (stage == STAGE_PLATFORM_INIT) {
 		Limelog("Cleaning up platform...");
 		cleanupPlatformSockets();
+		cleanupPlatformThreads();
 		stage--;
 		Limelog("done\n");
 	}
@@ -95,6 +96,12 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 	Limelog("Initializing platform...");
 	ListenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
 	err = initializePlatformSockets();
+	if (err != 0) {
+		Limelog("failed: %d\n", err);
+		ListenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);
+		goto Cleanup;
+	}
+	err = initializePlatformThreads();
 	if (err != 0) {
 		Limelog("failed: %d\n", err);
 		ListenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);

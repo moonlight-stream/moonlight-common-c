@@ -3,6 +3,7 @@
 #include "Limelight.h"
 #include "Platform.h"
 #include "PlatformSockets.h"
+#include "PlatformThreads.h"
 #include "Video.h"
 
 char* allocateConfigDataForStreamConfig(PSTREAM_CONFIGURATION streamConfig);
