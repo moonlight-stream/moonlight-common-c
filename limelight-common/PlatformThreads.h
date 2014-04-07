@@ -40,6 +40,12 @@ CreateThread(
 	_In_ DWORD dwCreationFlags,
 	_Out_opt_ LPDWORD lpThreadId
 );
+
+DWORD
+WINAPI
+ResumeThread(
+	_In_  HANDLE hThread
+);
 #endif
 
 int initializePlatformThreads(void);

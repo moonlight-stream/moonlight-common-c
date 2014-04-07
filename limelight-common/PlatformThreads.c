@@ -157,7 +157,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 			return -1;
 		}
 		thread->cancelled = 0;
-		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
+		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, CREATE_SUSPENDED, &thread->tid);
 		if (thread->handle == NULL) {
 			CloseHandle(thread->termevent);
 			free(ctx);
@@ -169,6 +169,9 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 			thread->next = thread_head;
 			thread_head = thread;
 			PltUnlockMutex(&thread_list_lock);
+
+			// Now the thread can run
+			ResumeThread(thread->handle);
 
 			err = 0;
 		}
