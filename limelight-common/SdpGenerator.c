@@ -5,6 +5,11 @@
 #define MAX_SDP_HEADER_LEN 128
 #define MAX_SDP_TAIL_LEN 128
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4996)
+#endif
+
 static const char ATTRIB_X_NV_CALLBACKS [] = {
 	0x50, 0x51, 0x49, 0x4a, 0x0d,
 	0xad, 0x30, 0x4a, 0xf1, 0xbd, 0x30, 0x4a, 0xd5,
@@ -104,7 +109,7 @@ static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
 	return offset;
 }
 
-static int addAttributeBinary(PSDP_OPTION *head, char* name, void* payload, int payloadLen) {
+static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload, int payloadLen) {
 	PSDP_OPTION option, currentOption;
 
 	option = malloc(sizeof(*option) + payloadLen);
@@ -131,12 +136,12 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, void* payload, int 
 	return 0;
 }
 
-static int addAttributeString(PSDP_OPTION *head, char* name, char* payload) {
+static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload) {
 	// We purposefully omit the null terminating character
 	return addAttributeBinary(head, name, payload, strlen(payload));
 }
 
-static PSDP_OPTION *getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {
+static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {
 	PSDP_OPTION optionHead;
 	int payloadInt;
 	char payloadStr[64];
@@ -361,9 +366,13 @@ char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in
 	}
 
 	offset = fillSdpHeader(payload, targetAddress);
-	offset += fillSerializedAttributeList(payload[offset], attributeList);
-	offset += fillSdpTail(payload);
+	offset += fillSerializedAttributeList(&payload[offset], attributeList);
+	offset += fillSdpTail(&payload[offset]);
 
 	*length = offset;
 	return payload;
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
