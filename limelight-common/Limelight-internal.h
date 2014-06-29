@@ -17,7 +17,7 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 
-void initializeVideoDepacketizer(void);
+void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
 int getNextDecodeUnit(PDECODE_UNIT *du);

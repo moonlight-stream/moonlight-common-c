@@ -32,7 +32,7 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
-	initializeVideoDepacketizer();
+	initializeVideoDepacketizer(configuration.packetSize);
 }
 
 void destroyVideoStream(void) {

@@ -15,17 +15,19 @@ static int gotNextFrameStart;
 static int lastPacketInStream = 0;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
+static int packetSize;
 
 static unsigned short lastSequenceNumber;
 
 typedef struct _BUFFER_DESC {
 	char* data;
-	int offset;
-	int length;
+	unsigned int offset;
+	unsigned int length;
 } BUFFER_DESC, *PBUFFER_DESC;
 
-void initializeVideoDepacketizer(void) {
+void initializeVideoDepacketizer(int pktSize) {
 	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
+	packetSize = pktSize;
 }
 
 static void clearAvcNalState(void) {
@@ -243,7 +245,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	currentPos.offset = 0;
 	currentPos.length = length - sizeof(*videoPacket);
 
-	if (currentPos.length < 968) {
+	if (currentPos.length < packetSize - sizeof(NV_VIDEO_PACKET)) {
 		processRtpPayloadSlow(videoPacket, &currentPos);
 		return;
 	}
