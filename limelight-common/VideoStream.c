@@ -18,7 +18,6 @@ static SOCKET firstFrameSocket = INVALID_SOCKET;
 
 static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
-static PLT_THREAD decoderThread;
 
 void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
 	PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
@@ -83,20 +82,6 @@ static void ReceiveThreadProc(void* context) {
 	free(buffer);
 }
 
-static void DecoderThreadProc(void* context) {
-	PDECODE_UNIT du;
-	while (!PltIsThreadInterrupted(&decoderThread)) {
-		if (!getNextDecodeUnit(&du)) {
-			printf("Decoder thread terminating\n");
-			return;
-		}
-
-		callbacks.submitDecodeUnit(du);
-
-		freeDecodeUnit(du);
-	}
-}
-
 int readFirstFrame(void) {
 	char* firstFrame;
 	int err;
@@ -133,7 +118,6 @@ void stopVideoStream(void) {
 
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
-	PltInterruptThread(&decoderThread);
 
 	if (firstFrameSocket != INVALID_SOCKET) {
 		closesocket(firstFrameSocket);
@@ -146,11 +130,9 @@ void stopVideoStream(void) {
 
 	PltJoinThread(&udpPingThread);
 	PltJoinThread(&receiveThread);
-	PltJoinThread(&decoderThread);
 
 	PltCloseThread(&udpPingThread);
 	PltCloseThread(&receiveThread);
-	PltCloseThread(&decoderThread);
 }
 
 int startVideoStream(void* rendererContext, int drFlags) {
@@ -172,11 +154,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	}
 
 	err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
-	if (err != 0) {
-		return err;
-	}
-
-	err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
 	if (err != 0) {
 		return err;
 	}

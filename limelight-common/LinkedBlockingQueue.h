@@ -7,6 +7,7 @@
 #define LBQ_INTERRUPTED 1
 #define LBQ_BOUND_EXCEEDED 2
 #define LBQ_NO_MEMORY 3
+#define LBQ_EMPTY 4
 
 typedef struct _LINKED_BLOCKING_QUEUE_ENTRY {
 	struct _LINKED_BLOCKING_QUEUE_ENTRY *flink;
@@ -27,3 +28,4 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data);
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);
+int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
