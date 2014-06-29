@@ -10,6 +10,8 @@ typedef struct _STREAM_CONFIGURATION {
 	int width;
 	int height;
 	int fps;
+	int bitrate;
+	int packetSize;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 typedef struct _LENTRY {

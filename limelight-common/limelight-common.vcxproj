@@ -135,6 +135,7 @@
     <ClCompile Include="LinkedBlockingQueue.c" />
     <ClCompile Include="PlatformSockets.c" />
     <ClCompile Include="PlatformThreads.c" />
+    <ClCompile Include="SdpGenerator.c" />
     <ClCompile Include="VideoDepacketizer.c" />
     <ClCompile Include="VideoStream.c" />
   </ItemGroup>
