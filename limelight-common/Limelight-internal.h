@@ -6,6 +6,8 @@
 #include "PlatformThreads.h"
 #include "Video.h"
 
+char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress, int *length);
+
 int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 int startControlStream(void);
 int stopControlStream(void);

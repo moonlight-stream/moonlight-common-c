@@ -117,6 +117,7 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload
 		return -1;
 	}
 
+	option->next = NULL;
 	option->payloadLen = payloadLen;
 	strcpy(option->name, name);
 	option->payload = (void*)(option + 1);
@@ -150,6 +151,7 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 
 	optionHead = NULL;
 
+	err = 0;
 	err |= addAttributeBinary(&optionHead, "x-nv-callbacks",
 		ATTRIB_X_NV_CALLBACKS, sizeof(ATTRIB_X_NV_CALLBACKS));
 	err |= addAttributeBinary(&optionHead, "x-nv-videoDecoder",
@@ -335,14 +337,14 @@ ExitFailure:
 	return NULL;
 }
 
-int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
+static int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
 	return sprintf(buffer,
 		"v=0\r\n"
 		"o=android 0 9 IN IPv4 %s\r\n"
 		"s=NVIDIA Streaming Client\r\n", inet_ntoa(targetAddress));
 }
 
-int fillSdpTail(char* buffer) {
+static int fillSdpTail(char* buffer) {
 	return sprintf(buffer,
 		"t=0 0\r\n"
 		"m=video 47996  \r\n");
@@ -369,6 +371,7 @@ char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in
 	offset += fillSerializedAttributeList(&payload[offset], attributeList);
 	offset += fillSdpTail(&payload[offset]);
 
+	freeAttributeList(attributeList);
 	*length = offset;
 	return payload;
 }
