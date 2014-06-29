@@ -6,18 +6,14 @@
 #include "PlatformThreads.h"
 #include "Video.h"
 
-char* allocateConfigDataForStreamConfig(PSTREAM_CONFIGURATION streamConfig);
-int getConfigDataSize(PSTREAM_CONFIGURATION streamConfig);
-
 int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
 void connectionSinkTooSlow(int startFrame, int endFrame);
 void connectionDetectedFrameLoss(int startFrame, int endFrame);
-
-int performHandshake(IP_ADDRESS host);
-void terminateHandshake(void);
+void connectionReceivedFrame(int frameIndex);
+void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 
 void initializeVideoDepacketizer(void);
 void destroyVideoDepacketizer(void);

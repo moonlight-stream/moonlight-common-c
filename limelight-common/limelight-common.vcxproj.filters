@@ -18,13 +18,7 @@
     <ClCompile Include="ByteBuffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Config.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Connection.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Handshake.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ControlStream.c">
