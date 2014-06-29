@@ -55,7 +55,7 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 // Use LiGetStageName() for stable stage names
 #define STAGE_NONE 0
 #define STAGE_PLATFORM_INIT 1
-#define STAGE_HANDSHAKE 2
+#define STAGE_RTSP_HANDSHAKE 2
 #define STAGE_CONTROL_STREAM_INIT 3
 #define STAGE_VIDEO_STREAM_INIT 4
 #define STAGE_AUDIO_STREAM_INIT 5

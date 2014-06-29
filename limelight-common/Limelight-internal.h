@@ -17,6 +17,9 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 
+int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr);
+void terminateRtspHandshake(void);
+
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
