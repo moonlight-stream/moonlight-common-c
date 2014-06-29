@@ -80,7 +80,7 @@ int BbGetLong(PBYTE_BUFFER buff, long long *l) {
 	memcpy(l, &buff->buffer[buff->position], sizeof(*l));
 	buff->position += sizeof(*l);
 
-	*l = byteSwapInt(buff, *l);
+	*l = byteSwapLongLong(buff, *l);
 
 	return 1;
 }
@@ -103,7 +103,7 @@ int BbPutLong(PBYTE_BUFFER buff, long long l) {
 		return 0;
 	}
 
-	l = byteSwapInt(buff, l);
+	l = byteSwapLongLong(buff, l);
 
 	memcpy(&buff->buffer[buff->position], &l, sizeof(l));
 	buff->position += sizeof(l);
