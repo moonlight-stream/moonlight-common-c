@@ -333,7 +333,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 				nextPacketNumber = 0;
 				clearAvcNalState();
 				return;
-			} {
+			} else {
 				gotNextFrameStart = 1;
 			}
 		}
