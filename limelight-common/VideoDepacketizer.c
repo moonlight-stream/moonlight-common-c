@@ -251,6 +251,7 @@ void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	BUFFER_DESC currentPos, specialSeq;
 	int isFirstPacket;
+	int streamPacketIndex;
 	
 	currentPos.data = (char*) (videoPacket + 1);
 	currentPos.offset = 0;
@@ -349,7 +350,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 		}
 	}
 
-	int streamPacketIndex = videoPacket->streamPacketIndex;
+	streamPacketIndex = videoPacket->streamPacketIndex;
 	if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
 		// Packets were lost so report this to the server
 		connectionLostPackets(lastPacketInStream, streamPacketIndex);

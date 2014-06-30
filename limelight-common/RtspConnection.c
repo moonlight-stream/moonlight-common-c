@@ -10,6 +10,8 @@ static void* transactRtspMessage(IP_ADDRESS addr, void* message) {
 	char responseBuffer[RTSP_MAX_RESP_SIZE];
 	int offset;
 	void* responseMsg = NULL;
+	char* serializedMessage;
+	int messageLen;
 
 	sock = connectTcpSocket(addr, 48010);
 	if (sock == INVALID_SOCKET) {
@@ -17,8 +19,8 @@ static void* transactRtspMessage(IP_ADDRESS addr, void* message) {
 	}
 	enableNoDelay(sock);
 
-	char* serializedMessage = NULL; // FIXME
-	int messageLen = 0; // FIXME
+	serializedMessage = NULL; // FIXME
+	messageLen = 0; // FIXME
 
 	// Send our message
 	err = send(sock, serializedMessage, messageLen, 0);
