@@ -179,12 +179,14 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		return err;
 	}
 
+	// This must be called before the decoder thread starts submitting
+	// decode units
+	callbacks.start();
+
 	err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
 	if (err != 0) {
 		return err;
 	}
-
-	callbacks.start();
 
 	return 0;
 }
