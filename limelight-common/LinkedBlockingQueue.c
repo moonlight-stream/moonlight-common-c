@@ -71,38 +71,6 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 	return LBQ_SUCCESS;
 }
 
-int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry;
-
-	PltLockMutex(&queueHead->mutex);
-
-	if (queueHead->head == NULL) {
-		PltUnlockMutex(&queueHead->mutex);
-		return LBQ_EMPTY;
-	}
-
-	entry = queueHead->head;
-	queueHead->head = entry->flink;
-	queueHead->currentSize--;
-	if (queueHead->head == NULL) {
-		LC_ASSERT(queueHead->currentSize == 0);
-		queueHead->tail = NULL;
-		PltClearEvent(&queueHead->containsDataEvent);
-	}
-	else {
-		LC_ASSERT(queueHead->currentSize != 0);
-		queueHead->head->blink = NULL;
-	}
-
-	PltUnlockMutex(&queueHead->mutex);
-
-	*data = entry->data;
-
-	free(entry);
-
-	return LBQ_SUCCESS;
-}
-
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry;
 	int err;
@@ -133,11 +101,11 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 			queueHead->head->blink = NULL;
 		}
 
-		PltUnlockMutex(&queueHead->mutex);
-
 		*data = entry->data;
 
 		free(entry);
+
+		PltUnlockMutex(&queueHead->mutex);
 
 		break;
 	}

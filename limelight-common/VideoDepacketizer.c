@@ -134,23 +134,12 @@ static void reassembleFrame(int frameNumber) {
 	}
 }
 
-int LiGetNextDecodeUnit(PDECODE_UNIT *du) {
+int getNextDecodeUnit(PDECODE_UNIT *du) {
 	int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)du);
 	if (err == LBQ_SUCCESS) {
 		return 1;
 	}
 	else {
-		return 0;
-	}
-}
-
-int LiPollNextDecodeUnit(PDECODE_UNIT *du) {
-	int err = LbqPollQueueElement(&decodeUnitQueue, (void**) du);
-	if (err == LBQ_SUCCESS) {
-		return 1;
-	}
-	else {
-		LC_ASSERT(err == LBQ_EMPTY);
 		return 0;
 	}
 }

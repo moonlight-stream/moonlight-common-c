@@ -29,12 +29,14 @@ typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void*
 typedef void(*DecoderRendererStart)(void);
 typedef void(*DecoderRendererStop)(void);
 typedef void(*DecoderRendererRelease)(void);
+typedef void(*DecoderRendererSubmitDecodeUnit)(PDECODE_UNIT decodeUnit);
 
 typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSetup setup;
 	DecoderRendererStart start;
 	DecoderRendererStop stop;
 	DecoderRendererRelease release;
+	DecoderRendererSubmitDecodeUnit submitDecodeUnit;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
 typedef void(*AudioRendererInit)(void);
@@ -90,8 +92,6 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 void LiStopConnection(void);
 const char* LiGetStageName(int stage);
-int LiGetNextDecodeUnit(PDECODE_UNIT *du);
-int LiPollNextDecodeUnit(PDECODE_UNIT *du);
 
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
 

@@ -23,6 +23,7 @@ void terminateRtspHandshake(void);
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
+int getNextDecodeUnit(PDECODE_UNIT *du);
 void freeDecodeUnit(PDECODE_UNIT decodeUnit);
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length);
 
