@@ -60,8 +60,11 @@ static void UdpPingThreadProc(void *context) {
 
 static void ReceiveThreadProc(void* context) {
 	int err;
+	int bufferSize;
+	char* buffer;
 
-	char* buffer = (char*) malloc(configuration.packetSize);
+	bufferSize = configuration.packetSize + sizeof(RTP_PACKET);
+	buffer = (char*)malloc(bufferSize);
 	if (buffer == NULL) {
 		Limelog("Receive thread terminating\n");
 		listenerCallbacks->connectionTerminated(-1);
@@ -69,7 +72,7 @@ static void ReceiveThreadProc(void* context) {
 	}
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
-		err = recv(rtpSocket, buffer, configuration.packetSize, 0);
+		err = recv(rtpSocket, buffer, bufferSize, 0);
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			listenerCallbacks->connectionTerminated(LastSocketError());
