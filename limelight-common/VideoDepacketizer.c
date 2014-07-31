@@ -351,7 +351,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	// Remove extra padding
 	currentPos.length = videoPacket->payloadLength;
 
-	if (isFirstPacket) {
+	/*if (isFirstPacket) {
 		if (getSpecialSeq(&currentPos, &specialSeq) &&
 			isSeqFrameStart(&specialSeq) &&
 			specialSeq.data[specialSeq.offset+specialSeq.length] == 0x67) {
@@ -360,7 +360,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 			processRtpPayloadSlow(videoPacket, &currentPos);
 			return;
 		}
-	}
+	}*/
 
 	processRtpPayloadFast(videoPacket, currentPos);
 
@@ -379,7 +379,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 			connectionDetectedFrameLoss(startFrameNumber, nextFrameNumber - 1);
 			waitingForNextSuccessfulFrame = 0;
 		}
-
 		startFrameNumber = nextFrameNumber;
 	}
 }

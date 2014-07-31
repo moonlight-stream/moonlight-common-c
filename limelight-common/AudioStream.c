@@ -17,6 +17,7 @@ static PLT_THREAD decoderThread;
 
 #define RTP_PORT 48000
 
+/* Initialize the audio stream */
 void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, arCallbacks, sizeof(callbacks));
 	remoteHost = host;
@@ -25,6 +26,7 @@ void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallback
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 }
 
+/* Tear down the audio stream once we're done with it */
 void destroyAudioStream(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 
@@ -41,6 +43,7 @@ void destroyAudioStream(void) {
 }
 
 static void UdpPingThreadProc(void *context) {
+	/* Ping in ASCII */
 	char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
 	struct sockaddr_in saddr;
 	int err;
@@ -50,6 +53,7 @@ static void UdpPingThreadProc(void *context) {
 	saddr.sin_port = htons(RTP_PORT);
 	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
 
+	/* Send PING every 100 milliseconds */
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
