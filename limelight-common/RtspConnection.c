@@ -4,14 +4,15 @@
 static SOCKET sock = INVALID_SOCKET;
 static IP_ADDRESS remoteAddr;
 static int currentSeqNumber = 1;
-static char* rtspTargetUrl;
+static char rtspTargetUrl[256];
 static char sessionIdString[16];
+static int hasSessionId = 0;
 
 // GFE 2.1.1
 #define RTSP_CLIENT_VERSION 10
 #define RTSP_CLIENT_VERSION_S "10"
 
-#define RTSP_MAX_RESP_SIZE 1024
+#define RTSP_MAX_RESP_SIZE 16384
 
 static POPTION_ITEM createOptionItem(char* option, char* content)
 {
@@ -58,10 +59,15 @@ static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
 
 static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 {
+	char sequenceNumberStr[16];
+
+	// FIXME: Hacked CSeq attribute due to RTSP parser bug
 	createRtspRequest(msg, NULL, 0, command, target, "RTSP/1.0",
-		currentSeqNumber++, NULL, NULL);
+		0, NULL, NULL, 0);
 	
-	if (!addOption(msg, "X-GS-ClientVersion", RTSP_CLIENT_VERSION_S)) {
+	sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
+	if (!addOption(msg, "CSeq", sequenceNumberStr) ||
+		!addOption(msg, "X-GS-ClientVersion", RTSP_CLIENT_VERSION_S)) {
 		freeMessage(msg);
 		return 0;
 	}
@@ -113,7 +119,7 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
 		}
 	}
 
-	if (parseRtspMessage(response, responseBuffer) == RTSP_ERROR_SUCCESS) {
+	if (parseRtspMessage(response, responseBuffer, offset) == RTSP_ERROR_SUCCESS) {
 		// Successfully parsed response
 		ret = 1;
 	}
@@ -178,7 +184,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target) {
 
 	ret = initializeRtspRequest(&request, "SETUP", target);
 	if (ret != 0) {
-		if (sessionIdString[0] != 0) {
+		if (hasSessionId) {
 			if (!addOption(&request, "Session", sessionIdString)) {
 				ret = 0;
 				goto FreeMessage;
@@ -241,6 +247,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 			goto FreeMessage;
 		}
 		request.flags |= FLAG_ALLOCATED_PAYLOAD;
+		request.payloadLength = payloadLength;
 
 		sprintf(payloadLengthStr, "%d", payloadLength);
 		if (!addOption(&request, "Content-length", payloadLengthStr)) {
@@ -257,7 +264,12 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 }
 
 int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
+	struct in_addr inaddr;
+
+	// Initialize global state
 	remoteAddr = addr;
+	inaddr.S_un.S_addr = addr;
+	sprintf(rtspTargetUrl, "rtsp://%s", inet_ntoa(inaddr));
 
 	{
 		RTSP_MESSAGE response;
@@ -313,6 +325,9 @@ int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr)
 			Limelog("RTSP SETUP streamid=audio is missing session attribute");
 			return -1;
 		}
+
+		strcpy(sessionIdString, sessionId);
+		hasSessionId = 1;
 
 		freeMessage(&response);
 	}

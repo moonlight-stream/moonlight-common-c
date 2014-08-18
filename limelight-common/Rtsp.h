@@ -37,6 +37,7 @@ typedef struct _RTSP_MESSAGE {
 	char *protocol;
 	POPTION_ITEM options;
 	char *payload;
+	int payloadLength;
 
 	char* messageBuffer;
 
@@ -54,10 +55,10 @@ typedef struct _RTSP_MESSAGE {
 	} message;
 } RTSP_MESSAGE, *PRTSP_MESSAGE;
 
-int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage);
+int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length);
 void freeMessage(PRTSP_MESSAGE msg);
-void createRtspResponse(PRTSP_MESSAGE msg, char* messageBuffer, int flags, char *protocol, int statusCode, char *statusString, int sequenceNumber, POPTION_ITEM optionsHead, char *payload);
-void createRtspRequest(PRTSP_MESSAGE msg, char* messageBuffer, int flags, char *command, char *target, char *protocol, int sequenceNumber, POPTION_ITEM optionsHead, char *payload);
+void createRtspResponse(PRTSP_MESSAGE msg, char* messageBuffer, int flags, char *protocol, int statusCode, char *statusString, int sequenceNumber, POPTION_ITEM optionsHead, char *payload, int payloadLength);
+void createRtspRequest(PRTSP_MESSAGE msg, char* messageBuffer, int flags, char *command, char *target, char *protocol, int sequenceNumber, POPTION_ITEM optionsHead, char *payload, int payloadLength);
 char *getOptionContent(POPTION_ITEM optionsHead, char *option);
 void insertOption(POPTION_ITEM *optionsHead, POPTION_ITEM opt);
 void freeOptionList(POPTION_ITEM optionsHead);
