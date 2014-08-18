@@ -150,6 +150,7 @@
     <ClInclude Include="Platform.h" />
     <ClInclude Include="PlatformSockets.h" />
     <ClInclude Include="PlatformThreads.h" />
+    <ClInclude Include="Rtsp.h" />
     <ClInclude Include="Video.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

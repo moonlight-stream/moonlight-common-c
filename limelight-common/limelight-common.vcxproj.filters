@@ -83,5 +83,8 @@
     <ClInclude Include="Input.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rtsp.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
