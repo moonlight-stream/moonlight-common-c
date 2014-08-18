@@ -291,6 +291,9 @@ static int isBeforeSigned(int numA, int numB, int ambiguousCase) {
 
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	BUFFER_DESC currentPos, specialSeq;
+	int frameIndex;
+	char flags;
+	int firstPacket;
 
 	// Mask the top 8 bits from the SPI
 	videoPacket->streamPacketIndex >>= 8;
@@ -300,9 +303,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	currentPos.offset = 0;
 	currentPos.length = length - sizeof(*videoPacket);
 
-	int frameIndex = videoPacket->frameIndex;
-	char flags = videoPacket->flags;
-	int firstPacket = isFirstPacket(flags);
+	frameIndex = videoPacket->frameIndex;
+	flags = videoPacket->flags;
+	firstPacket = isFirstPacket(flags);
 
 	// Drop duplicates or re-ordered packets
 	int streamPacketIndex = videoPacket->streamPacketIndex;
