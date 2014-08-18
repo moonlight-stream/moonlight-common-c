@@ -31,7 +31,7 @@ static const int PPAYLOAD_START_STREAM_B[4] = { 0, 0, 0, 0xa }; // FIXME: Little
 #define PPAYLEN_RESYNC 24
 
 #define PTYPE_LOSS_STATS 0x140c
-#define PPAYLEN_LOSS_STATS 20
+#define PPAYLEN_LOSS_STATS 32
 
 #define PTYPE_FRAME_STATS 0x1417
 #define PPAYLEN_FRAME_STATS 64
@@ -141,6 +141,9 @@ static void lossStatsThreadFunc(void* context) {
 		BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
 		BbPutInt(&byteBuffer, 1000);
 		BbPutLong(&byteBuffer, currentFrame);
+		BbPutInt(&byteBuffer, 0);
+		BbPutInt(&byteBuffer, 0);
+		BbPutInt(&byteBuffer, 0x14);
 
 		// Send the message (and don't expect a response)
 		if (!sendMessageAndForget(PTYPE_LOSS_STATS,
