@@ -294,6 +294,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	int frameIndex;
 	char flags;
 	int firstPacket;
+	int streamPacketIndex;
 
 	// Mask the top 8 bits from the SPI
 	videoPacket->streamPacketIndex >>= 8;
@@ -308,7 +309,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	firstPacket = isFirstPacket(flags);
 
 	// Drop duplicates or re-ordered packets
-	int streamPacketIndex = videoPacket->streamPacketIndex;
+	streamPacketIndex = videoPacket->streamPacketIndex;
 	if (isBeforeSigned((short) streamPacketIndex, (short) (lastPacketInStream + 1), 0)) {
 		return;
 	}
