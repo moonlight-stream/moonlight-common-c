@@ -16,6 +16,7 @@
 #define FLAG_ALLOCATED_OPTION_FIELDS 0x1
 #define FLAG_ALLOCATED_MESSAGE_BUFFER 0x2
 #define FLAG_ALLOCATED_OPTION_ITEMS 0x4
+#define FLAG_ALLOCATED_PAYLOAD 0x8
 
 /* Linked List to store the options */
 typedef struct _OPTION_ITEM {

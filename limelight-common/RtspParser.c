@@ -353,5 +353,9 @@ void freeMessage(PRTSP_MESSAGE msg){
 	if (msg->flags & FLAG_ALLOCATED_OPTION_ITEMS){
 		freeOptionList(msg->options);
 	}
-	free(msg);
+
+	/* If we've allocated the payload */
+	if (msg->flags & FLAG_ALLOCATED_PAYLOAD) {
+		free(msg->payload);
+	}
 }
