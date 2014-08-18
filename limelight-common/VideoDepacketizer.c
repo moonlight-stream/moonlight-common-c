@@ -5,17 +5,18 @@
 
 static PLENTRY nalChainHead;
 static int nalChainDataLength;
-static int decodingAvc;
 
 static int nextFrameNumber = 1;
 static int nextPacketNumber;
 static int startFrameNumber = 1;
 static int waitingForNextSuccessfulFrame;
+static int waitingForIdrFrame = 1;
 static int gotNextFrameStart;
 static int lastPacketInStream = 0;
+static int decodingFrame = 0;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
-static int packetSize;
+static unsigned int nominalPacketDataLength;
 
 static unsigned short lastSequenceNumber;
 
@@ -27,10 +28,10 @@ typedef struct _BUFFER_DESC {
 
 void initializeVideoDepacketizer(int pktSize) {
 	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
-	packetSize = pktSize;
+	nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
 }
 
-static void clearAvcNalState(void) {
+static void cleanupAvcFrameState(void) {
 	PLENTRY lastEntry;
 
 	while (nalChainHead != NULL) {
@@ -41,6 +42,11 @@ static void clearAvcNalState(void) {
 	}
 
 	nalChainDataLength = 0;
+}
+
+static void dropAvcFrameState(void) {
+	waitingForIdrFrame = 1;
+	cleanupAvcFrameState();
 }
 
 void destroyVideoDepacketizer(void) {
@@ -54,7 +60,7 @@ void destroyVideoDepacketizer(void) {
 		entry = nextEntry;
 	}
 
-	clearAvcNalState();
+	cleanupAvcFrameState();
 }
 
 static int isSeqFrameStart(PBUFFER_DESC candidate) {
@@ -105,7 +111,7 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 	return 0;
 }
 
-static void reassembleFrame(int frameNumber) {
+static void reassembleAvcFrame(int frameNumber) {
 	if (nalChainHead != NULL) {
 		PDECODE_UNIT du = (PDECODE_UNIT) malloc(sizeof(*du));
 		if (du != NULL) {
@@ -122,10 +128,12 @@ static void reassembleFrame(int frameNumber) {
 				nalChainDataLength = du->fullLength;
 				free(du);
 
-				clearAvcNalState();
-
 				// FIXME: Get proper lower bound
 				connectionSinkTooSlow(0, frameNumber);
+
+				// Clear frame state and wait for an IDR
+				dropAvcFrameState();
+				return;
 			}
 
 			// Notify the control connection
@@ -157,7 +165,7 @@ void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
 	free(decodeUnit);
 }
 
-void queueFragment(char *data, int offset, int length) {
+static void queueFragment(char *data, int offset, int length) {
 	PLENTRY entry = (PLENTRY) malloc(sizeof(*entry));
 	if (entry != NULL) {
 		entry->next = NULL;
@@ -187,42 +195,60 @@ void queueFragment(char *data, int offset, int length) {
 	}
 }
 
-void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
+static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
 	BUFFER_DESC specialSeq;
+	int decodingAvc = 0;
 
 	while (currentPos->length != 0) {
 		int start = currentPos->offset;
 
 		if (getSpecialSeq(currentPos, &specialSeq)) {
 			if (isSeqAvcStart(&specialSeq)) {
+				// Now we're decoding AVC
 				decodingAvc = 1;
 
 				if (isSeqFrameStart(&specialSeq)) {
-					reassembleFrame(videoPacket->frameIndex);
+					// Now we're working on a frame
+					decodingFrame = 1;
+
+					// Reassemble any pending frame
+					reassembleAvcFrame(videoPacket->frameIndex);
+
+					if (specialSeq.data[specialSeq.offset + specialSeq.length] == 0x65) {
+						// This is the NALU code for I-frame data
+						waitingForIdrFrame = 0;
+					}
 				}
 
+				// Skip the start sequence
 				currentPos->length -= specialSeq.length;
 				currentPos->offset += specialSeq.length;
 			}
 			else {
+				// Check if this is padding after a full AVC frame
 				if (decodingAvc && isSeqPadding(currentPos)) {
-					reassembleFrame(videoPacket->frameIndex);
+					reassembleAvcFrame(videoPacket->frameIndex);
 				}
 
+				// Not decoding AVC
 				decodingAvc = 0;
 
+				// Just skip this byte
 				currentPos->length--;
 				currentPos->offset++;
 			}
 		}
 
+		// Move to the next special sequence
 		while (currentPos->length != 0) {
+			// Check if this should end the current NAL
 			if (getSpecialSeq(currentPos, &specialSeq)) {
 				if (decodingAvc || !isSeqPadding(&specialSeq)) {
 					break;
 				}
 			}
 
+			// This byte is part of the NAL data
 			currentPos->offset++;
 			currentPos->length--;
 		}
@@ -233,156 +259,189 @@ void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos
 	}
 }
 
-void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
+static int isFirstPacket(char flags) {
+	// Clear the picture data flag
+	flags &= ~FLAG_CONTAINS_PIC_DATA;
+	
+	// Check if it's just the start or both start and end of a frame
+	return (flags == (FLAG_SOF | FLAG_EOF) ||
+		flags == FLAG_SOF);
+}
+
+static void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
 	queueFragment(location.data, location.offset, location.length);
+}
+
+static int isBeforeSigned(int numA, int numB, int ambiguousCase) {
+	// This should be the common case for most callers
+	if (numA == numB) {
+		return 0;
+	}
+
+	// If numA and numB have the same signs,
+	// we can just do a regular comparison.
+	if ((numA < 0 && numB < 0) || (numA >= 0 && numB >= 0)) {
+		return numA < numB;
+	}
+	else {
+		// The sign switch is ambiguous
+		return ambiguousCase;
+	}
 }
 
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	BUFFER_DESC currentPos, specialSeq;
-	int isFirstPacket;
-	int streamPacketIndex;
+
+	// Mask the top 8 bits from the SPI
+	videoPacket->streamPacketIndex >>= 8;
+	videoPacket->streamPacketIndex &= 0xFFFFFF;
 	
 	currentPos.data = (char*) (videoPacket + 1);
 	currentPos.offset = 0;
 	currentPos.length = length - sizeof(*videoPacket);
 
-	if (currentPos.length < packetSize - sizeof(NV_VIDEO_PACKET)) {
-		processRtpPayloadSlow(videoPacket, &currentPos);
+	int frameIndex = videoPacket->frameIndex;
+	char flags = videoPacket->flags;
+	int firstPacket = isFirstPacket(flags);
+
+	// Drop duplicates or re-ordered packets
+	int streamPacketIndex = videoPacket->streamPacketIndex;
+	if (isBeforeSigned((short) streamPacketIndex, (short) (lastPacketInStream + 1), 0)) {
 		return;
 	}
 
-	// We can use FEC to correct single packet errors
-	// on single packet frames because we just get a
-	// duplicate of the original packet
-	if (videoPacket->totalPackets == 1 &&
-		videoPacket->packetIndex == 1 &&
-		nextPacketNumber == 0 &&
-		videoPacket->frameIndex == nextFrameNumber) {
-		Limelog("Using FEC for error correction\n");
-		nextPacketNumber = 1;
-	}
-	// Discard the rest of the FEC data until we know how to use it
-	else if (videoPacket->packetIndex >= videoPacket->totalPackets) {
+	// Drop packets from a previously completed frame
+	if (isBeforeSigned(frameIndex, nextFrameNumber, 0)) {
 		return;
 	}
 
-	// Check that this is the next frame
-	isFirstPacket = (videoPacket->flags & FLAG_SOF) != 0;
-	if (videoPacket->frameIndex > nextFrameNumber) {
-		// Nope, but we can still work with it if it's
-		// the start of the next frame
-		if (isFirstPacket) {
-			Limelog("Got start of frame %d when expecting %d of frame %d\n",
-				videoPacket->frameIndex, nextPacketNumber, nextFrameNumber);
+	// Look for a frame start before receiving a frame end
+	if (firstPacket && decodingFrame)
+	{
+		Limelog("Network dropped end of a frame\n");
+		nextFrameNumber = frameIndex;
 
-			nextFrameNumber = videoPacket->frameIndex;
-			nextPacketNumber = 0;
-			clearAvcNalState();
+		// Unexpected start of next frame before terminating the last
+		waitingForNextSuccessfulFrame = 1;
+		waitingForIdrFrame = 1;
 
-			// Tell the encoder when we're done decoding this frame
-			// that we lost some previous frames
+		// Clear the old state and wait for an IDR
+		dropAvcFrameState();
+	}
+	// Look for a non-frame start before a frame start
+	else if (!firstPacket && !decodingFrame) {
+		// Check if this looks like a real frame
+		if (flags == FLAG_CONTAINS_PIC_DATA ||
+			flags == FLAG_EOF ||
+			currentPos.length < nominalPacketDataLength)
+		{
+			Limelog("Network dropped beginning of a frame");
+			nextFrameNumber = frameIndex + 1;
+
 			waitingForNextSuccessfulFrame = 1;
-			gotNextFrameStart = 0;
+
+			dropAvcFrameState();
+			decodingFrame = 0;
+			return;
 		}
 		else {
-			Limelog("Got packet %d of frame %d when expecting packet %d of frame %d\n",
-				videoPacket->packetIndex, videoPacket->frameIndex,
-				nextPacketNumber, nextFrameNumber);
-
-			// We dropped the start of this frame too
-			waitingForNextSuccessfulFrame = 1;
-			gotNextFrameStart = 0;
-
-			// Try to pickup on the next frame
-			nextFrameNumber = videoPacket->frameIndex + 1;
-			nextPacketNumber = 0;
-			clearAvcNalState();
+			// FEC data
 			return;
 		}
 	}
-	else if (videoPacket->frameIndex < nextFrameNumber) {
-		Limelog("Frame %d is behind our current frame number %d\n",
-			videoPacket->frameIndex, nextFrameNumber);
-		return;
+	// Check sequencing of this frame to ensure we didn't
+	// miss one in between
+	else if (firstPacket) {
+		// Make sure this is the next consecutive frame
+		if (isBeforeSigned(nextFrameNumber, frameIndex, 1)) {
+			Limelog("Network dropped an entire frame");
+			nextFrameNumber = frameIndex;
+
+			// Wait until an IDR frame comes
+			waitingForNextSuccessfulFrame = 1;
+			dropAvcFrameState();
+		}
+		else if (nextFrameNumber != frameIndex) {
+			// Duplicate packet or FEC dup
+			decodingFrame = 0;
+			return;
+		}
+
+		// We're now decoding a frame
+		decodingFrame = 1;
 	}
 
-	// We know it's the right frame, now check the packet number
-	if (videoPacket->packetIndex != nextPacketNumber) {
-		Limelog("Frame %d: expected packet %d but got %d\n",
-			videoPacket->frameIndex, nextPacketNumber, videoPacket->packetIndex);
+	// If it's not the first packet of a frame
+	// we need to drop it if the stream packet index
+	// doesn't match
+	if (!firstPacket && decodingFrame) {
+		if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
+			Limelog("Network dropped middle of a frame");
+			nextFrameNumber = frameIndex + 1;
 
-		// At this point, we're guaranteed that it's not FEC data that we lost
-		waitingForNextSuccessfulFrame = 1;
-		gotNextFrameStart = 0;
+			waitingForNextSuccessfulFrame = 1;
 
-		// Skip this frame
-		nextFrameNumber++;
-		nextPacketNumber = 0;
-		clearAvcNalState();
-		return;
-	}
+			dropAvcFrameState();
+			decodingFrame = 0;
 
-	if (waitingForNextSuccessfulFrame) {
-		if (!gotNextFrameStart) {
-			if (!isFirstPacket) {
-				// We're waiting for the next frame, but this one is a fragment of a frame
-				// so we must discard it and wait for the next one
-				Limelog("Expected start of frame %d\n", videoPacket->frameIndex);
-
-				nextFrameNumber = videoPacket->frameIndex;
-				nextPacketNumber = 0;
-				clearAvcNalState();
-				return;
-			} else {
-				gotNextFrameStart = 1;
-			}
+			return;
 		}
 	}
 
-	streamPacketIndex = videoPacket->streamPacketIndex;
+	// Notify the server of any packet losses
 	if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
 		// Packets were lost so report this to the server
 		connectionLostPackets(lastPacketInStream, streamPacketIndex);
 	}
 	lastPacketInStream = streamPacketIndex;
 
-	nextPacketNumber++;
-
-	// Remove extra padding
-	currentPos.length = videoPacket->payloadLength;
-
-	/*if (isFirstPacket) {
-		if (getSpecialSeq(&currentPos, &specialSeq) &&
-			isSeqFrameStart(&specialSeq) &&
-			specialSeq.data[specialSeq.offset+specialSeq.length] == 0x67) {
-			// SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
-			clearAvcNalState();
-			processRtpPayloadSlow(videoPacket, &currentPos);
-			return;
-		}
-	}*/
-
-	processRtpPayloadFast(videoPacket, currentPos);
-
-	// We can't use the EOF flag here because real frames can be split across
-	// multiple "frames" when packetized to fit under the bandwidth ceiling
-	if (videoPacket->packetIndex + 1 >= videoPacket->totalPackets) {
-		nextFrameNumber++;
-		nextPacketNumber = 0;
+	if (isFirstPacket &&
+		getSpecialSeq(&currentPos, &specialSeq) &&
+		isSeqFrameStart(&specialSeq) &&
+		specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67)
+	{
+		// SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
+		processRtpPayloadSlow(videoPacket, &currentPos);
+	}
+	else
+	{
+		processRtpPayloadFast(videoPacket, currentPos);
 	}
 
-	if (videoPacket->flags & FLAG_EOF) {
-		reassembleFrame(videoPacket->frameIndex);
+	if (flags & FLAG_EOF) {
+		// Move on to the next frame
+		decodingFrame = 0;
+		nextFrameNumber = frameIndex + 1;
 
+		// If waiting for next successful frame and we got here
+		// with an end flag, we can send a message to the server
 		if (waitingForNextSuccessfulFrame) {
 			// This is the next successful frame after a loss event
 			connectionDetectedFrameLoss(startFrameNumber, nextFrameNumber - 1);
 			waitingForNextSuccessfulFrame = 0;
 		}
+
+		// If we need an IDR frame first, then drop this frame
+		if (waitingForIdrFrame) {
+			Limelog("Waiting for IDR frame");
+
+			dropAvcFrameState();
+			return;
+		}
+
+		reassembleAvcFrame(frameIndex);
+
 		startFrameNumber = nextFrameNumber;
 	}
 }
 
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
-	processRtpPayload((PNV_VIDEO_PACKET) (rtpPacket + 1), length - sizeof(*rtpPacket));
+	int dataOffset;
+
+	dataOffset = sizeof(*rtpPacket);
+	if (rtpPacket->header & FLAG_EXTENSION) {
+		dataOffset += 4; // 2 additional fields
+	}
+
+	processRtpPayload((PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset), length - dataOffset);
 }

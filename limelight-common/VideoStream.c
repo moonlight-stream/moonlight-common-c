@@ -63,7 +63,7 @@ static void ReceiveThreadProc(void* context) {
 	int bufferSize;
 	char* buffer;
 
-	bufferSize = configuration.packetSize + sizeof(RTP_PACKET);
+	bufferSize = configuration.packetSize + MAX_RTP_HEADER_SIZE;
 	buffer = (char*)malloc(bufferSize);
 	if (buffer == NULL) {
 		Limelog("Receive thread terminating\n");
