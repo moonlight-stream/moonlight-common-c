@@ -339,7 +339,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 			flags == FLAG_EOF ||
 			currentPos.length < nominalPacketDataLength)
 		{
-			Limelog("Network dropped beginning of a frame");
+			Limelog("Network dropped beginning of a frame\n");
 			nextFrameNumber = frameIndex + 1;
 
 			waitingForNextSuccessfulFrame = 1;
@@ -358,7 +358,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	else if (firstPacket) {
 		// Make sure this is the next consecutive frame
 		if (isBeforeSigned(nextFrameNumber, frameIndex, 1)) {
-			Limelog("Network dropped an entire frame");
+			Limelog("Network dropped an entire frame\n");
 			nextFrameNumber = frameIndex;
 
 			// Wait until an IDR frame comes
@@ -380,7 +380,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	// doesn't match
 	if (!firstPacket && decodingFrame) {
 		if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
-			Limelog("Network dropped middle of a frame");
+			Limelog("Network dropped middle of a frame\n");
 			nextFrameNumber = frameIndex + 1;
 
 			waitingForNextSuccessfulFrame = 1;
@@ -427,7 +427,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
 		// If we need an IDR frame first, then drop this frame
 		if (waitingForIdrFrame) {
-			Limelog("Waiting for IDR frame");
+			Limelog("Waiting for IDR frame\n");
 
 			dropAvcFrameState();
 			return;
