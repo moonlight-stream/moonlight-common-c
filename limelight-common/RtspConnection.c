@@ -8,12 +8,13 @@ static char rtspTargetUrl[256];
 static char sessionIdString[16];
 static int hasSessionId = 0;
 
-// GFE 2.1.1
+/* GFE 2.1.1 */
 #define RTSP_CLIENT_VERSION 10
 #define RTSP_CLIENT_VERSION_S "10"
 
 #define RTSP_MAX_RESP_SIZE 16384
 
+/* Create RTSP Option */
 static POPTION_ITEM createOptionItem(char* option, char* content)
 {
 	POPTION_ITEM item = malloc(sizeof(*item));
@@ -44,6 +45,7 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
 	return item;
 }
 
+/* Add an option to the RTSP Message */
 static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
 {
 	POPTION_ITEM item = createOptionItem(option, content);
@@ -57,6 +59,7 @@ static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
 	return 1;
 }
 
+/* Create an RTSP Request */
 static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 {
 	char sequenceNumberStr[16];
@@ -137,6 +140,7 @@ Exit:
 	return ret;
 }
 
+/* Terminate the RTSP Handshake process by closing the socket */
 void terminateRtspHandshake(void) {
 	if (sock != INVALID_SOCKET) {
 		closesocket(sock);
@@ -144,6 +148,7 @@ void terminateRtspHandshake(void) {
 	}
 }
 
+/* Send RTSP OPTIONS request */
 static int requestOptions(PRTSP_MESSAGE response) {
 	RTSP_MESSAGE request;
 	int ret;
@@ -157,6 +162,7 @@ static int requestOptions(PRTSP_MESSAGE response) {
 	return ret;
 }
 
+/* Send RTSP DESCRIBE request */
 static int requestDescribe(PRTSP_MESSAGE response) {
 	RTSP_MESSAGE request;
 	int ret;
@@ -178,6 +184,7 @@ static int requestDescribe(PRTSP_MESSAGE response) {
 	return ret;
 }
 
+/* Send RTSP SETUP request */
 static int setupStream(PRTSP_MESSAGE response, char* target) {
 	RTSP_MESSAGE request;
 	int ret;
@@ -207,6 +214,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target) {
 	return ret;
 }
 
+/* Send RTSP PLAY request*/
 static int playStream(PRTSP_MESSAGE response, char* target) {
 	RTSP_MESSAGE request;
 	int ret;
@@ -225,6 +233,7 @@ static int playStream(PRTSP_MESSAGE response, char* target) {
 	return ret;
 }
 
+/* Send RTSP ANNOUNCE message */
 static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION streamConfig) {
 	RTSP_MESSAGE request;
 	int ret;
@@ -263,6 +272,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 	return ret;
 }
 
+/* Perform RTSP Handshake with the streaming server machine as part of the connection process */
 int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
 	struct in_addr inaddr;
 

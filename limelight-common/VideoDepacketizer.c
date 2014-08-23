@@ -26,11 +26,13 @@ typedef struct _BUFFER_DESC {
 	unsigned int length;
 } BUFFER_DESC, *PBUFFER_DESC;
 
+/* Init */
 void initializeVideoDepacketizer(int pktSize) {
 	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 	nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
 }
 
+/* Free malloced memory in AvcFrameState*/
 static void cleanupAvcFrameState(void) {
 	PLENTRY lastEntry;
 
@@ -49,6 +51,7 @@ static void dropAvcFrameState(void) {
 	cleanupAvcFrameState();
 }
 
+/* Cleanup video depacketizer and free malloced memory */
 void destroyVideoDepacketizer(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 	
@@ -63,18 +66,22 @@ void destroyVideoDepacketizer(void) {
 	cleanupAvcFrameState();
 }
 
+/* Returns 1 if candidate is a frame start and 0 otherwise */
 static int isSeqFrameStart(PBUFFER_DESC candidate) {
 	return (candidate->length == 4 && candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
+/* Returns 1 if candidate an AVC start and 0 otherwise */
 static int isSeqAvcStart(PBUFFER_DESC candidate) {
 	return (candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
+/* Returns 1 if candidate is padding and 0 otherwise */
 static int isSeqPadding(PBUFFER_DESC candidate) {
 	return (candidate->data[candidate->offset + candidate->length - 1] == 0);
 }
 
+/* Returns 1 on success, 0 otherwise */
 static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 	if (current->length < 3) {
 		return 0;
@@ -111,6 +118,7 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 	return 0;
 }
 
+/* Reassemble the frame with the given frame number */
 static void reassembleAvcFrame(int frameNumber) {
 	if (nalChainHead != NULL) {
 		PDECODE_UNIT du = (PDECODE_UNIT) malloc(sizeof(*du));
@@ -142,6 +150,7 @@ static void reassembleAvcFrame(int frameNumber) {
 	}
 }
 
+/* Given a decode unit, get the next one in the linked blocking queue */
 int getNextDecodeUnit(PDECODE_UNIT *du) {
 	int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)du);
 	if (err == LBQ_SUCCESS) {
@@ -152,6 +161,7 @@ int getNextDecodeUnit(PDECODE_UNIT *du) {
 	}
 }
 
+/* Cleanup a decode unit by freeing malloced memory */
 void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
 	PLENTRY lastEntry;
 
@@ -259,6 +269,7 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
 	}
 }
 
+/* Return 1 if packet is the first one in the frame */
 static int isFirstPacket(char flags) {
 	// Clear the picture data flag
 	flags &= ~FLAG_CONTAINS_PIC_DATA;
@@ -268,7 +279,9 @@ static int isFirstPacket(char flags) {
 		flags == FLAG_SOF);
 }
 
+/* Adds a fragment directly to the queue */
 static void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
+	// FIXME not using videoPacket parameter?? 
 	queueFragment(location.data, location.offset, location.length);
 }
 
@@ -439,6 +452,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	}
 }
 
+/* Add an RTP Packet to the queue */
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
 	int dataOffset;
 
