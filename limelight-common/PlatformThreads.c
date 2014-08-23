@@ -97,19 +97,30 @@ void PltCloseThread(PLT_THREAD *thread) {
 	PLT_THREAD *current_thread;
 	
 	PltLockMutex(&thread_list_lock);
-	current_thread = thread_head;
-	while (current_thread != NULL) {
-		if (current_thread->next == thread) {
-			break;
+
+	if (thread_head == thread)
+	{
+		// Remove the thread from the head
+		thread_head = thread_head->next;
+	}
+	else
+	{
+		// Find the thread in the list
+		current_thread = thread_head;
+		while (current_thread != NULL) {
+			if (current_thread->next == thread) {
+				break;
+			}
+
+			current_thread = current_thread->next;
 		}
 
-		current_thread = current_thread->next;
+		LC_ASSERT(current_thread != NULL);
+
+		// Unlink this thread
+		current_thread->next = thread->next;
 	}
 
-	LC_ASSERT(current_thread != NULL);
-
-	// Unlink this thread
-	current_thread->next = thread->next;
 	PltUnlockMutex(&thread_list_lock);
 
 	CloseHandle(thread->termevent);
