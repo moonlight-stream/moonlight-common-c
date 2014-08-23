@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma pack(push, 1)
+
 #define FLAG_CONTAINS_PIC_DATA 0x1
 #define FLAG_EOF 0x2
 #define FLAG_SOF 0x4
@@ -23,3 +25,5 @@ typedef struct _RTP_PACKET {
 	unsigned short sequenceNumber;
 	char reserved[8];
 } RTP_PACKET, *PRTP_PACKET;
+
+#pragma pack(pop)
