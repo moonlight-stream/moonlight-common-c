@@ -195,6 +195,9 @@ int startAudioStream(void) {
     callbacks.init();
 
 	rtpSocket = bindUdpSocket(RTP_PORT);
+	if (rtpSocket == INVALID_SOCKET) {
+		return LastSocketError();
+	}
 
 	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
 	if (err != 0) {

@@ -163,6 +163,9 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		configuration.height, 60, rendererContext, drFlags);
 
 	rtpSocket = bindUdpSocket(RTP_PORT);
+	if (rtpSocket == INVALID_SOCKET) {
+		return LastSocketError();
+	}
 
 	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
 	if (err != 0) {
