@@ -39,7 +39,6 @@ static void cleanupAvcFrameState(void) {
 	while (nalChainHead != NULL) {
 		lastEntry = nalChainHead;
 		nalChainHead = lastEntry->next;
-		free(lastEntry->data);
 		free(lastEntry);
 	}
 
@@ -58,7 +57,6 @@ void destroyVideoDepacketizer(void) {
 	entry = LbqDestroyLinkedBlockingQueue(&decodeUnitQueue);
 	while (entry != NULL) {
 		nextEntry = entry->flink;
-		free(entry->data);
 		free(entry);
 		entry = nextEntry;
 	}
@@ -168,7 +166,6 @@ void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
 	while (decodeUnit->bufferList != NULL) {
 		lastEntry = decodeUnit->bufferList;
 		decodeUnit->bufferList = lastEntry->next;
-		free(lastEntry->data);
 		free(lastEntry);
 	}
 
@@ -176,15 +173,11 @@ void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
 }
 
 static void queueFragment(char *data, int offset, int length) {
-	PLENTRY entry = (PLENTRY) malloc(sizeof(*entry));
+	PLENTRY entry = (PLENTRY) malloc(sizeof(*entry) + length);
 	if (entry != NULL) {
 		entry->next = NULL;
 		entry->length = length;
-		entry->data = (char*) malloc(entry->length);
-		if (entry->data == NULL) {
-			free(entry);
-			return;
-		}
+		entry->data = (char*) (entry + 1);
 
 		memcpy(entry->data, &data[offset], entry->length);
 
