@@ -71,10 +71,9 @@ static void UdpPingThreadProc(void *context) {
 static void ReceiveThreadProc(void* context) {
 	int err;
 	PRTP_PACKET rtp;
+    char* buffer = NULL;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
-		char* buffer = NULL;
-		
 		if (buffer == NULL) {
 			buffer = (char*) malloc(MAX_PACKET_SIZE + sizeof(int));
 			if (buffer == NULL) {
