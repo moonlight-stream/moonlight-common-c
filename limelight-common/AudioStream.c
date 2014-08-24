@@ -17,6 +17,8 @@ static PLT_THREAD decoderThread;
 
 #define RTP_PORT 48000
 
+#define MAX_PACKET_SIZE 100
+
 /* Initialize the audio stream */
 void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, arCallbacks, sizeof(callbacks));
@@ -68,16 +70,21 @@ static void UdpPingThreadProc(void *context) {
 
 static void ReceiveThreadProc(void* context) {
 	int err;
+	PRTP_PACKET rtp;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
-		char* buffer = (char*) malloc(1500 + sizeof(int));
+		char* buffer = NULL;
+		
 		if (buffer == NULL) {
-			Limelog("Receive thread terminating\n");
-			listenerCallbacks->connectionTerminated(-1);
-			return;
+			buffer = (char*) malloc(MAX_PACKET_SIZE + sizeof(int));
+			if (buffer == NULL) {
+				Limelog("Receive thread terminating\n");
+				listenerCallbacks->connectionTerminated(-1);
+				return;
+			}
 		}
 
-		err = recv(rtpSocket, &buffer[sizeof(int)], 1500, 0);
+		err = recv(rtpSocket, &buffer[sizeof(int)], MAX_PACKET_SIZE, 0);
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			free(buffer);
@@ -85,11 +92,26 @@ static void ReceiveThreadProc(void* context) {
 			return;
 		}
 
+		if (err < sizeof(RTP_PACKET)) {
+			// Runt packet
+			continue;
+		}
+
+		rtp = (PRTP_PACKET) &buffer[sizeof(int)];
+		if (rtp->packetType != 97) {
+			// Not audio
+			continue;
+		}
+
 		memcpy(buffer, &err, sizeof(err));
 
 		err = LbqOfferQueueItem(&packetQueue, buffer);
 		if (err != LBQ_SUCCESS) {
 			free(buffer);
+		}
+		else {
+			// The queue owns the buffer now
+			buffer = NULL;
 		}
 
 		if (err == LBQ_BOUND_EXCEEDED) {
