@@ -1,18 +1,19 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 
+#define RTSP_MAX_RESP_SIZE 16384
+
 static SOCKET sock = INVALID_SOCKET;
 static IP_ADDRESS remoteAddr;
 static int currentSeqNumber = 1;
 static char rtspTargetUrl[256];
 static char sessionIdString[16];
 static int hasSessionId = 0;
+static char responseBuffer[RTSP_MAX_RESP_SIZE];
 
 /* GFE 2.1.1 */
 #define RTSP_CLIENT_VERSION 10
 #define RTSP_CLIENT_VERSION_S "10"
-
-#define RTSP_MAX_RESP_SIZE 16384
 
 /* Create RTSP Option */
 static POPTION_ITEM createOptionItem(char* option, char* content)
@@ -81,7 +82,6 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 /* Returns 1 on success, 0 otherwise */
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
 	int err, ret = 0;
-	char responseBuffer[RTSP_MAX_RESP_SIZE];
 	int offset;
 	PRTSP_MESSAGE responseMsg = NULL;
 	char* serializedMessage = NULL;

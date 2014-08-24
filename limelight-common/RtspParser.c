@@ -28,7 +28,7 @@ static int getMessageLength(PRTSP_MESSAGE msg){
 	}
 	/* Add length of response-specific strings */
 	else {
-		char *statusCodeStr = malloc(sizeof(int));
+		char statusCodeStr[16];
 		sprintf(statusCodeStr, "%d", msg->message.response.statusCode);
 		count += strlen(statusCodeStr);
 		count += strlen(msg->message.response.statusString);
@@ -303,9 +303,14 @@ void freeOptionList(POPTION_ITEM optionsHead){
 /* Serialize the message struct into a string containing the RTSP message */
 char *serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength){
 	int size = getMessageLength(msg);
-	char *serializedMessage = malloc(size);
+	char *serializedMessage;
 	POPTION_ITEM current = msg->options;
-	char *statusCodeStr = malloc(4); // 3 characeters + NUL
+	char statusCodeStr[16];
+
+	serializedMessage = malloc(size);
+	if (serializedMessage == NULL) {
+		return NULL;
+	}
 
 	if (msg->type == TYPE_REQUEST){
 		/* command [space] */
