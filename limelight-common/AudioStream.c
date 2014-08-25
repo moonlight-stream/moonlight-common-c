@@ -105,10 +105,7 @@ static void ReceiveThreadProc(void* context) {
 		memcpy(buffer, &err, sizeof(err));
 
 		err = LbqOfferQueueItem(&packetQueue, buffer);
-		if (err != LBQ_SUCCESS) {
-			free(buffer);
-		}
-		else {
+		if (err == LBQ_SUCCESS) {
 			// The queue owns the buffer now
 			buffer = NULL;
 		}
@@ -118,6 +115,7 @@ static void ReceiveThreadProc(void* context) {
 		}
 		else if (err == LBQ_INTERRUPTED) {
 			Limelog("Receive thread terminating #2\n");
+			free(buffer);
 			return;
 		}
 	}
