@@ -137,6 +137,8 @@
     <ClCompile Include="ControlStream.c" />
     <ClCompile Include="InputStream.c" />
     <ClCompile Include="LinkedBlockingQueue.c" />
+    <ClCompile Include="OpenAES\oaes_base64.c" />
+    <ClCompile Include="OpenAES\oaes_lib.c" />
     <ClCompile Include="PlatformSockets.c" />
     <ClCompile Include="PlatformThreads.c" />
     <ClCompile Include="RtspConnection.c" />
@@ -151,6 +153,10 @@
     <ClInclude Include="Limelight-internal.h" />
     <ClInclude Include="Limelight.h" />
     <ClInclude Include="LinkedBlockingQueue.h" />
+    <ClInclude Include="OpenAES\oaes_base64.h" />
+    <ClInclude Include="OpenAES\oaes_common.h" />
+    <ClInclude Include="OpenAES\oaes_config.h" />
+    <ClInclude Include="OpenAES\oaes_lib.h" />
     <ClInclude Include="Platform.h" />
     <ClInclude Include="PlatformSockets.h" />
     <ClInclude Include="PlatformThreads.h" />

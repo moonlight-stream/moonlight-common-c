@@ -156,7 +156,9 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 
 	Limelog("Initializing input stream...");
 	ListenerCallbacks.stageStarting(STAGE_INPUT_STREAM_INIT);
-	initializeInputStream(host, &ListenerCallbacks);
+	initializeInputStream(host, &ListenerCallbacks,
+		streamConfig->remoteInputAesKey, sizeof(streamConfig->remoteInputAesKey),
+		streamConfig->remoteInputAesIv, sizeof(streamConfig->remoteInputAesIv));
 	stage++;
 	LC_ASSERT(stage == STAGE_INPUT_STREAM_INIT);
 	ListenerCallbacks.stageComplete(STAGE_INPUT_STREAM_INIT);

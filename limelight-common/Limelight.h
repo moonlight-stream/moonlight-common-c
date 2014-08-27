@@ -12,6 +12,8 @@ typedef struct _STREAM_CONFIGURATION {
 	int fps;
 	int bitrate;
 	int packetSize;
+	char remoteInputAesKey[16];
+	char remoteInputAesIv[16];
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 typedef struct _LENTRY {

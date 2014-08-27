@@ -37,7 +37,8 @@ void destroyAudioStream(void);
 int startAudioStream(void);
 void stopAudioStream(void);
 
-int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
+int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+	char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength);
 void destroyInputStream(void);
 int startInputStream(void);
 int stopInputStream(void);

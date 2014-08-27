@@ -4,12 +4,18 @@
 #include "LinkedBlockingQueue.h"
 #include "Input.h"
 
+#include "OpenAES\oaes_lib.h"
+#include "OpenAES\oaes_common.h"
+
 static IP_ADDRESS host;
 static SOCKET inputSock = INVALID_SOCKET;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
+static OAES_CTX* oaesContext;
+
+#define MAX_INPUT_PACKET_SIZE 128
 
 typedef struct _PACKET_HOLDER {
 	int packetLength;
@@ -20,9 +26,35 @@ typedef struct _PACKET_HOLDER {
 	} packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
-int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
+int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+	char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength) {
 	host = addr;
 	listenerCallbacks = clCallbacks;
+
+	if (aesIvLength != OAES_BLOCK_SIZE)
+	{
+		Limelog("AES IV is incorrect length. Should be %d\n", aesIvLength);
+		return -1;
+	}
+
+	oaesContext = oaes_alloc();
+	if (oaesContext == NULL)
+	{
+		Limelog("Failed to allocate OpenAES context\n");
+		return -1;
+	}
+
+	if (oaes_set_option(oaesContext, OAES_OPTION_CBC, aesIv) != OAES_RET_SUCCESS)
+	{
+		Limelog("Failed to set CBC and IV on OAES context\n");
+		return -1;
+	}
+
+	if (oaes_key_import_data(oaesContext, aesKeyData, aesKeyDataLength) != OAES_RET_SUCCESS)
+	{
+		Limelog("Failed to import AES key data\n");
+		return -1;
+	}
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
@@ -31,6 +63,11 @@ int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCall
 
 void destroyInputStream(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
+
+	if (oaesContext != NULL)
+	{
+		oaes_free(oaesContext);
+	}
 
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
 
@@ -45,8 +82,12 @@ void destroyInputStream(void) {
 static void inputSendThreadProc(void* context) {
 	int err;
 	PPACKET_HOLDER holder;
+	char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
+	size_t encryptedSize;
 
 	while (!PltIsThreadInterrupted(&inputSendThread)) {
+		int encryptedLengthPrefix;
+
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &holder);
 		if (err != LBQ_SUCCESS) {
 			Limelog("Input thread terminating #1\n");
@@ -54,13 +95,32 @@ static void inputSendThreadProc(void* context) {
 			return;
 		}
 
-#ifdef _MSC_VER
-#pragma warning(suppress: 6001)
-#endif
-		err = send(inputSock, (const char*) &holder->packet, holder->packetLength, 0);
+		encryptedSize = sizeof(encryptedBuffer);
+		err = oaes_encrypt(oaesContext, (const char*) &holder->packet, holder->packetLength,
+			encryptedBuffer, &encryptedSize);
 		free(holder);
-		if (err <= 0) {
+		if (err != OAES_RET_SUCCESS) {
 			Limelog("Input thread terminating #2\n");
+			listenerCallbacks->connectionTerminated(err);
+			return;
+		}
+
+		// The first 32-bytes of the output are internal OAES stuff that we want to ignore
+		encryptedSize -= 32;
+
+		// Send the encrypted length first
+		encryptedLengthPrefix = htonl((unsigned long) encryptedSize);
+		err = send(inputSock, (const char*) &encryptedLengthPrefix, sizeof(encryptedLengthPrefix), 0);
+		if (err <= 0) {
+			Limelog("Input thread terminating #3\n");
+			listenerCallbacks->connectionTerminated(err);
+			return;
+		}
+
+		// Send the encrypted payload
+		err = send(inputSock, (const char*) &encryptedBuffer[32], encryptedSize, 0);
+		if (err <= 0) {
+			Limelog("Input thread terminating #4\n");
 			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
