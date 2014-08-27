@@ -512,7 +512,7 @@ static uint32_t oaes_get_seed()
 	_test = (char *) calloc( sizeof( char ), timer.millitm );
 	_ret = gmTimer->tm_year + 1900 + gmTimer->tm_mon + 1 + gmTimer->tm_mday +
 			gmTimer->tm_hour + gmTimer->tm_min + gmTimer->tm_sec + timer.millitm +
-			(uint32_t) ( _test + timer.millitm ) + _getpid();
+			(uint32_t) ( _test + timer.millitm );
 
 	if( _test )
 		free( _test );
