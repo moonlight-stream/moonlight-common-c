@@ -5,10 +5,10 @@
 
 static SOCKET sock = INVALID_SOCKET;
 static IP_ADDRESS remoteAddr;
-static int currentSeqNumber = 1;
+static int currentSeqNumber;
 static char rtspTargetUrl[256];
 static char sessionIdString[16];
-static int hasSessionId = 0;
+static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
 
 /* GFE 2.1.1 */
@@ -280,6 +280,8 @@ int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr)
 	remoteAddr = addr;
 	inaddr.S_un.S_addr = addr;
 	sprintf(rtspTargetUrl, "rtsp://%s", inet_ntoa(inaddr));
+	currentSeqNumber = 1;
+	hasSessionId = 0;
 
 	{
 		RTSP_MESSAGE response;

@@ -70,6 +70,7 @@ void destroyInputStream(void) {
 	if (oaesContext != NULL)
 	{
 		oaes_free(oaesContext);
+		oaesContext = NULL;
 	}
 
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
@@ -80,6 +81,8 @@ void destroyInputStream(void) {
 		free(entry);
 		entry = nextEntry;
 	}
+
+	initialized = 0;
 }
 
 static void inputSendThreadProc(void* context) {

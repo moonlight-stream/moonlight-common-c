@@ -6,14 +6,14 @@
 static PLENTRY nalChainHead;
 static int nalChainDataLength;
 
-static int nextFrameNumber = 1;
+static int nextFrameNumber;
 static int nextPacketNumber;
-static int startFrameNumber = 1;
+static int startFrameNumber;
 static int waitingForNextSuccessfulFrame;
-static int waitingForIdrFrame = 1;
+static int waitingForIdrFrame;
 static int gotNextFrameStart;
-static int lastPacketInStream = 0;
-static int decodingFrame = 0;
+static int lastPacketInStream;
+static int decodingFrame;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 static unsigned int nominalPacketDataLength;
@@ -30,6 +30,15 @@ typedef struct _BUFFER_DESC {
 void initializeVideoDepacketizer(int pktSize) {
 	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 	nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
+
+	nextFrameNumber = 1;
+	nextPacketNumber = 0;
+	startFrameNumber = 1;
+	waitingForNextSuccessfulFrame = 0;
+	waitingForIdrFrame = 1;
+	gotNextFrameStart = 0;
+	lastPacketInStream = 0;
+	decodingFrame = 0;
 }
 
 /* Free malloced memory in AvcFrameState*/
