@@ -10,6 +10,7 @@
 static IP_ADDRESS host;
 static SOCKET inputSock = INVALID_SOCKET;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
+static int initialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
@@ -59,6 +60,7 @@ int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCall
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
+	initialized = 1;
 	return 0;
 }
 
@@ -164,6 +166,10 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 	PPACKET_HOLDER holder;
 	int err;
 
+	if (!initialized) {
+		return -2;
+	}
+
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
 		return -1;
@@ -187,6 +193,10 @@ int LiSendMouseButtonEvent(char action, int button) {
 	PPACKET_HOLDER holder;
 	int err;
 
+	if (!initialized) {
+		return -2;
+	}
+
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
 		return -1;
@@ -208,6 +218,10 @@ int LiSendMouseButtonEvent(char action, int button) {
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	PPACKET_HOLDER holder;
 	int err;
+
+	if (!initialized) {
+		return -2;
+	}
 
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
@@ -235,6 +249,10 @@ int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger
 {
 	PPACKET_HOLDER holder;
 	int err;
+
+	if (!initialized) {
+		return -2;
+	}
 
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
