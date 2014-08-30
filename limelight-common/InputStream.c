@@ -23,6 +23,7 @@ typedef struct _PACKET_HOLDER {
 		NV_KEYBOARD_PACKET keyboard;
 		NV_MOUSE_MOVE_PACKET mouseMove;
 		NV_MOUSE_BUTTON_PACKET mouseButton;
+		NV_CONTROLLER_PACKET controller;
 	} packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
@@ -229,3 +230,34 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	return err;
 }
 
+int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
+	short leftStickX, short leftStickY, short rightStickX, short rightStickY)
+{
+	PPACKET_HOLDER holder;
+	int err;
+
+	holder = malloc(sizeof(*holder));
+	if (holder == NULL) {
+		return -1;
+	}
+
+	holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
+	holder->packet.controller.header.packetType = PACKET_TYPE_CONTROLLER;
+	holder->packet.controller.headerA = HEADER_A;
+	holder->packet.controller.headerB = HEADER_B;
+	holder->packet.controller.buttonFlags = buttonFlags;
+	holder->packet.controller.leftTrigger = leftTrigger;
+	holder->packet.controller.rightTrigger = rightTrigger;
+	holder->packet.controller.leftStickX = leftStickX;
+	holder->packet.controller.leftStickY = leftStickY;
+	holder->packet.controller.rightStickX = rightStickX;
+	holder->packet.controller.rightStickY = rightStickY;
+	holder->packet.controller.tailA = TAIL_A;
+	holder->packet.controller.tailB = TAIL_B;
+	err = LbqOfferQueueItem(&packetQueue, holder);
+	if (err != LBQ_SUCCESS) {
+		free(holder);
+	}
+
+	return err;
+}

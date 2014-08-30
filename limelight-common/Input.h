@@ -32,4 +32,24 @@ typedef struct _NV_MOUSE_BUTTON_PACKET {
 	int button;
 } NV_MOUSE_BUTTON_PACKET, *PNV_MOUSE_BUTTON_PACKET;
 
+#define PACKET_TYPE_CONTROLLER 0x18
+#define HEADER_A 0x0000000A
+#define HEADER_B 0x1400
+#define TAIL_A 0x0000009C
+#define TAIL_B 0x0055
+typedef struct _NV_CONTROLLER_PACKET {
+	NV_INPUT_HEADER header;
+	int headerA;
+	short headerB;
+	short buttonFlags;
+	char leftTrigger;
+	char rightTrigger;
+	short leftStickX;
+	short leftStickY;
+	short rightStickX;
+	short rightStickY;
+	int tailA;
+	short tailB;
+} NV_CONTROLLER_PACKET, *PNV_CONTROLLER_PACKET;
+
 #pragma pack(pop)
