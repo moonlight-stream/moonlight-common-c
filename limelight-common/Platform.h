@@ -24,11 +24,11 @@
 #endif
 
 #include <stdio.h>
-#ifdef LC_WINDOWS_PHONE
+#if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 extern WCHAR DbgBuf[512];
 #define Limelog(s, ...) \
 	swprintf(DbgBuf, sizeof(DbgBuf) / sizeof(WCHAR), L ## s, ##__VA_ARGS__); \
-	OutputDebugString(DbgBuf)
+	OutputDebugStringW(DbgBuf)
 #else
 #define Limelog printf
 #endif
