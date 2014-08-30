@@ -232,7 +232,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	holder->packet.keyboard.header.packetType = htonl(PACKET_TYPE_KEYBOARD);
 	holder->packet.keyboard.keyAction = keyAction;
 	holder->packet.keyboard.zero1 = 0;
-	holder->packet.keyboard.keyCode = htons(keyCode);
+	holder->packet.keyboard.keyCode = keyCode;
 	holder->packet.keyboard.modifiers = modifiers;
 	holder->packet.keyboard.zero2 = 0;
 
@@ -260,7 +260,7 @@ int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger
 	}
 
 	holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
-	holder->packet.controller.header.packetType = PACKET_TYPE_CONTROLLER;
+	holder->packet.controller.header.packetType = htonl(PACKET_TYPE_CONTROLLER);
 	holder->packet.controller.headerA = HEADER_A;
 	holder->packet.controller.headerB = HEADER_B;
 	holder->packet.controller.buttonFlags = buttonFlags;
