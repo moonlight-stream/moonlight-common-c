@@ -6,7 +6,7 @@ struct thread_context {
 	void* context;
 };
 
-#if defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 WCHAR DbgBuf[512];
 #endif
 

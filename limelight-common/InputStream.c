@@ -10,6 +10,7 @@
 static IP_ADDRESS host;
 static SOCKET inputSock = INVALID_SOCKET;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
+static int initialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
@@ -23,6 +24,7 @@ typedef struct _PACKET_HOLDER {
 		NV_KEYBOARD_PACKET keyboard;
 		NV_MOUSE_MOVE_PACKET mouseMove;
 		NV_MOUSE_BUTTON_PACKET mouseButton;
+		NV_CONTROLLER_PACKET controller;
 	} packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
@@ -58,6 +60,7 @@ int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCall
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
+	initialized = 1;
 	return 0;
 }
 
@@ -67,6 +70,7 @@ void destroyInputStream(void) {
 	if (oaesContext != NULL)
 	{
 		oaes_free(oaesContext);
+		oaesContext = NULL;
 	}
 
 	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
@@ -77,6 +81,8 @@ void destroyInputStream(void) {
 		free(entry);
 		entry = nextEntry;
 	}
+
+	initialized = 0;
 }
 
 static void inputSendThreadProc(void* context) {
@@ -163,6 +169,10 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 	PPACKET_HOLDER holder;
 	int err;
 
+	if (!initialized) {
+		return -2;
+	}
+
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
 		return -1;
@@ -186,6 +196,10 @@ int LiSendMouseButtonEvent(char action, int button) {
 	PPACKET_HOLDER holder;
 	int err;
 
+	if (!initialized) {
+		return -2;
+	}
+
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
 		return -1;
@@ -208,6 +222,10 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	PPACKET_HOLDER holder;
 	int err;
 
+	if (!initialized) {
+		return -2;
+	}
+
 	holder = malloc(sizeof(*holder));
 	if (holder == NULL) {
 		return -1;
@@ -217,7 +235,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	holder->packet.keyboard.header.packetType = htonl(PACKET_TYPE_KEYBOARD);
 	holder->packet.keyboard.keyAction = keyAction;
 	holder->packet.keyboard.zero1 = 0;
-	holder->packet.keyboard.keyCode = htons(keyCode);
+	holder->packet.keyboard.keyCode = keyCode;
 	holder->packet.keyboard.modifiers = modifiers;
 	holder->packet.keyboard.zero2 = 0;
 
@@ -229,3 +247,38 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	return err;
 }
 
+int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
+	short leftStickX, short leftStickY, short rightStickX, short rightStickY)
+{
+	PPACKET_HOLDER holder;
+	int err;
+
+	if (!initialized) {
+		return -2;
+	}
+
+	holder = malloc(sizeof(*holder));
+	if (holder == NULL) {
+		return -1;
+	}
+
+	holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
+	holder->packet.controller.header.packetType = htonl(PACKET_TYPE_CONTROLLER);
+	holder->packet.controller.headerA = HEADER_A;
+	holder->packet.controller.headerB = HEADER_B;
+	holder->packet.controller.buttonFlags = buttonFlags;
+	holder->packet.controller.leftTrigger = leftTrigger;
+	holder->packet.controller.rightTrigger = rightTrigger;
+	holder->packet.controller.leftStickX = leftStickX;
+	holder->packet.controller.leftStickY = leftStickY;
+	holder->packet.controller.rightStickX = rightStickX;
+	holder->packet.controller.rightStickY = rightStickY;
+	holder->packet.controller.tailA = TAIL_A;
+	holder->packet.controller.tailB = TAIL_B;
+	err = LbqOfferQueueItem(&packetQueue, holder);
+	if (err != LBQ_SUCCESS) {
+		free(holder);
+	}
+
+	return err;
+}

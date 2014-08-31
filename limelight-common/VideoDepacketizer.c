@@ -6,14 +6,14 @@
 static PLENTRY nalChainHead;
 static int nalChainDataLength;
 
-static int nextFrameNumber = 1;
+static int nextFrameNumber;
 static int nextPacketNumber;
-static int startFrameNumber = 1;
+static int startFrameNumber;
 static int waitingForNextSuccessfulFrame;
-static int waitingForIdrFrame = 1;
+static int waitingForIdrFrame;
 static int gotNextFrameStart;
-static int lastPacketInStream = 0;
-static int decodingFrame = 0;
+static int lastPacketInStream;
+static int decodingFrame;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 static unsigned int nominalPacketDataLength;
@@ -30,6 +30,15 @@ typedef struct _BUFFER_DESC {
 void initializeVideoDepacketizer(int pktSize) {
 	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 	nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
+
+	nextFrameNumber = 1;
+	nextPacketNumber = 0;
+	startFrameNumber = 1;
+	waitingForNextSuccessfulFrame = 0;
+	waitingForIdrFrame = 1;
+	gotNextFrameStart = 0;
+	lastPacketInStream = 0;
+	decodingFrame = 0;
 }
 
 /* Free malloced memory in AvcFrameState*/
@@ -50,16 +59,20 @@ static void dropAvcFrameState(void) {
 	cleanupAvcFrameState();
 }
 
-/* Cleanup video depacketizer and free malloced memory */
-void destroyVideoDepacketizer(void) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
-	
-	entry = LbqDestroyLinkedBlockingQueue(&decodeUnitQueue);
+static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
+
 	while (entry != NULL) {
 		nextEntry = entry->flink;
+		free(entry->data);
 		free(entry);
 		entry = nextEntry;
 	}
+}
+
+/* Cleanup video depacketizer and free malloced memory */
+void destroyVideoDepacketizer(void) {
+	freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
 
 	cleanupAvcFrameState();
 }
@@ -130,15 +143,19 @@ static void reassembleAvcFrame(int frameNumber) {
 			if (LbqOfferQueueItem(&decodeUnitQueue, du) == LBQ_BOUND_EXCEEDED) {
 				Limelog("Decode unit queue overflow\n");
 
+				// Clear frame state and wait for an IDR
 				nalChainHead = du->bufferList;
 				nalChainDataLength = du->fullLength;
+				dropAvcFrameState();
+
+				// Free the DU
 				free(du);
+
+				// Flush the decode unit queue
+				freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
 				// FIXME: Get proper lower bound
 				connectionSinkTooSlow(0, frameNumber);
-
-				// Clear frame state and wait for an IDR
-				dropAvcFrameState();
 				return;
 			}
 

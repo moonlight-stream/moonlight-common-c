@@ -28,13 +28,8 @@ void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallback
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 }
 
-/* Tear down the audio stream once we're done with it */
-void destroyAudioStream(void) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
-
-	callbacks.release();
-
-	entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
+static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
 
 	while (entry != NULL) {
 		nextEntry = entry->flink;
@@ -43,6 +38,15 @@ void destroyAudioStream(void) {
 		entry = nextEntry;
 	}
 }
+
+/* Tear down the audio stream once we're done with it */
+void destroyAudioStream(void) {
+	callbacks.release();
+
+	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
+}
+
+
 
 static void UdpPingThreadProc(void *context) {
 	/* Ping in ASCII */
@@ -112,6 +116,7 @@ static void ReceiveThreadProc(void* context) {
 
 		if (err == LBQ_BOUND_EXCEEDED) {
 			Limelog("Audio packet queue overflow\n");
+			freePacketList(LbqFlushQueueItems(&packetQueue));
 		}
 		else if (err == LBQ_INTERRUPTED) {
 			Limelog("Receive thread terminating #2\n");
