@@ -4,8 +4,8 @@
 #include "LinkedBlockingQueue.h"
 #include "Input.h"
 
-#include "OpenAES\oaes_lib.h"
-#include "OpenAES\oaes_common.h"
+#include "OpenAES/oaes_lib.h"
+#include "OpenAES/oaes_common.h"
 
 static IP_ADDRESS host;
 static SOCKET inputSock = INVALID_SOCKET;

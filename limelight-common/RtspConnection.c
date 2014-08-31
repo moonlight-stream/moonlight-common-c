@@ -1,5 +1,6 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
+#include <arpa/inet.h>
 
 #define RTSP_MAX_RESP_SIZE 16384
 
@@ -250,7 +251,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 			goto FreeMessage;
 		}
 
-		sdpAddr.S_un.S_addr = remoteAddr;
+        memcpy(&sdpAddr, &remoteAddr, sizeof(remoteAddr));
 		request.payload = getSdpPayloadForStreamConfig(streamConfig, sdpAddr, &payloadLength);
 		if (request.payload == NULL) {
 			goto FreeMessage;
@@ -278,7 +279,7 @@ int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr)
 
 	// Initialize global state
 	remoteAddr = addr;
-	inaddr.S_un.S_addr = addr;
+    memcpy(&inaddr, &addr, sizeof(addr));
 	sprintf(rtspTargetUrl, "rtsp://%s", inet_ntoa(inaddr));
 
 	{
