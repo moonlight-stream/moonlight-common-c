@@ -1,5 +1,4 @@
 #include "Limelight-internal.h"
-#include <arpa/inet.h>
 
 #define MAX_OPTION_NAME_LEN 128
 

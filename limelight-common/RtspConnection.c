@@ -1,6 +1,5 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
-#include <arpa/inet.h>
 
 #define RTSP_MAX_RESP_SIZE 16384
 
