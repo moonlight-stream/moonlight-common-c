@@ -59,16 +59,20 @@ static void dropAvcFrameState(void) {
 	cleanupAvcFrameState();
 }
 
-/* Cleanup video depacketizer and free malloced memory */
-void destroyVideoDepacketizer(void) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
-	
-	entry = LbqDestroyLinkedBlockingQueue(&decodeUnitQueue);
+static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
+
 	while (entry != NULL) {
 		nextEntry = entry->flink;
+		free(entry->data);
 		free(entry);
 		entry = nextEntry;
 	}
+}
+
+/* Cleanup video depacketizer and free malloced memory */
+void destroyVideoDepacketizer(void) {
+	freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
 
 	cleanupAvcFrameState();
 }
@@ -139,15 +143,19 @@ static void reassembleAvcFrame(int frameNumber) {
 			if (LbqOfferQueueItem(&decodeUnitQueue, du) == LBQ_BOUND_EXCEEDED) {
 				Limelog("Decode unit queue overflow\n");
 
+				// Clear frame state and wait for an IDR
 				nalChainHead = du->bufferList;
 				nalChainDataLength = du->fullLength;
+				dropAvcFrameState();
+
+				// Free the DU
 				free(du);
+
+				// Flush the decode unit queue
+				freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
 				// FIXME: Get proper lower bound
 				connectionSinkTooSlow(0, frameNumber);
-
-				// Clear frame state and wait for an IDR
-				dropAvcFrameState();
 				return;
 			}
 

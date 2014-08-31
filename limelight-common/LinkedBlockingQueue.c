@@ -7,6 +7,25 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEU
 	return queueHead->head;
 }
 
+PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead) {
+	PLINKED_BLOCKING_QUEUE_ENTRY head;
+	
+	PltLockMutex(&queueHead->mutex);
+
+	// Save the old head
+	head = queueHead->head;
+
+	// Reinitialize the queue to empty
+	queueHead->head = NULL;
+	queueHead->tail = NULL;
+	queueHead->currentSize = 0;
+	PltClearEvent(&queueHead->containsDataEvent);
+
+	PltUnlockMutex(&queueHead->mutex);
+
+	return head;
+}
+
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
 	int err;
 	

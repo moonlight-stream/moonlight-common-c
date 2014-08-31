@@ -27,3 +27,4 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data);
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);
+PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead);
