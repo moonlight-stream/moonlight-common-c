@@ -1,7 +1,7 @@
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
-SOCKET bindUdpSocket(unsigned short port) {
+SOCKET bindUdpSocket(void) {
 	SOCKET s;
 	struct sockaddr_in addr;
 	int val;
@@ -14,7 +14,6 @@ SOCKET bindUdpSocket(unsigned short port) {
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
 	if (bind(s, (struct sockaddr*) &addr, sizeof(addr)) == SOCKET_ERROR) {
 		err = LastSocketError();
 		closesocket(s);

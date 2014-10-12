@@ -25,7 +25,7 @@
 #endif
 
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
-SOCKET bindUdpSocket(unsigned short port);
+SOCKET bindUdpSocket(void);
 int enableNoDelay(SOCKET s);
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);

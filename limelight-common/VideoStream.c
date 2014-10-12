@@ -162,7 +162,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	callbacks.setup(configuration.width,
 		configuration.height, 60, rendererContext, drFlags);
 
-	rtpSocket = bindUdpSocket(RTP_PORT);
+	rtpSocket = bindUdpSocket();
 	if (rtpSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}
