@@ -7,40 +7,6 @@
 
 #define RTSP_CLIENT_VERSION_S "10"
 
-static const int ATTRIB_X_NV_GENERAL_SERVERPORTS [] = {
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff,
-
-	0x00000000, 0xffffffff, 0xffffffff, 0x00000000,
-	0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
-	0xffffffff, 0x00000000, 0xffffffff, 0xffffffff
-};
-
 typedef struct _SDP_OPTION {
 	char name[MAX_OPTION_NAME_LEN+1];
 	void* payload;
@@ -130,10 +96,8 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err = 0;
 	err |= addAttributeString(&optionHead, "x-nv-general.serverAddress",
 		inet_ntoa(targetAddress));
-	err |= addAttributeBinary(&optionHead, "x-nv-general.serverPorts",
-		ATTRIB_X_NV_GENERAL_SERVERPORTS, sizeof(ATTRIB_X_NV_GENERAL_SERVERPORTS));
 
-	payloadInt = 0x42774141;
+	payloadInt = htonl(0x42774141);
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-general.featureFlags", &payloadInt, sizeof(payloadInt));
 
@@ -145,25 +109,33 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	sprintf(payloadStr, "%d", streamConfig->fps);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
 
-	payloadInt = 0x41514120;
+	payloadInt = htonl(0x41514141);
+	err |= addAttributeBinary(&optionHead,
+		"x-nv-video[0].transferProtocol", &payloadInt, sizeof(payloadInt));
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-video[1].transferProtocol", &payloadInt, sizeof(payloadInt));
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-video[2].transferProtocol", &payloadInt, sizeof(payloadInt));
+	err |= addAttributeBinary(&optionHead,
+		"x-nv-video[3].transferProtocol", &payloadInt, sizeof(payloadInt));
 
-	payloadInt = 0x42414141;
+	payloadInt = htonl(0x42414141);
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-video[0].rateControlMode", &payloadInt, sizeof(payloadInt));
+	payloadInt = htonl(0x42514141);
+	err |= addAttributeBinary(&optionHead,
+		"x-nv-video[1].rateControlMode", &payloadInt, sizeof(payloadInt));
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
+	err |= addAttributeBinary(&optionHead,
+		"x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 	
-
-	// The low nibble of the high byte should be 0x9 but that causes video issues
-	// The bit 0x80 enables video scaling on packet loss which we can't support (for now)
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "7011");
+	// FIXME: This number is taken from limelight-common, but doesn't have the same
+	// bitrate floor which can cause blockiness when scaling
+	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "14083");
 
 	sprintf(payloadStr, "%d", streamConfig->bitrate);
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
@@ -177,7 +149,13 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairMinPercent", "1");
 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "7");
+	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
+
+	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQosMaxConsecutiveDrops", "0");
+	err |= addAttributeString(&optionHead, "x-nv-vqos[1].videoQosMaxConsecutiveDrops", "0");
+	err |= addAttributeString(&optionHead, "x-nv-vqos[2].videoQosMaxConsecutiveDrops", "0");
+	err |= addAttributeString(&optionHead, "x-nv-vqos[3].videoQosMaxConsecutiveDrops", "0");
+
 	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "8");
 
 	if (err == 0) {
