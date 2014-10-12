@@ -129,6 +129,8 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
 	short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
+int LiSendScrollEvent(char scrollClicks);
+
 #ifdef __cplusplus
 }
 #endif

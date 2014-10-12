@@ -52,4 +52,16 @@ typedef struct _NV_CONTROLLER_PACKET {
 	short tailB;
 } NV_CONTROLLER_PACKET, *PNV_CONTROLLER_PACKET;
 
+#define PACKET_TYPE_SCROLL 0xA
+#define MAGIC_A 0x09
+typedef struct _NV_SCROLL_PACKET {
+	NV_INPUT_HEADER header;
+	char magicA;
+	char zero1;
+	short zero2;
+	short scrollAmt1;
+	short scrollAmt2;
+	short zero3;
+} NV_SCROLL_PACKET, *PNV_SCROLL_PACKET;
+
 #pragma pack(pop)

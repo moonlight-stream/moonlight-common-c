@@ -25,6 +25,7 @@ typedef struct _PACKET_HOLDER {
 		NV_MOUSE_MOVE_PACKET mouseMove;
 		NV_MOUSE_BUTTON_PACKET mouseButton;
 		NV_CONTROLLER_PACKET controller;
+		NV_SCROLL_PACKET scroll;
 	} packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
@@ -275,6 +276,36 @@ int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger
 	holder->packet.controller.rightStickY = rightStickY;
 	holder->packet.controller.tailA = TAIL_A;
 	holder->packet.controller.tailB = TAIL_B;
+	err = LbqOfferQueueItem(&packetQueue, holder);
+	if (err != LBQ_SUCCESS) {
+		free(holder);
+	}
+
+	return err;
+}
+
+int LiSendScrollEvent(char scrollClicks) {
+	PPACKET_HOLDER holder;
+	int err;
+
+	if (!initialized) {
+		return -2;
+	}
+
+	holder = malloc(sizeof(*holder));
+	if (holder == NULL) {
+		return -1;
+	}
+
+	holder->packetLength = sizeof(NV_SCROLL_PACKET);
+	holder->packet.scroll.header.packetType = htonl(PACKET_TYPE_SCROLL);
+	holder->packet.scroll.magicA = MAGIC_A;
+	holder->packet.scroll.zero1 = 0;
+	holder->packet.scroll.zero2 = 0;
+	holder->packet.scroll.scrollAmt1 = htons(scrollClicks * 120);
+	holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
+	holder->packet.scroll.zero3 = 0;
+
 	err = LbqOfferQueueItem(&packetQueue, holder);
 	if (err != LBQ_SUCCESS) {
 		free(holder);
