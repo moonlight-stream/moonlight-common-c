@@ -53,7 +53,7 @@ int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCall
 		return -1;
 	}
 
-	if (oaes_key_import_data(oaesContext, aesKeyData, aesKeyDataLength) != OAES_RET_SUCCESS)
+	if (oaes_key_import_data(oaesContext, (const unsigned char*)aesKeyData, aesKeyDataLength) != OAES_RET_SUCCESS)
 	{
 		Limelog("Failed to import AES key data\n");
 		return -1;
@@ -103,8 +103,8 @@ static void inputSendThreadProc(void* context) {
 		}
 
 		encryptedSize = sizeof(encryptedBuffer);
-		err = oaes_encrypt(oaesContext, (const char*) &holder->packet, holder->packetLength,
-			encryptedBuffer, &encryptedSize);
+		err = oaes_encrypt(oaesContext, (const unsigned char*) &holder->packet, holder->packetLength,
+			(unsigned char*) encryptedBuffer, &encryptedSize);
 		free(holder);
 		if (err != OAES_RET_SUCCESS) {
 			Limelog("Input thread terminating #2\n");
