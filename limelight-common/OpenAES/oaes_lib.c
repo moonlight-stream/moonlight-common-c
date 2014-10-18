@@ -27,9 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * ---------------------------------------------------------------------------
  */
+#if 0 // LIMELIGHT
 static const char _NR[] = {
 	0x4e,0x61,0x62,0x69,0x6c,0x20,0x53,0x2e,0x20,
 	0x41,0x6c,0x20,0x52,0x61,0x6d,0x6c,0x69,0x00 };
+#endif
 
 #include <stdlib.h>
 #include <stddef.h>
@@ -288,6 +290,7 @@ static OAES_RET oaes_inv_sub_byte( uint8_t * byte )
 	return OAES_RET_SUCCESS;
 }
 
+#if 0 // LIMELIGHT
 static OAES_RET oaes_word_rot_right( uint8_t word[OAES_COL_LEN] )
 {
 	uint8_t _temp[OAES_COL_LEN];
@@ -301,6 +304,7 @@ static OAES_RET oaes_word_rot_right( uint8_t word[OAES_COL_LEN] )
 	
 	return OAES_RET_SUCCESS;
 }
+#endif
 
 static OAES_RET oaes_word_rot_left( uint8_t word[OAES_COL_LEN] )
 {
