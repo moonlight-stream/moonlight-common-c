@@ -39,7 +39,7 @@ void destroyVideoStream(void) {
 static void UdpPingThreadProc(void *context) {
 	char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
 	struct sockaddr_in saddr;
-	int err;
+	SOCK_RET err;
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
@@ -59,7 +59,7 @@ static void UdpPingThreadProc(void *context) {
 }
 
 static void ReceiveThreadProc(void* context) {
-	int err;
+	SOCK_RET err;
 	int bufferSize;
 	char* buffer;
 
@@ -80,7 +80,7 @@ static void ReceiveThreadProc(void* context) {
 		}
 
 		// queueRtpPacket() copies the data it needs to we can reuse the buffer
-		queueRtpPacket((PRTP_PACKET) buffer, err);
+		queueRtpPacket((PRTP_PACKET) buffer, (int)err);
 	}
 
 	free(buffer);
@@ -102,7 +102,7 @@ static void DecoderThreadProc(void* context) {
 
 int readFirstFrame(void) {
 	char* firstFrame;
-	int err;
+	SOCK_RET err;
 	int offset = 0;
 
 	firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);

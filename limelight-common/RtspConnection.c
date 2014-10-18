@@ -81,7 +81,8 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 
 /* Returns 1 on success, 0 otherwise */
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
-	int err, ret = 0;
+    SOCK_RET err;
+    int ret = 0;
 	int offset;
 	char* serializedMessage = NULL;
 	int messageLen;

@@ -74,7 +74,7 @@ void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket) {
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 	NVCTL_PACKET_HEADER staticHeader;
 	PNVCTL_PACKET_HEADER fullPacket;
-	int err;
+	SOCK_RET err;
 
 	err = recv(ctlSock, (char*) &staticHeader, sizeof(staticHeader), 0);
 	if (err != sizeof(staticHeader)) {
@@ -100,7 +100,7 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 
 static int sendMessageAndForget(short ptype, short paylen, const void* payload) {
 	NVCTL_PACKET_HEADER header;
-	int err;
+	SOCK_RET err;
 
 	header.type = ptype;
 	header.payloadLength = paylen;

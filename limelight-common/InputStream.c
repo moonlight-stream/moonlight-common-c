@@ -87,7 +87,7 @@ void destroyInputStream(void) {
 }
 
 static void inputSendThreadProc(void* context) {
-	int err;
+	SOCK_RET err;
 	PPACKET_HOLDER holder;
 	char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
 	size_t encryptedSize;

@@ -52,7 +52,7 @@ static void UdpPingThreadProc(void *context) {
 	/* Ping in ASCII */
 	char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
 	struct sockaddr_in saddr;
-	int err;
+	SOCK_RET err;
 
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
@@ -73,8 +73,9 @@ static void UdpPingThreadProc(void *context) {
 }
 
 static void ReceiveThreadProc(void* context) {
-	int err;
+	SOCK_RET err;
 	PRTP_PACKET rtp;
+    int packetSize;
     char* buffer = NULL;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
@@ -94,8 +95,10 @@ static void ReceiveThreadProc(void* context) {
 			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
 		}
+        
+        packetSize = (int)err;
 
-		if (err < sizeof(RTP_PACKET)) {
+		if (packetSize < sizeof(RTP_PACKET)) {
 			// Runt packet
 			continue;
 		}
@@ -106,7 +109,7 @@ static void ReceiveThreadProc(void* context) {
 			continue;
 		}
 
-		memcpy(buffer, &err, sizeof(err));
+		memcpy(buffer, &packetSize, sizeof(int));
 
 		err = LbqOfferQueueItem(&packetQueue, buffer);
 		if (err == LBQ_SUCCESS) {

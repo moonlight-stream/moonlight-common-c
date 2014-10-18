@@ -82,7 +82,7 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload
 
 static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload) {
 	// We purposefully omit the null terminating character
-	return addAttributeBinary(head, name, payload, strlen(payload));
+	return addAttributeBinary(head, name, payload, (int)strlen(payload));
 }
 
 static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {

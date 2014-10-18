@@ -39,7 +39,7 @@ void PltSleepMs(int ms) {
 #if defined(LC_WINDOWS) || defined (LC_WINDOWS_PHONE)
 	WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
 #else
-    long usecs = (long)ms * 1000;
+    useconds_t usecs = ms * 1000;
     usleep(usecs);
 #endif
 }

@@ -72,10 +72,10 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 
 typedef void(*ConnListenerStageStarting)(int stage);
 typedef void(*ConnListenerStageComplete)(int stage);
-typedef void(*ConnListenerStageFailed)(int stage, int errorCode);
+typedef void(*ConnListenerStageFailed)(int stage, long errorCode);
 
 typedef void(*ConnListenerConnectionStarted)(void);
-typedef void(*ConnListenerConnectionTerminated)(int errorCode);
+typedef void(*ConnListenerConnectionTerminated)(long errorCode);
 
 typedef void(*ConnListenerDisplayMessage)(char* message);
 typedef void(*ConnListenerDisplayTransientMessage)(char* message);
