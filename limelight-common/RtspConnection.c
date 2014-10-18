@@ -83,7 +83,6 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
 	int err, ret = 0;
 	int offset;
-	PRTSP_MESSAGE responseMsg = NULL;
 	char* serializedMessage = NULL;
 	int messageLen;
 

@@ -57,7 +57,7 @@ static int getMessageLength(PRTSP_MESSAGE msg){
 int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length) {
 	char *token, *protocol, *endCheck, *target, *statusStr, *command, *sequence, *content, flag;
 	char messageEnded = 0, *payload = NULL, *opt = NULL;
-	int statusCode, sequenceNum, exitCode;
+	int statusCode = 0, sequenceNum, exitCode;
 	POPTION_ITEM options = NULL;
 	POPTION_ITEM newOpt;
 

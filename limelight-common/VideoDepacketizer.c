@@ -18,8 +18,6 @@ static int decodingFrame;
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 static unsigned int nominalPacketDataLength;
 
-static unsigned short lastSequenceNumber;
-
 typedef struct _BUFFER_DESC {
 	char* data;
 	unsigned int offset;
