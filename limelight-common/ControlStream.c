@@ -120,14 +120,23 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
 }
 
 static PNVCTL_PACKET_HEADER sendMessage(short ptype, short paylen, const void* payload) {
-	int success;
-
-	success = sendMessageAndForget(ptype, paylen, payload);
-	if (!success) {
-		return NULL;
-	}
+    if (!sendMessageAndForget(ptype, paylen, payload)) {
+        return NULL;
+    }
 
 	return readNvctlPacket();
+}
+
+static int sendMessageAndDiscardReply(short ptype, short paylen, const void* payload) {
+    PNVCTL_PACKET_HEADER reply;
+    
+    reply = sendMessage(ptype, paylen, payload);
+    if (reply == NULL) {
+        return 0;
+    }
+    
+    free(reply);
+    return 1;
 }
 
 static void lossStatsThreadFunc(void* context) {
@@ -162,7 +171,6 @@ static void lossStatsThreadFunc(void* context) {
 
 static void resyncThreadFunc(void* context) {
 	long long payload[3];
-	PNVCTL_PACKET_HEADER response;
 
 	while (!PltIsThreadInterrupted(&resyncThread)) {
 		// Wait for a resync request
@@ -177,8 +185,7 @@ static void resyncThreadFunc(void* context) {
 		PltClearEvent(&resyncEvent);
 
 		// Send the resync request and read the response
-		response = sendMessage(PTYPE_RESYNC, PPAYLEN_RESYNC, payload);
-		if (response == NULL) {
+		if (!sendMessageAndDiscardReply(PTYPE_RESYNC, PPAYLEN_RESYNC, payload)) {
 			Limelog("Resync thread terminating #1\n");
 			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
@@ -207,7 +214,6 @@ int stopControlStream(void) {
 
 int startControlStream(void) {
 	int err;
-	PNVCTL_PACKET_HEADER response;
 
 	ctlSock = connectTcpSocket(host, 47995);
 	if (ctlSock == INVALID_SOCKET) {
@@ -217,18 +223,18 @@ int startControlStream(void) {
 	enableNoDelay(ctlSock);
 
 	// Send START A
-	response = sendMessage(PTYPE_START_STREAM_A,
-		PPAYLEN_START_STREAM_A, PPAYLOAD_START_STREAM_A);
-	if (response == NULL) {
-		return LastSocketError();
-	}
+	if (!sendMessageAndDiscardReply(PTYPE_START_STREAM_A,
+                                    PPAYLEN_START_STREAM_A,
+                                    PPAYLOAD_START_STREAM_A)) {
+        return LastSocketError();
+    }
 
 	// Send START B
-	response = sendMessage(PTYPE_START_STREAM_B,
-		PPAYLEN_START_STREAM_B, PPAYLOAD_START_STREAM_B);
-	if (response == NULL) {
-		return LastSocketError();
-	}
+	if (!sendMessageAndDiscardReply(PTYPE_START_STREAM_B,
+                                    PPAYLEN_START_STREAM_B,
+                                    PPAYLOAD_START_STREAM_B)) {
+        return LastSocketError();
+    }
 
 	err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
 	if (err != 0) {
