@@ -55,7 +55,7 @@ static int getMessageLength(PRTSP_MESSAGE msg){
 
 /* Given an RTSP message string rtspMessage, parse it into an RTSP_MESSAGE struct msg */
 int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length) {
-	char *token, *protocol, *endCheck, *target, *statusStr, *command, *sequence, *content, flag;
+	char *token, *protocol, *endCheck, *target, *statusStr, *command, *sequence, flag;
 	char messageEnded = 0, *payload = NULL, *opt = NULL;
 	int statusCode = 0, sequenceNum, exitCode;
 	POPTION_ITEM options = NULL;
@@ -146,7 +146,6 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length) {
 			}
 			/* The token is content */
 			else {
-				content = token;
 				/* Create a new node containing the option and content */
 				newOpt = (POPTION_ITEM)malloc(sizeof(OPTION_ITEM));
 				if (newOpt == NULL){
@@ -197,11 +196,11 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length) {
 	/* Package the new parsed message into the struct */
 	if (flag == TYPE_REQUEST){
 		createRtspRequest(msg, messageBuffer, FLAG_ALLOCATED_MESSAGE_BUFFER | FLAG_ALLOCATED_OPTION_ITEMS, command, target,
-			protocol, sequenceNum, options, payload, payload ? length - (messageBuffer - payload) : 0);
+			protocol, sequenceNum, options, payload, payload ? length - (int)(messageBuffer - payload) : 0);
 	}
 	else {
 		createRtspResponse(msg, messageBuffer, FLAG_ALLOCATED_MESSAGE_BUFFER | FLAG_ALLOCATED_OPTION_ITEMS, protocol, statusCode,
-			statusStr, sequenceNum, options, payload, payload ? length - (messageBuffer - payload) : 0);
+			statusStr, sequenceNum, options, payload, payload ? length - (int)(messageBuffer - payload) : 0);
 	}
 	return RTSP_ERROR_SUCCESS;
 
@@ -359,7 +358,7 @@ char *serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength){
 		*serializedLength = offset + msg->payloadLength;
 	}
 	else {
-		*serializedLength = strlen(serializedMessage);
+		*serializedLength = (int)strlen(serializedMessage);
 	}
 
 	return serializedMessage;
