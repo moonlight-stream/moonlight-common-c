@@ -74,7 +74,6 @@
 		FB290E5619B37A8B004C83CF /* Video.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Video.h; sourceTree = "<group>"; };
 		FB290E5719B37A8B004C83CF /* VideoDepacketizer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = VideoDepacketizer.c; sourceTree = "<group>"; };
 		FB290E5819B37A8B004C83CF /* VideoStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = VideoStream.c; sourceTree = "<group>"; };
-		FB290E5919B37A8B004C83CF /* make_fat_lib.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = make_fat_lib.sh; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,7 +91,6 @@
 			isa = PBXGroup;
 			children = (
 				FB290E3519B37A8B004C83CF /* limelight-common */,
-				FB290E5919B37A8B004C83CF /* make_fat_lib.sh */,
 				FB290E2F19B37A4E004C83CF /* Products */,
 			);
 			sourceTree = "<group>";
