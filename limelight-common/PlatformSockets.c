@@ -68,6 +68,17 @@ int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	WSADATA data;
 	return WSAStartup(MAKEWORD(2, 0), &data);
+#elif defined(LC_POSIX)
+    // Disable SIGPIPE signals to avoid us getting
+    // killed when a socket gets an EPIPE error
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;
+    sa.sa_flags = 0;
+    if (sigaction(SIGPIPE, &sa, 0) == -1) {
+        perror("sigaction");
+        return -1;
+    }
+    return 0;
 #else
 	return 0;
 #endif
