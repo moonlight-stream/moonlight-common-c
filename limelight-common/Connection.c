@@ -90,27 +90,27 @@ void LiStopConnection(void) {
 	LC_ASSERT(stage == STAGE_NONE);
 }
 
-static void ClStageStarting(int stage)
+static void ClInternalStageStarting(int stage)
 {
     originalCallbacks.stageStarting(stage);
 }
 
-static void ClStageComplete(int stage)
+static void ClInternalStageComplete(int stage)
 {
     originalCallbacks.stageComplete(stage);
 }
 
-static void ClStageFailed(int stage, long errorCode)
+static void ClInternalStageFailed(int stage, long errorCode)
 {
     originalCallbacks.stageFailed(stage, errorCode);
 }
 
-static void ClConnectionStarted(void)
+static void ClInternalConnectionStarted(void)
 {
     originalCallbacks.connectionStarted();
 }
 
-static void ClConnectionTerminated(long errorCode)
+static void ClInternalConnectionTerminated(long errorCode)
 {
     // Avoid recursion and issuing multiple callbacks
     if (alreadyTerminated) {
@@ -121,12 +121,12 @@ static void ClConnectionTerminated(long errorCode)
     originalCallbacks.connectionTerminated(errorCode);
 }
 
-void ClDisplayMessage(char* message)
+void ClInternalDisplayMessage(char* message)
 {
     originalCallbacks.displayMessage(message);
 }
 
-void ClDisplayTransientMessage(char* message)
+void ClInternalDisplayTransientMessage(char* message)
 {
     originalCallbacks.displayTransientMessage(message);
 }
@@ -137,13 +137,13 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 
 	memcpy(&originalCallbacks, clCallbacks, sizeof(originalCallbacks));
     
-    listenerCallbacks.stageStarting = ClStageStarting;
-    listenerCallbacks.stageComplete = ClStageComplete;
-    listenerCallbacks.stageFailed = ClStageFailed;
-    listenerCallbacks.connectionStarted = ClConnectionStarted;
-    listenerCallbacks.connectionTerminated = ClConnectionTerminated;
-    listenerCallbacks.displayMessage = ClDisplayMessage;
-    listenerCallbacks.displayTransientMessage = ClDisplayTransientMessage;
+    listenerCallbacks.stageStarting = ClInternalStageStarting;
+    listenerCallbacks.stageComplete = ClInternalStageComplete;
+    listenerCallbacks.stageFailed = ClInternalStageFailed;
+    listenerCallbacks.connectionStarted = ClInternalConnectionStarted;
+    listenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
+    listenerCallbacks.displayMessage = ClInternalDisplayMessage;
+    listenerCallbacks.displayTransientMessage = ClInternalDisplayTransientMessage;
     
     alreadyTerminated = 0;
 
