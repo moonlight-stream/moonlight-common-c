@@ -158,6 +158,7 @@ static void lossStatsThreadFunc(void* context) {
 		if (!sendMessageAndForget(PTYPE_LOSS_STATS,
 			PPAYLEN_LOSS_STATS, lossStatsPayload)) {
 			Limelog("Loss stats thread terminating #1\n");
+            listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
 		}
 
