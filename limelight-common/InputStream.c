@@ -70,7 +70,8 @@ void destroyInputStream(void) {
 
 	if (oaesContext != NULL)
 	{
-		oaes_free(oaesContext);
+		// FIXME: This crashes trying to free ctx->key
+        // oaes_free(oaesContext);
 		oaesContext = NULL;
 	}
 

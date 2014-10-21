@@ -5,7 +5,7 @@ static int stage = STAGE_NONE;
 static CONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
 
-static int alreadyTerminated = 0;
+static int alreadyTerminated;
 
 static const char* stageNames[STAGE_MAX] = {
 	"none",
@@ -144,6 +144,8 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
     listenerCallbacks.connectionTerminated = ClConnectionTerminated;
     listenerCallbacks.displayMessage = ClDisplayMessage;
     listenerCallbacks.displayTransientMessage = ClDisplayTransientMessage;
+    
+    alreadyTerminated = 0;
 
 	Limelog("Initializing platform...");
 	listenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
