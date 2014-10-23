@@ -79,7 +79,7 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 	return 1;
 }
 
-/* Returns 1 on success, 0 otherwise */
+/* Send RTSP message and get response */
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
     SOCK_RET err;
     int ret = 0;

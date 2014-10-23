@@ -1,5 +1,6 @@
 #include "LinkedBlockingQueue.h"
 
+/* Destroy the linked blocking queue and associated mutex and event */
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead) {
 	PltDeleteMutex(&queueHead->mutex);
 	PltCloseEvent(&queueHead->containsDataEvent);
@@ -7,6 +8,7 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEU
 	return queueHead->head;
 }
 
+/* Flush the queue */
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead) {
 	PLINKED_BLOCKING_QUEUE_ENTRY head;
 	
@@ -26,6 +28,7 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead
 	return head;
 }
 
+/* Linked blocking queue init */
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
 	int err;
 	

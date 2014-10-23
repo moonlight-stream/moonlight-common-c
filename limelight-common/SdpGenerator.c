@@ -14,6 +14,7 @@ typedef struct _SDP_OPTION {
 	struct _SDP_OPTION *next;
 } SDP_OPTION, *PSDP_OPTION;
 
+/* Cleanup the attribute list */
 static void freeAttributeList(PSDP_OPTION head) {
 	PSDP_OPTION next;
 	while (head != NULL) {
@@ -23,6 +24,7 @@ static void freeAttributeList(PSDP_OPTION head) {
 	}
 }
 
+/* Get the size of the attribute list */
 static int getSerializedAttributeListSize(PSDP_OPTION head) {
 	PSDP_OPTION currentEntry = head;
 	int size = 0;
@@ -38,6 +40,7 @@ static int getSerializedAttributeListSize(PSDP_OPTION head) {
 	return size;
 }
 
+/* Populate the serialized attribute list into a string */
 static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
 	PSDP_OPTION currentEntry = head;
 	int offset = 0;
@@ -52,6 +55,7 @@ static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
 	return offset;
 }
 
+/* Add an attribute */
 static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload, int payloadLen) {
 	PSDP_OPTION option, currentOption;
 
@@ -80,6 +84,7 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload
 	return 0;
 }
 
+/* Add an attribute string */
 static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload) {
 	// We purposefully omit the null terminating character
 	return addAttributeBinary(head, name, payload, (int)strlen(payload));
@@ -166,6 +171,7 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	return NULL;
 }
 
+/* Populate the SDP header with required information */
 static int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
 	return sprintf(buffer,
 		"v=0\r\n"
@@ -173,12 +179,14 @@ static int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
 		"s=NVIDIA Streaming Client\r\n", inet_ntoa(targetAddress));
 }
 
+/* Populate the SDP tail with required information */
 static int fillSdpTail(char* buffer) {
 	return sprintf(buffer,
 		"t=0 0\r\n"
 		"m=video 47996  \r\n");
 }
 
+/* Get the SDP attributes for the stream config */
 char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress, int *length) {
 	PSDP_OPTION attributeList;
 	int offset;

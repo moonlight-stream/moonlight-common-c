@@ -52,11 +52,13 @@ static void cleanupAvcFrameState(void) {
 	nalChainDataLength = 0;
 }
 
+/* Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
 static void dropAvcFrameState(void) {
 	waitingForIdrFrame = 1;
 	cleanupAvcFrameState();
 }
 
+/* Cleanup the list of decode units */
 static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
 
@@ -213,6 +215,7 @@ static void queueFragment(char *data, int offset, int length) {
 	}
 }
 
+/* Process an RTP Payload */
 static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
 	BUFFER_DESC specialSeq;
 	int decodingAvc = 0;
@@ -310,6 +313,7 @@ static int isBeforeSigned(int numA, int numB, int ambiguousCase) {
 	}
 }
 
+/* Process an RTP Payload */
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	BUFFER_DESC currentPos, specialSeq;
 	int frameIndex;

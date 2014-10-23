@@ -20,6 +20,7 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
+/* Initialize the video stream */
 void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
 	PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, drCallbacks, sizeof(callbacks));
@@ -30,12 +31,14 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 	initializeVideoDepacketizer(configuration.packetSize);
 }
 
+/* Clean up the video stream */
 void destroyVideoStream(void) {
 	callbacks.release();
 
 	destroyVideoDepacketizer();
 }
 
+/* UDP Ping proc */
 static void UdpPingThreadProc(void *context) {
 	char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
 	struct sockaddr_in saddr;
@@ -58,6 +61,7 @@ static void UdpPingThreadProc(void *context) {
 	}
 }
 
+/* Receive thread proc */
 static void ReceiveThreadProc(void* context) {
 	SOCK_RET err;
 	int bufferSize;
@@ -86,6 +90,7 @@ static void ReceiveThreadProc(void* context) {
 	free(buffer);
 }
 
+/* Decoder thread proc */
 static void DecoderThreadProc(void* context) {
 	PDECODE_UNIT du;
 	while (!PltIsThreadInterrupted(&decoderThread)) {
@@ -100,6 +105,7 @@ static void DecoderThreadProc(void* context) {
 	}
 }
 
+/* Read the first frame of the video stream */
 int readFirstFrame(void) {
 	char* firstFrame;
 	SOCK_RET err;
@@ -131,6 +137,7 @@ int readFirstFrame(void) {
 	return 0;
 }
 
+/* Terminate the video stream */
 void stopVideoStream(void) {
 	callbacks.stop();
 
@@ -156,6 +163,7 @@ void stopVideoStream(void) {
 	PltCloseThread(&decoderThread);
 }
 
+/* Start the video stream */
 int startVideoStream(void* rendererContext, int drFlags) {
 	int err;
 
@@ -182,7 +190,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		return err;
 	}
 
-	// This must be called before the decoder thread starts submitting
+	//This must be called before the decoder thread starts submitting
 	// decode units
 	callbacks.start();
 

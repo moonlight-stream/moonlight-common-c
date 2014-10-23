@@ -4,6 +4,7 @@
 
 #include "ByteBuffer.h"
 
+/* NV control stream packet header */
 typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short type;
 	unsigned short payloadLength;
@@ -38,6 +39,7 @@ static const int PPAYLOAD_START_STREAM_B[4] = { 0, 0, 0, 0xa }; // FIXME: Little
 
 #define LOSS_REPORT_INTERVAL_MS 50
 
+/* Initializes the control stream */
 int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
 
@@ -49,28 +51,34 @@ int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigP
 	return 0;
 }
 
+/* Cleans up control stream */
 void destroyControlStream(void) {
 	PltCloseEvent(&resyncEvent);
 }
 
+/* Resync if the connection is too slow */
 void connectionSinkTooSlow(int startFrame, int endFrame) {
 	// FIXME: Send ranges
 	PltSetEvent(&resyncEvent);
 }
 
+/* Resync if we're losing frames */
 void connectionDetectedFrameLoss(int startFrame, int endFrame) {
 	// FIXME: Send ranges
 	PltSetEvent(&resyncEvent);
 }
 
+/* When we receive a frame, update the number of our current frame */
 void connectionReceivedFrame(int frameIndex) {
 	currentFrame = frameIndex;
 }
 
+/* When we lose packets, update our packet loss count */
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket) {
 	lossCountSinceLastReport += (nextReceivedPacket - lastReceivedPacket) - 1;
 }
 
+/* Reads an NV control stream packet */
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 	NVCTL_PACKET_HEADER staticHeader;
 	PNVCTL_PACKET_HEADER fullPacket;
@@ -195,6 +203,7 @@ static void resyncThreadFunc(void* context) {
 	}
 }
 
+/* Stops the control stream */
 int stopControlStream(void) {
 	PltInterruptThread(&lossStatsThread);
 	PltInterruptThread(&resyncThread);
@@ -213,6 +222,7 @@ int stopControlStream(void) {
 	return 0;
 }
 
+/* Starts the control stream */
 int startControlStream(void) {
 	int err;
 

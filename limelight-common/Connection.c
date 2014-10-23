@@ -7,6 +7,7 @@ static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
 
 static int alreadyTerminated;
 
+/* Connection stages */
 static const char* stageNames[STAGE_MAX] = {
 	"none",
 	"platform initialization",
@@ -21,10 +22,12 @@ static const char* stageNames[STAGE_MAX] = {
 	"input stream establishment"
 };
 
+/* Get the name of the current stage based on its number */
 const char* LiGetStageName(int stage) {
 	return stageNames[stage];
 }
 
+/* Stop the connection by undoing the step at the current stage and those before it */
 void LiStopConnection(void) {
 	if (stage == STAGE_INPUT_STREAM_START) {
 		Limelog("Stopping input stream...");
@@ -131,6 +134,7 @@ void ClInternalDisplayTransientMessage(char* message)
     originalCallbacks.displayTransientMessage(message);
 }
 
+/* Starts the connection to the streaming machine */
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags) {
 	int err;

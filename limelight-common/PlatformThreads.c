@@ -168,6 +168,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 			return -1;
 		}
 		thread->cancelled = 0;
+		// TODO we aren't allowed to use CreateThread API in kernel32.dll
 		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, CREATE_SUSPENDED, &thread->tid);
 		if (thread->handle == NULL) {
 			CloseHandle(thread->termevent);
@@ -182,6 +183,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 			PltUnlockMutex(&thread_list_lock);
 
 			// Now the thread can run
+			// TODO can't use ResumeThread in kernel32.dll
 			ResumeThread(thread->handle);
 
 			err = 0;

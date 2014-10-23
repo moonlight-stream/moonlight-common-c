@@ -18,6 +18,7 @@ static OAES_CTX* oaesContext;
 
 #define MAX_INPUT_PACKET_SIZE 128
 
+/* Contains input stream packets */
 typedef struct _PACKET_HOLDER {
 	int packetLength;
 	union {
@@ -29,6 +30,7 @@ typedef struct _PACKET_HOLDER {
 	} packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
+/* Initializes the input stream */
 int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength) {
 	host = addr;
@@ -65,6 +67,7 @@ int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCall
 	return 0;
 }
 
+/* Destroys and cleans up the input stream */
 void destroyInputStream(void) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 
@@ -87,6 +90,7 @@ void destroyInputStream(void) {
 	initialized = 0;
 }
 
+/* Input thread proc */
 static void inputSendThreadProc(void* context) {
 	SOCK_RET err;
 	PPACKET_HOLDER holder;
@@ -135,6 +139,7 @@ static void inputSendThreadProc(void* context) {
 	}
 }
 
+/* Begin the input stream */
 int startInputStream(void) {
 	int err;
 
@@ -153,6 +158,7 @@ int startInputStream(void) {
 	return err;
 }
 
+/* Stops the input stream */
 int stopInputStream(void) {
 	PltInterruptThread(&inputSendThread);
 
@@ -167,6 +173,7 @@ int stopInputStream(void) {
 	return 0;
 }
 
+/* Send a mouse move event to the streaming machine */
 int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 	PPACKET_HOLDER holder;
 	int err;
@@ -194,6 +201,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 	return err;
 }
 
+/* Send a mouse button event to the streaming machine */
 int LiSendMouseButtonEvent(char action, int button) {
 	PPACKET_HOLDER holder;
 	int err;
@@ -220,6 +228,7 @@ int LiSendMouseButtonEvent(char action, int button) {
 	return err;
 }
 
+/* Send a key press event to the streaming machine */
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	PPACKET_HOLDER holder;
 	int err;
@@ -249,6 +258,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	return err;
 }
 
+/* Send a controller event to the streaming machine */
 int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
 	short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
@@ -285,6 +295,7 @@ int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger
 	return err;
 }
 
+/* Send a scroll event to the streaming machine */
 int LiSendScrollEvent(char scrollClicks) {
 	PPACKET_HOLDER holder;
 	int err;
