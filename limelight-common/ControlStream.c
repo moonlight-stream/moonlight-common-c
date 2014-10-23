@@ -122,7 +122,7 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
 	err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
 	free(packet);
 
-	if (err != sizeof(*packet)) {
+	if (err != sizeof(*packet) + paylen) {
 		return 0;
 	}
 
