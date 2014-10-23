@@ -15,7 +15,7 @@
 		FB290E5F19B37A8B004C83CF /* Input.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E3B19B37A8B004C83CF /* Input.h */; };
 		FB290E6019B37A8B004C83CF /* InputStream.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E3C19B37A8B004C83CF /* InputStream.c */; };
 		FB290E6119B37A8B004C83CF /* Limelight-internal.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E3F19B37A8B004C83CF /* Limelight-internal.h */; };
-		FB290E6219B37A8B004C83CF /* Limelight.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E4019B37A8B004C83CF /* Limelight.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		FB290E6219B37A8B004C83CF /* Limelight.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E4019B37A8B004C83CF /* Limelight.h */; };
 		FB290E6319B37A8B004C83CF /* LinkedBlockingQueue.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E4119B37A8B004C83CF /* LinkedBlockingQueue.c */; };
 		FB290E6419B37A8B004C83CF /* LinkedBlockingQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E4219B37A8B004C83CF /* LinkedBlockingQueue.h */; };
 		FB290E6519B37A8B004C83CF /* oaes_base64.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E4519B37A8B004C83CF /* oaes_base64.c */; };
@@ -264,6 +264,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Mac Developer";
 				COPY_PHASE_STRIP = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
@@ -283,6 +284,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
@@ -302,6 +304,7 @@
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "3rd Party Mac Developer Application";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -314,13 +317,16 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				PROVISIONING_PROFILE = "";
 				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Release;
 		};
 		FB290E3319B37A4E004C83CF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				EXECUTABLE_PREFIX = lib;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -332,6 +338,7 @@
 		FB290E3419B37A4E004C83CF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				EXECUTABLE_PREFIX = lib;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";

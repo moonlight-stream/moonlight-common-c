@@ -90,6 +90,8 @@ void destroyInputStream(void) {
 	initialized = 0;
 }
 
+#define OAES_DATA_OFFSET 32
+
 /* Input thread proc */
 static void inputSendThreadProc(void* context) {
 	SOCK_RET err;
@@ -118,21 +120,20 @@ static void inputSendThreadProc(void* context) {
 		}
 
 		// The first 32-bytes of the output are internal OAES stuff that we want to ignore
-		encryptedSize -= 32;
+		encryptedSize -= OAES_DATA_OFFSET;
 
-		// Send the encrypted length first
+		// Overwrite the last 4 bytes before the encrypted data with the length so
+		// we can send the message all at once. GFE can choke if it gets the header
+		// before the rest of the message.
 		encryptedLengthPrefix = htonl((unsigned long) encryptedSize);
-		err = send(inputSock, (const char*) &encryptedLengthPrefix, sizeof(encryptedLengthPrefix), 0);
-		if (err <= 0) {
-			Limelog("Input thread terminating #3\n");
-			listenerCallbacks->connectionTerminated(err);
-			return;
-		}
+		memcpy(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+			&encryptedLengthPrefix, sizeof(encryptedLengthPrefix));
 
 		// Send the encrypted payload
-		err = send(inputSock, (const char*) &encryptedBuffer[32], encryptedSize, 0);
+		err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+			encryptedSize + sizeof(encryptedLengthPrefix), 0);
 		if (err <= 0) {
-			Limelog("Input thread terminating #4\n");
+			Limelog("Input thread terminating #3\n");
 			listenerCallbacks->connectionTerminated(err);
 			return;
 		}

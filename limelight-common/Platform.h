@@ -21,6 +21,9 @@
 # endif
 #else
 # define LC_POSIX
+# if defined(__APPLE__)
+#  define LC_DARWIN
+# endif
 #endif
 
 #include <stdio.h>

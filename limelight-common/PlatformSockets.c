@@ -20,7 +20,14 @@ SOCKET bindUdpSocket(void) {
 		SetLastSocketError(err);
 		return INVALID_SOCKET;
 	}
+    
+#ifdef LC_DARWIN
+    // Disable SIGPIPE on iOS
+    val = 1;
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
+#endif
 
+    // Set the receive buffer to 64KB by default
 	val = 65536;
 	setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &val, sizeof(val));
 
@@ -31,11 +38,20 @@ SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
 	SOCKET s;
 	struct sockaddr_in addr;
 	int err;
+#ifdef LC_DARWIN
+    int val;
+#endif
 
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == INVALID_SOCKET) {
 		return INVALID_SOCKET;
 	}
+    
+#ifdef LC_DARWIN
+    // Disable SIGPIPE on iOS
+    val = 1;
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
+#endif
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
