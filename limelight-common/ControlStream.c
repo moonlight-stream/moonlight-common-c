@@ -88,7 +88,7 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 
 	memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
 	if (staticHeader.payloadLength != 0) {
-	err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
+		err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
 		if (err != staticHeader.payloadLength) {
 			free(fullPacket);
 			return NULL;
@@ -99,21 +99,23 @@ static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
 }
 
 static int sendMessageAndForget(short ptype, short paylen, const void* payload) {
-	NVCTL_PACKET_HEADER header;
+	PNVCTL_PACKET_HEADER packet;
 	SOCK_RET err;
 
-	header.type = ptype;
-	header.payloadLength = paylen;
-	err = send(ctlSock, (char*) &header, sizeof(header), 0);
-	if (err != sizeof(header)) {
+	packet = malloc(sizeof(*packet) + paylen);
+	if (packet == NULL) {
 		return 0;
 	}
 
-	if (payload != NULL) {
-		err = send(ctlSock, payload, paylen, 0);
-		if (err != paylen) {
-			return 0;
-		}
+	packet->type = ptype;
+	packet->payloadLength = paylen;
+	memcpy(&packet[1], payload, paylen);
+
+	err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
+	free(packet);
+
+	if (err != sizeof(*packet)) {
+		return 0;
 	}
 
 	return 1;
