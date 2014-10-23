@@ -1,3 +1,4 @@
 limelight-common/ARM/
 limelight-common/Debug/
 Build/
+**/xcuserdata/
