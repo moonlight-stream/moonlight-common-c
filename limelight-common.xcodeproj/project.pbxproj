@@ -47,8 +47,6 @@
 		FB290E3A19B37A8B004C83CF /* ControlStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ControlStream.c; sourceTree = "<group>"; };
 		FB290E3B19B37A8B004C83CF /* Input.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Input.h; sourceTree = "<group>"; };
 		FB290E3C19B37A8B004C83CF /* InputStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = InputStream.c; sourceTree = "<group>"; };
-		FB290E3D19B37A8B004C83CF /* limelight-common.vcxproj */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = "limelight-common.vcxproj"; sourceTree = "<group>"; };
-		FB290E3E19B37A8B004C83CF /* limelight-common.vcxproj.filters */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xml; path = "limelight-common.vcxproj.filters"; sourceTree = "<group>"; };
 		FB290E3F19B37A8B004C83CF /* Limelight-internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "Limelight-internal.h"; sourceTree = "<group>"; };
 		FB290E4019B37A8B004C83CF /* Limelight.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Limelight.h; sourceTree = "<group>"; };
 		FB290E4119B37A8B004C83CF /* LinkedBlockingQueue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = LinkedBlockingQueue.c; sourceTree = "<group>"; };
@@ -113,8 +111,6 @@
 				FB290E3A19B37A8B004C83CF /* ControlStream.c */,
 				FB290E3B19B37A8B004C83CF /* Input.h */,
 				FB290E3C19B37A8B004C83CF /* InputStream.c */,
-				FB290E3D19B37A8B004C83CF /* limelight-common.vcxproj */,
-				FB290E3E19B37A8B004C83CF /* limelight-common.vcxproj.filters */,
 				FB290E3F19B37A8B004C83CF /* Limelight-internal.h */,
 				FB290E4019B37A8B004C83CF /* Limelight.h */,
 				FB290E4119B37A8B004C83CF /* LinkedBlockingQueue.c */,
