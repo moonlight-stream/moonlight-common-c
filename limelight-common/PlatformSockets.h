@@ -33,5 +33,5 @@ typedef ssize_t SOCK_RET;
 SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
 SOCKET bindUdpSocket(void);
 int enableNoDelay(SOCKET s);
-int initializePlatformSockets(void);
+int initializePlatformSockets(PPLATFORM_CALLBACKS plCallbacks);
 void cleanupPlatformSockets(void);

@@ -4,6 +4,7 @@
 static int stage = STAGE_NONE;
 static CONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
+static PLATFORM_CALLBACKS platformCallbacks;
 
 static int alreadyTerminated;
 
@@ -134,12 +135,19 @@ void ClInternalDisplayTransientMessage(char* message)
     originalCallbacks.displayTransientMessage(message);
 }
 
+void LiCompleteThreadStart(void)
+{
+	PltRunThreadProc();
+}
+
 /* Starts the connection to the streaming machine */
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags) {
+	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
+	void* renderContext, int drFlags) {
 	int err;
 
 	memcpy(&originalCallbacks, clCallbacks, sizeof(originalCallbacks));
+	memcpy(&platformCallbacks, plCallbacks, sizeof(platformCallbacks));
     
     listenerCallbacks.stageStarting = ClInternalStageStarting;
     listenerCallbacks.stageComplete = ClInternalStageComplete;
@@ -153,13 +161,13 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 
 	Limelog("Initializing platform...");
 	listenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
-	err = initializePlatformSockets();
+	err = initializePlatformSockets(&platformCallbacks);
 	if (err != 0) {
 		Limelog("failed: %d\n", err);
 		listenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);
 		goto Cleanup;
 	}
-	err = initializePlatformThreads();
+	err = initializePlatformThreads(&platformCallbacks);
 	if (err != 0) {
 		Limelog("failed: %d\n", err);
 		listenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);

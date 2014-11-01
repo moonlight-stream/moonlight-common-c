@@ -80,7 +80,7 @@ int enableNoDelay(SOCKET s) {
 	return 0;
 }
 
-int initializePlatformSockets(void) {
+int initializePlatformSockets(PPLATFORM_CALLBACKS plCallbacks) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	WSADATA data;
 	return WSAStartup(MAKEWORD(2, 0), &data);

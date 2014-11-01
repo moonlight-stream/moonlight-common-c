@@ -90,10 +90,20 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 	ConnListenerDisplayTransientMessage displayTransientMessage;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
+typedef void(*PlatformThreadStart)(void);
+
+typedef struct _PLATFORM_CALLBACKS {
+	PlatformThreadStart threadStart;
+} PLATFORM_CALLBACKS, *PPLATFORM_CALLBACKS;
+
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
+	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
+	void* renderContext, int drFlags);
 void LiStopConnection(void);
 const char* LiGetStageName(int stage);
+
+/* Call in the context of a new thread */
+void LiCompleteThreadStart(void);
 
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
 

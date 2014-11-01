@@ -1,28 +1,15 @@
 #include "PlatformThreads.h"
 #include "Platform.h"
 
-struct thread_context {
-	ThreadEntry entry;
-	void* context;
-};
-
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 WCHAR DbgBuf[512];
 #endif
 
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 PLT_MUTEX thread_list_lock;
+PLT_THREAD *pending_thread_head;
 PLT_THREAD *thread_head;
-
-DWORD WINAPI ThreadProc(LPVOID lpParameter) {
-	struct thread_context *ctx = (struct thread_context *)lpParameter;
-
-	ctx->entry(ctx->context);
-
-	free(ctx);
-
-	return 0;
-}
+PPLATFORM_CALLBACKS platformCallbacks;
 #else
 void* ThreadProc(void* context) {
     struct thread_context *ctx = (struct thread_context *)context;
@@ -86,7 +73,8 @@ void PltUnlockMutex(PLT_MUTEX *mutex) {
 
 void PltJoinThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
+	// Wait for the thread to leave our code
+	WaitForSingleObjectEx(thread->termCompleted, INFINITE, FALSE);
 #else
     pthread_join(*thread, NULL);
 #endif
@@ -123,8 +111,8 @@ void PltCloseThread(PLT_THREAD *thread) {
 
 	PltUnlockMutex(&thread_list_lock);
 
-	CloseHandle(thread->termevent);
-	CloseHandle(thread->handle);
+	CloseHandle(thread->termRequested);
+	CloseHandle(thread->termCompleted);
 #else
 #endif
 }
@@ -142,9 +130,44 @@ int PltIsThreadInterrupted(PLT_THREAD *thread) {
 void PltInterruptThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	thread->cancelled = 1;
-	SetEvent(thread->termevent);
+	SetEvent(thread->termRequested);
 #else
 	pthread_cancel(*thread);
+#endif
+}
+
+void PltRunThreadProc(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	PLT_THREAD *thread;
+	
+	// Grab the first entry from the pending list and move it
+	// to the active list
+	PltLockMutex(&thread_list_lock);
+	thread = pending_thread_head;
+
+	// If there's no pending thread, something is seriously wrong
+	LC_ASSERT(thread != NULL);
+
+	pending_thread_head = pending_thread_head->next;
+
+	thread->next = thread_head;
+	thread_head = thread;
+	PltUnlockMutex(&thread_list_lock);
+
+	// Set up final thread state before running
+	thread->tid = GetCurrentThreadId();
+
+	// Now we're going to invoke the thread proc
+	thread->ctx->entry(thread->ctx->context);
+	free(thread->ctx);
+
+	// Signal the event to indicate the thread has "terminated"
+	SetEvent(thread->termCompleted);
+
+	// PltCloseThread() frees this state
+#else
+	// This code shouldn't be called on *NIX
+	LC_ASSERT(0);
 #endif
 }
 
@@ -162,32 +185,32 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	{
-		thread->termevent = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
-		if (thread->termevent == NULL) {
+		thread->termRequested = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+		if (thread->termRequested == NULL) {
 			free(ctx);
 			return -1;
 		}
+
+		thread->termCompleted = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
+		if (thread->termCompleted == NULL) {
+			CloseHandle(thread->termRequested);
+			free(ctx);
+			return -1;
+		}
+
 		thread->cancelled = 0;
-		// TODO we aren't allowed to use CreateThread API in kernel32.dll
-		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, CREATE_SUSPENDED, &thread->tid);
-		if (thread->handle == NULL) {
-			CloseHandle(thread->termevent);
-			free(ctx);
-			return -1;
-		}
-		else {
-			// Add this thread to the thread list
-			PltLockMutex(&thread_list_lock);
-			thread->next = thread_head;
-			thread_head = thread;
-			PltUnlockMutex(&thread_list_lock);
+		thread->ctx = ctx;
 
-			// Now the thread can run
-			// TODO can't use ResumeThread in kernel32.dll
-			ResumeThread(thread->handle);
+		// Queue on the pending threads list
+		PltLockMutex(&thread_list_lock);
+		thread->next = pending_thread_head;
+		pending_thread_head = thread;
+		PltUnlockMutex(&thread_list_lock);
 
-			err = 0;
-		}
+		// Make a callback to managed code to ask for a thread to grab this
+		platformCallbacks->threadStart();
+
+		err = 0;
 	}
 #else
     {
@@ -263,7 +286,7 @@ int PltWaitForEvent(PLT_EVENT *event) {
 	LC_ASSERT(current_thread != NULL);
 
 	objects[0] = *event;
-	objects[1] = current_thread->termevent;
+	objects[1] = current_thread->termRequested;
 	error = WaitForMultipleObjectsEx(2, objects, FALSE, INFINITE, FALSE);
 	if (error == WAIT_OBJECT_0) {
 		return PLT_WAIT_SUCCESS;
@@ -285,8 +308,14 @@ int PltWaitForEvent(PLT_EVENT *event) {
 #endif
 }
 
-int initializePlatformThreads(void) {
+int initializePlatformThreads(PPLATFORM_CALLBACKS plCallbacks) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	pending_thread_head = thread_head = NULL;
+
+	// This data is stored in static memory in Connection.c, so we don't
+	// bother making our own copy
+	platformCallbacks = plCallbacks;
+
 	return PltCreateMutex(&thread_list_lock);
 #else
 	return 0;

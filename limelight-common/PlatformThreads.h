@@ -1,15 +1,23 @@
 #pragma once
 
+#include "Limelight.h"
 #include "Platform.h"
 
 typedef void (*ThreadEntry)(void *context);
 
+struct thread_context {
+	ThreadEntry entry;
+	void* context;
+};
+
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 typedef struct _PLT_THREAD {
-	HANDLE handle;
 	int cancelled;
 	DWORD tid;
-	HANDLE termevent;
+	HANDLE termRequested;
+	HANDLE termCompleted;
+
+	struct thread_context *ctx;
 
 	struct _PLT_THREAD *next;
 } PLT_THREAD;
@@ -27,28 +35,7 @@ typedef struct _PLT_EVENT {
 #error Unsupported platform
 #endif
 
-#ifdef LC_WINDOWS_PHONE
-WINBASEAPI
-_Ret_maybenull_
-HANDLE
-WINAPI
-CreateThread(
-	_In_opt_ LPSECURITY_ATTRIBUTES lpThreadAttributes,
-	_In_ SIZE_T dwStackSize,
-	_In_ LPTHREAD_START_ROUTINE lpStartAddress,
-	_In_opt_ __drv_aliasesMem LPVOID lpParameter,
-	_In_ DWORD dwCreationFlags,
-	_Out_opt_ LPDWORD lpThreadId
-);
-
-DWORD
-WINAPI
-ResumeThread(
-	_In_  HANDLE hThread
-);
-#endif
-
-int initializePlatformThreads(void);
+int initializePlatformThreads(PPLATFORM_CALLBACKS plCallbacks);
 void cleanupPlatformThreads(void);
 
 int PltCreateMutex(PLT_MUTEX *mutex);
@@ -67,6 +54,8 @@ void PltCloseEvent(PLT_EVENT *event);
 void PltSetEvent(PLT_EVENT *event);
 void PltClearEvent(PLT_EVENT *event);
 int PltWaitForEvent(PLT_EVENT *event);
+
+void PltRunThreadProc(void);
 
 #define PLT_WAIT_SUCCESS 0
 #define PLT_WAIT_INTERRUPTED 1
