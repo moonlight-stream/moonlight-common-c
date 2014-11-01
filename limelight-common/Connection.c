@@ -4,7 +4,9 @@
 static int stage = STAGE_NONE;
 static CONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
-static PLATFORM_CALLBACKS platformCallbacks;
+
+// This is used for debug prints so it's not declared static
+PLATFORM_CALLBACKS platformCallbacks;
 
 static int alreadyTerminated;
 
@@ -161,13 +163,13 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
 
 	Limelog("Initializing platform...");
 	listenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
-	err = initializePlatformSockets(&platformCallbacks);
+	err = initializePlatformSockets();
 	if (err != 0) {
 		Limelog("failed: %d\n", err);
 		listenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);
 		goto Cleanup;
 	}
-	err = initializePlatformThreads(&platformCallbacks);
+	err = initializePlatformThreads();
 	if (err != 0) {
 		Limelog("failed: %d\n", err);
 		listenerCallbacks.stageFailed(STAGE_PLATFORM_INIT, err);

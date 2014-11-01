@@ -27,11 +27,13 @@
 #endif
 
 #include <stdio.h>
+#include "Limelight.h"
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
-extern WCHAR DbgBuf[512];
+extern char DbgBuf[512];
+extern PLATFORM_CALLBACKS platformCallbacks;
 #define Limelog(s, ...) \
-	swprintf(DbgBuf, sizeof(DbgBuf) / sizeof(WCHAR), L ## s, ##__VA_ARGS__); \
-	OutputDebugStringW(DbgBuf)
+	sprintf(DbgBuf, s, ##__VA_ARGS__); \
+	platformCallbacks.debugPrint(DbgBuf)
 #else
 #define Limelog printf
 #endif

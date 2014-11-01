@@ -91,9 +91,11 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 typedef void(*PlatformThreadStart)(void);
+typedef void(*PlatformDebugPrint)(char* string);
 
 typedef struct _PLATFORM_CALLBACKS {
 	PlatformThreadStart threadStart;
+	PlatformDebugPrint debugPrint;
 } PLATFORM_CALLBACKS, *PPLATFORM_CALLBACKS;
 
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,

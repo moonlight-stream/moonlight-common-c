@@ -2,14 +2,13 @@
 #include "Platform.h"
 
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
-WCHAR DbgBuf[512];
+CHAR DbgBuf[512];
 #endif
 
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-PLT_MUTEX thread_list_lock;
-PLT_THREAD *pending_thread_head;
-PLT_THREAD *thread_head;
-PPLATFORM_CALLBACKS platformCallbacks;
+static PLT_MUTEX thread_list_lock;
+static PLT_THREAD *pending_thread_head;
+static PLT_THREAD *thread_head;
 #else
 void* ThreadProc(void* context) {
     struct thread_context *ctx = (struct thread_context *)context;
@@ -208,7 +207,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 		PltUnlockMutex(&thread_list_lock);
 
 		// Make a callback to managed code to ask for a thread to grab this
-		platformCallbacks->threadStart();
+		platformCallbacks.threadStart();
 
 		err = 0;
 	}
@@ -308,14 +307,8 @@ int PltWaitForEvent(PLT_EVENT *event) {
 #endif
 }
 
-int initializePlatformThreads(PPLATFORM_CALLBACKS plCallbacks) {
+int initializePlatformThreads(void) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	pending_thread_head = thread_head = NULL;
-
-	// This data is stored in static memory in Connection.c, so we don't
-	// bother making our own copy
-	platformCallbacks = plCallbacks;
-
 	return PltCreateMutex(&thread_list_lock);
 #else
 	return 0;
@@ -324,6 +317,9 @@ int initializePlatformThreads(PPLATFORM_CALLBACKS plCallbacks) {
 
 void cleanupPlatformThreads(void) {
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	LC_ASSERT(pending_thread_head == NULL);
+	LC_ASSERT(thread_head == NULL);
+
 	PltDeleteMutex(&thread_list_lock);
 #else
 #endif
