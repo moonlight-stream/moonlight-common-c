@@ -179,6 +179,10 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	if (err != 0) {
 		return err;
 	}
+    
+    // This must be called before the decoder thread starts submitting
+    // decode units
+    callbacks.start();
 
 	err = readFirstFrame();
 	if (err != 0) {
@@ -189,10 +193,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	if (err != 0) {
 		return err;
 	}
-
-	//This must be called before the decoder thread starts submitting
-	// decode units
-	callbacks.start();
 
 	err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
 	if (err != 0) {
