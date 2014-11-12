@@ -145,13 +145,11 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	sprintf(payloadStr, "%d", streamConfig->bitrate);
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
 
-	// Since we can only deal with FEC data on a 1 packet frame,
-	// restrict FEC repair percentage to minimum so we get only 1
-	// FEC packet per frame
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.enable", "1");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairPercent", "1");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairMaxPercent", "1");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairMinPercent", "1");
+    // Using FEC turns padding on which makes us have to take the slow path
+    // in the depacketizer, not to mention exposing some ambiguous cases with
+    // distinguishing padding from valid sequences. Since we can only perform
+    // execute an FEC recovery on a 1 packet frame, we'll just turn it off completely.
+    err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.enable", "0");
 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
