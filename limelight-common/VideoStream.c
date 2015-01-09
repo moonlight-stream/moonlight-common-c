@@ -57,7 +57,7 @@ static void UdpPingThreadProc(void *context) {
 			return;
 		}
 
-		PltSleepMs(100);
+		PltSleepMs(500);
 	}
 }
 

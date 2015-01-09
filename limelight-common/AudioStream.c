@@ -59,7 +59,7 @@ static void UdpPingThreadProc(void *context) {
 	saddr.sin_port = htons(RTP_PORT);
 	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
 
-	/* Send PING every 100 milliseconds */
+	/* Send PING every 500 milliseconds */
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
 		if (err != sizeof(pingData)) {
@@ -68,7 +68,7 @@ static void UdpPingThreadProc(void *context) {
 			return;
 		}
 
-		PltSleepMs(100);
+		PltSleepMs(500);
 	}
 }
 
