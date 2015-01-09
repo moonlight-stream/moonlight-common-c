@@ -111,11 +111,6 @@ int readFirstFrame(void) {
 	SOCK_RET err;
 	int offset = 0;
 
-	firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);
-	if (firstFrameSocket == INVALID_SOCKET) {
-		return LastSocketError();
-	}
-
 	firstFrame = (char*) malloc(FIRST_FRAME_MAX);
 	if (firstFrame == NULL) {
 		return -1;
@@ -132,8 +127,12 @@ int readFirstFrame(void) {
 	}
 	Limelog("Read %d bytes\n", offset);
 
-	processRtpPayload((PNV_VIDEO_PACKET) firstFrame, offset);
-
+    // We can just ignore this data for now. It's the act of reading
+    // it that matters. If this changes, we'll need to move this call before
+    // starting the receive thread to avoid state corruption in the depacketizer.
+    
+    free(firstFrame);
+    
 	return 0;
 }
 
@@ -170,23 +169,13 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	callbacks.setup(configuration.width,
 		configuration.height, 60, rendererContext, drFlags);
 
-	rtpSocket = bindUdpSocket();
-	if (rtpSocket == INVALID_SOCKET) {
-		return LastSocketError();
-	}
-
-	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
-	if (err != 0) {
-		return err;
-	}
-    
     // This must be called before the decoder thread starts submitting
     // decode units
     callbacks.start();
-
-	err = readFirstFrame();
-	if (err != 0) {
-		return err;
+    
+	rtpSocket = bindUdpSocket();
+	if (rtpSocket == INVALID_SOCKET) {
+		return LastSocketError();
 	}
 
 	err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
@@ -198,6 +187,25 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	if (err != 0) {
 		return err;
 	}
+    
+    // Connect this socket to open port 47998 for our ping thread
+    firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);
+    if (firstFrameSocket == INVALID_SOCKET) {
+        return LastSocketError();
+    }
+    
+    // Start pinging before reading the first frame so GFE knows where
+    // to send UDP data
+    err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
+    if (err != 0) {
+        return err;
+    }
+    
+    // Read the first frame to start the flow of video
+    err = readFirstFrame();
+    if (err != 0) {
+        return err;
+    }
 
 	return 0;
 }
