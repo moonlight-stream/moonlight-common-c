@@ -31,7 +31,10 @@ typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void*
 typedef void(*DecoderRendererStart)(void);
 typedef void(*DecoderRendererStop)(void);
 typedef void(*DecoderRendererRelease)(void);
-typedef void(*DecoderRendererSubmitDecodeUnit)(PDECODE_UNIT decodeUnit);
+
+#define DR_OK 0
+#define DR_NEED_IDR -1
+typedef int(*DecoderRendererSubmitDecodeUnit)(PDECODE_UNIT decodeUnit);
 
 typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSetup setup;

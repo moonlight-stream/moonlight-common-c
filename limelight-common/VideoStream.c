@@ -99,9 +99,14 @@ static void DecoderThreadProc(void* context) {
 			return;
 		}
 
-		callbacks.submitDecodeUnit(du);
+		int ret = callbacks.submitDecodeUnit(du);
 
 		freeDecodeUnit(du);
+        
+        if (ret == DR_NEED_IDR) {
+            Limelog("Request IDR frame on behalf of DR\n");
+            resyncOnDemand();
+        }
 	}
 }
 

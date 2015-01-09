@@ -56,6 +56,12 @@ void destroyControlStream(void) {
 	PltCloseEvent(&resyncEvent);
 }
 
+/* Resync on demand by the decoder */
+void resyncOnDemand(void) {
+    // FIXME: Send ranges
+    PltSetEvent(&resyncEvent);
+}
+
 /* Resync if the connection is too slow */
 void connectionSinkTooSlow(int startFrame, int endFrame) {
 	// FIXME: Send ranges

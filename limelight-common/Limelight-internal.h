@@ -12,6 +12,7 @@ int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig,
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
+void resyncOnDemand(void);
 void connectionSinkTooSlow(int startFrame, int endFrame);
 void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedFrame(int frameIndex);
