@@ -15,6 +15,9 @@ static int gotNextFrameStart;
 static int lastPacketInStream;
 static int decodingFrame;
 
+#define CONSECUTIVE_DROP_LIMIT 120
+static int consecutiveFrameDrops;
+
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 static unsigned int nominalPacketDataLength;
 
@@ -55,6 +58,21 @@ static void cleanupAvcFrameState(void) {
 /* Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
 static void dropAvcFrameState(void) {
 	waitingForIdrFrame = 1;
+    
+    // Count the number of consecutive frames dropped
+    consecutiveFrameDrops++;
+    
+    // If we reach our limit, immediately request an IDR frame and reset
+    if (consecutiveFrameDrops == CONSECUTIVE_DROP_LIMIT) {
+        Limelog("Reached consecutive drop limit");
+        
+        // Restart the count
+        consecutiveFrameDrops = 0;
+        
+        // Request an IDR frame
+        connectionDetectedFrameLoss(0, 0);
+    }
+    
 	cleanupAvcFrameState();
 }
 
@@ -161,6 +179,9 @@ static void reassembleAvcFrame(int frameNumber) {
 
 			// Notify the control connection
 			connectionReceivedFrame(frameNumber);
+            
+            // Clear frame drops
+            consecutiveFrameDrops = 0;
 		}
 	}
 }
