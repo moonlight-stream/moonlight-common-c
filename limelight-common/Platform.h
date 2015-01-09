@@ -35,7 +35,8 @@ extern PLATFORM_CALLBACKS platformCallbacks;
 	sprintf(DbgBuf, s, ##__VA_ARGS__); \
 	platformCallbacks.debugPrint(DbgBuf)
 #else
-#define Limelog printf
+#define Limelog(s, ...) \
+    fprintf(stderr, s, ##__VA_ARGS__)
 #endif
 
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
