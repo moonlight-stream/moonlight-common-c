@@ -113,6 +113,9 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 
 	sprintf(payloadStr, "%d", streamConfig->fps);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
+    
+    sprintf(payloadStr, "%d", streamConfig->packetSize);
+    err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
 	payloadInt = htonl(0x41514141);
 	err |= addAttributeBinary(&optionHead,
