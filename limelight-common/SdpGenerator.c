@@ -134,13 +134,47 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 		"x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
 	err |= addAttributeBinary(&optionHead,
 		"x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
+    
+    // FIXME: Remote optimizations
+    if (streamConfig->bitrate <= 13000) {
+        err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "9");
+        err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "9");
+    }
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
-	
-	// FIXME: This number is taken from limelight-common, but doesn't have the same
-	// bitrate floor which can cause blockiness when scaling
+    
+    // This flags value will mean that resolution won't change as bitrate falls
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "14083");
+    
+    // Lock the bitrate since we're not scaling resolution so the picture doesn't get too bad
+    if (streamConfig->height >= 1080 && streamConfig->fps >= 60) {
+        if (streamConfig->bitrate < 10000) {
+            sprintf(payloadStr, "%d", streamConfig->bitrate);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+        }
+        else {
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "10000");
+        }
+    }
+    else if (streamConfig->height >= 1080 || streamConfig->fps >= 60) {
+        if (streamConfig->bitrate < 7000) {
+            sprintf(payloadStr, "%d", streamConfig->bitrate);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+        }
+        else {
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "7000");
+        }
+    }
+    else {
+        if (streamConfig->bitrate < 3000) {
+            sprintf(payloadStr, "%d", streamConfig->bitrate);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+        }
+        else {
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "7000");
+        }
+    }
 
 	sprintf(payloadStr, "%d", streamConfig->bitrate);
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
@@ -152,6 +186,8 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.enable", "0");
 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
+    
+    // FIXME: Remote optimizations
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQosMaxConsecutiveDrops", "0");
@@ -159,7 +195,8 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[2].videoQosMaxConsecutiveDrops", "0");
 	err |= addAttributeString(&optionHead, "x-nv-vqos[3].videoQosMaxConsecutiveDrops", "0");
 
-	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "8");
+    // FIXME: Remote optimizations
+	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
 
 	if (err == 0) {
 		return optionHead;
