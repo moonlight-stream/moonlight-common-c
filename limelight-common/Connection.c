@@ -32,6 +32,9 @@ const char* LiGetStageName(int stage) {
 
 /* Stop the connection by undoing the step at the current stage and those before it */
 void LiStopConnection(void) {
+    // Disable termination callbacks now
+    alreadyTerminated = 1;
+    
 	if (stage == STAGE_INPUT_STREAM_START) {
 		Limelog("Stopping input stream...");
 		stopInputStream();
