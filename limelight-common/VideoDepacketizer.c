@@ -64,7 +64,7 @@ static void dropAvcFrameState(void) {
     
     // If we reach our limit, immediately request an IDR frame and reset
     if (consecutiveFrameDrops == CONSECUTIVE_DROP_LIMIT) {
-        Limelog("Reached consecutive drop limit");
+        Limelog("Reached consecutive drop limit\n");
         
         // Restart the count
         consecutiveFrameDrops = 0;
