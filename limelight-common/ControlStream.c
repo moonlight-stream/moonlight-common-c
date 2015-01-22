@@ -20,21 +20,21 @@ static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static int lossCountSinceLastReport = 0;
 static long currentFrame = 0;
 
-#define PTYPE_START_STREAM_A 0x140b
-#define PPAYLEN_START_STREAM_A 1
-static const char PPAYLOAD_START_STREAM_A[1] = { 0 };
+#define PTYPE_START_STREAM_A 0x0606
+#define PPAYLEN_START_STREAM_A 2
+static const char PPAYLOAD_START_STREAM_A[PPAYLEN_START_STREAM_A] = { 0, 0 };
 
-#define PTYPE_START_STREAM_B 0x1410
-#define PPAYLEN_START_STREAM_B 16
-static const int PPAYLOAD_START_STREAM_B[4] = { 0, 0, 0, 0xa }; // FIXME: Little endian
+#define PTYPE_START_STREAM_B 0x0609
+#define PPAYLEN_START_STREAM_B 1
+static const char PPAYLOAD_START_STREAM_B[PPAYLEN_START_STREAM_B] = { 0 };
 
-#define PTYPE_RESYNC 0x1404
+#define PTYPE_RESYNC 0x0604
 #define PPAYLEN_RESYNC 24
 
-#define PTYPE_LOSS_STATS 0x140c
+#define PTYPE_LOSS_STATS 0x060a
 #define PPAYLEN_LOSS_STATS 32
 
-#define PTYPE_FRAME_STATS 0x1417
+#define PTYPE_FRAME_STATS 0x0611
 #define PPAYLEN_FRAME_STATS 64
 
 #define LOSS_REPORT_INTERVAL_MS 50

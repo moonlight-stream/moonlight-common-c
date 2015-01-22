@@ -6,6 +6,10 @@
 #include "PlatformThreads.h"
 #include "Video.h"
 
+/* GFE 2.2.2+ RTSP/SDP version code */
+#define RTSP_CLIENT_VERSION 11
+#define RTSP_CLIENT_VERSION_S "11"
+
 char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress, int *length);
 
 int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks);

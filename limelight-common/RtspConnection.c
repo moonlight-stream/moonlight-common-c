@@ -11,10 +11,6 @@ static char sessionIdString[16];
 static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
 
-/* GFE 2.1.1 */
-#define RTSP_CLIENT_VERSION 10
-#define RTSP_CLIENT_VERSION_S "10"
-
 /* Create RTSP Option */
 static POPTION_ITEM createOptionItem(char* option, char* content)
 {

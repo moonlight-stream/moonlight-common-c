@@ -5,8 +5,6 @@
 #define MAX_SDP_HEADER_LEN 128
 #define MAX_SDP_TAIL_LEN 128
 
-#define RTSP_CLIENT_VERSION_S "10"
-
 typedef struct _SDP_OPTION {
 	char name[MAX_OPTION_NAME_LEN+1];
 	void* payload;
@@ -92,19 +90,14 @@ static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload
 
 static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {
 	PSDP_OPTION optionHead;
-	int payloadInt;
-	char payloadStr[64];
+	char payloadStr[92];
 	int err;
 
 	optionHead = NULL;
-
 	err = 0;
-	err |= addAttributeString(&optionHead, "x-nv-general.serverAddress",
-		inet_ntoa(targetAddress));
-
-	payloadInt = htonl(0x42774141);
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-general.featureFlags", &payloadInt, sizeof(payloadInt));
+    
+    sprintf(payloadStr, "rtsp://%s:48010", inet_ntoa(targetAddress));
+	err |= addAttributeString(&optionHead, "x-nv-general.serverAddress", payloadStr);
 
 	sprintf(payloadStr, "%d", streamConfig->width);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportWd", payloadStr);
@@ -117,26 +110,7 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
     sprintf(payloadStr, "%d", streamConfig->packetSize);
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
-	payloadInt = htonl(0x41514141);
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[0].transferProtocol", &payloadInt, sizeof(payloadInt));
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[1].transferProtocol", &payloadInt, sizeof(payloadInt));
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[2].transferProtocol", &payloadInt, sizeof(payloadInt));
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[3].transferProtocol", &payloadInt, sizeof(payloadInt));
-
-	payloadInt = htonl(0x42414141);
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[0].rateControlMode", &payloadInt, sizeof(payloadInt));
-	payloadInt = htonl(0x42514141);
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[1].rateControlMode", &payloadInt, sizeof(payloadInt));
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
-	err |= addAttributeBinary(&optionHead,
-		"x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
+	err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
     
     // FIXME: Remote optimizations
     if (streamConfig->bitrate <= 13000) {
@@ -148,7 +122,7 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
     
     // This flags value will mean that resolution won't change as bitrate falls
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "14083");
+	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "51");
     
     // Lock the bitrate since we're not scaling resolution so the picture doesn't get too bad
     if (streamConfig->height >= 1080 && streamConfig->fps >= 60) {
@@ -192,13 +166,6 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
     
     // FIXME: Remote optimizations
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
-
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQosMaxConsecutiveDrops", "0");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[1].videoQosMaxConsecutiveDrops", "0");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[2].videoQosMaxConsecutiveDrops", "0");
-	err |= addAttributeString(&optionHead, "x-nv-vqos[3].videoQosMaxConsecutiveDrops", "0");
-
-    // FIXME: Remote optimizations
 	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
 
 	if (err == 0) {
@@ -221,7 +188,7 @@ static int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
 static int fillSdpTail(char* buffer) {
 	return sprintf(buffer,
 		"t=0 0\r\n"
-		"m=video 47996  \r\n");
+		"m=video 47998  \r\n");
 }
 
 /* Get the SDP attributes for the stream config */
