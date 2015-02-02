@@ -88,6 +88,62 @@ static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload
 	return addAttributeBinary(head, name, payload, (int)strlen(payload));
 }
 
+static int addGen3Options(PSDP_OPTION *head, char* addrStr) {
+    int payloadInt;
+    int err = 0;
+    
+    err |= addAttributeString(head, "x-nv-general.serverAddress", addrStr);
+    
+    payloadInt = htonl(0x42774141);
+    err |= addAttributeBinary(head,
+                              "x-nv-general.featureFlags", &payloadInt, sizeof(payloadInt));
+
+    
+    payloadInt = htonl(0x41514141);
+    err |= addAttributeBinary(head,
+                              "x-nv-video[0].transferProtocol", &payloadInt, sizeof(payloadInt));
+    err |= addAttributeBinary(head,
+                              "x-nv-video[1].transferProtocol", &payloadInt, sizeof(payloadInt));
+    err |= addAttributeBinary(head,
+                              "x-nv-video[2].transferProtocol", &payloadInt, sizeof(payloadInt));
+    err |= addAttributeBinary(head,
+                              "x-nv-video[3].transferProtocol", &payloadInt, sizeof(payloadInt));
+    
+    payloadInt = htonl(0x42414141);
+    err |= addAttributeBinary(head,
+                              "x-nv-video[0].rateControlMode", &payloadInt, sizeof(payloadInt));
+    payloadInt = htonl(0x42514141);
+    err |= addAttributeBinary(head,
+                              "x-nv-video[1].rateControlMode", &payloadInt, sizeof(payloadInt));
+    err |= addAttributeBinary(head,
+                              "x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
+    err |= addAttributeBinary(head,
+                              "x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
+    
+    err |= addAttributeString(head, "x-nv-vqos[0].bw.flags", "14083");
+    
+    err |= addAttributeString(head, "x-nv-vqos[0].videoQosMaxConsecutiveDrops", "0");
+    err |= addAttributeString(head, "x-nv-vqos[1].videoQosMaxConsecutiveDrops", "0");
+    err |= addAttributeString(head, "x-nv-vqos[2].videoQosMaxConsecutiveDrops", "0");
+    err |= addAttributeString(head, "x-nv-vqos[3].videoQosMaxConsecutiveDrops", "0");
+    
+    return err;
+}
+
+static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
+    char payloadStr[92];
+    int err = 0;
+    
+    sprintf(payloadStr, "rtsp://%s:48010", addrStr);
+    err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
+    
+    err |= addAttributeString(head, "x-nv-video[0].rateControlMode", "4");
+    
+    err |= addAttributeString(head, "x-nv-vqos[0].bw.flags", "51");
+    
+    return err;
+}
+
 static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {
 	PSDP_OPTION optionHead;
 	char payloadStr[92];
@@ -95,9 +151,6 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 
 	optionHead = NULL;
 	err = 0;
-    
-    sprintf(payloadStr, "rtsp://%s:48010", inet_ntoa(targetAddress));
-	err |= addAttributeString(&optionHead, "x-nv-general.serverAddress", payloadStr);
 
 	sprintf(payloadStr, "%d", streamConfig->width);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportWd", payloadStr);
@@ -120,9 +173,6 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
-    
-    // This flags value will mean that resolution won't change as bitrate falls
-	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.flags", "51");
     
     // Lock the bitrate since we're not scaling resolution so the picture doesn't get too bad
     if (streamConfig->height >= 1080 && streamConfig->fps >= 60) {
@@ -167,6 +217,13 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
     // FIXME: Remote optimizations
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
 	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
+    
+    if (serverMajorVersion == 3) {
+        err |= addGen3Options(&optionHead, inet_ntoa(targetAddress));
+    }
+    else {
+        err |= addGen4Options(&optionHead, inet_ntoa(targetAddress));
+    }
 
 	if (err == 0) {
 		return optionHead;
@@ -177,22 +234,24 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 }
 
 /* Populate the SDP header with required information */
-static int fillSdpHeader(char* buffer, struct in_addr targetAddress) {
+static int fillSdpHeader(char* buffer, struct in_addr targetAddress, int rtspClientVersion) {
 	return sprintf(buffer,
 		"v=0\r\n"
-		"o=android 0 "RTSP_CLIENT_VERSION_S" IN IPv4 %s\r\n"
-		"s=NVIDIA Streaming Client\r\n", inet_ntoa(targetAddress));
+		"o=android 0 %d IN IPv4 %s\r\n"
+		"s=NVIDIA Streaming Client\r\n", rtspClientVersion, inet_ntoa(targetAddress));
 }
 
 /* Populate the SDP tail with required information */
 static int fillSdpTail(char* buffer) {
 	return sprintf(buffer,
 		"t=0 0\r\n"
-		"m=video 47998  \r\n");
+		"m=video %d  \r\n",
+                   serverMajorVersion < 4 ? 47996 : 47998);
 }
 
 /* Get the SDP attributes for the stream config */
-char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress, int *length) {
+char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress,
+                                   int rtspClientVersion, int *length) {
 	PSDP_OPTION attributeList;
 	int offset;
 	char* payload;
@@ -209,7 +268,7 @@ char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in
 		return NULL;
 	}
 
-	offset = fillSdpHeader(payload, targetAddress);
+	offset = fillSdpHeader(payload, targetAddress, rtspClientVersion);
 	offset += fillSerializedAttributeList(&payload[offset], attributeList);
 	offset += fillSdpTail(&payload[offset]);
 

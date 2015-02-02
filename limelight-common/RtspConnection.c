@@ -10,6 +10,7 @@ static char rtspTargetUrl[256];
 static char sessionIdString[16];
 static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
+static int rtspClientVersion;
 
 /* Create RTSP Option */
 static POPTION_ITEM createOptionItem(char* option, char* content)
@@ -60,14 +61,16 @@ static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
 static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 {
 	char sequenceNumberStr[16];
+    char clientVersionStr[16];
 
 	// FIXME: Hacked CSeq attribute due to RTSP parser bug
 	createRtspRequest(msg, NULL, 0, command, target, "RTSP/1.0",
 		0, NULL, NULL, 0);
 	
 	sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
+    sprintf(clientVersionStr, "%d", rtspClientVersion);
 	if (!addOption(msg, "CSeq", sequenceNumberStr) ||
-		!addOption(msg, "X-GS-ClientVersion", RTSP_CLIENT_VERSION_S)) {
+		!addOption(msg, "X-GS-ClientVersion", clientVersionStr)) {
 		freeMessage(msg);
 		return 0;
 	}
@@ -247,7 +250,8 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 		}
 
         memcpy(&sdpAddr, &remoteAddr, sizeof(remoteAddr));
-		request.payload = getSdpPayloadForStreamConfig(streamConfig, sdpAddr, &payloadLength);
+		request.payload = getSdpPayloadForStreamConfig(streamConfig, sdpAddr,
+                                                       rtspClientVersion, &payloadLength);
 		if (request.payload == NULL) {
 			goto FreeMessage;
 		}
@@ -278,6 +282,13 @@ int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr)
 	sprintf(rtspTargetUrl, "rtsp://%s", inet_ntoa(inaddr));
 	currentSeqNumber = 1;
 	hasSessionId = 0;
+    
+    if (serverMajorVersion == 3) {
+        rtspClientVersion = 10;
+    }
+    else {
+        rtspClientVersion = 11;
+    }
 
 	{
 		RTSP_MESSAGE response;

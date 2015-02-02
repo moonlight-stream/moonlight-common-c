@@ -20,22 +20,59 @@ static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static int lossCountSinceLastReport = 0;
 static long currentFrame = 0;
 
-#define PTYPE_START_STREAM_A 0x0606
-#define PPAYLEN_START_STREAM_A 2
-static const char PPAYLOAD_START_STREAM_A[PPAYLEN_START_STREAM_A] = { 0, 0 };
+#define IDX_START_A 0
+#define IDX_START_B 1
+#define IDX_RESYNC 2
+#define IDX_LOSS_STATS 3
 
-#define PTYPE_START_STREAM_B 0x0609
-#define PPAYLEN_START_STREAM_B 1
-static const char PPAYLOAD_START_STREAM_B[PPAYLEN_START_STREAM_B] = { 0 };
+static const short packetTypesGen3[] = {
+    0x140b, // Start A
+    0x1410, // Start B
+    0x1404, // Resync
+    0x140c, // Loss Stats
+    0x1417, // Frame Stats (unused)
+};
+static const short packetTypesGen4[] = {
+    0x0606, // Start A
+    0x0609, // Start B
+    0x0604, // Resync
+    0x060a, // Loss Stats
+    0x0611, // Frame Stats (unused)
+};
 
-#define PTYPE_RESYNC 0x0604
-#define PPAYLEN_RESYNC 24
+static const char startAGen3[] = {0};
+static const int startBGen3[] = {0, 0, 0, 0xa};
 
-#define PTYPE_LOSS_STATS 0x060a
-#define PPAYLEN_LOSS_STATS 32
+static const char startAGen4[] = {0, 0};
+static const char startBGen4[] = {0};
 
-#define PTYPE_FRAME_STATS 0x0611
-#define PPAYLEN_FRAME_STATS 64
+static const short payloadLengthsGen3[] = {
+    sizeof(startAGen3), // Start A
+    sizeof(startBGen3), // Start B
+    24, // Resync
+    32, // Loss Stats
+    64, // Frame Stats
+};
+static const short payloadLengthsGen4[] = {
+    sizeof(startAGen4), // Start A
+    sizeof(startBGen4), // Start B
+    24, // Resync
+    32, // Loss Stats
+    64, // Frame Stats
+};
+
+static const char* preconstructedPayloadsGen3[] = {
+    startAGen3,
+    (char*)startBGen3
+};
+static const char* preconstructedPayloadsGen4[] = {
+    startAGen4,
+    startBGen4
+};
+
+static short *packetTypes;
+static short *payloadLengths;
+static char **preconstructedPayloads;
 
 #define LOSS_REPORT_INTERVAL_MS 50
 
@@ -47,6 +84,17 @@ int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigP
 
 	host = addr;
 	listenerCallbacks = clCallbacks;
+    
+    if (serverMajorVersion == 3) {
+        packetTypes = (short*)packetTypesGen3;
+        payloadLengths = (short*)payloadLengthsGen3;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen3;
+    }
+    else {
+        packetTypes = (short*)packetTypesGen4;
+        payloadLengths = (short*)payloadLengthsGen4;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen4;
+    }
 
 	return 0;
 }
@@ -156,12 +204,12 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
 }
 
 static void lossStatsThreadFunc(void* context) {
-	char lossStatsPayload[PPAYLEN_LOSS_STATS];
+	char lossStatsPayload[payloadLengths[IDX_LOSS_STATS]];
 	BYTE_BUFFER byteBuffer;
 
 	while (!PltIsThreadInterrupted(&lossStatsThread)) {
 		// Construct the payload
-		BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, PPAYLEN_LOSS_STATS, BYTE_ORDER_LITTLE);
+		BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
 		BbPutInt(&byteBuffer, lossCountSinceLastReport);
 		BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
 		BbPutInt(&byteBuffer, 1000);
@@ -171,8 +219,8 @@ static void lossStatsThreadFunc(void* context) {
 		BbPutInt(&byteBuffer, 0x14);
 
 		// Send the message (and don't expect a response)
-		if (!sendMessageAndForget(PTYPE_LOSS_STATS,
-			PPAYLEN_LOSS_STATS, lossStatsPayload)) {
+		if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
+			payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
 			Limelog("Loss stats thread terminating #1\n");
             listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
@@ -202,7 +250,7 @@ static void resyncThreadFunc(void* context) {
 		PltClearEvent(&resyncEvent);
 
 		// Send the resync request and read the response
-		if (!sendMessageAndDiscardReply(PTYPE_RESYNC, PPAYLEN_RESYNC, payload)) {
+		if (!sendMessageAndDiscardReply(packetTypes[IDX_RESYNC], payloadLengths[IDX_RESYNC], payload)) {
 			Limelog("Resync thread terminating #1\n");
 			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
@@ -242,16 +290,16 @@ int startControlStream(void) {
 	enableNoDelay(ctlSock);
 
 	// Send START A
-	if (!sendMessageAndDiscardReply(PTYPE_START_STREAM_A,
-                                    PPAYLEN_START_STREAM_A,
-                                    PPAYLOAD_START_STREAM_A)) {
+	if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
+                                    payloadLengths[IDX_START_A],
+                                    preconstructedPayloads[IDX_START_A])) {
         return LastSocketError();
     }
 
 	// Send START B
-	if (!sendMessageAndDiscardReply(PTYPE_START_STREAM_B,
-                                    PPAYLEN_START_STREAM_B,
-                                    PPAYLOAD_START_STREAM_B)) {
+    if (!sendMessageAndDiscardReply(packetTypes[IDX_START_B],
+                                    payloadLengths[IDX_START_B],
+                                    preconstructedPayloads[IDX_START_B])) {
         return LastSocketError();
     }
 

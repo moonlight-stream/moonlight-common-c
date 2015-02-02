@@ -8,6 +8,8 @@ static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
 // This is used for debug prints so it's not declared static
 PLATFORM_CALLBACKS platformCallbacks;
 
+int serverMajorVersion;
+
 static int alreadyTerminated;
 
 /* Connection stages */
@@ -148,8 +150,10 @@ void LiCompleteThreadStart(void)
 /* Starts the connection to the streaming machine */
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
-	void* renderContext, int drFlags) {
+	void* renderContext, int drFlags, int _serverMajorVersion) {
 	int err;
+    
+    serverMajorVersion = _serverMajorVersion;
 
 	memcpy(&originalCallbacks, clCallbacks, sizeof(originalCallbacks));
 	memcpy(&platformCallbacks, plCallbacks, sizeof(platformCallbacks));

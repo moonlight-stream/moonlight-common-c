@@ -103,7 +103,7 @@ typedef struct _PLATFORM_CALLBACKS {
 
 int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
-	void* renderContext, int drFlags);
+	void* renderContext, int drFlags, int _serverMajorVersion);
 void LiStopConnection(void);
 const char* LiGetStageName(int stage);
 

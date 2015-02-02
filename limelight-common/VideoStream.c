@@ -6,6 +6,7 @@
 #define FIRST_FRAME_MAX 1500
 
 #define RTP_PORT 47998
+#define FIRST_FRAME_PORT 47996
 
 static DECODER_RENDERER_CALLBACKS callbacks;
 static STREAM_CONFIGURATION configuration;
@@ -13,6 +14,7 @@ static IP_ADDRESS remoteHost;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
+static SOCKET firstFrameSocket = INVALID_SOCKET;
 
 static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
@@ -108,6 +110,17 @@ static void DecoderThreadProc(void* context) {
 	}
 }
 
+/* Read the first frame of the video stream */
+int readFirstFrame(void) {
+    // All that matters is that we close this socket.
+    // This starts the flow of video on Gen 3 servers.
+    
+    closesocket(firstFrameSocket);
+    firstFrameSocket = INVALID_SOCKET;
+    
+	return 0;
+}
+
 /* Terminate the video stream */
 void stopVideoStream(void) {
 	callbacks.stop();
@@ -116,6 +129,10 @@ void stopVideoStream(void) {
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
 
+	if (firstFrameSocket != INVALID_SOCKET) {
+		closesocket(firstFrameSocket);
+		firstFrameSocket = INVALID_SOCKET;
+	}
 	if (rtpSocket != INVALID_SOCKET) {
 		closesocket(rtpSocket);
 		rtpSocket = INVALID_SOCKET;
@@ -156,11 +173,27 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		return err;
 	}
     
+    if (serverMajorVersion == 3) {
+        // Connect this socket to open port 47998 for our ping thread
+        firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);
+        if (firstFrameSocket == INVALID_SOCKET) {
+            return LastSocketError();
+        }
+    }
+    
     // Start pinging before reading the first frame so GFE knows where
     // to send UDP data
     err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         return err;
+    }
+    
+    if (serverMajorVersion == 3) {
+        // Read the first frame to start the flow of video
+        err = readFirstFrame();
+        if (err != 0) {
+            return err;
+        }
     }
 
 	return 0;
