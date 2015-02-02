@@ -143,6 +143,8 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 #define SPECIAL_FLAG 0x0400
 int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
 	short leftStickX, short leftStickY, short rightStickX, short rightStickY);
+int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, char leftTrigger, char rightTrigger,
+    short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 int LiSendScrollEvent(char scrollClicks);
 
