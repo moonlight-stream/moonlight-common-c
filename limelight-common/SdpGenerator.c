@@ -178,28 +178,28 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
     if (streamConfig->height >= 1080 && streamConfig->fps >= 60) {
         if (streamConfig->bitrate < 10000) {
             sprintf(payloadStr, "%d", streamConfig->bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "10000");
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "10000");
         }
     }
     else if (streamConfig->height >= 1080 || streamConfig->fps >= 60) {
         if (streamConfig->bitrate < 7000) {
             sprintf(payloadStr, "%d", streamConfig->bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "7000");
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "7000");
         }
     }
     else {
         if (streamConfig->bitrate < 3000) {
             sprintf(payloadStr, "%d", streamConfig->bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", "7000");
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "3000");
         }
     }
 
