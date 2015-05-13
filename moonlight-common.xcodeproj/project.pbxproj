@@ -39,7 +39,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		FB290E2E19B37A4E004C83CF /* liblimelight-common.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblimelight-common.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB290E2E19B37A4E004C83CF /* libmoonlight-common.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libmoonlight-common.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB290E3619B37A8B004C83CF /* AudioStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AudioStream.c; sourceTree = "<group>"; };
 		FB290E3719B37A8B004C83CF /* ByteBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ByteBuffer.c; sourceTree = "<group>"; };
 		FB290E3819B37A8B004C83CF /* ByteBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByteBuffer.h; sourceTree = "<group>"; };
@@ -96,7 +96,7 @@
 		FB290E2F19B37A4E004C83CF /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				FB290E2E19B37A4E004C83CF /* liblimelight-common.a */,
+				FB290E2E19B37A4E004C83CF /* libmoonlight-common.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -175,9 +175,9 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
-		FB290E2D19B37A4E004C83CF /* limelight-common */ = {
+		FB290E2D19B37A4E004C83CF /* moonlight-common */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FB290E3219B37A4E004C83CF /* Build configuration list for PBXNativeTarget "limelight-common" */;
+			buildConfigurationList = FB290E3219B37A4E004C83CF /* Build configuration list for PBXNativeTarget "moonlight-common" */;
 			buildPhases = (
 				FB290E2A19B37A4E004C83CF /* Sources */,
 				FB290E2B19B37A4E004C83CF /* Frameworks */,
@@ -187,9 +187,9 @@
 			);
 			dependencies = (
 			);
-			name = "limelight-common";
+			name = "moonlight-common";
 			productName = "limelight-common";
-			productReference = FB290E2E19B37A4E004C83CF /* liblimelight-common.a */;
+			productReference = FB290E2E19B37A4E004C83CF /* libmoonlight-common.a */;
 			productType = "com.apple.product-type.library.static";
 		};
 /* End PBXNativeTarget section */
@@ -201,7 +201,7 @@
 				LastUpgradeCheck = 0510;
 				ORGANIZATIONNAME = "Limelight Stream";
 			};
-			buildConfigurationList = FB290E2919B37A4E004C83CF /* Build configuration list for PBXProject "limelight-common" */;
+			buildConfigurationList = FB290E2919B37A4E004C83CF /* Build configuration list for PBXProject "moonlight-common" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
@@ -213,7 +213,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				FB290E2D19B37A4E004C83CF /* limelight-common */,
+				FB290E2D19B37A4E004C83CF /* moonlight-common */,
 			);
 		};
 /* End PBXProject section */
@@ -346,7 +346,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		FB290E2919B37A4E004C83CF /* Build configuration list for PBXProject "limelight-common" */ = {
+		FB290E2919B37A4E004C83CF /* Build configuration list for PBXProject "moonlight-common" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FB290E3019B37A4E004C83CF /* Debug */,
@@ -355,7 +355,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		FB290E3219B37A4E004C83CF /* Build configuration list for PBXNativeTarget "limelight-common" */ = {
+		FB290E3219B37A4E004C83CF /* Build configuration list for PBXNativeTarget "moonlight-common" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FB290E3319B37A4E004C83CF /* Debug */,
