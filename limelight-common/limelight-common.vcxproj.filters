@@ -63,6 +63,9 @@
     <ClCompile Include="OpenAES\oaes_lib.c">
       <Filter>Source Files\OpenAES</Filter>
     </ClCompile>
+    <ClCompile Include="FakeCallbacks.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ByteBuffer.h">

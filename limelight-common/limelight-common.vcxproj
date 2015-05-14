@@ -135,6 +135,7 @@
     <ClCompile Include="ByteBuffer.c" />
     <ClCompile Include="Connection.c" />
     <ClCompile Include="ControlStream.c" />
+    <ClCompile Include="FakeCallbacks.c" />
     <ClCompile Include="InputStream.c" />
     <ClCompile Include="LinkedBlockingQueue.c" />
     <ClCompile Include="OpenAES\oaes_base64.c" />

@@ -3,7 +3,7 @@
 
 static int stage = STAGE_NONE;
 static CONNECTION_LISTENER_CALLBACKS listenerCallbacks;
-static CONNECTION_LISTENER_CALLBACKS originalCallbacks;
+static ConnListenerConnectionTerminated originalTerminationCallback;
 
 // This is used for debug prints so it's not declared static
 PLATFORM_CALLBACKS platformCallbacks;
@@ -101,26 +101,6 @@ void LiStopConnection(void) {
 	LC_ASSERT(stage == STAGE_NONE);
 }
 
-static void ClInternalStageStarting(int stage)
-{
-    originalCallbacks.stageStarting(stage);
-}
-
-static void ClInternalStageComplete(int stage)
-{
-    originalCallbacks.stageComplete(stage);
-}
-
-static void ClInternalStageFailed(int stage, long errorCode)
-{
-    originalCallbacks.stageFailed(stage, errorCode);
-}
-
-static void ClInternalConnectionStarted(void)
-{
-    originalCallbacks.connectionStarted();
-}
-
 static void ClInternalConnectionTerminated(long errorCode)
 {
     // Avoid recursion and issuing multiple callbacks
@@ -129,17 +109,7 @@ static void ClInternalConnectionTerminated(long errorCode)
     }
     
     alreadyTerminated = 1;
-    originalCallbacks.connectionTerminated(errorCode);
-}
-
-void ClInternalDisplayMessage(char* message)
-{
-    originalCallbacks.displayMessage(message);
-}
-
-void ClInternalDisplayTransientMessage(char* message)
-{
-    originalCallbacks.displayTransientMessage(message);
+    originalTerminationCallback(errorCode);
 }
 
 void LiCompleteThreadStart(void)
@@ -155,16 +125,15 @@ int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONN
     
     serverMajorVersion = _serverMajorVersion;
 
-	memcpy(&originalCallbacks, clCallbacks, sizeof(originalCallbacks));
+	// Replace missing callbacks with placeholders
+	fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks, &plCallbacks);
 	memcpy(&platformCallbacks, plCallbacks, sizeof(platformCallbacks));
-    
-    listenerCallbacks.stageStarting = ClInternalStageStarting;
-    listenerCallbacks.stageComplete = ClInternalStageComplete;
-    listenerCallbacks.stageFailed = ClInternalStageFailed;
-    listenerCallbacks.connectionStarted = ClInternalConnectionStarted;
+
+	// Hook the termination callback so we can avoid issuing a termination callback
+	// after LiStopConnection() is called
+	originalTerminationCallback = clCallbacks->connectionTerminated;
+	memcpy(&listenerCallbacks, clCallbacks, sizeof(listenerCallbacks));
     listenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
-    listenerCallbacks.displayMessage = ClInternalDisplayMessage;
-    listenerCallbacks.displayTransientMessage = ClInternalDisplayTransientMessage;
     
     alreadyTerminated = 0;
 

@@ -8,6 +8,9 @@
 
 extern int serverMajorVersion;
 
+void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
+	PCONNECTION_LISTENER_CALLBACKS *clCallbacks, PPLATFORM_CALLBACKS *plCallbacks);
+
 char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress,
                                    int rtspClientVersion, int *length);
 
