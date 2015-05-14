@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		988814E81B044E570081B9A8 /* FakeCallbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = 988814E71B044E570081B9A8 /* FakeCallbacks.c */; };
 		FB290E5A19B37A8B004C83CF /* AudioStream.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E3619B37A8B004C83CF /* AudioStream.c */; };
 		FB290E5B19B37A8B004C83CF /* ByteBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E3719B37A8B004C83CF /* ByteBuffer.c */; };
 		FB290E5C19B37A8B004C83CF /* ByteBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E3819B37A8B004C83CF /* ByteBuffer.h */; };
@@ -39,6 +40,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		988814E71B044E570081B9A8 /* FakeCallbacks.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = FakeCallbacks.c; sourceTree = "<group>"; };
 		FB290E2E19B37A4E004C83CF /* libmoonlight-common.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libmoonlight-common.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB290E3619B37A8B004C83CF /* AudioStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AudioStream.c; sourceTree = "<group>"; };
 		FB290E3719B37A8B004C83CF /* ByteBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ByteBuffer.c; sourceTree = "<group>"; };
@@ -109,6 +111,7 @@
 				FB290E3819B37A8B004C83CF /* ByteBuffer.h */,
 				FB290E3919B37A8B004C83CF /* Connection.c */,
 				FB290E3A19B37A8B004C83CF /* ControlStream.c */,
+				988814E71B044E570081B9A8 /* FakeCallbacks.c */,
 				FB290E3B19B37A8B004C83CF /* Input.h */,
 				FB290E3C19B37A8B004C83CF /* InputStream.c */,
 				FB290E3F19B37A8B004C83CF /* Limelight-internal.h */,
@@ -230,6 +233,7 @@
 				FB290E6C19B37A8B004C83CF /* PlatformSockets.c in Sources */,
 				FB290E6519B37A8B004C83CF /* oaes_base64.c in Sources */,
 				FB290E6319B37A8B004C83CF /* LinkedBlockingQueue.c in Sources */,
+				988814E81B044E570081B9A8 /* FakeCallbacks.c in Sources */,
 				FB290E7619B37A8B004C83CF /* VideoStream.c in Sources */,
 				FB290E5E19B37A8B004C83CF /* ControlStream.c in Sources */,
 				FB290E7519B37A8B004C83CF /* VideoDepacketizer.c in Sources */,
