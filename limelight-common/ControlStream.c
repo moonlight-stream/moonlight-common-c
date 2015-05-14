@@ -204,8 +204,15 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
 }
 
 static void lossStatsThreadFunc(void* context) {
-	char lossStatsPayload[payloadLengths[IDX_LOSS_STATS]];
+	char *lossStatsPayload;
 	BYTE_BUFFER byteBuffer;
+
+	lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
+	if (lossStatsPayload == NULL) {
+		Limelog("Loss stats thread terminating #0\n");
+		listenerCallbacks->connectionTerminated(LastSocketError());
+		return;
+	}
 
 	while (!PltIsThreadInterrupted(&lossStatsThread)) {
 		// Construct the payload
@@ -221,6 +228,7 @@ static void lossStatsThreadFunc(void* context) {
 		// Send the message (and don't expect a response)
 		if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
 			payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
+			free(lossStatsPayload);
 			Limelog("Loss stats thread terminating #1\n");
             listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
@@ -232,6 +240,8 @@ static void lossStatsThreadFunc(void* context) {
 		// Wait a bit
 		PltSleepMs(LOSS_REPORT_INTERVAL_MS);
 	}
+
+	free(lossStatsPayload);
 }
 
 static void resyncThreadFunc(void* context) {
