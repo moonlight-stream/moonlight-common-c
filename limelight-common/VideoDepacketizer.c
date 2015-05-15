@@ -445,7 +445,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	}
 	lastPacketInStream = streamPacketIndex;
 
-	if (isFirstPacket &&
+	if (firstPacket &&
 		getSpecialSeq(&currentPos, &specialSeq) &&
 		isSeqFrameStart(&specialSeq) &&
 		specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67)
