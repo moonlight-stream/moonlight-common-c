@@ -90,7 +90,7 @@ static void UdpPingThreadProc(void *context) {
 static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
 	int err;
 
-	err = LbqOfferQueueItem(&packetQueue, packet, &(*packet)->q.lentry);
+	err = LbqOfferQueueItem(&packetQueue, *packet, &(*packet)->q.lentry);
 	if (err == LBQ_SUCCESS) {
 		// The LBQ owns the buffer now
 		*packet = NULL;
@@ -143,6 +143,9 @@ static void ReceiveThreadProc(void* context) {
 			// Not audio
 			continue;
 		}
+        
+        // RTP sequence number must be in host order for the RTP queue
+        rtp->sequenceNumber = htons(rtp->sequenceNumber);
 
 		queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET) packet, &packet->q.rentry);
 		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
@@ -184,9 +187,6 @@ static void DecoderThreadProc(void* context) {
 		}
 
 		rtp = (PRTP_PACKET) &packet->data[0];
-
-		rtp->sequenceNumber = htons(rtp->sequenceNumber);
-
 		if (lastSeq != 0 && (unsigned short) (lastSeq + 1) != rtp->sequenceNumber) {
 			Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
 

@@ -82,6 +82,8 @@ static void ReceiveThreadProc(void* context) {
 	buffer = NULL;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
+        PRTP_PACKET packet;
+        
 		if (buffer == NULL) {
 			buffer = (char*) malloc(bufferSize);
 			if (buffer == NULL) {
@@ -99,11 +101,15 @@ static void ReceiveThreadProc(void* context) {
 		}
 
 		memcpy(&buffer[receiveSize], &err, sizeof(int));
+        
+        // RTP sequence number must be in host order for the RTP queue
+        packet = (PRTP_PACKET) &buffer[0];
+        packet->sequenceNumber = htons(packet->sequenceNumber);
 
-		queueStatus = RtpqAddPacket(&rtpQueue, (PRTP_PACKET) &buffer[0], (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
+		queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
 		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
 			// queueRtpPacket() copies the data it needs to we can reuse the buffer
-			queueRtpPacket((PRTP_PACKET) buffer, err);
+			queueRtpPacket(packet, err);
 		}
 		else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
 			// The packet queue now has packets ready
