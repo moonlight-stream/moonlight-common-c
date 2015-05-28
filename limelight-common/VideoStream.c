@@ -152,7 +152,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	int err;
 
 	callbacks.setup(configuration.width,
-		configuration.height, 60, rendererContext, drFlags);
+		configuration.height, configuration.fps, rendererContext, drFlags);
 
     // This must be called before the decoder thread starts submitting
     // decode units
