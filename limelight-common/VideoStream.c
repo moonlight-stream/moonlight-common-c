@@ -113,6 +113,10 @@ static void ReceiveThreadProc(void* context) {
 				free(buffer);
 			}
 		}
+        else if (queueStatus == RTPQ_RET_QUEUED_NOTHING_READY) {
+            // The queue owns the buffer
+            buffer = NULL;
+        }
 	}
 
 	if (buffer != NULL) {

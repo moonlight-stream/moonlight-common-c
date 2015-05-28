@@ -15,7 +15,7 @@ void RtpqCleanupQueue(PRTP_REORDER_QUEUE queue) {
 	while (queue->queueHead != NULL) {
 		PRTP_QUEUE_ENTRY entry = queue->queueHead;
 		queue->queueHead = entry->next;
-		free(entry);
+		free(entry->packet);
 	}
 }
 
@@ -47,6 +47,7 @@ static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int 
 
 	if (queue->oldestQueuedTimeMs == UINT64_MAX) {
 		queue->oldestQueuedTimeMs = newEntry->queueTimeMs;
+        queue->oldestQueuedEntry = newEntry;
 	}
 
 	if (queue->queueHead == NULL) {
@@ -144,7 +145,7 @@ static PRTP_QUEUE_ENTRY validateQueueConstraints(PRTP_REORDER_QUEUE queue) {
 
 	// Check that the queue's time constraint is satisfied
 	if (PltGetMillis() - queue->oldestQueuedTimeMs > queue->maxQueueTimeMs) {
-		Limelog("Discarding RTP packet queued for too long");
+		Limelog("Discarding RTP packet queued for too long\n");
 		removeEntry(queue, queue->oldestQueuedEntry);
 		free(queue->oldestQueuedEntry->packet);
 		needsUpdate = 1;
@@ -152,7 +153,7 @@ static PRTP_QUEUE_ENTRY validateQueueConstraints(PRTP_REORDER_QUEUE queue) {
 
 	// Check that the queue's size constraint is satisfied
 	if (!needsUpdate && queue->queueSize == queue->maxSize) {
-		Limelog("Discarding RTP packet after queue overgrowth");
+		Limelog("Discarding RTP packet after queue overgrowth\n");
 		removeEntry(queue, queue->oldestQueuedEntry);
 		free(queue->oldestQueuedEntry->packet);
 		needsUpdate = 1;
