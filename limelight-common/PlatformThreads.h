@@ -35,9 +35,6 @@ typedef struct _PLT_EVENT {
 #error Unsupported platform
 #endif
 
-int initializePlatformThreads(void);
-void cleanupPlatformThreads(void);
-
 int PltCreateMutex(PLT_MUTEX *mutex);
 void PltDeleteMutex(PLT_MUTEX *mutex);
 void PltLockMutex(PLT_MUTEX *mutex);

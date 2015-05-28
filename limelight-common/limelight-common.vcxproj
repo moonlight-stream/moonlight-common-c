@@ -141,7 +141,7 @@
     <ClCompile Include="OpenAES\oaes_base64.c" />
     <ClCompile Include="OpenAES\oaes_lib.c" />
     <ClCompile Include="PlatformSockets.c" />
-    <ClCompile Include="PlatformThreads.c" />
+    <ClCompile Include="Platform.c" />
     <ClCompile Include="RtspConnection.c" />
     <ClCompile Include="RtspParser.c" />
     <ClCompile Include="SdpGenerator.c" />

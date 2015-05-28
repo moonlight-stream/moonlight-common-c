@@ -1,6 +1,9 @@
 #include "PlatformThreads.h"
 #include "Platform.h"
 
+int initializePlatformSockets(void);
+void cleanupPlatformSockets(void);
+
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 CHAR DbgBuf[512];
 #endif
@@ -307,7 +310,14 @@ int PltWaitForEvent(PLT_EVENT *event) {
 #endif
 }
 
-int initializePlatformThreads(void) {
+int initializePlatform(void) {
+	int err;
+
+	err = initializePlatformSockets();
+	if (err != 0) {
+		return err;
+	}
+
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	return PltCreateMutex(&thread_list_lock);
 #else
@@ -315,7 +325,9 @@ int initializePlatformThreads(void) {
 #endif
 }
 
-void cleanupPlatformThreads(void) {
+void cleanupPlatform(void) {
+	cleanupPlatformSockets();
+
 #if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
 	LC_ASSERT(pending_thread_head == NULL);
 	LC_ASSERT(thread_head == NULL);

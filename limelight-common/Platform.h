@@ -46,3 +46,6 @@ extern PLATFORM_CALLBACKS platformCallbacks;
 #else
 #define LC_ASSERT(x)
 #endif
+
+int initializePlatform(void);
+void cleanupPlatform(void);
