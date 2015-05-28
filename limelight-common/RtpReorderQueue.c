@@ -151,7 +151,7 @@ static PRTP_QUEUE_ENTRY validateQueueConstraints(PRTP_REORDER_QUEUE queue) {
 	}
 
 	// Check that the queue's size constraint is satisfied
-	if (queue->queueSize == queue->maxSize) {
+	if (!needsUpdate && queue->queueSize == queue->maxSize) {
 		Limelog("Discarding RTP packet after queue overgrowth");
 		removeEntry(queue, queue->oldestQueuedEntry);
 		free(queue->oldestQueuedEntry->packet);
