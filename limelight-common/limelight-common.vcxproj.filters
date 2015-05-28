@@ -63,7 +63,13 @@
     <ClCompile Include="FakeCallbacks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RtpReorderQueue.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="Platform.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -109,6 +115,9 @@
     </ClInclude>
     <ClInclude Include="OpenAES\oaes_lib.h">
       <Filter>Source Files\OpenAES</Filter>
+    </ClInclude>
+    <ClInclude Include="RtpReorderQueue.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

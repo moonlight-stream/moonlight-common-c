@@ -319,23 +319,6 @@ static void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC loca
 	queueFragment(location.data, location.offset, location.length);
 }
 
-static int isBeforeSigned(int numA, int numB, int ambiguousCase) {
-	// This should be the common case for most callers
-	if (numA == numB) {
-		return 0;
-	}
-
-	// If numA and numB have the same signs,
-	// we can just do a regular comparison.
-	if ((numA < 0 && numB < 0) || (numA >= 0 && numB >= 0)) {
-		return numA < numB;
-	}
-	else {
-		// The sign switch is ambiguous
-		return ambiguousCase;
-	}
-}
-
 /* Process an RTP Payload */
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	BUFFER_DESC currentPos, specialSeq;
@@ -358,12 +341,12 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
 	// Drop duplicates or re-ordered packets
 	streamPacketIndex = videoPacket->streamPacketIndex;
-	if (isBeforeSigned((short) streamPacketIndex, (short) (lastPacketInStream + 1), 0)) {
+	if (isBeforeSignedInt((short) streamPacketIndex, (short) (lastPacketInStream + 1), 0)) {
 		return;
 	}
 
 	// Drop packets from a previously completed frame
-	if (isBeforeSigned(frameIndex, nextFrameNumber, 0)) {
+	if (isBeforeSignedInt(frameIndex, nextFrameNumber, 0)) {
 		return;
 	}
 
@@ -405,7 +388,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	// miss one in between
 	else if (firstPacket) {
 		// Make sure this is the next consecutive frame
-		if (isBeforeSigned(nextFrameNumber, frameIndex, 1)) {
+		if (isBeforeSignedInt(nextFrameNumber, frameIndex, 1)) {
 			Limelog("Network dropped an entire frame\n");
 			nextFrameNumber = frameIndex;
 

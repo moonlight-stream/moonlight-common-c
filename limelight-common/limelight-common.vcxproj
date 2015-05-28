@@ -138,10 +138,12 @@
     <ClCompile Include="FakeCallbacks.c" />
     <ClCompile Include="InputStream.c" />
     <ClCompile Include="LinkedBlockingQueue.c" />
+    <ClCompile Include="Misc.c" />
     <ClCompile Include="OpenAES\oaes_base64.c" />
     <ClCompile Include="OpenAES\oaes_lib.c" />
     <ClCompile Include="PlatformSockets.c" />
     <ClCompile Include="Platform.c" />
+    <ClCompile Include="RtpReorderQueue.c" />
     <ClCompile Include="RtspConnection.c" />
     <ClCompile Include="RtspParser.c" />
     <ClCompile Include="SdpGenerator.c" />
@@ -161,6 +163,7 @@
     <ClInclude Include="Platform.h" />
     <ClInclude Include="PlatformSockets.h" />
     <ClInclude Include="PlatformThreads.h" />
+    <ClInclude Include="RtpReorderQueue.h" />
     <ClInclude Include="Rtsp.h" />
     <ClInclude Include="Video.h" />
   </ItemGroup>

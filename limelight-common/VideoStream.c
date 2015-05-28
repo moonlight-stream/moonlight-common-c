@@ -2,6 +2,7 @@
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 #include "LinkedBlockingQueue.h"
+#include "RtpReorderQueue.h"
 
 #define FIRST_FRAME_MAX 1500
 
@@ -12,6 +13,7 @@ static DECODER_RENDERER_CALLBACKS callbacks;
 static STREAM_CONFIGURATION configuration;
 static IP_ADDRESS remoteHost;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
+static RTP_REORDER_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 static SOCKET firstFrameSocket = INVALID_SOCKET;
@@ -19,6 +21,11 @@ static SOCKET firstFrameSocket = INVALID_SOCKET;
 static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
+
+// We can't request an IDR frame until the depacketizer knows
+// that a packet was lost. This timeout bounds the time that
+// the RTP queue will wait for missing/reordered packets.
+#define RTP_QUEUE_DELAY 10
 
 /* Initialize the video stream */
 void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
@@ -29,6 +36,7 @@ void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, 
 	listenerCallbacks = clCallbacks;
 
 	initializeVideoDepacketizer(configuration.packetSize);
+	RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
 }
 
 /* Clean up the video stream */
@@ -36,6 +44,7 @@ void destroyVideoStream(void) {
 	callbacks.release();
 
 	destroyVideoDepacketizer();
+	RtpqCleanupQueue(&rtpQueue);
 }
 
 /* UDP Ping proc */
@@ -63,31 +72,52 @@ static void UdpPingThreadProc(void *context) {
 
 /* Receive thread proc */
 static void ReceiveThreadProc(void* context) {
-	SOCK_RET err;
-	int bufferSize;
+	int err;
+	int bufferSize, receiveSize;
 	char* buffer;
+	int queueStatus;
 
-	bufferSize = configuration.packetSize + MAX_RTP_HEADER_SIZE;
-	buffer = (char*)malloc(bufferSize);
-	if (buffer == NULL) {
-		Limelog("Receive thread terminating\n");
-		listenerCallbacks->connectionTerminated(-1);
-		return;
-	}
+	receiveSize = configuration.packetSize + MAX_RTP_HEADER_SIZE;
+	bufferSize = receiveSize + sizeof(int) + sizeof(RTP_QUEUE_ENTRY);
+	buffer = NULL;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
-		err = recv(rtpSocket, buffer, bufferSize, 0);
+		if (buffer == NULL) {
+			buffer = (char*) malloc(bufferSize);
+			if (buffer == NULL) {
+				Limelog("Receive thread terminating\n");
+				listenerCallbacks->connectionTerminated(-1);
+				return;
+			}
+		}
+
+		err = (int) recv(rtpSocket, buffer, receiveSize, 0);
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			listenerCallbacks->connectionTerminated(LastSocketError());
 			break;
 		}
 
-		// queueRtpPacket() copies the data it needs to we can reuse the buffer
-		queueRtpPacket((PRTP_PACKET) buffer, (int)err);
+		memcpy(&buffer[receiveSize], &err, sizeof(int));
+
+		queueStatus = RtpqAddPacket(&rtpQueue, (PRTP_PACKET) &buffer[0], (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
+		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
+			// queueRtpPacket() copies the data it needs to we can reuse the buffer
+			queueRtpPacket((PRTP_PACKET) buffer, err);
+		}
+		else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
+			// The packet queue now has packets ready
+			while ((buffer = (char*) RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
+				memcpy(&err, &buffer[receiveSize], sizeof(int));
+				queueRtpPacket((PRTP_PACKET) buffer, err);
+				free(buffer);
+			}
+		}
 	}
 
-	free(buffer);
+	if (buffer != NULL) {
+		free(buffer);
+	}
 }
 
 /* Decoder thread proc */

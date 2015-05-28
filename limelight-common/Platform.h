@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -11,6 +12,7 @@
 #else
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/time.h>
 #endif
 
 #ifdef _WIN32
@@ -49,3 +51,5 @@ extern PLATFORM_CALLBACKS platformCallbacks;
 
 int initializePlatform(void);
 void cleanupPlatform(void);
+
+uint64_t PltGetMillis(void);

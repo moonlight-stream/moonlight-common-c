@@ -310,6 +310,18 @@ int PltWaitForEvent(PLT_EVENT *event) {
 #endif
 }
 
+uint64_t PltGetMillis(void) {
+#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+	return GetTickCount64();
+#else
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+
+	return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+#endif
+}
+
 int initializePlatform(void) {
 	int err;
 

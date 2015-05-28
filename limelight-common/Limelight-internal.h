@@ -8,6 +8,8 @@
 
 extern int serverMajorVersion;
 
+int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
+
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
 	PCONNECTION_LISTENER_CALLBACKS *clCallbacks, PPLATFORM_CALLBACKS *plCallbacks);
 

@@ -2,6 +2,7 @@
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 #include "LinkedBlockingQueue.h"
+#include "RtpReorderQueue.h"
 
 static AUDIO_RENDERER_CALLBACKS callbacks;
 static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
@@ -10,6 +11,7 @@ static IP_ADDRESS remoteHost;
 static SOCKET rtpSocket = INVALID_SOCKET;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
+static RTP_REORDER_QUEUE rtpReorderQueue;
 
 static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
@@ -20,9 +22,14 @@ static PLT_THREAD decoderThread;
 #define MAX_PACKET_SIZE 100
 
 typedef struct _QUEUED_AUDIO_PACKET {
+	// data must remain at the front
 	char data[MAX_PACKET_SIZE];
+
 	int size;
-	LINKED_BLOCKING_QUEUE_ENTRY entry;
+	union {
+		RTP_QUEUE_ENTRY rentry;
+		LINKED_BLOCKING_QUEUE_ENTRY lentry;
+	} q;
 } QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
 
 /* Initialize the audio stream */
@@ -32,6 +39,7 @@ void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallback
 	listenerCallbacks = clCallbacks;
 
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
+	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFUALT_QUEUE_TIME);
 }
 
 static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
@@ -52,6 +60,7 @@ void destroyAudioStream(void) {
 	callbacks.release();
 
 	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
+	RtpqCleanupQueue(&rtpReorderQueue);
 }
 
 static void UdpPingThreadProc(void *context) {
@@ -78,10 +87,31 @@ static void UdpPingThreadProc(void *context) {
 	}
 }
 
+static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
+	int err;
+
+	err = LbqOfferQueueItem(&packetQueue, packet, &(*packet)->q.lentry);
+	if (err == LBQ_SUCCESS) {
+		// The LBQ owns the buffer now
+		*packet = NULL;
+	}
+	else if (err == LBQ_BOUND_EXCEEDED) {
+		Limelog("Audio packet queue overflow\n");
+		freePacketList(LbqFlushQueueItems(&packetQueue));
+	}
+	else if (err == LBQ_INTERRUPTED) {
+		Limelog("Receive thread terminating #3\n");
+		free(*packet);
+		return 0;
+	}
+
+	return 1;
+}
+
 static void ReceiveThreadProc(void* context) {
 	PRTP_PACKET rtp;
 	PQUEUED_AUDIO_PACKET packet;
-	int err;
+	int queueStatus;
 
 	packet = NULL;
 
@@ -114,20 +144,28 @@ static void ReceiveThreadProc(void* context) {
 			continue;
 		}
 
-		err = LbqOfferQueueItem(&packetQueue, packet, &packet->entry);
-		if (err == LBQ_SUCCESS) {
-			// The queue owns the buffer now
-			packet = NULL;
+		queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET) packet, &packet->q.rentry);
+		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
+			if (!queuePacketToLbq(&packet)) {
+				// An exit signal was received
+				return;
+			}
 		}
+		else {
+			if (queueStatus != RTPQ_RET_REJECTED) {
+				// The queue consumed our packet, so we must allocate a new one
+				packet = NULL;
+			}
 
-		if (err == LBQ_BOUND_EXCEEDED) {
-			Limelog("Audio packet queue overflow\n");
-			freePacketList(LbqFlushQueueItems(&packetQueue));
-		}
-		else if (err == LBQ_INTERRUPTED) {
-			Limelog("Receive thread terminating #2\n");
-			free(packet);
-			return;
+			if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
+				// If packets are ready, pull them and send them to the decoder
+				while ((packet = (PQUEUED_AUDIO_PACKET) RtpqGetQueuedPacket(&rtpReorderQueue)) != NULL) {
+					if (!queuePacketToLbq(&packet)) {
+						// An exit signal was received
+						return;
+					}
+				}
+			}
 		}
 	}
 }
