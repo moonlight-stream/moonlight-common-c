@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		988814E81B044E570081B9A8 /* FakeCallbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = 988814E71B044E570081B9A8 /* FakeCallbacks.c */; };
+		98E197771B1752B200F421E2 /* Platform.c in Sources */ = {isa = PBXBuildFile; fileRef = 98E197761B1752B200F421E2 /* Platform.c */; };
+		98E1977A1B1752C300F421E2 /* RtpReorderQueue.c in Sources */ = {isa = PBXBuildFile; fileRef = 98E197781B1752C300F421E2 /* RtpReorderQueue.c */; };
+		98E1977B1B1752C300F421E2 /* RtpReorderQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = 98E197791B1752C300F421E2 /* RtpReorderQueue.h */; };
+		98E1977D1B1752EA00F421E2 /* Misc.c in Sources */ = {isa = PBXBuildFile; fileRef = 98E1977C1B1752EA00F421E2 /* Misc.c */; };
 		FB290E5A19B37A8B004C83CF /* AudioStream.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E3619B37A8B004C83CF /* AudioStream.c */; };
 		FB290E5B19B37A8B004C83CF /* ByteBuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E3719B37A8B004C83CF /* ByteBuffer.c */; };
 		FB290E5C19B37A8B004C83CF /* ByteBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E3819B37A8B004C83CF /* ByteBuffer.h */; };
@@ -28,7 +32,6 @@
 		FB290E6B19B37A8B004C83CF /* Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E4D19B37A8B004C83CF /* Platform.h */; };
 		FB290E6C19B37A8B004C83CF /* PlatformSockets.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E4E19B37A8B004C83CF /* PlatformSockets.c */; };
 		FB290E6D19B37A8B004C83CF /* PlatformSockets.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E4F19B37A8B004C83CF /* PlatformSockets.h */; };
-		FB290E6E19B37A8B004C83CF /* PlatformThreads.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E5019B37A8B004C83CF /* PlatformThreads.c */; };
 		FB290E6F19B37A8B004C83CF /* PlatformThreads.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E5119B37A8B004C83CF /* PlatformThreads.h */; };
 		FB290E7019B37A8B004C83CF /* Rtsp.h in Headers */ = {isa = PBXBuildFile; fileRef = FB290E5219B37A8B004C83CF /* Rtsp.h */; };
 		FB290E7119B37A8B004C83CF /* RtspConnection.c in Sources */ = {isa = PBXBuildFile; fileRef = FB290E5319B37A8B004C83CF /* RtspConnection.c */; };
@@ -41,6 +44,10 @@
 
 /* Begin PBXFileReference section */
 		988814E71B044E570081B9A8 /* FakeCallbacks.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = FakeCallbacks.c; sourceTree = "<group>"; };
+		98E197761B1752B200F421E2 /* Platform.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = Platform.c; sourceTree = "<group>"; };
+		98E197781B1752C300F421E2 /* RtpReorderQueue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = RtpReorderQueue.c; sourceTree = "<group>"; };
+		98E197791B1752C300F421E2 /* RtpReorderQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RtpReorderQueue.h; sourceTree = "<group>"; };
+		98E1977C1B1752EA00F421E2 /* Misc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = Misc.c; path = "limelight-common/Misc.c"; sourceTree = SOURCE_ROOT; };
 		FB290E2E19B37A4E004C83CF /* libmoonlight-common.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libmoonlight-common.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB290E3619B37A8B004C83CF /* AudioStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = AudioStream.c; sourceTree = "<group>"; };
 		FB290E3719B37A8B004C83CF /* ByteBuffer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ByteBuffer.c; sourceTree = "<group>"; };
@@ -65,7 +72,6 @@
 		FB290E4D19B37A8B004C83CF /* Platform.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
 		FB290E4E19B37A8B004C83CF /* PlatformSockets.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = PlatformSockets.c; sourceTree = "<group>"; };
 		FB290E4F19B37A8B004C83CF /* PlatformSockets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlatformSockets.h; sourceTree = "<group>"; };
-		FB290E5019B37A8B004C83CF /* PlatformThreads.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = PlatformThreads.c; sourceTree = "<group>"; };
 		FB290E5119B37A8B004C83CF /* PlatformThreads.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlatformThreads.h; sourceTree = "<group>"; };
 		FB290E5219B37A8B004C83CF /* Rtsp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Rtsp.h; sourceTree = "<group>"; };
 		FB290E5319B37A8B004C83CF /* RtspConnection.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = RtspConnection.c; sourceTree = "<group>"; };
@@ -118,12 +124,15 @@
 				FB290E4019B37A8B004C83CF /* Limelight.h */,
 				FB290E4119B37A8B004C83CF /* LinkedBlockingQueue.c */,
 				FB290E4219B37A8B004C83CF /* LinkedBlockingQueue.h */,
+				98E1977C1B1752EA00F421E2 /* Misc.c */,
 				FB290E4319B37A8B004C83CF /* OpenAES */,
 				FB290E4D19B37A8B004C83CF /* Platform.h */,
 				FB290E4E19B37A8B004C83CF /* PlatformSockets.c */,
+				98E197761B1752B200F421E2 /* Platform.c */,
 				FB290E4F19B37A8B004C83CF /* PlatformSockets.h */,
-				FB290E5019B37A8B004C83CF /* PlatformThreads.c */,
 				FB290E5119B37A8B004C83CF /* PlatformThreads.h */,
+				98E197781B1752C300F421E2 /* RtpReorderQueue.c */,
+				98E197791B1752C300F421E2 /* RtpReorderQueue.h */,
 				FB290E5219B37A8B004C83CF /* Rtsp.h */,
 				FB290E5319B37A8B004C83CF /* RtspConnection.c */,
 				FB290E5419B37A8B004C83CF /* RtspParser.c */,
@@ -163,6 +172,7 @@
 				FB290E6819B37A8B004C83CF /* oaes_config.h in Headers */,
 				FB290E6619B37A8B004C83CF /* oaes_base64.h in Headers */,
 				FB290E6F19B37A8B004C83CF /* PlatformThreads.h in Headers */,
+				98E1977B1B1752C300F421E2 /* RtpReorderQueue.h in Headers */,
 				FB290E5C19B37A8B004C83CF /* ByteBuffer.h in Headers */,
 				FB290E6719B37A8B004C83CF /* oaes_common.h in Headers */,
 				FB290E5F19B37A8B004C83CF /* Input.h in Headers */,
@@ -226,10 +236,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FB290E6E19B37A8B004C83CF /* PlatformThreads.c in Sources */,
+				98E197771B1752B200F421E2 /* Platform.c in Sources */,
+				98E1977D1B1752EA00F421E2 /* Misc.c in Sources */,
 				FB290E5D19B37A8B004C83CF /* Connection.c in Sources */,
 				FB290E6919B37A8B004C83CF /* oaes_lib.c in Sources */,
 				FB290E7219B37A8B004C83CF /* RtspParser.c in Sources */,
+				98E1977A1B1752C300F421E2 /* RtpReorderQueue.c in Sources */,
 				FB290E6C19B37A8B004C83CF /* PlatformSockets.c in Sources */,
 				FB290E6519B37A8B004C83CF /* oaes_base64.c in Sources */,
 				FB290E6319B37A8B004C83CF /* LinkedBlockingQueue.c in Sources */,
