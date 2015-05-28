@@ -1,5 +1,15 @@
 #pragma once
 
+#include "LinkedBlockingQueue.h"
+
+typedef struct _QUEUED_DECODE_UNIT {
+	DECODE_UNIT decodeUnit;
+	LINKED_BLOCKING_QUEUE_ENTRY entry;
+} QUEUED_DECODE_UNIT, *PQUEUED_DECODE_UNIT;
+
+void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu);
+int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu);
+
 #pragma pack(push, 1)
 
 #define FLAG_CONTAINS_PIC_DATA 0x1

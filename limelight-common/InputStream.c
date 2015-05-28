@@ -29,6 +29,7 @@ typedef struct _PACKET_HOLDER {
         NV_MULTI_CONTROLLER_PACKET multiController;
 		NV_SCROLL_PACKET scroll;
 	} packet;
+	LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
 /* Initializes the input stream */
@@ -83,8 +84,10 @@ void destroyInputStream(void) {
 
 	while (entry != NULL) {
 		nextEntry = entry->flink;
+
+		// The entry is stored in the data buffer
 		free(entry->data);
-		free(entry);
+
 		entry = nextEntry;
 	}
 
@@ -195,7 +198,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 	holder->packet.mouseMove.deltaX = htons(deltaX);
 	holder->packet.mouseMove.deltaY = htons(deltaY);
 
-	err = LbqOfferQueueItem(&packetQueue, holder);
+	err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
 	if (err != LBQ_SUCCESS) {
 		free(holder);
 	}
@@ -222,7 +225,7 @@ int LiSendMouseButtonEvent(char action, int button) {
 	holder->packet.mouseButton.action = action;
 	holder->packet.mouseButton.button = htonl(button);
 
-	err = LbqOfferQueueItem(&packetQueue, holder);
+	err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
 	if (err != LBQ_SUCCESS) {
 		free(holder);
 	}
@@ -252,7 +255,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	holder->packet.keyboard.modifiers = modifiers;
 	holder->packet.keyboard.zero2 = 0;
 
-	err = LbqOfferQueueItem(&packetQueue, holder);
+	err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
 	if (err != LBQ_SUCCESS) {
 		free(holder);
 	}
@@ -312,7 +315,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         holder->packet.multiController.tailB = MC_TAIL_B;
     }
     
-    err = LbqOfferQueueItem(&packetQueue, holder);
+	err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
         free(holder);
     }
@@ -359,7 +362,7 @@ int LiSendScrollEvent(char scrollClicks) {
 	holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
 	holder->packet.scroll.zero3 = 0;
 
-	err = LbqOfferQueueItem(&packetQueue, holder);
+	err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
 	if (err != LBQ_SUCCESS) {
 		free(holder);
 	}

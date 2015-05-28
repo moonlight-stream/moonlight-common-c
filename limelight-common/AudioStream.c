@@ -19,6 +19,12 @@ static PLT_THREAD decoderThread;
 
 #define MAX_PACKET_SIZE 100
 
+typedef struct _QUEUED_AUDIO_PACKET {
+	char data[MAX_PACKET_SIZE];
+	int size;
+	LINKED_BLOCKING_QUEUE_ENTRY entry;
+} QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
+
 /* Initialize the audio stream */
 void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
 	memcpy(&callbacks, arCallbacks, sizeof(callbacks));
@@ -33,8 +39,10 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 	while (entry != NULL) {
 		nextEntry = entry->flink;
+
+		// The entry is stored within the data allocation
 		free(entry->data);
-		free(entry);
+
 		entry = nextEntry;
 	}
 }
@@ -45,8 +53,6 @@ void destroyAudioStream(void) {
 
 	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
 }
-
-
 
 static void UdpPingThreadProc(void *context) {
 	/* Ping in ASCII */
@@ -73,48 +79,45 @@ static void UdpPingThreadProc(void *context) {
 }
 
 static void ReceiveThreadProc(void* context) {
-	SOCK_RET err;
 	PRTP_PACKET rtp;
-    int packetSize;
-    char* buffer = NULL;
+	PQUEUED_AUDIO_PACKET packet;
+	int err;
+
+	packet = NULL;
 
 	while (!PltIsThreadInterrupted(&receiveThread)) {
-		if (buffer == NULL) {
-			buffer = (char*) malloc(MAX_PACKET_SIZE + sizeof(int));
-			if (buffer == NULL) {
+		if (packet == NULL) {
+			packet = (PQUEUED_AUDIO_PACKET) malloc(sizeof(*packet));
+			if (packet == NULL) {
 				Limelog("Receive thread terminating\n");
 				listenerCallbacks->connectionTerminated(-1);
 				return;
 			}
 		}
 
-		err = recv(rtpSocket, &buffer[sizeof(int)], MAX_PACKET_SIZE, 0);
-		if (err <= 0) {
+		packet->size = (int) recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
+		if (packet->size <= 0) {
 			Limelog("Receive thread terminating #2\n");
-			free(buffer);
+			free(packet);
 			listenerCallbacks->connectionTerminated(LastSocketError());
 			return;
 		}
-        
-        packetSize = (int)err;
 
-		if (packetSize < sizeof(RTP_PACKET)) {
+		if (packet->size < sizeof(RTP_PACKET)) {
 			// Runt packet
 			continue;
 		}
 
-		rtp = (PRTP_PACKET) &buffer[sizeof(int)];
+		rtp = (PRTP_PACKET) &packet->data[0];
 		if (rtp->packetType != 97) {
 			// Not audio
 			continue;
 		}
 
-		memcpy(buffer, &packetSize, sizeof(int));
-
-		err = LbqOfferQueueItem(&packetQueue, buffer);
+		err = LbqOfferQueueItem(&packetQueue, packet, &packet->entry);
 		if (err == LBQ_SUCCESS) {
 			// The queue owns the buffer now
-			buffer = NULL;
+			packet = NULL;
 		}
 
 		if (err == LBQ_BOUND_EXCEEDED) {
@@ -123,7 +126,7 @@ static void ReceiveThreadProc(void* context) {
 		}
 		else if (err == LBQ_INTERRUPTED) {
 			Limelog("Receive thread terminating #2\n");
-			free(buffer);
+			free(packet);
 			return;
 		}
 	}
@@ -131,30 +134,18 @@ static void ReceiveThreadProc(void* context) {
 
 static void DecoderThreadProc(void* context) {
 	PRTP_PACKET rtp;
-	int length;
 	int err;
-	char *data;
+	PQUEUED_AUDIO_PACKET packet;
 	unsigned short lastSeq = 0;
 
 	while (!PltIsThreadInterrupted(&decoderThread)) {
-		err = LbqWaitForQueueElement(&packetQueue, (void**) &data);
+		err = LbqWaitForQueueElement(&packetQueue, (void**) &packet);
 		if (err != LBQ_SUCCESS) {
 			Limelog("Decoder thread terminating\n");
 			return;
 		}
 
-		memcpy(&length, data, sizeof(int));
-		rtp = (PRTP_PACKET) &data[sizeof(int)];
-
-		if (length < sizeof(RTP_PACKET)) {
-			// Runt packet
-			goto freeandcontinue;
-		}
-
-		if (rtp->packetType != 97) {
-			// Not audio
-			goto freeandcontinue;
-		}
+		rtp = (PRTP_PACKET) &packet->data[0];
 
 		rtp->sequenceNumber = htons(rtp->sequenceNumber);
 
@@ -166,10 +157,9 @@ static void DecoderThreadProc(void* context) {
 
 		lastSeq = rtp->sequenceNumber;
 
-		callbacks.decodeAndPlaySample((char *) (rtp + 1), length - sizeof(*rtp));
+		callbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
 
-	freeandcontinue:
-		free(data);
+		free(packet);
 	}
 }
 

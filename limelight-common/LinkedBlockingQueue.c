@@ -50,14 +50,7 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 	return 0;
 }
 
-int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
-	PLINKED_BLOCKING_QUEUE_ENTRY entry;
-
-	entry = (PLINKED_BLOCKING_QUEUE_ENTRY) malloc(sizeof(*entry));
-	if (entry == NULL) {
-		return LBQ_NO_MEMORY;
-	}
-
+int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 	entry->flink = NULL;
 	entry->data = data;
 
@@ -65,7 +58,6 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data) {
 
 	if (queueHead->currentSize == queueHead->sizeBound) {
 		PltUnlockMutex(&queueHead->mutex);
-		free(entry);
 		return LBQ_BOUND_EXCEEDED;
 	}
 
@@ -124,8 +116,6 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 		}
 
 		*data = entry->data;
-
-		free(entry);
 
 		PltUnlockMutex(&queueHead->mutex);
 

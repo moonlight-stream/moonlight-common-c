@@ -82,8 +82,10 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 	while (entry != NULL) {
 		nextEntry = entry->flink;
+
+		// The entry is stored within the data allocation
 		free(entry->data);
-		free(entry);
+
 		entry = nextEntry;
 	}
 }
@@ -147,27 +149,51 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 	return 0;
 }
 
+/* Get the first decode unit available */
+int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu) {
+	int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**) qdu);
+	if (err == LBQ_SUCCESS) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
+}
+
+/* Cleanup a decode unit by freeing the buffer chain and the holder */
+void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
+	PLENTRY lastEntry;
+
+	while (qdu->decodeUnit.bufferList != NULL) {
+		lastEntry = qdu->decodeUnit.bufferList;
+		qdu->decodeUnit.bufferList = lastEntry->next;
+		free(lastEntry);
+	}
+
+	free(qdu);
+}
+
 /* Reassemble the frame with the given frame number */
 static void reassembleAvcFrame(int frameNumber) {
 	if (nalChainHead != NULL) {
-		PDECODE_UNIT du = (PDECODE_UNIT) malloc(sizeof(*du));
-		if (du != NULL) {
-			du->bufferList = nalChainHead;
-			du->fullLength = nalChainDataLength;
+		PQUEUED_DECODE_UNIT qdu = (PQUEUED_DECODE_UNIT) malloc(sizeof(*qdu));
+		if (qdu != NULL) {
+			qdu->decodeUnit.bufferList = nalChainHead;
+			qdu->decodeUnit.fullLength = nalChainDataLength;
 
 			nalChainHead = NULL;
 			nalChainDataLength = 0;
 
-			if (LbqOfferQueueItem(&decodeUnitQueue, du) == LBQ_BOUND_EXCEEDED) {
+			if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
 				Limelog("Decode unit queue overflow\n");
 
 				// Clear frame state and wait for an IDR
-				nalChainHead = du->bufferList;
-				nalChainDataLength = du->fullLength;
+				nalChainHead = qdu->decodeUnit.bufferList;
+				nalChainDataLength = qdu->decodeUnit.fullLength;
 				dropAvcFrameState();
 
 				// Free the DU
-				free(du);
+				free(qdu);
 
 				// Flush the decode unit queue
 				freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
@@ -184,30 +210,6 @@ static void reassembleAvcFrame(int frameNumber) {
             consecutiveFrameDrops = 0;
 		}
 	}
-}
-
-/* Given a decode unit, get the next one in the linked blocking queue */
-int getNextDecodeUnit(PDECODE_UNIT *du) {
-	int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)du);
-	if (err == LBQ_SUCCESS) {
-		return 1;
-	}
-	else {
-		return 0;
-	}
-}
-
-/* Cleanup a decode unit by freeing malloced memory */
-void freeDecodeUnit(PDECODE_UNIT decodeUnit) {
-	PLENTRY lastEntry;
-
-	while (decodeUnit->bufferList != NULL) {
-		lastEntry = decodeUnit->bufferList;
-		decodeUnit->bufferList = lastEntry->next;
-		free(lastEntry);
-	}
-
-	free(decodeUnit);
 }
 
 static void queueFragment(char *data, int offset, int length) {

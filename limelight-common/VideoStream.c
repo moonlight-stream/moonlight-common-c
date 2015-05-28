@@ -92,16 +92,16 @@ static void ReceiveThreadProc(void* context) {
 
 /* Decoder thread proc */
 static void DecoderThreadProc(void* context) {
-	PDECODE_UNIT du;
+	PQUEUED_DECODE_UNIT qdu;
 	while (!PltIsThreadInterrupted(&decoderThread)) {
-		if (!getNextDecodeUnit(&du)) {
+		if (!getNextQueuedDecodeUnit(&qdu)) {
 			printf("Decoder thread terminating\n");
 			return;
 		}
 
-		int ret = callbacks.submitDecodeUnit(du);
+		int ret = callbacks.submitDecodeUnit(&qdu->decodeUnit);
 
-		freeDecodeUnit(du);
+		freeQueuedDecodeUnit(qdu);
         
         if (ret == DR_NEED_IDR) {
             Limelog("Request IDR frame on behalf of DR\n");
