@@ -7,12 +7,12 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
 #include <Winsock2.h>
 #else
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 #endif
 
 #ifdef _WIN32
