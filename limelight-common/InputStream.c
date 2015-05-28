@@ -94,6 +94,35 @@ void destroyInputStream(void) {
 	initialized = 0;
 }
 
+// Checks if values are compatible with controller batching
+static int checkDirs(short currentVal, short newVal, int* dir) {
+    if (currentVal == newVal) {
+        return 1;
+    }
+    
+    // We want to send a new packet if we've now zeroed an axis
+    if (newVal == 0) {
+        return 0;
+    }
+    
+    if (*dir == 0) {
+        if (newVal < currentVal) {
+            *dir = -1;
+        }
+        else {
+            *dir = 1;
+        }
+    }
+    else if (*dir == -1) {
+        return newVal < currentVal;
+    }
+    else if (newVal < currentVal) {
+        return 0;
+    }
+    
+    return 1;
+}
+
 #define OAES_DATA_OFFSET 32
 
 /* Input thread proc */
@@ -112,6 +141,106 @@ static void inputSendThreadProc(void* context) {
 			listenerCallbacks->connectionTerminated(err);
 			return;
 		}
+        
+        // If it's a multi-controller packet we can do batching
+        if (holder->packet.multiController.header.packetType == htonl(PACKET_TYPE_MULTI_CONTROLLER)) {
+            PPACKET_HOLDER controllerBatchHolder;
+            PNV_MULTI_CONTROLLER_PACKET origPkt;
+            int dirs[6];
+            
+            origPkt = &holder->packet.multiController;
+            for (;;) {
+                PNV_MULTI_CONTROLLER_PACKET newPkt;
+                
+                // Peek at the next packet
+                if (LbqPeekQueueElement(&packetQueue, (void**)&controllerBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+                
+                // If it's not a controller packet, we're done
+                if (controllerBatchHolder->packet.multiController.header.packetType != htonl(PACKET_TYPE_MULTI_CONTROLLER)) {
+                    break;
+                }
+                
+                // Check if it's able to be batched
+                newPkt = &controllerBatchHolder->packet.multiController;
+                if (newPkt->buttonFlags != origPkt->buttonFlags ||
+                    newPkt->controllerNumber != origPkt->controllerNumber ||
+                    !checkDirs(origPkt->leftTrigger, newPkt->leftTrigger, &dirs[0]) ||
+                    !checkDirs(origPkt->rightTrigger, newPkt->rightTrigger, &dirs[1]) ||
+                    !checkDirs(origPkt->leftStickX, newPkt->leftStickX, &dirs[2]) ||
+                    !checkDirs(origPkt->leftStickY, newPkt->leftStickY, &dirs[3]) ||
+                    !checkDirs(origPkt->rightStickX, newPkt->rightStickX, &dirs[4]) ||
+                    !checkDirs(origPkt->rightStickY, newPkt->rightStickY, &dirs[5])) {
+                    // Batching not allowed
+                    break;
+                }
+                
+                // Remove the batchable controller packet
+                if (LbqPollQueueElement(&packetQueue, (void**)&controllerBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+                
+                // Update the original packet
+                origPkt->leftTrigger = newPkt->leftTrigger;
+                origPkt->rightTrigger = newPkt->rightTrigger;
+                origPkt->leftStickX = newPkt->leftStickX;
+                origPkt->leftStickY = newPkt->leftStickY;
+                origPkt->rightStickX = newPkt->rightStickX;
+                origPkt->rightStickY = newPkt->rightStickY;
+                
+                // Free the batched packet holder
+                free(controllerBatchHolder);
+            }
+        }
+        // If it's a mouse move packet, we can also do batching
+        else if (holder->packet.mouseMove.header.packetType == htonl(PACKET_TYPE_MOUSE_MOVE)) {
+            PPACKET_HOLDER mouseBatchHolder;
+            int totalDeltaX = htons(holder->packet.mouseMove.deltaX);
+            int totalDeltaY = htons(holder->packet.mouseMove.deltaY);
+            
+            for (;;) {
+                int partialDeltaX;
+                int partialDeltaY;
+                
+                // Peek at the next packet
+                if (LbqPeekQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+                
+                // If it's not a mouse move packet, we're done
+                if (mouseBatchHolder->packet.mouseMove.header.packetType != htonl(PACKET_TYPE_MOUSE_MOVE)) {
+                    break;
+                }
+                
+                partialDeltaX = htons(mouseBatchHolder->packet.mouseMove.deltaX);
+                partialDeltaY = htons(mouseBatchHolder->packet.mouseMove.deltaY);
+                
+                // Check for overflow
+                if (partialDeltaX + totalDeltaX > INT16_MAX ||
+                    partialDeltaX + totalDeltaX < INT16_MIN ||
+                    partialDeltaY + totalDeltaY > INT16_MAX ||
+                    partialDeltaY + totalDeltaY < INT16_MIN) {
+                    // Total delta would overflow our 16-bit short
+                    break;
+                }
+                
+                // Remove the batchable mouse move packet
+                if (LbqPollQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+                
+                totalDeltaX += partialDeltaX;
+                totalDeltaY += partialDeltaY;
+                
+                // Free the batched packet holder
+                free(mouseBatchHolder);
+            }
+            
+            // Update the original packet
+            holder->packet.mouseMove.deltaX = htons((short)totalDeltaX);
+            holder->packet.mouseMove.deltaY = htons((short)totalDeltaY);
+        }
 
 		encryptedSize = sizeof(encryptedBuffer);
 		err = oaes_encrypt(oaesContext, (const unsigned char*) &holder->packet, holder->packetLength,

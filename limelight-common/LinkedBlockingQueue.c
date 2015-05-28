@@ -85,6 +85,60 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
 	return LBQ_SUCCESS;
 }
 
+// This must be synchronized with LbqFlushQueueItems by the caller
+int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
+    if (queueHead->head == NULL) {
+        return LBQ_NO_ELEMENT;
+    }
+    
+    PltLockMutex(&queueHead->mutex);
+    
+    if (queueHead->head == NULL) {
+        PltUnlockMutex(&queueHead->mutex);
+        return LBQ_NO_ELEMENT;
+    }
+    
+    *data = queueHead->head->data;
+    
+    PltUnlockMutex(&queueHead->mutex);
+    
+    return LBQ_SUCCESS;
+}
+
+int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
+    PLINKED_BLOCKING_QUEUE_ENTRY entry;
+    
+    if (queueHead->head == NULL) {
+        return LBQ_NO_ELEMENT;
+    }
+    
+    PltLockMutex(&queueHead->mutex);
+    
+    if (queueHead->head == NULL) {
+        PltUnlockMutex(&queueHead->mutex);
+        return LBQ_NO_ELEMENT;
+    }
+    
+    entry = queueHead->head;
+    queueHead->head = entry->flink;
+    queueHead->currentSize--;
+    if (queueHead->head == NULL) {
+        LC_ASSERT(queueHead->currentSize == 0);
+        queueHead->tail = NULL;
+        PltClearEvent(&queueHead->containsDataEvent);
+    }
+    else {
+        LC_ASSERT(queueHead->currentSize != 0);
+        queueHead->head->blink = NULL;
+    }
+    
+    *data = entry->data;
+    
+    PltUnlockMutex(&queueHead->mutex);
+    
+    return LBQ_SUCCESS;
+}
+
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 	PLINKED_BLOCKING_QUEUE_ENTRY entry;
 	int err;
