@@ -196,8 +196,8 @@ static void inputSendThreadProc(void* context) {
         // If it's a mouse move packet, we can also do batching
         else if (holder->packet.mouseMove.header.packetType == htonl(PACKET_TYPE_MOUSE_MOVE)) {
             PPACKET_HOLDER mouseBatchHolder;
-            int totalDeltaX = htons(holder->packet.mouseMove.deltaX);
-            int totalDeltaY = htons(holder->packet.mouseMove.deltaY);
+            int totalDeltaX = (short)htons(holder->packet.mouseMove.deltaX);
+            int totalDeltaY = (short)htons(holder->packet.mouseMove.deltaY);
             
             for (;;) {
                 int partialDeltaX;
@@ -213,8 +213,8 @@ static void inputSendThreadProc(void* context) {
                     break;
                 }
                 
-                partialDeltaX = htons(mouseBatchHolder->packet.mouseMove.deltaX);
-                partialDeltaY = htons(mouseBatchHolder->packet.mouseMove.deltaY);
+                partialDeltaX = (short)htons(mouseBatchHolder->packet.mouseMove.deltaX);
+                partialDeltaY = (short)htons(mouseBatchHolder->packet.mouseMove.deltaY);
                 
                 // Check for overflow
                 if (partialDeltaX + totalDeltaX > INT16_MAX ||
