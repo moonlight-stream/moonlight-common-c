@@ -148,6 +148,8 @@ static void inputSendThreadProc(void* context) {
             PNV_MULTI_CONTROLLER_PACKET origPkt;
             int dirs[6];
             
+            memset(dirs, 0, sizeof(dirs));
+            
             origPkt = &holder->packet.multiController;
             for (;;) {
                 PNV_MULTI_CONTROLLER_PACKET newPkt;
