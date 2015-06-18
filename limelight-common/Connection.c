@@ -131,6 +131,7 @@ static int resolveHostName(char *host)
     
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = AI_ADDRCONFIG;
     err = getaddrinfo(host, NULL, &hints, &res);
     if (err != 0) {
         return err;
