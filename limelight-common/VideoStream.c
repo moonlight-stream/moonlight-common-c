@@ -9,10 +9,6 @@
 #define RTP_PORT 47998
 #define FIRST_FRAME_PORT 47996
 
-static DECODER_RENDERER_CALLBACKS callbacks;
-static STREAM_CONFIGURATION configuration;
-static IP_ADDRESS remoteHost;
-static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static RTP_REORDER_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
@@ -28,20 +24,14 @@ static PLT_THREAD decoderThread;
 #define RTP_QUEUE_DELAY 10
 
 /* Initialize the video stream */
-void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks,
-	PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
-	memcpy(&callbacks, drCallbacks, sizeof(callbacks));
-	memcpy(&configuration, streamConfig, sizeof(configuration));
-	remoteHost = host;
-	listenerCallbacks = clCallbacks;
-
-	initializeVideoDepacketizer(configuration.packetSize);
+void initializeVideoStream(void) {
+	initializeVideoDepacketizer(StreamConfig.packetSize);
 	RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
 }
 
 /* Clean up the video stream */
 void destroyVideoStream(void) {
-	callbacks.release();
+	VideoCallbacks.cleanup();
 
 	destroyVideoDepacketizer();
 	RtpqCleanupQueue(&rtpQueue);
@@ -50,19 +40,17 @@ void destroyVideoStream(void) {
 /* UDP Ping proc */
 static void UdpPingThreadProc(void *context) {
 	char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
-	struct sockaddr_in saddr;
+	struct sockaddr_in6 saddr;
 	SOCK_RET err;
 
-	memset(&saddr, 0, sizeof(saddr));
-	saddr.sin_family = AF_INET;
-	saddr.sin_port = htons(RTP_PORT);
-	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
+	memcpy(&saddr, &RemoteAddr, sizeof(saddr));
+	saddr.sin6_port = htons(RTP_PORT);
 
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
-		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
+		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
 		if (err != sizeof(pingData)) {
 			Limelog("UDP ping thread terminating #1\n");
-			listenerCallbacks->connectionTerminated(LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 
@@ -77,7 +65,7 @@ static void ReceiveThreadProc(void* context) {
 	char* buffer;
 	int queueStatus;
 
-	receiveSize = configuration.packetSize + MAX_RTP_HEADER_SIZE;
+	receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
 	bufferSize = receiveSize + sizeof(int) + sizeof(RTP_QUEUE_ENTRY);
 	buffer = NULL;
 
@@ -88,7 +76,7 @@ static void ReceiveThreadProc(void* context) {
 			buffer = (char*) malloc(bufferSize);
 			if (buffer == NULL) {
 				Limelog("Receive thread terminating\n");
-				listenerCallbacks->connectionTerminated(-1);
+				ListenerCallbacks.connectionTerminated(-1);
 				return;
 			}
 		}
@@ -96,7 +84,7 @@ static void ReceiveThreadProc(void* context) {
 		err = (int) recv(rtpSocket, buffer, receiveSize, 0);
 		if (err <= 0) {
 			Limelog("Receive thread terminating #2\n");
-			listenerCallbacks->connectionTerminated(LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			break;
 		}
 
@@ -135,11 +123,11 @@ static void DecoderThreadProc(void* context) {
 	PQUEUED_DECODE_UNIT qdu;
 	while (!PltIsThreadInterrupted(&decoderThread)) {
 		if (!getNextQueuedDecodeUnit(&qdu)) {
-			printf("Decoder thread terminating\n");
+			Limelog("Decoder thread terminating\n");
 			return;
 		}
 
-		int ret = callbacks.submitDecodeUnit(&qdu->decodeUnit);
+		int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
 		freeQueuedDecodeUnit(qdu);
         
@@ -163,8 +151,6 @@ int readFirstFrame(void) {
 
 /* Terminate the video stream */
 void stopVideoStream(void) {
-	callbacks.stop();
-
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
@@ -191,14 +177,12 @@ void stopVideoStream(void) {
 int startVideoStream(void* rendererContext, int drFlags) {
 	int err;
 
-	callbacks.setup(configuration.width,
-		configuration.height, configuration.fps, rendererContext, drFlags);
-
     // This must be called before the decoder thread starts submitting
     // decode units
-    callbacks.start();
+	VideoCallbacks.setup(StreamConfig.width,
+		StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
     
-	rtpSocket = bindUdpSocket();
+	rtpSocket = bindUdpSocket(RemoteAddr.ss_family);
 	if (rtpSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}
@@ -213,9 +197,9 @@ int startVideoStream(void* rendererContext, int drFlags) {
 		return err;
 	}
     
-    if (serverMajorVersion == 3) {
+    if (ServerMajorVersion == 3) {
         // Connect this socket to open port 47998 for our ping thread
-        firstFrameSocket = connectTcpSocket(remoteHost, FIRST_FRAME_PORT);
+        firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen, FIRST_FRAME_PORT);
         if (firstFrameSocket == INVALID_SOCKET) {
             return LastSocketError();
         }
@@ -228,7 +212,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         return err;
     }
     
-    if (serverMajorVersion == 3) {
+    if (ServerMajorVersion == 3) {
         // Read the first frame to start the flow of video
         err = readFirstFrame();
         if (err != 0) {

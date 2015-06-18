@@ -1,30 +1,22 @@
 #include "Limelight-internal.h"
 
 static void fakeDrSetup(int width, int height, int redrawRate, void* context, int drFlags) {}
-static void fakeDrStart(void) {}
-static void fakeDrStop(void) {}
-static void fakeDrRelease(void) {}
+static void fakeDrCleanup(void) {}
 static int fakeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) { return DR_OK; }
 
 static DECODER_RENDERER_CALLBACKS fakeDrCallbacks = {
 	.setup = fakeDrSetup,
-	.start = fakeDrStart,
-	.stop = fakeDrStop,
-	.release = fakeDrRelease,
+	.cleanup = fakeDrCleanup,
 	.submitDecodeUnit = fakeDrSubmitDecodeUnit,
 };
 
 static void fakeArInit(void) {}
-static void fakeArStart(void) {}
-static void fakeArStop(void) {}
-static void fakeArRelease(void) {}
+static void fakeArCleanup(void) {}
 static void fakeArDecodeAndPlaySample(char* sampleData, int sampleLength) {}
 
 AUDIO_RENDERER_CALLBACKS fakeArCallbacks = {
 	.init = fakeArInit,
-	.start = fakeArStart,
-	.stop = fakeArStop,
-	.release = fakeArRelease,
+	.cleanup = fakeArCleanup,
 	.decodeAndPlaySample = fakeArDecodeAndPlaySample,
 };
 
@@ -64,14 +56,8 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_REND
 		if ((*drCallbacks)->setup == NULL) {
 			(*drCallbacks)->setup = fakeDrSetup;
 		}
-		if ((*drCallbacks)->start == NULL) {
-			(*drCallbacks)->start = fakeDrStart;
-		}
-		if ((*drCallbacks)->stop == NULL) {
-			(*drCallbacks)->stop = fakeDrStop;
-		}
-		if ((*drCallbacks)->release == NULL) {
-			(*drCallbacks)->release = fakeDrRelease;
+		if ((*drCallbacks)->cleanup == NULL) {
+			(*drCallbacks)->cleanup = fakeDrCleanup;
 		}
 		if ((*drCallbacks)->submitDecodeUnit == NULL) {
 			(*drCallbacks)->submitDecodeUnit = fakeDrSubmitDecodeUnit;
@@ -85,14 +71,8 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_REND
 		if ((*arCallbacks)->init == NULL) {
 			(*arCallbacks)->init = fakeArInit;
 		}
-		if ((*arCallbacks)->start == NULL) {
-			(*arCallbacks)->start = fakeArStart;
-		}
-		if ((*arCallbacks)->stop == NULL) {
-			(*arCallbacks)->stop = fakeArStop;
-		}
-		if ((*arCallbacks)->release == NULL) {
-			(*arCallbacks)->release = fakeArRelease;
+		if ((*arCallbacks)->cleanup == NULL) {
+            (*arCallbacks)->cleanup = fakeArCleanup;
 		}
 		if ((*arCallbacks)->decodeAndPlaySample == NULL) {
 			(*arCallbacks)->decodeAndPlaySample = fakeArDecodeAndPlaySample;

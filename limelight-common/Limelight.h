@@ -8,8 +8,6 @@
 extern "C" {
 #endif
 
-#define IP_ADDRESS unsigned int
-
 typedef struct _STREAM_CONFIGURATION {
 	// Dimensions in pixels of the desired video stream
 	int width;
@@ -54,14 +52,8 @@ typedef struct _DECODE_UNIT {
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder
 typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void* context, int drFlags);
 
-// This callback is invoked right before video data starts being submitted to the decoder
-typedef void(*DecoderRendererStart)(void);
-
-// After this callback is invoked, no more video data will be submitted to the decoder
-typedef void(*DecoderRendererStop)(void);
-
-// This callback performs the final teardown of the video decoder
-typedef void(*DecoderRendererRelease)(void);
+// This callback performs the teardown of the video decoder
+typedef void(*DecoderRendererCleanup)(void);
 
 // This callback provides Annex B formatted H264 elementary stream data to the
 // decoder. If the decoder is unable to process the submitted data for some reason,
@@ -72,32 +64,22 @@ typedef int(*DecoderRendererSubmitDecodeUnit)(PDECODE_UNIT decodeUnit);
 
 typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSetup setup;
-	DecoderRendererStart start;
-	DecoderRendererStop stop;
-	DecoderRendererRelease release;
+	DecoderRendererCleanup cleanup;
 	DecoderRendererSubmitDecodeUnit submitDecodeUnit;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
 // This callback initializes the audio renderer
 typedef void(*AudioRendererInit)(void);
 
-// This callback occurs before audio data is submitted
-typedef void(*AudioRendererStart)(void);
-
-// After this callback is invoked, no more audio data will be submitted
-typedef void(*AudioRendererStop)(void);
-
 // This callback performs the final teardown of the audio decoder
-typedef void(*AudioRendererRelease)(void);
+typedef void(*AudioRendererCleanup)(void);
 
 // This callback provides Opus audio data to be decoded and played. sampleLength is in bytes.
 typedef void(*AudioRendererDecodeAndPlaySample)(char* sampleData, int sampleLength);
 
 typedef struct _AUDIO_RENDERER_CALLBACKS {
 	AudioRendererInit init;
-	AudioRendererStart start;
-	AudioRendererStop stop;
-	AudioRendererRelease release;
+	AudioRendererCleanup cleanup;
 	AudioRendererDecodeAndPlaySample decodeAndPlaySample;
 } AUDIO_RENDERER_CALLBACKS, *PAUDIO_RENDERER_CALLBACKS;
 
@@ -105,16 +87,17 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 // Use LiGetStageName() for stable stage names
 #define STAGE_NONE 0
 #define STAGE_PLATFORM_INIT 1
-#define STAGE_RTSP_HANDSHAKE 2
-#define STAGE_CONTROL_STREAM_INIT 3
-#define STAGE_VIDEO_STREAM_INIT 4
-#define STAGE_AUDIO_STREAM_INIT 5
-#define STAGE_INPUT_STREAM_INIT 6
-#define STAGE_CONTROL_STREAM_START 7
-#define STAGE_VIDEO_STREAM_START 8
-#define STAGE_AUDIO_STREAM_START 9
-#define STAGE_INPUT_STREAM_START 10
-#define STAGE_MAX 11
+#define STAGE_NAME_RESOLUTION 2
+#define STAGE_RTSP_HANDSHAKE 3
+#define STAGE_CONTROL_STREAM_INIT 4
+#define STAGE_VIDEO_STREAM_INIT 5
+#define STAGE_AUDIO_STREAM_INIT 6
+#define STAGE_INPUT_STREAM_INIT 7
+#define STAGE_CONTROL_STREAM_START 8
+#define STAGE_VIDEO_STREAM_START 9
+#define STAGE_AUDIO_STREAM_START 10
+#define STAGE_INPUT_STREAM_START 11
+#define STAGE_MAX 12
 
 // This callback is invoked to indicate that a stage of initialization is about to begin
 typedef void(*ConnListenerStageStarting)(int stage);
@@ -169,7 +152,7 @@ typedef struct _PLATFORM_CALLBACKS {
 //
 // _serverMajorVersion is the major version number of the 'appversion' tag in the /serverinfo request
 //
-int LiStartConnection(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+int LiStartConnection(char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
 	void* renderContext, int drFlags, int _serverMajorVersion);
 

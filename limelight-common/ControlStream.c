@@ -10,13 +10,10 @@ typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
 
-static IP_ADDRESS host;
 static SOCKET ctlSock = INVALID_SOCKET;
-static STREAM_CONFIGURATION streamConfig;
 static PLT_THREAD lossStatsThread;
 static PLT_THREAD resyncThread;
 static PLT_EVENT resyncEvent;
-static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static int lossCountSinceLastReport = 0;
 static long currentFrame = 0;
 
@@ -77,15 +74,10 @@ static char **preconstructedPayloads;
 #define LOSS_REPORT_INTERVAL_MS 50
 
 /* Initializes the control stream */
-int initializeControlStream(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
-	memcpy(&streamConfig, streamConfigPtr, sizeof(*streamConfigPtr));
-
+int initializeControlStream(void) {
 	PltCreateEvent(&resyncEvent);
-
-	host = addr;
-	listenerCallbacks = clCallbacks;
     
-    if (serverMajorVersion == 3) {
+    if (ServerMajorVersion == 3) {
         packetTypes = (short*)packetTypesGen3;
         payloadLengths = (short*)payloadLengthsGen3;
         preconstructedPayloads = (char**)preconstructedPayloadsGen3;
@@ -210,7 +202,7 @@ static void lossStatsThreadFunc(void* context) {
 	lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
 	if (lossStatsPayload == NULL) {
 		Limelog("Loss stats thread terminating #0\n");
-		listenerCallbacks->connectionTerminated(LastSocketError());
+		ListenerCallbacks.connectionTerminated(LastSocketError());
 		return;
 	}
 
@@ -230,7 +222,7 @@ static void lossStatsThreadFunc(void* context) {
 			payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
 			free(lossStatsPayload);
 			Limelog("Loss stats thread terminating #1\n");
-            listenerCallbacks->connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 
@@ -262,7 +254,7 @@ static void resyncThreadFunc(void* context) {
 		// Send the resync request and read the response
 		if (!sendMessageAndDiscardReply(packetTypes[IDX_RESYNC], payloadLengths[IDX_RESYNC], payload)) {
 			Limelog("Resync thread terminating #1\n");
-			listenerCallbacks->connectionTerminated(LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 		Limelog("Resync complete\n");
@@ -292,7 +284,7 @@ int stopControlStream(void) {
 int startControlStream(void) {
 	int err;
 
-	ctlSock = connectTcpSocket(host, 47995);
+	ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 47995);
 	if (ctlSock == INVALID_SOCKET) {
 		return LastSocketError();
 	}

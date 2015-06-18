@@ -6,17 +6,24 @@
 #include "PlatformThreads.h"
 #include "Video.h"
 
-extern int serverMajorVersion;
+// Common globals
+extern struct sockaddr_storage RemoteAddr;
+extern SOCKADDR_LEN RemoteAddrLen;
+extern int ServerMajorVersion;
+extern STREAM_CONFIGURATION StreamConfig;
+extern PLATFORM_CALLBACKS PlatformCallbacks;
+extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
+extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
+extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
 	PCONNECTION_LISTENER_CALLBACKS *clCallbacks, PPLATFORM_CALLBACKS *plCallbacks);
 
-char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress,
-                                   int rtspClientVersion, int *length);
+char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length);
 
-int initializeControlStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
+int initializeControlStream(void);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
@@ -26,7 +33,7 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 
-int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr);
+int performRtspHandshake(void);
 void terminateRtspHandshake(void);
 
 void initializeVideoDepacketizer(int pktSize);
@@ -34,18 +41,17 @@ void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length);
 
-void initializeVideoStream(IP_ADDRESS host, PSTREAM_CONFIGURATION streamConfig, PDECODER_RENDERER_CALLBACKS drCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
+void initializeVideoStream(void);
 void destroyVideoStream(void);
 int startVideoStream(void* rendererContext, int drFlags);
 void stopVideoStream(void);
 
-void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks);
+void initializeAudioStream(void);
 void destroyAudioStream(void);
 int startAudioStream(void);
 void stopAudioStream(void);
 
-int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength);
+int initializeInputStream(char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength);
 void destroyInputStream(void);
 int startInputStream(void);
 int stopInputStream(void);

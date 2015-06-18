@@ -7,9 +7,7 @@
 #include "OpenAES/oaes_lib.h"
 #include "OpenAES/oaes_common.h"
 
-static IP_ADDRESS host;
 static SOCKET inputSock = INVALID_SOCKET;
-static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
 static int initialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -33,11 +31,8 @@ typedef struct _PACKET_HOLDER {
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
 /* Initializes the input stream */
-int initializeInputStream(IP_ADDRESS addr, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength) {
-	host = addr;
-	listenerCallbacks = clCallbacks;
-
+int initializeInputStream(char* aesKeyData, int aesKeyDataLength,
+                          char* aesIv, int aesIvLength) {
 	if (aesIvLength != OAES_BLOCK_SIZE)
 	{
 		Limelog("AES IV is incorrect length. Should be %d\n", aesIvLength);
@@ -138,7 +133,7 @@ static void inputSendThreadProc(void* context) {
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &holder);
 		if (err != LBQ_SUCCESS) {
 			Limelog("Input thread terminating #1\n");
-			listenerCallbacks->connectionTerminated(err);
+			ListenerCallbacks.connectionTerminated(err);
 			return;
 		}
         
@@ -250,7 +245,7 @@ static void inputSendThreadProc(void* context) {
 		free(holder);
 		if (err != OAES_RET_SUCCESS) {
 			Limelog("Input thread terminating #2\n");
-			listenerCallbacks->connectionTerminated(err);
+			ListenerCallbacks.connectionTerminated(err);
 			return;
 		}
 
@@ -269,7 +264,7 @@ static void inputSendThreadProc(void* context) {
 			encryptedSize + sizeof(encryptedLengthPrefix), 0);
 		if (err <= 0) {
 			Limelog("Input thread terminating #3\n");
-			listenerCallbacks->connectionTerminated(err);
+			ListenerCallbacks.connectionTerminated(err);
 			return;
 		}
 	}
@@ -279,7 +274,7 @@ static void inputSendThreadProc(void* context) {
 int startInputStream(void) {
 	int err;
 
-	inputSock = connectTcpSocket(host, 35043);
+	inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 35043);
 	if (inputSock == INVALID_SOCKET) {
 		return LastSocketError();
 	}
@@ -409,7 +404,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         return -1;
     }
     
-    if (serverMajorVersion == 3) {
+    if (ServerMajorVersion == 3) {
         // Generation 3 servers don't support multiple controllers so we send
         // the legacy packet
         holder->packetLength = sizeof(NV_CONTROLLER_PACKET);

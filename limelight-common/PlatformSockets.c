@@ -1,20 +1,44 @@
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
-SOCKET bindUdpSocket(void) {
+void addrToUrlSafeString(struct sockaddr_storage *addr, char* string)
+{
+    if (addr->ss_family == AF_INET6) {
+        char addrstr[INET6_ADDRSTRLEN];
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
+        inet_ntop(addr->ss_family, &sin6->sin6_addr, addrstr, sizeof(addrstr));
+        
+        // IPv6 addresses need to be enclosed in brackets for URLs
+        sprintf(string, "[%s]", addrstr);
+    }
+    else {
+        struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+        char *addrstr = inet_ntoa(sin->sin_addr);
+        
+        // IPv4 addresses are returned without changes
+        sprintf(string, "%s", addrstr);
+    }
+}
+
+SOCKET bindUdpSocket(int addrfamily) {
 	SOCKET s;
-	struct sockaddr_in addr;
+    struct sockaddr_storage addr;
 	int val;
 	int err;
 
-	s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
+    
+	s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == INVALID_SOCKET) {
 		return INVALID_SOCKET;
 	}
 
 	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	if (bind(s, (struct sockaddr*) &addr, sizeof(addr)) == SOCKET_ERROR) {
+    addr.ss_family = addrfamily;
+	if (bind(s, (struct sockaddr*) &addr,
+             addrfamily == AF_INET ?
+                sizeof(struct sockaddr_in) :
+                sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
 		err = LastSocketError();
 		closesocket(s);
 		SetLastSocketError(err);
@@ -34,15 +58,15 @@ SOCKET bindUdpSocket(void) {
 	return s;
 }
 
-SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
+SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, unsigned short port) {
 	SOCKET s;
-	struct sockaddr_in addr;
+    struct sockaddr_in6 addr;
 	int err;
 #ifdef LC_DARWIN
     int val;
 #endif
 
-	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	s = socket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP);
 	if (s == INVALID_SOCKET) {
 		return INVALID_SOCKET;
 	}
@@ -53,11 +77,9 @@ SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port) {
     setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
 #endif
 
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	memcpy(&addr.sin_addr, &dstaddr, sizeof(dstaddr));
-	if (connect(s, (struct sockaddr*) &addr, sizeof(addr)) == SOCKET_ERROR) {
+    memcpy(&addr, dstaddr, sizeof(addr));
+	addr.sin6_port = htons(port);
+	if (connect(s, (struct sockaddr*) &addr, addrlen) == SOCKET_ERROR) {
 		err = LastSocketError();
 		closesocket(s);
 		SetLastSocketError(err);

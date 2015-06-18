@@ -144,7 +144,7 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     return err;
 }
 
-static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress) {
+static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 	PSDP_OPTION optionHead;
 	char payloadStr[92];
 	int err;
@@ -152,21 +152,21 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	optionHead = NULL;
 	err = 0;
 
-	sprintf(payloadStr, "%d", streamConfig->width);
+	sprintf(payloadStr, "%d", StreamConfig.width);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportWd", payloadStr);
-	sprintf(payloadStr, "%d", streamConfig->height);
+	sprintf(payloadStr, "%d", StreamConfig.height);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportHt", payloadStr);
 
-	sprintf(payloadStr, "%d", streamConfig->fps);
+	sprintf(payloadStr, "%d", StreamConfig.fps);
 	err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
     
-    sprintf(payloadStr, "%d", streamConfig->packetSize);
+    sprintf(payloadStr, "%d", StreamConfig.packetSize);
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
     
     // FIXME: Remote optimizations
-    if (streamConfig->bitrate <= 13000) {
+    if (StreamConfig.bitrate <= 13000) {
         err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "9");
         err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "9");
     }
@@ -175,18 +175,18 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
     
     // Lock the bitrate since we're not scaling resolution so the picture doesn't get too bad
-    if (streamConfig->height >= 1080 && streamConfig->fps >= 60) {
-        if (streamConfig->bitrate < 10000) {
-            sprintf(payloadStr, "%d", streamConfig->bitrate);
+    if (StreamConfig.height >= 1080 && StreamConfig.fps >= 60) {
+        if (StreamConfig.bitrate < 10000) {
+            sprintf(payloadStr, "%d", StreamConfig.bitrate);
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "10000");
         }
     }
-    else if (streamConfig->height >= 1080 || streamConfig->fps >= 60) {
-        if (streamConfig->bitrate < 7000) {
-            sprintf(payloadStr, "%d", streamConfig->bitrate);
+    else if (StreamConfig.height >= 1080 || StreamConfig.fps >= 60) {
+        if (StreamConfig.bitrate < 7000) {
+            sprintf(payloadStr, "%d", StreamConfig.bitrate);
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
@@ -194,8 +194,8 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
         }
     }
     else {
-        if (streamConfig->bitrate < 3000) {
-            sprintf(payloadStr, "%d", streamConfig->bitrate);
+        if (StreamConfig.bitrate < 3000) {
+            sprintf(payloadStr, "%d", StreamConfig.bitrate);
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         }
         else {
@@ -203,7 +203,7 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
         }
     }
 
-	sprintf(payloadStr, "%d", streamConfig->bitrate);
+	sprintf(payloadStr, "%d", StreamConfig.bitrate);
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
 
     // Using FEC turns padding on which makes us have to take the slow path
@@ -218,11 +218,11 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
 	err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
     
-    if (serverMajorVersion == 3) {
-        err |= addGen3Options(&optionHead, inet_ntoa(targetAddress));
+    if (ServerMajorVersion == 3) {
+        err |= addGen3Options(&optionHead, urlSafeAddr);
     }
     else {
-        err |= addGen4Options(&optionHead, inet_ntoa(targetAddress));
+        err |= addGen4Options(&optionHead, urlSafeAddr);
     }
 
 	if (err == 0) {
@@ -234,11 +234,14 @@ static PSDP_OPTION getAttributesList(PSTREAM_CONFIGURATION streamConfig, struct 
 }
 
 /* Populate the SDP header with required information */
-static int fillSdpHeader(char* buffer, struct in_addr targetAddress, int rtspClientVersion) {
+static int fillSdpHeader(char* buffer, int rtspClientVersion, char *urlSafeAddr) {
 	return sprintf(buffer,
 		"v=0\r\n"
-		"o=android 0 %d IN IPv4 %s\r\n"
-		"s=NVIDIA Streaming Client\r\n", rtspClientVersion, inet_ntoa(targetAddress));
+		"o=android 0 %d IN %s %s\r\n"
+		"s=NVIDIA Streaming Client\r\n",
+                   rtspClientVersion,
+                   RemoteAddr.ss_family == AF_INET ? "IPv4" : "IPv6",
+                   urlSafeAddr);
 }
 
 /* Populate the SDP tail with required information */
@@ -246,17 +249,19 @@ static int fillSdpTail(char* buffer) {
 	return sprintf(buffer,
 		"t=0 0\r\n"
 		"m=video %d  \r\n",
-                   serverMajorVersion < 4 ? 47996 : 47998);
+                   ServerMajorVersion < 4 ? 47996 : 47998);
 }
 
 /* Get the SDP attributes for the stream config */
-char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in_addr targetAddress,
-                                   int rtspClientVersion, int *length) {
+char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length) {
 	PSDP_OPTION attributeList;
 	int offset;
 	char* payload;
+    char urlSafeAddr[URLSAFESTRING_LEN];
+    
+    addrToUrlSafeString(&RemoteAddr, urlSafeAddr);
 
-	attributeList = getAttributesList(streamConfig, targetAddress);
+	attributeList = getAttributesList(urlSafeAddr);
 	if (attributeList == NULL) {
 		return NULL;
 	}
@@ -268,7 +273,7 @@ char* getSdpPayloadForStreamConfig(PSTREAM_CONFIGURATION streamConfig, struct in
 		return NULL;
 	}
 
-	offset = fillSdpHeader(payload, targetAddress, rtspClientVersion);
+	offset = fillSdpHeader(payload, rtspClientVersion, urlSafeAddr);
 	offset += fillSerializedAttributeList(&payload[offset], attributeList);
 	offset += fillSdpTail(&payload[offset]);
 

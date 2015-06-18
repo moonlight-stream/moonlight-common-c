@@ -4,7 +4,6 @@
 #define RTSP_MAX_RESP_SIZE 16384
 
 static SOCKET sock = INVALID_SOCKET;
-static IP_ADDRESS remoteAddr;
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
 static char sessionIdString[16];
@@ -86,7 +85,7 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
 	char* serializedMessage = NULL;
 	int messageLen;
 
-	sock = connectTcpSocket(remoteAddr, 48010);
+	sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010);
 	if (sock == INVALID_SOCKET) {
 		return ret;
 	}
@@ -238,7 +237,6 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 	int ret;
 	int payloadLength;
 	char payloadLengthStr[16];
-	struct in_addr sdpAddr;
 
 	ret = initializeRtspRequest(&request, "ANNOUNCE", "streamid=video");
 	if (ret != 0) {
@@ -249,9 +247,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 			goto FreeMessage;
 		}
 
-        memcpy(&sdpAddr, &remoteAddr, sizeof(remoteAddr));
-		request.payload = getSdpPayloadForStreamConfig(streamConfig, sdpAddr,
-                                                       rtspClientVersion, &payloadLength);
+		request.payload = getSdpPayloadForStreamConfig(rtspClientVersion, &payloadLength);
 		if (request.payload == NULL) {
 			goto FreeMessage;
 		}
@@ -273,17 +269,16 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 }
 
 /* Perform RTSP Handshake with the streaming server machine as part of the connection process */
-int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr) {
-	struct in_addr inaddr;
-
+int performRtspHandshake(void) {
+    char urlAddr[URLSAFESTRING_LEN];
+    
 	// Initialize global state
-	remoteAddr = addr;
-    memcpy(&inaddr, &addr, sizeof(addr));
-	sprintf(rtspTargetUrl, "rtsp://%s", inet_ntoa(inaddr));
+    addrToUrlSafeString(&RemoteAddr, urlAddr);
+	sprintf(rtspTargetUrl, "rtsp://%s", urlAddr);
 	currentSeqNumber = 1;
 	hasSessionId = 0;
     
-    if (serverMajorVersion == 3) {
+    if (ServerMajorVersion == 3) {
         rtspClientVersion = 10;
     }
     else {
@@ -371,7 +366,7 @@ int performRtspHandshake(IP_ADDRESS addr, PSTREAM_CONFIGURATION streamConfigPtr)
 	{
 		RTSP_MESSAGE response;
 
-		if (!sendVideoAnnounce(&response, streamConfigPtr)) {
+		if (!sendVideoAnnounce(&response, &StreamConfig)) {
 			Limelog("RTSP ANNOUNCE request failed\n");
 			return -1;
 		}

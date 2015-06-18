@@ -4,10 +4,6 @@
 #include "LinkedBlockingQueue.h"
 #include "RtpReorderQueue.h"
 
-static AUDIO_RENDERER_CALLBACKS callbacks;
-static PCONNECTION_LISTENER_CALLBACKS listenerCallbacks;
-static IP_ADDRESS remoteHost;
-
 static SOCKET rtpSocket = INVALID_SOCKET;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -33,11 +29,7 @@ typedef struct _QUEUED_AUDIO_PACKET {
 } QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
 
 /* Initialize the audio stream */
-void initializeAudioStream(IP_ADDRESS host, PAUDIO_RENDERER_CALLBACKS arCallbacks, PCONNECTION_LISTENER_CALLBACKS clCallbacks) {
-	memcpy(&callbacks, arCallbacks, sizeof(callbacks));
-	remoteHost = host;
-	listenerCallbacks = clCallbacks;
-
+void initializeAudioStream(void) {
 	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFUALT_QUEUE_TIME);
 }
@@ -57,7 +49,7 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 /* Tear down the audio stream once we're done with it */
 void destroyAudioStream(void) {
-	callbacks.release();
+	AudioCallbacks.cleanup();
 
 	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
 	RtpqCleanupQueue(&rtpReorderQueue);
@@ -66,20 +58,18 @@ void destroyAudioStream(void) {
 static void UdpPingThreadProc(void *context) {
 	/* Ping in ASCII */
 	char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
-	struct sockaddr_in saddr;
+	struct sockaddr_in6 saddr;
 	SOCK_RET err;
 
-	memset(&saddr, 0, sizeof(saddr));
-	saddr.sin_family = AF_INET;
-	saddr.sin_port = htons(RTP_PORT);
-	memcpy(&saddr.sin_addr, &remoteHost, sizeof(remoteHost));
+    memcpy(&saddr, &RemoteAddr, sizeof(saddr));
+	saddr.sin6_port = htons(RTP_PORT);
 
 	/* Send PING every 500 milliseconds */
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
-		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, sizeof(saddr));
+		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
 		if (err != sizeof(pingData)) {
 			Limelog("UDP ping thread terminating #1\n");
-			listenerCallbacks->connectionTerminated(LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 
@@ -120,7 +110,7 @@ static void ReceiveThreadProc(void* context) {
 			packet = (PQUEUED_AUDIO_PACKET) malloc(sizeof(*packet));
 			if (packet == NULL) {
 				Limelog("Receive thread terminating\n");
-				listenerCallbacks->connectionTerminated(-1);
+				ListenerCallbacks.connectionTerminated(-1);
 				return;
 			}
 		}
@@ -129,7 +119,7 @@ static void ReceiveThreadProc(void* context) {
 		if (packet->size <= 0) {
 			Limelog("Receive thread terminating #2\n");
 			free(packet);
-			listenerCallbacks->connectionTerminated(LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 
@@ -190,20 +180,18 @@ static void DecoderThreadProc(void* context) {
 		if (lastSeq != 0 && (unsigned short) (lastSeq + 1) != rtp->sequenceNumber) {
 			Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
 
-			callbacks.decodeAndPlaySample(NULL, 0);
+			AudioCallbacks.decodeAndPlaySample(NULL, 0);
 		}
 
 		lastSeq = rtp->sequenceNumber;
 
-		callbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
+		AudioCallbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
 
 		free(packet);
 	}
 }
 
 void stopAudioStream(void) {
-	callbacks.stop();
-
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
@@ -225,9 +213,9 @@ void stopAudioStream(void) {
 int startAudioStream(void) {
 	int err;
     
-    callbacks.init();
+    AudioCallbacks.init();
 
-	rtpSocket = bindUdpSocket();
+	rtpSocket = bindUdpSocket(RemoteAddr.ss_family);
 	if (rtpSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}
@@ -246,8 +234,6 @@ int startAudioStream(void) {
 	if (err != 0) {
 		return err;
 	}
-
-	callbacks.start();
 
 	return 0;
 }

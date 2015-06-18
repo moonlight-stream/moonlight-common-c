@@ -10,6 +10,7 @@
 #define LastSocketError() WSAGetLastError()
 
 typedef int SOCK_RET;
+typedef int SOCKADDR_LEN;
 
 #else
 #include <sys/types.h>
@@ -17,6 +18,7 @@ typedef int SOCK_RET;
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <errno.h>
 #include <signal.h>
 
@@ -28,8 +30,13 @@ typedef int SOCK_RET;
 
 typedef int SOCKET;
 typedef ssize_t SOCK_RET;
+typedef socklen_t SOCKADDR_LEN;
 #endif
 
-SOCKET connectTcpSocket(IP_ADDRESS dstaddr, unsigned short port);
-SOCKET bindUdpSocket(void);
+// IPv6 addresses have 2 extra characters for URL escaping
+#define URLSAFESTRING_LEN INET6_ADDRSTRLEN+2
+void addrToUrlSafeString(struct sockaddr_storage *addr, char* string);
+
+SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
+SOCKET bindUdpSocket(int addrfamily);
 int enableNoDelay(SOCKET s);
