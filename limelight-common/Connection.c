@@ -124,7 +124,7 @@ void LiCompleteThreadStart(void)
 	PltRunThreadProc();
 }
 
-static int resolveHostName(char *host)
+static int resolveHostName(const char *host)
 {
     struct addrinfo hints, *res;
     int err;
@@ -151,7 +151,7 @@ static int resolveHostName(char *host)
 }
 
 /* Starts the connection to the streaming machine */
-int LiStartConnection(char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
 	void* renderContext, int drFlags, int _serverMajorVersion) {
 	int err;

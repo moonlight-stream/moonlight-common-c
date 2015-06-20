@@ -152,7 +152,7 @@ typedef struct _PLATFORM_CALLBACKS {
 //
 // _serverMajorVersion is the major version number of the 'appversion' tag in the /serverinfo request
 //
-int LiStartConnection(char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
 	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
 	void* renderContext, int drFlags, int _serverMajorVersion);
 
