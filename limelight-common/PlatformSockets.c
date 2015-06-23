@@ -110,6 +110,7 @@ int initializePlatformSockets(void) {
     // Disable SIGPIPE signals to avoid us getting
     // killed when a socket gets an EPIPE error
     struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
     sa.sa_handler = SIG_IGN;
     sa.sa_flags = 0;
     if (sigaction(SIGPIPE, &sa, 0) == -1) {
