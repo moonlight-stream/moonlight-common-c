@@ -185,7 +185,7 @@ static void reassembleAvcFrame(int frameNumber) {
 			nalChainDataLength = 0;
 
 			if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
-				Limelog("Decode unit queue overflow\n");
+				Limelog("Video decode unit queue overflow\n");
 
 				// Clear frame state and wait for an IDR
 				nalChainHead = qdu->decodeUnit.bufferList;

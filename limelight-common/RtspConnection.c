@@ -78,15 +78,18 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 }
 
 /* Send RTSP message and get response */
-static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
+static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int* error) {
     SOCK_RET err;
     int ret = 0;
 	int offset;
 	char* serializedMessage = NULL;
 	int messageLen;
+    
+    *error = -1;
 
 	sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010);
 	if (sock == INVALID_SOCKET) {
+        *error = LastSocketError();
 		return ret;
 	}
 	enableNoDelay(sock);
@@ -94,12 +97,15 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
 	serializedMessage = serializeRtspMessage(request, &messageLen);
 	if (serializedMessage == NULL) {
 		closesocket(sock);
+        sock = INVALID_SOCKET;
 		return ret;
 	}
 
 	// Send our message
 	err = send(sock, serializedMessage, messageLen, 0);
 	if (err == SOCKET_ERROR) {
+        *error = LastSocketError();
+        Limelog("Failed to send RTSP message: %d\n", *error);
 		goto Exit;
 	}
 
@@ -147,13 +153,15 @@ void terminateRtspHandshake(void) {
 }
 
 /* Send RTSP OPTIONS request */
-static int requestOptions(PRTSP_MESSAGE response) {
+static int requestOptions(PRTSP_MESSAGE response, int* error) {
 	RTSP_MESSAGE request;
 	int ret;
+    
+    *error = -1;
 
 	ret = initializeRtspRequest(&request, "OPTIONS", rtspTargetUrl);
 	if (ret != 0) {
-		ret = transactRtspMessage(&request, response);
+		ret = transactRtspMessage(&request, response, error);
 		freeMessage(&request);
 	}
 
@@ -161,9 +169,11 @@ static int requestOptions(PRTSP_MESSAGE response) {
 }
 
 /* Send RTSP DESCRIBE request */
-static int requestDescribe(PRTSP_MESSAGE response) {
+static int requestDescribe(PRTSP_MESSAGE response, int* error) {
 	RTSP_MESSAGE request;
 	int ret;
+    
+    *error = -1;
 
 	ret = initializeRtspRequest(&request, "DESCRIBE", rtspTargetUrl);
 	if (ret != 0) {
@@ -171,7 +181,7 @@ static int requestDescribe(PRTSP_MESSAGE response) {
 				"application/sdp") &&
 			addOption(&request, "If-Modified-Since",
 				"Thu, 01 Jan 1970 00:00:00 GMT")) {
-			ret = transactRtspMessage(&request, response);
+			ret = transactRtspMessage(&request, response, error);
 		}
 		else {
 			ret = 0;
@@ -183,9 +193,11 @@ static int requestDescribe(PRTSP_MESSAGE response) {
 }
 
 /* Send RTSP SETUP request */
-static int setupStream(PRTSP_MESSAGE response, char* target) {
+static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
 	RTSP_MESSAGE request;
 	int ret;
+    
+    *error = -1;
 
 	ret = initializeRtspRequest(&request, "SETUP", target);
 	if (ret != 0) {
@@ -199,7 +211,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target) {
 		if (addOption(&request, "Transport", " ") &&
 			addOption(&request, "If-Modified-Since",
 				"Thu, 01 Jan 1970 00:00:00 GMT")) {
-			ret = transactRtspMessage(&request, response);
+			ret = transactRtspMessage(&request, response, error);
 		}
 		else {
 			ret = 0;
@@ -213,14 +225,16 @@ static int setupStream(PRTSP_MESSAGE response, char* target) {
 }
 
 /* Send RTSP PLAY request*/
-static int playStream(PRTSP_MESSAGE response, char* target) {
+static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
 	RTSP_MESSAGE request;
 	int ret;
+    
+    *error = -1;
 
 	ret = initializeRtspRequest(&request, "PLAY", target);
 	if (ret != 0) {
 		if (addOption(&request, "Session", sessionIdString)) {
-			ret = transactRtspMessage(&request, response);
+			ret = transactRtspMessage(&request, response, error);
 		}
 		else {
 			ret = 0;
@@ -232,11 +246,13 @@ static int playStream(PRTSP_MESSAGE response, char* target) {
 }
 
 /* Send RTSP ANNOUNCE message */
-static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION streamConfig) {
+static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
 	RTSP_MESSAGE request;
 	int ret;
 	int payloadLength;
 	char payloadLengthStr[16];
+    
+    *error = -1;
 
 	ret = initializeRtspRequest(&request, "ANNOUNCE", "streamid=video");
 	if (ret != 0) {
@@ -259,7 +275,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, PSTREAM_CONFIGURATION strea
 			goto FreeMessage;
 		}
 
-		ret = transactRtspMessage(&request, response);
+		ret = transactRtspMessage(&request, response, error);
 
 	FreeMessage:
 		freeMessage(&request);
@@ -287,16 +303,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!requestOptions(&response)) {
-			Limelog("RTSP OPTIONS request failed\n");
-			return -1;
+		if (!requestOptions(&response, &error)) {
+			Limelog("RTSP OPTIONS request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP OPTIONS request failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);
@@ -304,16 +321,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!requestDescribe(&response)) {
-			Limelog("RTSP DESCRIBE request failed\n");
-			return -1;
+		if (!requestDescribe(&response, &error)) {
+			Limelog("RTSP DESCRIBE request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP DESCRIBE request failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);
@@ -322,16 +340,17 @@ int performRtspHandshake(void) {
 	{
 		RTSP_MESSAGE response;
 		char* sessionId;
+        int error = -1;
 
-		if (!setupStream(&response, "streamid=audio")) {
-			Limelog("RTSP SETUP streamid=audio request failed\n");
-			return -1;
+		if (!setupStream(&response, "streamid=audio", &error)) {
+			Limelog("RTSP SETUP streamid=audio request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP SETUP streamid=audio request failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		sessionId = getOptionContent(response.options, "Session");
@@ -348,16 +367,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!setupStream(&response, "streamid=video")) {
-			Limelog("RTSP SETUP streamid=video request failed\n");
-			return -1;
+		if (!setupStream(&response, "streamid=video", &error)) {
+			Limelog("RTSP SETUP streamid=video request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP SETUP streamid=video request failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);
@@ -365,16 +385,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!sendVideoAnnounce(&response, &StreamConfig)) {
-			Limelog("RTSP ANNOUNCE request failed\n");
-			return -1;
+		if (!sendVideoAnnounce(&response, &error)) {
+			Limelog("RTSP ANNOUNCE request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP ANNOUNCE request failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);
@@ -382,16 +403,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!playStream(&response, "streamid=video")) {
-			Limelog("RTSP PLAY streamid=video request failed\n");
-			return -1;
+		if (!playStream(&response, "streamid=video", &error)) {
+			Limelog("RTSP PLAY streamid=video request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP PLAY streamid=video failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);
@@ -399,16 +421,17 @@ int performRtspHandshake(void) {
 
 	{
 		RTSP_MESSAGE response;
+        int error = -1;
 
-		if (!playStream(&response, "streamid=audio")) {
-			Limelog("RTSP PLAY streamid=audio request failed\n");
-			return -1;
+		if (!playStream(&response, "streamid=audio", &error)) {
+			Limelog("RTSP PLAY streamid=audio request failed: %d\n", error);
+			return error;
 		}
 
 		if (response.message.response.statusCode != 200) {
 			Limelog("RTSP PLAY streamid=audio failed: %d\n",
 				response.message.response.statusCode);
-			return -1;
+			return response.message.response.statusCode;
 		}
 
 		freeMessage(&response);

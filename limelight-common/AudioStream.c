@@ -68,7 +68,7 @@ static void UdpPingThreadProc(void *context) {
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
 		if (err != sizeof(pingData)) {
-			Limelog("UDP ping thread terminating #1\n");
+			Limelog("Audio Ping: sendto() failed: %d\n", (int)LastSocketError());
 			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
@@ -90,7 +90,6 @@ static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
 		freePacketList(LbqFlushQueueItems(&packetQueue));
 	}
 	else if (err == LBQ_INTERRUPTED) {
-		Limelog("Receive thread terminating #3\n");
 		free(*packet);
 		return 0;
 	}
@@ -109,7 +108,7 @@ static void ReceiveThreadProc(void* context) {
 		if (packet == NULL) {
 			packet = (PQUEUED_AUDIO_PACKET) malloc(sizeof(*packet));
 			if (packet == NULL) {
-				Limelog("Receive thread terminating\n");
+				Limelog("Audio Receive: malloc() failed\n");
 				ListenerCallbacks.connectionTerminated(-1);
 				return;
 			}
@@ -117,7 +116,7 @@ static void ReceiveThreadProc(void* context) {
 
 		packet->size = (int) recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
 		if (packet->size <= 0) {
-			Limelog("Receive thread terminating #2\n");
+			Limelog("Audio Receive: recv() failed: %d\n", (int)LastSocketError());
 			free(packet);
 			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
@@ -172,7 +171,7 @@ static void DecoderThreadProc(void* context) {
 	while (!PltIsThreadInterrupted(&decoderThread)) {
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &packet);
 		if (err != LBQ_SUCCESS) {
-			Limelog("Decoder thread terminating\n");
+            // An exit signal was received
 			return;
 		}
 
@@ -217,7 +216,7 @@ int startAudioStream(void) {
 
 	rtpSocket = bindUdpSocket(RemoteAddr.ss_family);
 	if (rtpSocket == INVALID_SOCKET) {
-		return LastSocketError();
+		return LastSocketFail();
 	}
 
 	err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);

@@ -30,6 +30,7 @@ SOCKET bindUdpSocket(int addrfamily) {
     
 	s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == INVALID_SOCKET) {
+        Limelog("socket() failed: %d\n", (int)LastSocketError());
 		return INVALID_SOCKET;
 	}
 
@@ -40,6 +41,7 @@ SOCKET bindUdpSocket(int addrfamily) {
                 sizeof(struct sockaddr_in) :
                 sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
 		err = LastSocketError();
+        Limelog("bind() failed: %d\n", err);
 		closesocket(s);
 		SetLastSocketError(err);
 		return INVALID_SOCKET;
@@ -68,6 +70,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, 
 
 	s = socket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP);
 	if (s == INVALID_SOCKET) {
+        Limelog("socket() failed: %d\n", (int)LastSocketError());
 		return INVALID_SOCKET;
 	}
     
@@ -81,6 +84,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, 
 	addr.sin6_port = htons(port);
 	if (connect(s, (struct sockaddr*) &addr, addrlen) == SOCKET_ERROR) {
 		err = LastSocketError();
+        Limelog("connect() failed: %d\n", err);
 		closesocket(s);
 		SetLastSocketError(err);
 		return INVALID_SOCKET;

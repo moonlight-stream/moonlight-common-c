@@ -132,8 +132,6 @@ static void inputSendThreadProc(void* context) {
 
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &holder);
 		if (err != LBQ_SUCCESS) {
-			Limelog("Input thread terminating #1\n");
-			ListenerCallbacks.connectionTerminated(err);
 			return;
 		}
         
@@ -244,7 +242,7 @@ static void inputSendThreadProc(void* context) {
 			(unsigned char*) encryptedBuffer, &encryptedSize);
 		free(holder);
 		if (err != OAES_RET_SUCCESS) {
-			Limelog("Input thread terminating #2\n");
+			Limelog("Input: Encryption failed: %d\n", (int)err);
 			ListenerCallbacks.connectionTerminated(err);
 			return;
 		}
@@ -263,8 +261,8 @@ static void inputSendThreadProc(void* context) {
 		err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
 			encryptedSize + sizeof(encryptedLengthPrefix), 0);
 		if (err <= 0) {
-			Limelog("Input thread terminating #3\n");
-			ListenerCallbacks.connectionTerminated(err);
+			Limelog("Input: send() failed: %d\n", (int)LastSocketError());
+			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
 	}
@@ -276,7 +274,7 @@ int startInputStream(void) {
 
 	inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 35043);
 	if (inputSock == INVALID_SOCKET) {
-		return LastSocketError();
+		return LastSocketFail();
 	}
 
 	enableNoDelay(inputSock);

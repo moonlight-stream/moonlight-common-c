@@ -33,6 +33,8 @@ typedef ssize_t SOCK_RET;
 typedef socklen_t SOCKADDR_LEN;
 #endif
 
+#define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)
+
 // IPv6 addresses have 2 extra characters for URL escaping
 #define URLSAFESTRING_LEN INET6_ADDRSTRLEN+2
 void addrToUrlSafeString(struct sockaddr_storage *addr, char* string);

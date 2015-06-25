@@ -49,7 +49,7 @@ static void UdpPingThreadProc(void *context) {
 	while (!PltIsThreadInterrupted(&udpPingThread)) {
 		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
 		if (err != sizeof(pingData)) {
-			Limelog("UDP ping thread terminating #1\n");
+			Limelog("Video Ping: send() failed: %d\n", (int)LastSocketError());
 			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
@@ -75,7 +75,7 @@ static void ReceiveThreadProc(void* context) {
 		if (buffer == NULL) {
 			buffer = (char*) malloc(bufferSize);
 			if (buffer == NULL) {
-				Limelog("Receive thread terminating\n");
+				Limelog("Video Receive: malloc() failed\n");
 				ListenerCallbacks.connectionTerminated(-1);
 				return;
 			}
@@ -83,7 +83,7 @@ static void ReceiveThreadProc(void* context) {
 
 		err = (int) recv(rtpSocket, buffer, receiveSize, 0);
 		if (err <= 0) {
-			Limelog("Receive thread terminating #2\n");
+			Limelog("Video Receive: recv() failed: %d\n", (int)LastSocketError());
 			ListenerCallbacks.connectionTerminated(LastSocketError());
 			break;
 		}
@@ -123,7 +123,6 @@ static void DecoderThreadProc(void* context) {
 	PQUEUED_DECODE_UNIT qdu;
 	while (!PltIsThreadInterrupted(&decoderThread)) {
 		if (!getNextQueuedDecodeUnit(&qdu)) {
-			Limelog("Decoder thread terminating\n");
 			return;
 		}
 

@@ -201,8 +201,8 @@ static void lossStatsThreadFunc(void* context) {
 
 	lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
 	if (lossStatsPayload == NULL) {
-		Limelog("Loss stats thread terminating #0\n");
-		ListenerCallbacks.connectionTerminated(LastSocketError());
+		Limelog("Loss Stats: malloc() failed\n");
+		ListenerCallbacks.connectionTerminated(-1);
 		return;
 	}
 
@@ -221,7 +221,7 @@ static void lossStatsThreadFunc(void* context) {
 		if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
 			payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
 			free(lossStatsPayload);
-			Limelog("Loss stats thread terminating #1\n");
+			Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
@@ -253,7 +253,7 @@ static void resyncThreadFunc(void* context) {
 
 		// Send the resync request and read the response
 		if (!sendMessageAndDiscardReply(packetTypes[IDX_RESYNC], payloadLengths[IDX_RESYNC], payload)) {
-			Limelog("Resync thread terminating #1\n");
+			Limelog("Resync: Transaction failed: %d\n", (int)LastSocketError());
 			ListenerCallbacks.connectionTerminated(LastSocketError());
 			return;
 		}
@@ -286,7 +286,7 @@ int startControlStream(void) {
 
 	ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 47995);
 	if (ctlSock == INVALID_SOCKET) {
-		return LastSocketError();
+		return LastSocketFail();
 	}
 
 	enableNoDelay(ctlSock);
@@ -295,14 +295,16 @@ int startControlStream(void) {
 	if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
                                     payloadLengths[IDX_START_A],
                                     preconstructedPayloads[IDX_START_A])) {
-        return LastSocketError();
+        Limelog("Start A failed: %d\n", (int)LastSocketError());
+        return LastSocketFail();
     }
 
 	// Send START B
     if (!sendMessageAndDiscardReply(packetTypes[IDX_START_B],
                                     payloadLengths[IDX_START_B],
                                     preconstructedPayloads[IDX_START_B])) {
-        return LastSocketError();
+        Limelog("Start B failed: %d\n", (int)LastSocketError());
+        return LastSocketFail();
     }
 
 	err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);

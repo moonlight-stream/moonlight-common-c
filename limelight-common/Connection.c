@@ -134,6 +134,7 @@ static int resolveHostName(const char *host)
     hints.ai_flags = AI_ADDRCONFIG;
     err = getaddrinfo(host, NULL, &hints, &res);
     if (err != 0) {
+        Limelog("getaddrinfo() failed: %d\n", err);
         return err;
     }
     
