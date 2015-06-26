@@ -42,8 +42,8 @@ typedef struct _NV_CONTROLLER_PACKET {
 	int headerA;
 	short headerB;
 	short buttonFlags;
-	char leftTrigger;
-	char rightTrigger;
+	unsigned char leftTrigger;
+	unsigned char rightTrigger;
 	short leftStickX;
 	short leftStickY;
 	short rightStickX;
@@ -67,8 +67,8 @@ typedef struct _NV_MULTI_CONTROLLER_PACKET {
     short midA;
     short midB;
     short buttonFlags;
-    char leftTrigger;
-    char rightTrigger;
+    unsigned char leftTrigger;
+    unsigned char rightTrigger;
     short leftStickX;
     short leftStickY;
     short rightStickX;

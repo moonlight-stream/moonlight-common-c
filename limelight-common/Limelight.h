@@ -206,18 +206,18 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 // This function queues a controller event to be sent to the remote server. It will
 // be seen by the computer as the first controller.
-int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
+int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
 	short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function queues a controller event to be sent to the remote server. The controllerNumber
 // parameter is a zero-based index of which controller this event corresponds to. The largest legal
 // controller number is 3 (for a total of 4 controllers, the Xinput maximum). On generation 3 servers (GFE 2.1.x),
 // these will be sent as controller 0 regardless of the controllerNumber parameter.
-int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, char leftTrigger, char rightTrigger,
+int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function queues a vertical scroll event to the remote server.
-int LiSendScrollEvent(char scrollClicks);
+int LiSendScrollEvent(signed char scrollClicks);
 
 #ifdef __cplusplus
 }

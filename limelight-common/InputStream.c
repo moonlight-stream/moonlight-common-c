@@ -387,7 +387,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 	return err;
 }
 
-static int sendControllerEventInternal(short controllerNumber, short buttonFlags, char leftTrigger, char rightTrigger,
+static int sendControllerEventInternal(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
                                        short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     PPACKET_HOLDER holder;
@@ -448,7 +448,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
 }
 
 /* Send a controller event to the streaming machine */
-int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger,
+int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
 	short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(0, buttonFlags, leftTrigger, rightTrigger,
@@ -456,7 +456,7 @@ int LiSendControllerEvent(short buttonFlags, char leftTrigger, char rightTrigger
 }
 
 /* Send a controller event to the streaming machine */
-int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, char leftTrigger, char rightTrigger,
+int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
                           short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(controllerNumber, buttonFlags, leftTrigger, rightTrigger,
@@ -464,7 +464,7 @@ int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, char l
 }
 
 /* Send a scroll event to the streaming machine */
-int LiSendScrollEvent(char scrollClicks) {
+int LiSendScrollEvent(signed char scrollClicks) {
 	PPACKET_HOLDER holder;
 	int err;
 
