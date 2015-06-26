@@ -152,6 +152,7 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 		PltLockMutex(&queueHead->mutex);
 
 		if (queueHead->head == NULL) {
+			PltClearEvent(&queueHead->containsDataEvent);
 			PltUnlockMutex(&queueHead->mutex);
 			continue;
 		}
