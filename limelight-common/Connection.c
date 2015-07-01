@@ -188,7 +188,6 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
 	Limelog("done\n");
     
     Limelog("Resolving host name...");
-    LC_ASSERT(stage == STAGE_NAME_RESOLUTION);
     ListenerCallbacks.stageStarting(STAGE_NAME_RESOLUTION);
     err = resolveHostName(host);
     if (err != 0) {
