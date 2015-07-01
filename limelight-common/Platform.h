@@ -17,11 +17,7 @@
 #endif
 
 #ifdef _WIN32
-# if WINAPI_FAMILY == WINAPI_FAMILY_PHONE_APP
-#  define LC_WINDOWS_PHONE
-# elif WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP
-#  define LC_WINDOWS
-# endif
+# define LC_WINDOWS
 #else
 # define LC_POSIX
 # if defined(__APPLE__)
@@ -33,10 +29,10 @@
 #include "Limelight.h"
 #if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
 extern char DbgBuf[512];
-extern PLATFORM_CALLBACKS platformCallbacks;
+extern PLATFORM_CALLBACKS PlatformCallbacks;
 #define Limelog(s, ...) \
 	sprintf(DbgBuf, s, ##__VA_ARGS__); \
-	platformCallbacks.debugPrint(DbgBuf)
+	PlatformCallbacks.debugPrint(DbgBuf)
 #else
 #define Limelog(s, ...) \
     fprintf(stderr, s, ##__VA_ARGS__)

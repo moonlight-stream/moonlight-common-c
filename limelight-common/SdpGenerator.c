@@ -25,7 +25,7 @@ static void freeAttributeList(PSDP_OPTION head) {
 /* Get the size of the attribute list */
 static int getSerializedAttributeListSize(PSDP_OPTION head) {
 	PSDP_OPTION currentEntry = head;
-	int size = 0;
+	size_t size = 0;
 	while (currentEntry != NULL) {
 		size += strlen("a=");
 		size += strlen(currentEntry->name);
@@ -35,7 +35,7 @@ static int getSerializedAttributeListSize(PSDP_OPTION head) {
 
 		currentEntry = currentEntry->next;
 	}
-	return size;
+	return (int)size;
 }
 
 /* Populate the serialized attribute list into a string */

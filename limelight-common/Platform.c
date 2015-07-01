@@ -210,7 +210,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 		PltUnlockMutex(&thread_list_lock);
 
 		// Make a callback to managed code to ask for a thread to grab this
-		platformCallbacks.threadStart();
+		PlatformCallbacks.threadStart();
 
 		err = 0;
 	}

@@ -15,7 +15,7 @@ static int getMessageLength(PRTSP_MESSAGE msg){
 	POPTION_ITEM current;
 
 	/* Initialize to 1 for null terminator */
-	int count = 1;
+	size_t count = 1;
 	/* Add the length of the protocol */
 	count += strlen(msg->protocol);
 
@@ -50,7 +50,7 @@ static int getMessageLength(PRTSP_MESSAGE msg){
 	/* Add the length of the payload, if any */
 	count += msg->payloadLength;
 
-	return count;
+	return (int)count;
 }
 
 /* Given an RTSP message string rtspMessage, parse it into an RTSP_MESSAGE struct msg */
