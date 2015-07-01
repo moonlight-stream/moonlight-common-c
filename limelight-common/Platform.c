@@ -1,17 +1,26 @@
 #include "PlatformThreads.h"
 #include "Platform.h"
 
+#if defined(LC_WINDOWS)
+WCHAR DbgBuf[512];
+#endif
+
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
 
-#if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
-CHAR DbgBuf[512];
-#endif
+#if defined(LC_WINDOWS)
+PLT_MUTEX thread_list_lock;
+PLT_THREAD *thread_head;
 
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-static PLT_MUTEX thread_list_lock;
-static PLT_THREAD *pending_thread_head;
-static PLT_THREAD *thread_head;
+DWORD WINAPI ThreadProc(LPVOID lpParameter) {
+	struct thread_context *ctx = (struct thread_context *)lpParameter;
+
+	ctx->entry(ctx->context);
+
+	free(ctx);
+
+	return 0;
+}
 #else
 void* ThreadProc(void* context) {
     struct thread_context *ctx = (struct thread_context *)context;
@@ -25,7 +34,7 @@ void* ThreadProc(void* context) {
 #endif
 
 void PltSleepMs(int ms) {
-#if defined(LC_WINDOWS) || defined (LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
 #else
     useconds_t usecs = ms * 1000;
@@ -34,7 +43,7 @@ void PltSleepMs(int ms) {
 }
 
 int PltCreateMutex(PLT_MUTEX *mutex) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	*mutex = CreateMutexEx(NULL, NULL, 0, MUTEX_ALL_ACCESS);
 	if (!*mutex) {
 		return -1;
@@ -46,7 +55,7 @@ int PltCreateMutex(PLT_MUTEX *mutex) {
 }
 
 void PltDeleteMutex(PLT_MUTEX *mutex) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	CloseHandle(*mutex);
 #else
     pthread_mutex_destroy(mutex);
@@ -54,7 +63,7 @@ void PltDeleteMutex(PLT_MUTEX *mutex) {
 }
 
 void PltLockMutex(PLT_MUTEX *mutex) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	int err;
 	err = WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
 	if (err != WAIT_OBJECT_0) {
@@ -66,7 +75,7 @@ void PltLockMutex(PLT_MUTEX *mutex) {
 }
 
 void PltUnlockMutex(PLT_MUTEX *mutex) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	ReleaseMutex(*mutex);
 #else
     pthread_mutex_unlock(mutex);
@@ -74,16 +83,15 @@ void PltUnlockMutex(PLT_MUTEX *mutex) {
 }
 
 void PltJoinThread(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	// Wait for the thread to leave our code
-	WaitForSingleObjectEx(thread->termCompleted, INFINITE, FALSE);
+#if defined(LC_WINDOWS)
+	WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
     pthread_join(*thread, NULL);
 #endif
 }
 
 void PltCloseThread(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	PLT_THREAD *current_thread;
 	
 	PltLockMutex(&thread_list_lock);
@@ -114,13 +122,13 @@ void PltCloseThread(PLT_THREAD *thread) {
 	PltUnlockMutex(&thread_list_lock);
 
 	CloseHandle(thread->termRequested);
-	CloseHandle(thread->termCompleted);
+	CloseHandle(thread->handle);
 #else
 #endif
 }
 
 int PltIsThreadInterrupted(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	return thread->cancelled;
 #else
 	// The thread will die here if a cancellation was requested
@@ -130,46 +138,11 @@ int PltIsThreadInterrupted(PLT_THREAD *thread) {
 }
 
 void PltInterruptThread(PLT_THREAD *thread) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	thread->cancelled = 1;
 	SetEvent(thread->termRequested);
 #else
 	pthread_cancel(*thread);
-#endif
-}
-
-void PltRunThreadProc(void) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	PLT_THREAD *thread;
-	
-	// Grab the first entry from the pending list and move it
-	// to the active list
-	PltLockMutex(&thread_list_lock);
-	thread = pending_thread_head;
-
-	// If there's no pending thread, something is seriously wrong
-	LC_ASSERT(thread != NULL);
-
-	pending_thread_head = pending_thread_head->next;
-
-	thread->next = thread_head;
-	thread_head = thread;
-	PltUnlockMutex(&thread_list_lock);
-
-	// Set up final thread state before running
-	thread->tid = GetCurrentThreadId();
-
-	// Now we're going to invoke the thread proc
-	thread->ctx->entry(thread->ctx->context);
-	free(thread->ctx);
-
-	// Signal the event to indicate the thread has "terminated"
-	SetEvent(thread->termCompleted);
-
-	// PltCloseThread() frees this state
-#else
-	// This code shouldn't be called on *NIX
-	LC_ASSERT(0);
 #endif
 }
 
@@ -185,7 +158,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 	ctx->entry = entry;
 	ctx->context = context;
 
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	{
 		thread->termRequested = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
 		if (thread->termRequested == NULL) {
@@ -193,26 +166,27 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 			return -1;
 		}
 
-		thread->termCompleted = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
-		if (thread->termCompleted == NULL) {
+		thread->cancelled = 0;
+
+		thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, CREATE_SUSPENDED, &thread->tid);
+		if (thread->handle == NULL) {
 			CloseHandle(thread->termRequested);
 			free(ctx);
 			return -1;
 		}
+		else {
+			// Add this thread to the thread list
+			PltLockMutex(&thread_list_lock);
+			thread->next = thread_head;
+			thread_head = thread;
+			PltUnlockMutex(&thread_list_lock);
 
-		thread->cancelled = 0;
-		thread->ctx = ctx;
+			// Now the thread can run
+			ResumeThread(thread->handle);
 
-		// Queue on the pending threads list
-		PltLockMutex(&thread_list_lock);
-		thread->next = pending_thread_head;
-		pending_thread_head = thread;
-		PltUnlockMutex(&thread_list_lock);
+			err = 0;
+		}
 
-		// Make a callback to managed code to ask for a thread to grab this
-		PlatformCallbacks.threadStart();
-
-		err = 0;
 	}
 #else
     {
@@ -227,7 +201,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 }
 
 int PltCreateEvent(PLT_EVENT *event) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	*event = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
 	if (!*event) {
 		return -1;
@@ -243,7 +217,7 @@ int PltCreateEvent(PLT_EVENT *event) {
 }
 
 void PltCloseEvent(PLT_EVENT *event) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	CloseHandle(*event);
 #else
     pthread_mutex_destroy(&event->mutex);
@@ -252,7 +226,7 @@ void PltCloseEvent(PLT_EVENT *event) {
 }
 
 void PltSetEvent(PLT_EVENT *event) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	SetEvent(*event);
 #else
     event->signalled = 1;
@@ -261,7 +235,7 @@ void PltSetEvent(PLT_EVENT *event) {
 }
 
 void PltClearEvent(PLT_EVENT *event) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	ResetEvent(*event);
 #else
     event->signalled = 0;
@@ -269,7 +243,7 @@ void PltClearEvent(PLT_EVENT *event) {
 }
 
 int PltWaitForEvent(PLT_EVENT *event) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	DWORD error;
 	PLT_THREAD *current_thread;
 	HANDLE objects[2];
@@ -311,7 +285,7 @@ int PltWaitForEvent(PLT_EVENT *event) {
 }
 
 uint64_t PltGetMillis(void) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	return GetTickCount64();
 #else
 	struct timeval tv;
@@ -330,7 +304,7 @@ int initializePlatform(void) {
 		return err;
 	}
 
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	return PltCreateMutex(&thread_list_lock);
 #else
 	return 0;
@@ -340,8 +314,7 @@ int initializePlatform(void) {
 void cleanupPlatform(void) {
 	cleanupPlatformSockets();
 
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
-	LC_ASSERT(pending_thread_head == NULL);
+#if defined(LC_WINDOWS)
 	LC_ASSERT(thread_head == NULL);
 
 	PltDeleteMutex(&thread_list_lock);

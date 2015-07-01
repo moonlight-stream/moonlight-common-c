@@ -11,7 +11,6 @@ extern struct sockaddr_storage RemoteAddr;
 extern SOCKADDR_LEN RemoteAddrLen;
 extern int ServerMajorVersion;
 extern STREAM_CONFIGURATION StreamConfig;
-extern PLATFORM_CALLBACKS PlatformCallbacks;
 extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
 extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
@@ -19,7 +18,7 @@ extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
-	PCONNECTION_LISTENER_CALLBACKS *clCallbacks, PPLATFORM_CALLBACKS *plCallbacks);
+	PCONNECTION_LISTENER_CALLBACKS *clCallbacks);
 
 char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length);
 

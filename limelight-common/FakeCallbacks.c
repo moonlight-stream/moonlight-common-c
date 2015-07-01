@@ -38,16 +38,8 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
 	.displayTransientMessage = fakeClDisplayTransientMessage,
 };
 
-static void fakePlThreadStart(void) {}
-static void fakePlDebugPrint(char* string) {}
-
-static PLATFORM_CALLBACKS fakePlCallbacks = {
-	.threadStart = fakePlThreadStart,
-	.debugPrint = fakePlDebugPrint,
-};
-
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
-	PCONNECTION_LISTENER_CALLBACKS *clCallbacks, PPLATFORM_CALLBACKS *plCallbacks)
+	PCONNECTION_LISTENER_CALLBACKS *clCallbacks)
 {
 	if (*drCallbacks == NULL) {
 		*drCallbacks = &fakeDrCallbacks;
@@ -103,18 +95,6 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_REND
 		}
 		if ((*clCallbacks)->displayTransientMessage == NULL) {
 			(*clCallbacks)->displayTransientMessage = fakeClDisplayTransientMessage;
-		}
-	}
-
-	if (*plCallbacks == NULL) {
-		*plCallbacks = &fakePlCallbacks;
-	}
-	else {
-		if ((*plCallbacks)->threadStart == NULL) {
-			(*plCallbacks)->threadStart = fakePlThreadStart;
-		}
-		if ((*plCallbacks)->debugPrint == NULL) {
-			(*plCallbacks)->debugPrint = fakePlDebugPrint;
 		}
 	}
 }

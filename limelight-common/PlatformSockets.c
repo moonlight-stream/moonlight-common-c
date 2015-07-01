@@ -108,7 +108,7 @@ int enableNoDelay(SOCKET s) {
 }
 
 int initializePlatformSockets(void) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	WSADATA data;
 	return WSAStartup(MAKEWORD(2, 0), &data);
 #elif defined(LC_POSIX)
@@ -129,7 +129,7 @@ int initializePlatformSockets(void) {
 }
 
 void cleanupPlatformSockets(void) {
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 	WSACleanup();
 #else
 #endif

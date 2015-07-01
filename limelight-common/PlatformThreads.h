@@ -10,14 +10,12 @@ struct thread_context {
 	void* context;
 };
 
-#if defined(LC_WINDOWS) || defined(LC_WINDOWS_PHONE)
+#if defined(LC_WINDOWS)
 typedef struct _PLT_THREAD {
+	HANDLE handle;
 	int cancelled;
 	DWORD tid;
 	HANDLE termRequested;
-	HANDLE termCompleted;
-
-	struct thread_context *ctx;
 
 	struct _PLT_THREAD *next;
 } PLT_THREAD;

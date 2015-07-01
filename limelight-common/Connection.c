@@ -10,7 +10,6 @@ struct sockaddr_storage RemoteAddr;
 SOCKADDR_LEN RemoteAddrLen;
 int ServerMajorVersion;
 STREAM_CONFIGURATION StreamConfig;
-PLATFORM_CALLBACKS PlatformCallbacks;
 CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
@@ -119,11 +118,6 @@ static void ClInternalConnectionTerminated(long errorCode)
     originalTerminationCallback(errorCode);
 }
 
-void LiCompleteThreadStart(void)
-{
-	PltRunThreadProc();
-}
-
 static int resolveHostName(const char *host)
 {
     struct addrinfo hints, *res;
@@ -153,7 +147,7 @@ static int resolveHostName(const char *host)
 
 /* Starts the connection to the streaming machine */
 int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
+	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks,
 	void* renderContext, int drFlags, int _serverMajorVersion) {
 	int err;
 
@@ -161,8 +155,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
 
 	// Replace missing callbacks with placeholders
-	fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks, &plCallbacks);
-	memcpy(&PlatformCallbacks, plCallbacks, sizeof(PlatformCallbacks));
+	fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks);
     memcpy(&VideoCallbacks, drCallbacks, sizeof(VideoCallbacks));
     memcpy(&AudioCallbacks, arCallbacks, sizeof(AudioCallbacks));
 

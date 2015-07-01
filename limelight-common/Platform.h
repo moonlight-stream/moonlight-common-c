@@ -27,18 +27,17 @@
 
 #include <stdio.h>
 #include "Limelight.h"
-#if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
-extern char DbgBuf[512];
-extern PLATFORM_CALLBACKS PlatformCallbacks;
+#if defined(LC_WINDOWS)
+extern WCHAR DbgBuf[512];
 #define Limelog(s, ...) \
-	sprintf(DbgBuf, s, ##__VA_ARGS__); \
-	PlatformCallbacks.debugPrint(DbgBuf)
+	swprintf(DbgBuf, sizeof(DbgBuf) / sizeof(WCHAR), L ## s, ##__VA_ARGS__); \
+	OutputDebugStringW(DbgBuf)
 #else
 #define Limelog(s, ...) \
     fprintf(stderr, s, ##__VA_ARGS__)
 #endif
 
-#if defined(LC_WINDOWS_PHONE) || defined(LC_WINDOWS)
+#if defined(LC_WINDOWS)
 #include <crtdbg.h>
 #define LC_ASSERT(x) __analysis_assume(x); \
                      _ASSERTE(x)

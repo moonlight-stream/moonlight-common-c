@@ -132,19 +132,6 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 	ConnListenerDisplayTransientMessage displayTransientMessage;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
-// This is a Windows-only callback used to indicate that the client
-// should call LiCompleteThreadStart() from a new thread as soon as possible.
-typedef void(*PlatformThreadStart)(void);
-
-// This is a Windows-only callback used to display a debug message for
-// developer use.
-typedef void(*PlatformDebugPrint)(char* string);
-
-typedef struct _PLATFORM_CALLBACKS {
-	PlatformThreadStart threadStart;
-	PlatformDebugPrint debugPrint;
-} PLATFORM_CALLBACKS, *PPLATFORM_CALLBACKS;
-
 // This function begins streaming.
 //
 // Callbacks are all optional. Pass NULL for individual callbacks within each struct or pass NULL for the entire struct
@@ -153,8 +140,7 @@ typedef struct _PLATFORM_CALLBACKS {
 // _serverMajorVersion is the major version number of the 'appversion' tag in the /serverinfo request
 //
 int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, PPLATFORM_CALLBACKS plCallbacks,
-	void* renderContext, int drFlags, int _serverMajorVersion);
+	PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags, int _serverMajorVersion);
 
 // This function stops streaming.
 void LiStopConnection(void);
@@ -162,11 +148,6 @@ void LiStopConnection(void);
 // Use to get a user-visible string to display initialization progress
 // from the integer passed to the ConnListenerStageXXX callbacks
 const char* LiGetStageName(int stage);
-
-#ifdef _WIN32
-/* Call in the context of a new thread */
-void LiCompleteThreadStart(void);
-#endif
 
 // This function queues a mouse move event to be sent to the remote server.
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
