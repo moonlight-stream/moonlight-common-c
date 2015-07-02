@@ -83,8 +83,7 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 	while (entry != NULL) {
 		nextEntry = entry->flink;
 
-		// The entry is stored within the data allocation
-		free(entry->data);
+		freeQueuedDecodeUnit((PQUEUED_DECODE_UNIT) entry->data);
 
 		entry = nextEntry;
 	}
