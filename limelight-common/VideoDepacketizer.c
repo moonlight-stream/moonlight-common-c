@@ -313,8 +313,7 @@ static int isFirstPacket(char flags) {
 }
 
 /* Adds a fragment directly to the queue */
-static void processRtpPayloadFast(PNV_VIDEO_PACKET videoPacket, BUFFER_DESC location) {
-	// FIXME not using videoPacket parameter?? 
+static void processRtpPayloadFast(BUFFER_DESC location) {
 	queueFragment(location.data, location.offset, location.length);
 }
 
@@ -439,7 +438,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 	}
 	else
 	{
-		processRtpPayloadFast(videoPacket, currentPos);
+		processRtpPayloadFast(currentPos);
 	}
 
 	if (flags & FLAG_EOF) {
