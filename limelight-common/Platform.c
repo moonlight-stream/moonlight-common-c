@@ -1,12 +1,21 @@
 #include "PlatformThreads.h"
 #include "Platform.h"
 
-#if defined(LC_WINDOWS)
-WCHAR DbgBuf[512];
-#endif
-
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
+
+#if defined(LC_WINDOWS)
+void LimelogWindows(char* Format, ...) {
+	va_list va;
+	char buffer[1024];
+
+	va_start(va, Format);
+	vsprintf(buffer, Format, va);
+	va_end(va);
+
+	OutputDebugStringA(buffer);
+}
+#endif
 
 #if defined(LC_WINDOWS)
 PLT_MUTEX thread_list_lock;

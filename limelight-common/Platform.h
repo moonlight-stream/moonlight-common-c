@@ -29,10 +29,9 @@
 #include "Limelight.h"
 
 #if defined(LC_WINDOWS)
-extern WCHAR DbgBuf[512];
+void LimelogWindows(char* Format, ...);
 #define Limelog(s, ...) \
-	swprintf(DbgBuf, sizeof(DbgBuf) / sizeof(WCHAR), L ## s, ##__VA_ARGS__); \
-	OutputDebugStringW(DbgBuf)
+    LimelogWindows(s, ##__VA_ARGS__)
 #else
 #define Limelog(s, ...) \
     fprintf(stderr, s, ##__VA_ARGS__)
