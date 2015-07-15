@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include "Limelight.h"
+
 #if defined(LC_WINDOWS)
 extern WCHAR DbgBuf[512];
 #define Limelog(s, ...) \
@@ -38,11 +39,19 @@ extern WCHAR DbgBuf[512];
 #endif
 
 #if defined(LC_WINDOWS)
-#include <crtdbg.h>
-#define LC_ASSERT(x) __analysis_assume(x); \
-                     _ASSERTE(x)
+ #include <crtdbg.h>
+ #ifdef LC_DEBUG
+  #define LC_ASSERT(x) __analysis_assume(x); \
+                       _ASSERTE(x)
+ #else
+  #define LC_ASSERT(x)
+ #endif
 #else
-#define LC_ASSERT(x)
+ #ifndef LC_DEBUG
+  #define NDEBUG
+ #endif
+ #include <assert.h>
+ #define LC_ASSERT(x) assert(x)
 #endif
 
 int initializePlatform(void);

@@ -8,6 +8,9 @@
 extern "C" {
 #endif
 
+// Enable this definition during debugging to enable assertions
+//#define LC_DEBUG
+
 typedef struct _STREAM_CONFIGURATION {
 	// Dimensions in pixels of the desired video stream
 	int width;
