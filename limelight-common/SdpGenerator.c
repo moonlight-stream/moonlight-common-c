@@ -139,7 +139,8 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     
     err |= addAttributeString(head, "x-nv-video[0].rateControlMode", "4");
     
-    err |= addAttributeString(head, "x-nv-vqos[0].bw.flags", "51");
+    // Use slicing for increased performance on some decoders
+    err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", "4");
     
     return err;
 }
