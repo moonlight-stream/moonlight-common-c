@@ -284,6 +284,7 @@
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
+					LC_DEBUG,
 					"DEBUG=1",
 					"$(inherited)",
 				);
