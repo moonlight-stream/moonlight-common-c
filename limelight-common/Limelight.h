@@ -52,6 +52,8 @@ typedef struct _DECODE_UNIT {
 	PLENTRY bufferList;
 } DECODE_UNIT, *PDECODE_UNIT;
 
+#define CAPABILITY_DIRECT_SUBMIT 0x1
+
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder
 typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void* context, int drFlags);
 
@@ -84,6 +86,7 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 	AudioRendererInit init;
 	AudioRendererCleanup cleanup;
 	AudioRendererDecodeAndPlaySample decodeAndPlaySample;
+	int capabilities;
 } AUDIO_RENDERER_CALLBACKS, *PAUDIO_RENDERER_CALLBACKS;
 
 // Subject to change in future releases

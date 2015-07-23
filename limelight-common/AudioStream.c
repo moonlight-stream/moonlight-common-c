@@ -13,6 +13,8 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
+static unsigned short lastSeq = 0;
+
 #define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 100
@@ -30,7 +32,9 @@ typedef struct _QUEUED_AUDIO_PACKET {
 
 /* Initialize the audio stream */
 void initializeAudioStream(void) {
-	LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
+	}
 	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFUALT_QUEUE_TIME);
 }
 
@@ -49,7 +53,9 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 /* Tear down the audio stream once we're done with it */
 void destroyAudioStream(void) {
-	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
+	}
 	RtpqCleanupQueue(&rtpReorderQueue);
 }
 
@@ -95,6 +101,21 @@ static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
 	return 1;
 }
 
+static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
+	PRTP_PACKET rtp;
+
+	rtp = (PRTP_PACKET) &packet->data[0];
+	if (lastSeq != 0 && (unsigned short) (lastSeq + 1) != rtp->sequenceNumber) {
+		Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
+
+		AudioCallbacks.decodeAndPlaySample(NULL, 0);
+	}
+
+	lastSeq = rtp->sequenceNumber;
+
+	AudioCallbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
+}
+
 static void ReceiveThreadProc(void* context) {
 	PRTP_PACKET rtp;
 	PQUEUED_AUDIO_PACKET packet;
@@ -136,9 +157,13 @@ static void ReceiveThreadProc(void* context) {
 
 		queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET) packet, &packet->q.rentry);
 		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
-			if (!queuePacketToLbq(&packet)) {
-				// An exit signal was received
-				return;
+			if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+				if (!queuePacketToLbq(&packet)) {
+					// An exit signal was received
+					return;
+				}
+			} else {
+				decodeInputData(packet);
 			}
 		}
 		else {
@@ -150,9 +175,13 @@ static void ReceiveThreadProc(void* context) {
 			if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
 				// If packets are ready, pull them and send them to the decoder
 				while ((packet = (PQUEUED_AUDIO_PACKET) RtpqGetQueuedPacket(&rtpReorderQueue)) != NULL) {
-					if (!queuePacketToLbq(&packet)) {
-						// An exit signal was received
-						return;
+					if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+						if (!queuePacketToLbq(&packet)) {
+							// An exit signal was received
+							return;
+						}
+					} else {
+						decodeInputData(packet);
 					}
 				}
 			}
@@ -164,7 +193,6 @@ static void DecoderThreadProc(void* context) {
 	PRTP_PACKET rtp;
 	int err;
 	PQUEUED_AUDIO_PACKET packet;
-	unsigned short lastSeq = 0;
 
 	while (!PltIsThreadInterrupted(&decoderThread)) {
 		err = LbqWaitForQueueElement(&packetQueue, (void**) &packet);
@@ -173,16 +201,7 @@ static void DecoderThreadProc(void* context) {
 			return;
 		}
 
-		rtp = (PRTP_PACKET) &packet->data[0];
-		if (lastSeq != 0 && (unsigned short) (lastSeq + 1) != rtp->sequenceNumber) {
-			Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
-
-			AudioCallbacks.decodeAndPlaySample(NULL, 0);
-		}
-
-		lastSeq = rtp->sequenceNumber;
-
-		AudioCallbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
+		decodeInputData(packet);
 
 		free(packet);
 	}
@@ -191,7 +210,9 @@ static void DecoderThreadProc(void* context) {
 void stopAudioStream(void) {
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
-	PltInterruptThread(&decoderThread);
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		PltInterruptThread(&decoderThread);
+	}
 
 	if (rtpSocket != INVALID_SOCKET) {
 		closesocket(rtpSocket);
@@ -200,11 +221,15 @@ void stopAudioStream(void) {
 
 	PltJoinThread(&udpPingThread);
 	PltJoinThread(&receiveThread);
-	PltJoinThread(&decoderThread);
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		PltJoinThread(&decoderThread);
+	}
 
 	PltCloseThread(&udpPingThread);
 	PltCloseThread(&receiveThread);
-	PltCloseThread(&decoderThread);
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		PltCloseThread(&decoderThread);
+	}
 
     AudioCallbacks.cleanup();
 }
@@ -229,9 +254,11 @@ int startAudioStream(void) {
 		return err;
 	}
 
-	err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
-	if (err != 0) {
-		return err;
+	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
+		if (err != 0) {
+			return err;
+		}
 	}
 
 	return 0;
