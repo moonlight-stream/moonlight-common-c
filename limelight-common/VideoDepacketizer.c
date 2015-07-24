@@ -29,7 +29,9 @@ typedef struct _BUFFER_DESC {
 
 /* Init */
 void initializeVideoDepacketizer(int pktSize) {
-	LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
+	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
+	}
 	nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
 
 	nextFrameNumber = 1;
@@ -91,7 +93,9 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 /* Cleanup video depacketizer and free malloced memory */
 void destroyVideoDepacketizer(void) {
-	freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
+	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+		freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
+	}
 
 	cleanupAvcFrameState();
 }
@@ -183,23 +187,34 @@ static void reassembleAvcFrame(int frameNumber) {
 			nalChainHead = NULL;
 			nalChainDataLength = 0;
 
-			if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
-				Limelog("Video decode unit queue overflow\n");
+			if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+				if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
+					Limelog("Video decode unit queue overflow\n");
 
-				// Clear frame state and wait for an IDR
-				nalChainHead = qdu->decodeUnit.bufferList;
-				nalChainDataLength = qdu->decodeUnit.fullLength;
-				dropAvcFrameState();
+					// Clear frame state and wait for an IDR
+					nalChainHead = qdu->decodeUnit.bufferList;
+					nalChainDataLength = qdu->decodeUnit.fullLength;
+					dropAvcFrameState();
 
-				// Free the DU
-				free(qdu);
+					// Free the DU
+					free(qdu);
 
-				// Flush the decode unit queue
-				freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
+					// Flush the decode unit queue
+					freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
-				// FIXME: Get proper lower bound
-				connectionSinkTooSlow(0, frameNumber);
-				return;
+					// FIXME: Get proper lower bound
+					connectionSinkTooSlow(0, frameNumber);
+					return;
+				}
+			} else {
+				int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
+
+				freeQueuedDecodeUnit(qdu);
+
+				if (ret == DR_NEED_IDR) {
+					Limelog("Request IDR frame on behalf of DR\n");
+					requestIdrOnDemand();
+				}
 			}
 
 			// Notify the control connection

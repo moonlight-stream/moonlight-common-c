@@ -71,6 +71,7 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 	DecoderRendererSetup setup;
 	DecoderRendererCleanup cleanup;
 	DecoderRendererSubmitDecodeUnit submitDecodeUnit;
+	int capabilities;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
 // This callback initializes the audio renderer
