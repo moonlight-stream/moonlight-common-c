@@ -25,6 +25,9 @@ typedef struct _STREAM_CONFIGURATION {
 	// Max video packet size in bytes (use 1024 if unsure)
 	int packetSize;
 
+	// Enable remote optimizations
+	int remote;
+
 	// AES encryption data for the remote input stream. This must be
 	// the same as what was passed as rikey and rikeyid 
 	// in /launch and /resume requests.
