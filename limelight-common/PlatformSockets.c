@@ -21,7 +21,7 @@ void addrToUrlSafeString(struct sockaddr_storage *addr, char* string)
     }
 }
 
-SOCKET bindUdpSocket(int addrfamily) {
+SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 	SOCKET s;
     struct sockaddr_storage addr;
 	int val;
@@ -54,9 +54,7 @@ SOCKET bindUdpSocket(int addrfamily) {
     setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
 #endif
 
-    // Set the receive buffer to 64KB by default
-	val = 65536;
-	setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &val, sizeof(val));
+	setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &bufferSize, sizeof(bufferSize));
 
 	return s;
 }

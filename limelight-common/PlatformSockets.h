@@ -40,5 +40,5 @@ typedef socklen_t SOCKADDR_LEN;
 void addrToUrlSafeString(struct sockaddr_storage *addr, char* string);
 
 SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
-SOCKET bindUdpSocket(int addrfamily);
+SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
