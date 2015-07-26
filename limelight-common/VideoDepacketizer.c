@@ -57,8 +57,6 @@ static void cleanupAvcFrameState(void) {
 
 /* Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
 static void dropAvcFrameState(void) {
-	waitingForIdrFrame = 1;
-    
     // Count the number of consecutive frames dropped
     consecutiveFrameDrops++;
     
@@ -70,7 +68,8 @@ static void dropAvcFrameState(void) {
         consecutiveFrameDrops = 0;
         
         // Request an IDR frame
-        connectionDetectedFrameLoss(0, 0);
+        waitingForIdrFrame = 1;
+        requestIdrOnDemand();
     }
     
 	cleanupAvcFrameState();
@@ -356,9 +355,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
 		// Unexpected start of next frame before terminating the last
 		waitingForNextSuccessfulFrame = 1;
-		waitingForIdrFrame = 1;
-
-		// Clear the old state and wait for an IDR
 		dropAvcFrameState();
 	}
 	// Look for a non-frame start before a frame start
@@ -390,7 +386,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 			Limelog("Network dropped an entire frame\n");
 			nextFrameNumber = frameIndex;
 
-			// Wait until an IDR frame comes
+			// Wait until next complete frame
 			waitingForNextSuccessfulFrame = 1;
 			dropAvcFrameState();
 		}
