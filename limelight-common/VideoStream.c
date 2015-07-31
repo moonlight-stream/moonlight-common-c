@@ -148,8 +148,6 @@ int readFirstFrame(void) {
 
 /* Terminate the video stream */
 void stopVideoStream(void) {
-    VideoCallbacks.cleanup();
-
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
@@ -170,6 +168,8 @@ void stopVideoStream(void) {
 	PltCloseThread(&udpPingThread);
 	PltCloseThread(&receiveThread);
 	PltCloseThread(&decoderThread);
+
+    VideoCallbacks.cleanup();
 }
 
 /* Start the video stream */

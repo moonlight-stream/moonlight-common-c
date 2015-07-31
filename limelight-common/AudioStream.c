@@ -189,8 +189,6 @@ static void DecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
-    AudioCallbacks.cleanup();
-
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
@@ -207,6 +205,8 @@ void stopAudioStream(void) {
 	PltCloseThread(&udpPingThread);
 	PltCloseThread(&receiveThread);
 	PltCloseThread(&decoderThread);
+
+    AudioCallbacks.cleanup();
 }
 
 int startAudioStream(void) {
