@@ -31,8 +31,6 @@ void initializeVideoStream(void) {
 
 /* Clean up the video stream */
 void destroyVideoStream(void) {
-	VideoCallbacks.cleanup();
-
 	destroyVideoDepacketizer();
 	RtpqCleanupQueue(&rtpQueue);
 }
@@ -150,6 +148,8 @@ int readFirstFrame(void) {
 
 /* Terminate the video stream */
 void stopVideoStream(void) {
+    VideoCallbacks.cleanup();
+
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);

@@ -49,8 +49,6 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 /* Tear down the audio stream once we're done with it */
 void destroyAudioStream(void) {
-	AudioCallbacks.cleanup();
-
 	freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
 	RtpqCleanupQueue(&rtpReorderQueue);
 }
@@ -191,6 +189,8 @@ static void DecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
+    AudioCallbacks.cleanup();
+
 	PltInterruptThread(&udpPingThread);
 	PltInterruptThread(&receiveThread);
 	PltInterruptThread(&decoderThread);
