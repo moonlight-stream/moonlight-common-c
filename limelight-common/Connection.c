@@ -4,6 +4,8 @@
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;
 static int alreadyTerminated;
+static PLT_THREAD terminationCallbackThread;
+static long terminationCallbackErrorCode;
 
 // Common globals
 struct sockaddr_storage RemoteAddr;
@@ -107,15 +109,39 @@ void LiStopConnection(void) {
 	LC_ASSERT(stage == STAGE_NONE);
 }
 
+static void terminationCallbackThreadFunc(void* context)
+{
+    // Invoke the client's termination callback
+    originalTerminationCallback(terminationCallbackErrorCode);
+}
+
+// This shim callback runs the client's connectionTerminated() callback on a
+// separate thread. This is neccessary because other internal threads directly
+// invoke this callback. That can result in a deadlock if the client
+// calls LiStopConnection() in the callback when the cleanup code
+// attempts to join the thread that the termination callback (and LiStopConnection)
+// is running on.
 static void ClInternalConnectionTerminated(long errorCode)
 {
+    int err;
+
     // Avoid recursion and issuing multiple callbacks
     if (alreadyTerminated) {
         return;
     }
-    
+
     alreadyTerminated = 1;
-    originalTerminationCallback(errorCode);
+
+    // Invoke the termination callback on a separate thread
+    err = PltCreateThread(terminationCallbackThreadFunc, NULL, &terminationCallbackThread);
+    if (err != 0) {
+        // Nothing we can safely do here, so we'll just assert on debug builds
+        Limelog("Failed to create termination thread: %d\n", err);
+        LC_ASSERT(err == 0);
+    }
+
+    // Close the thread handle since we can never wait on it
+    PltCloseThread(&terminationCallbackThread);
 }
 
 static int resolveHostName(const char *host)
