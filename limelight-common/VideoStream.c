@@ -129,8 +129,8 @@ static void DecoderThreadProc(void* context) {
 		freeQueuedDecodeUnit(qdu);
         
         if (ret == DR_NEED_IDR) {
-            Limelog("Request IDR frame on behalf of DR\n");
-            resyncOnDemand();
+            Limelog("Requesting IDR frame on behalf of DR\n");
+            requestIdrOnDemand();
         }
 	}
 }

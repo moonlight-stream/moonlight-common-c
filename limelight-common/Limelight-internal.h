@@ -26,7 +26,7 @@ int initializeControlStream(void);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
-void resyncOnDemand(void);
+void requestIdrOnDemand(void);
 void connectionSinkTooSlow(int startFrame, int endFrame);
 void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedFrame(int frameIndex);

@@ -12,27 +12,28 @@ typedef struct _NVCTL_PACKET_HEADER {
 
 static SOCKET ctlSock = INVALID_SOCKET;
 static PLT_THREAD lossStatsThread;
-static PLT_THREAD resyncThread;
-static PLT_EVENT resyncEvent;
+static PLT_THREAD invalidateRefFramesThread;
+static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport = 0;
 static long currentFrame = 0;
 
 #define IDX_START_A 0
+#define IDX_REQUEST_IDR_FRAME 0
 #define IDX_START_B 1
-#define IDX_RESYNC 2
+#define IDX_INVALIDATE_REF_FRAMES 2
 #define IDX_LOSS_STATS 3
 
 static const short packetTypesGen3[] = {
     0x140b, // Start A
     0x1410, // Start B
-    0x1404, // Resync
+    0x1404, // Invalidate reference frames
     0x140c, // Loss Stats
     0x1417, // Frame Stats (unused)
 };
 static const short packetTypesGen4[] = {
-    0x0606, // Start A
+    0x0606, // Request IDR frame
     0x0609, // Start B
-    0x0604, // Resync
+    0x0604, // Invalidate reference frames
     0x060a, // Loss Stats
     0x0611, // Frame Stats (unused)
 };
@@ -40,20 +41,20 @@ static const short packetTypesGen4[] = {
 static const char startAGen3[] = {0};
 static const int startBGen3[] = {0, 0, 0, 0xa};
 
-static const char startAGen4[] = {0, 0};
+static const char requestIdrFrameGen4[] = {0, 0};
 static const char startBGen4[] = {0};
 
 static const short payloadLengthsGen3[] = {
     sizeof(startAGen3), // Start A
     sizeof(startBGen3), // Start B
-    24, // Resync
+    24, // Invalidate reference frames
     32, // Loss Stats
     64, // Frame Stats
 };
 static const short payloadLengthsGen4[] = {
-    sizeof(startAGen4), // Start A
+    sizeof(requestIdrFrameGen4), // Request IDR frame
     sizeof(startBGen4), // Start B
-    24, // Resync
+    24, // Invalidate reference frames
     32, // Loss Stats
     64, // Frame Stats
 };
@@ -63,7 +64,7 @@ static const char* preconstructedPayloadsGen3[] = {
     (char*)startBGen3
 };
 static const char* preconstructedPayloadsGen4[] = {
-    startAGen4,
+    requestIdrFrameGen4,
     startBGen4
 };
 
@@ -75,7 +76,7 @@ static char **preconstructedPayloads;
 
 /* Initializes the control stream */
 int initializeControlStream(void) {
-	PltCreateEvent(&resyncEvent);
+	PltCreateEvent(&invalidateRefFramesEvent);
     
     if (ServerMajorVersion == 3) {
         packetTypes = (short*)packetTypesGen3;
@@ -93,25 +94,24 @@ int initializeControlStream(void) {
 
 /* Cleans up control stream */
 void destroyControlStream(void) {
-	PltCloseEvent(&resyncEvent);
+	PltCloseEvent(&invalidateRefFramesEvent);
 }
 
-/* Resync on demand by the decoder */
-void resyncOnDemand(void) {
-    // FIXME: Send ranges
-    PltSetEvent(&resyncEvent);
+/* Request an IDR frame on demand by the decoder */
+void requestIdrOnDemand(void) {
+    PltSetEvent(&invalidateRefFramesEvent);
 }
 
-/* Resync if the connection is too slow */
+/* Invalidate reference frames if the decoder is too slow */
 void connectionSinkTooSlow(int startFrame, int endFrame) {
 	// FIXME: Send ranges
-	PltSetEvent(&resyncEvent);
+	PltSetEvent(&invalidateRefFramesEvent);
 }
 
-/* Resync if we're losing frames */
+/* Invalidate reference frames lost by the network */
 void connectionDetectedFrameLoss(int startFrame, int endFrame) {
 	// FIXME: Send ranges
-	PltSetEvent(&resyncEvent);
+	PltSetEvent(&invalidateRefFramesEvent);
 }
 
 /* When we receive a frame, update the number of our current frame */
@@ -236,35 +236,51 @@ static void lossStatsThreadFunc(void* context) {
 	free(lossStatsPayload);
 }
 
-static void resyncThreadFunc(void* context) {
-	long long payload[3];
+static void requestIdrFrame(void) {
+    long long payload[3];
 
-	while (!PltIsThreadInterrupted(&resyncThread)) {
-		// Wait for a resync request
-		PltWaitForEvent(&resyncEvent);
+    if (ServerMajorVersion == 3) {
+        // Form the payload
+        payload[0] = 0;
+        payload[1] = 0xFFFFF;
+        payload[2] = 0;
 
-		// Form the payload
-		payload[0] = 0;
-		payload[1] = 0xFFFFF;
-		payload[2] = 0;
+        // Send the reference frame invalidation request and read the response
+        if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
+            payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
+            Limelog("Request IDR Frame: Transaction failed: %d\n", (int) LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketError());
+            return;
+        }
+    }
+    else {
+        // Send IDR frame request and read the response
+        if (!sendMessageAndDiscardReply(packetTypes[IDX_REQUEST_IDR_FRAME],
+            payloadLengths[IDX_REQUEST_IDR_FRAME], preconstructedPayloads[IDX_REQUEST_IDR_FRAME])) {
+            Limelog("Request IDR Frame: Transaction failed: %d\n", (int) LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketError());
+            return;
+        }
+    }
 
-		// Done capturing the parameters
-		PltClearEvent(&resyncEvent);
+    Limelog("IDR frame request sent\n");
+}
 
-		// Send the resync request and read the response
-		if (!sendMessageAndDiscardReply(packetTypes[IDX_RESYNC], payloadLengths[IDX_RESYNC], payload)) {
-			Limelog("Resync: Transaction failed: %d\n", (int)LastSocketError());
-			ListenerCallbacks.connectionTerminated(LastSocketError());
-			return;
-		}
-		Limelog("Resync complete\n");
-	}
+static void invalidateRefFramesFunc(void* context) {
+    while (!PltIsThreadInterrupted(&invalidateRefFramesThread)) {
+        // Wait for a request to invalidate reference frames
+        PltWaitForEvent(&invalidateRefFramesEvent);
+        PltClearEvent(&invalidateRefFramesEvent);
+
+        // Send an IDR frame request
+        requestIdrFrame();
+    }
 }
 
 /* Stops the control stream */
 int stopControlStream(void) {
 	PltInterruptThread(&lossStatsThread);
-	PltInterruptThread(&resyncThread);
+	PltInterruptThread(&invalidateRefFramesThread);
 
 	if (ctlSock != INVALID_SOCKET) {
 		closesocket(ctlSock);
@@ -272,10 +288,10 @@ int stopControlStream(void) {
 	}
 
 	PltJoinThread(&lossStatsThread);
-	PltJoinThread(&resyncThread);
+	PltJoinThread(&invalidateRefFramesThread);
 
 	PltCloseThread(&lossStatsThread);
-	PltCloseThread(&resyncThread);
+	PltCloseThread(&invalidateRefFramesThread);
 
 	return 0;
 }
@@ -312,7 +328,7 @@ int startControlStream(void) {
 		return err;
 	}
 
-	err = PltCreateThread(resyncThreadFunc, NULL, &resyncThread);
+	err = PltCreateThread(invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
 	if (err != 0) {
 		return err;
 	}
