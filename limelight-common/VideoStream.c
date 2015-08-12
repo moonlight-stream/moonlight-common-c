@@ -9,6 +9,8 @@
 #define RTP_PORT 47998
 #define FIRST_FRAME_PORT 47996
 
+#define RTP_RECV_BUFFER 64 * 1024
+
 static RTP_REORDER_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
@@ -187,7 +189,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 	VideoCallbacks.setup(StreamConfig.width,
 		StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
     
-	rtpSocket = bindUdpSocket(RemoteAddr.ss_family);
+	rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
 	if (rtpSocket == INVALID_SOCKET) {
 		return LastSocketError();
 	}

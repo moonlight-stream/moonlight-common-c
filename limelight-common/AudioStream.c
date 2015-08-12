@@ -18,6 +18,7 @@ static unsigned short lastSeq = 0;
 #define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 100
+#define RTP_RECV_BUFFER 12 * MAX_PACKET_SIZE
 
 typedef struct _QUEUED_AUDIO_PACKET {
 	// data must remain at the front
@@ -239,7 +240,7 @@ int startAudioStream(void) {
     
     AudioCallbacks.init();
 
-	rtpSocket = bindUdpSocket(RemoteAddr.ss_family);
+	rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
 	if (rtpSocket == INVALID_SOCKET) {
 		return LastSocketFail();
 	}
