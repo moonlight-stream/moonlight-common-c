@@ -202,6 +202,13 @@ int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY
 		// and get the lowest element
 		lowestEntry = validateQueueConstraints(queue);
 
+		// If the queue is now empty after validating queue constraints,
+		// this packet can be returned immediately
+		if (lowestEntry == NULL && queue->queueHead == NULL) {
+			queue->nextRtpSequenceNumber = packet->sequenceNumber + 1;
+			return RTPQ_RET_HANDLE_IMMEDIATELY;
+		}
+
 		// Queue has data inside, so we need to see where this packet fits
 		if (packet->sequenceNumber == queue->nextRtpSequenceNumber) {
 			// It fits in a hole where we need a packet, now we have some ready
