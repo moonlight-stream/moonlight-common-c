@@ -9,7 +9,7 @@
 #define RTP_PORT 47998
 #define FIRST_FRAME_PORT 47996
 
-#define RTP_RECV_BUFFER 64 * 1024
+#define RTP_RECV_BUFFER (64 * 1024)
 
 static RTP_REORDER_QUEUE rtpQueue;
 

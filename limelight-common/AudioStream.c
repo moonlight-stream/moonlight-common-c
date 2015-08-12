@@ -18,7 +18,11 @@ static unsigned short lastSeq;
 #define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 100
-#define RTP_RECV_BUFFER 12 * MAX_PACKET_SIZE
+
+// This is much larger than we should typically have buffered, but
+// it needs to be. We need a cushion in case our thread gets blocked
+// for longer than normal.
+#define RTP_RECV_BUFFER (64 * MAX_PACKET_SIZE)
 
 typedef struct _QUEUED_AUDIO_PACKET {
 	// data must remain at the front
