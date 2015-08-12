@@ -293,7 +293,6 @@ static void lossStatsThreadFunc(void* context) {
 static void requestIdrFrame(void) {
     long long payload[3];
 
-    Limelog("IDR frame requested\n");
     if (ServerMajorVersion == 3) {
         // Form the payload
         payload[0] = 0;
