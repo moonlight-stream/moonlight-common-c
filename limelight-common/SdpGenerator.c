@@ -167,10 +167,6 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 	err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
     
     // FIXME: Remote optimizations
-    if (StreamConfig.bitrate <= 13000) {
-        err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "9");
-        err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "9");
-    }
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
