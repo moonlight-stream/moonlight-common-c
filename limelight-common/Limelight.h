@@ -52,7 +52,15 @@ typedef struct _DECODE_UNIT {
 	PLENTRY bufferList;
 } DECODE_UNIT, *PDECODE_UNIT;
 
+// If set in the renderer capabilities field, this flag will cause audio/video data to
+// be submitted directly from the receive thread. This should only be specified if the
+// renderer is non-blocking. This flag is valid on both audio and video renderers.
 #define CAPABILITY_DIRECT_SUBMIT 0x1
+
+// !!! HIGHLY EXPERIMENTAL - DO NOT SET IN PRODUCTION CODE !!!
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// supports reference frame invalidation. This flag is only valid on video renderers.
+#define CAPABILITY_REFERENCE_FRAME_INVALIDATION 0x2
 
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder
 typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void* context, int drFlags);

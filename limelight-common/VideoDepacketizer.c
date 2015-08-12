@@ -14,6 +14,7 @@ static int waitingForIdrFrame;
 static int gotNextFrameStart;
 static int lastPacketInStream;
 static int decodingFrame;
+static int strictIdrFrameWait;
 
 #define CONSECUTIVE_DROP_LIMIT 120
 static int consecutiveFrameDrops;
@@ -42,6 +43,7 @@ void initializeVideoDepacketizer(int pktSize) {
 	gotNextFrameStart = 0;
 	lastPacketInStream = -1;
 	decodingFrame = 0;
+    strictIdrFrameWait = !(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
 }
 
 /* Free malloced memory in AvcFrameState*/
@@ -59,6 +61,11 @@ static void cleanupAvcFrameState(void) {
 
 /* Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
 static void dropAvcFrameState(void) {
+    // We'll need an IDR frame now if we're in strict mode
+    if (strictIdrFrameWait) {
+        waitingForIdrFrame = 1;
+    }
+
     // Count the number of consecutive frames dropped
     consecutiveFrameDrops++;
     

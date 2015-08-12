@@ -10,20 +10,20 @@ typedef struct _NVCTL_PACKET_HEADER {
 	unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
 
-typedef struct _QUEUED_LOSS_STAT {
+typedef struct _QUEUED_FRAME_INVALIDATION_TUPLE {
 	int startFrame;
 	int endFrame;
 	LINKED_BLOCKING_QUEUE_ENTRY entry;
-} QUEUED_LOSS_STAT, *PQUEUED_LOSS_STAT;
+} QUEUED_FRAME_INVALIDATION_TUPLE, *PQUEUED_FRAME_INVALIDATION_TUPLE;
 
 static SOCKET ctlSock = INVALID_SOCKET;
 static PLT_THREAD lossStatsThread;
 static PLT_THREAD invalidateRefFramesThread;
 static PLT_EVENT invalidateRefFramesEvent;
-static int lossCountSinceLastReport = 0;
-static long currentFrame = 0;
+static int lossCountSinceLastReport;
+static long currentFrame;
 
-static int requestIdr;
+static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 
 #define IDX_START_A 0
@@ -99,60 +99,73 @@ int initializeControlStream(void) {
         preconstructedPayloads = (char**)preconstructedPayloadsGen4;
     }
 
+    idrFrameRequired = 0;
+    currentFrame = 0;
+    lossCountSinceLastReport = 0;
+
 	return 0;
 }
 
-void freeLossStatList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
 
 	while (entry != NULL) {
 		nextEntry = entry->flink;
-
 		free(entry->data);
-
 		entry = nextEntry;
 	}
 }
 
 /* Cleans up control stream */
 void destroyControlStream(void) {
-	PltCloseEvent(&invalidateRefFramesEvent);
-	freeLossStatList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
+    PltCloseEvent(&invalidateRefFramesEvent);
+    freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
 }
 
-int getNextLossStat(PQUEUED_LOSS_STAT *qls) {
-	int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**) qls);
+int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE *qfit) {
+	int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**) qfit);
 	return (err == LBQ_SUCCESS);
 }
 
-void queueLossStat(int startFrame, int endFrame) {
-	PQUEUED_LOSS_STAT qls;
-	qls = malloc(sizeof(QUEUED_LOSS_STAT));
-	if (qls != NULL) {
-		qls->startFrame = startFrame;
-		qls->endFrame = endFrame;
-		if (LbqOfferQueueItem(&invalidReferenceFrameTuples, qls, &qls->entry) == LBQ_BOUND_EXCEEDED) {
-			free(qls);
-			requestIdr = 1;
-                }
-		PltSetEvent(&invalidateRefFramesEvent);
-	}
+void queueFrameInvalidationTuple(int startFrame, int endFrame) {
+
+    if (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION) {
+        PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
+        qfit = malloc(sizeof(*qfit));
+        if (qfit != NULL) {
+            qfit->startFrame = startFrame;
+            qfit->endFrame = endFrame;
+            if (LbqOfferQueueItem(&invalidReferenceFrameTuples, qfit, &qfit->entry) == LBQ_BOUND_EXCEEDED) {
+                // Too many invalidation tuples, so we need an IDR frame now
+                free(qfit);
+                idrFrameRequired = 1;
+            }
+        }
+        else {
+            idrFrameRequired = 1;
+        }
+    }
+    else {
+        idrFrameRequired = 1;
+    }
+
+    PltSetEvent(&invalidateRefFramesEvent);
 }
 
 /* Request an IDR frame on demand by the decoder */
 void requestIdrOnDemand(void) {
-    requestIdr = 1;
+    idrFrameRequired = 1;
     PltSetEvent(&invalidateRefFramesEvent);
 }
 
 /* Invalidate reference frames if the decoder is too slow */
 void connectionSinkTooSlow(int startFrame, int endFrame) {
-	queueLossStat(startFrame, endFrame);
+    queueFrameInvalidationTuple(startFrame, endFrame);
 }
 
 /* Invalidate reference frames lost by the network */
 void connectionDetectedFrameLoss(int startFrame, int endFrame) {
-	queueLossStat(startFrame, endFrame);
+    queueFrameInvalidationTuple(startFrame, endFrame);
 }
 
 /* When we receive a frame, update the number of our current frame */
@@ -308,33 +321,39 @@ static void requestIdrFrame(void) {
     Limelog("IDR frame request sent\n");
 }
 
-static void requestInvalidateRefFrames(void) {
-	long long payload[3];
-	PQUEUED_LOSS_STAT qls;
-	if (!getNextLossStat(&qls)) {
-		return;
-	}
+static void requestInvalidateReferenceFrames(void) {
+    long long payload[3];
+    PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
 
-	payload[0] = qls->startFrame + 1;
+    LC_ASSERT(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
 
-	// Aggregate all lost frames into one range
-	while (getNextLossStat(&qls));
+    if (!getNextFrameInvalidationTuple(&qfit)) {
+        return;
+    }
 
-	// The server expects this to be the firstLostFrame + 1
-	payload[1] = qls->endFrame;
-	payload[2] = 0;
+    LC_ASSERT(qfit->startFrame <= qfit->endFrame);
 
-	free(qls);
+    // The server expects this to be the firstLostFrame + 1
+    payload[0] = qfit->startFrame + 1;
+    payload[1] = qfit->endFrame;
+    payload[2] = 0;
 
-	// Send the reference frame invalidation request and read the response
-	if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
-		payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
-		Limelog("Request Invaldiate Reference Frames: Transaction failed: %d\n", (int) LastSocketError());
-		ListenerCallbacks.connectionTerminated(LastSocketError());
-		return;
-        }
+    // Aggregate all lost frames into one range
+    do {
+        LC_ASSERT(qfit->endFrame >= payload[1]);
+        payload[1] = qfit->endFrame;
+        free(qfit);
+    } while (getNextFrameInvalidationTuple(&qfit));
 
-        Limelog("Invalidate Reference Frame request sent\n");
+    // Send the reference frame invalidation request and read the response
+    if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
+        payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
+        Limelog("Request Invaldiate Reference Frames: Transaction failed: %d\n", (int) LastSocketError());
+        ListenerCallbacks.connectionTerminated(LastSocketError());
+        return;
+    }
+
+    Limelog("Invalidate reference frame request sent\n");
 }
 
 static void invalidateRefFramesFunc(void* context) {
@@ -343,17 +362,20 @@ static void invalidateRefFramesFunc(void* context) {
         PltWaitForEvent(&invalidateRefFramesEvent);
         PltClearEvent(&invalidateRefFramesEvent);
 
-        if (requestIdr) {
-            // Send an IDR frame request
-            requestIdrFrame();
-            requestIdr = 0;
+        // Sometimes we absolutely need an IDR frame
+        if (idrFrameRequired) {
+            // Empty invalidate reference frames tuples
+            PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
+            while (getNextFrameInvalidationTuple(&qfit)) {
+                free(qfit);
+            }
 
-            //Empty invalidate reference frames tuples
-            PQUEUED_LOSS_STAT qls;
-            while (getNextLossStat(&qls));
-            free(qls);
+            // Send an IDR frame request
+            idrFrameRequired = 0;
+            requestIdrFrame();
         } else {
-            requestInvalidateRefFrames();
+            // Otherwise invalidate reference frames
+            requestInvalidateReferenceFrames();
         }
     }
 }
