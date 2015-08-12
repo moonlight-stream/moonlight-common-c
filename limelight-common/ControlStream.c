@@ -333,8 +333,7 @@ static void requestInvalidateReferenceFrames(void) {
 
     LC_ASSERT(qfit->startFrame <= qfit->endFrame);
 
-    // The server expects this to be the firstLostFrame + 1
-    payload[0] = qfit->startFrame + 1;
+    payload[0] = qfit->startFrame;
     payload[1] = qfit->endFrame;
     payload[2] = 0;
 

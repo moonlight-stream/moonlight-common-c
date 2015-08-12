@@ -37,7 +37,7 @@ void initializeVideoDepacketizer(int pktSize) {
 
 	nextFrameNumber = 1;
 	nextPacketNumber = 0;
-	startFrameNumber = 1;
+	startFrameNumber = 0;
 	waitingForNextSuccessfulFrame = 0;
 	waitingForIdrFrame = 1;
 	gotNextFrameStart = 0;
