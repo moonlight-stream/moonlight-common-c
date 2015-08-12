@@ -191,7 +191,6 @@ static void ReceiveThreadProc(void* context) {
 }
 
 static void DecoderThreadProc(void* context) {
-	PRTP_PACKET rtp;
 	int err;
 	PQUEUED_AUDIO_PACKET packet;
 

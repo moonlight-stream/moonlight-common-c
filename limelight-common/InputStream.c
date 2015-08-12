@@ -259,7 +259,7 @@ static void inputSendThreadProc(void* context) {
 
 		// Send the encrypted payload
 		err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
-			encryptedSize + sizeof(encryptedLengthPrefix), 0);
+			(int)(encryptedSize + sizeof(encryptedLengthPrefix)), 0);
 		if (err <= 0) {
 			Limelog("Input: send() failed: %d\n", (int)LastSocketError());
 			ListenerCallbacks.connectionTerminated(LastSocketError());

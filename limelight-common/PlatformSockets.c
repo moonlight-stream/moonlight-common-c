@@ -24,7 +24,9 @@ void addrToUrlSafeString(struct sockaddr_storage *addr, char* string)
 SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 	SOCKET s;
     struct sockaddr_storage addr;
+#ifdef LC_DARWIN
 	int val;
+#endif
 	int err;
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
