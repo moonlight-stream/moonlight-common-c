@@ -13,7 +13,7 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
-static unsigned short lastSeq = 0;
+static unsigned short lastSeq;
 
 #define RTP_PORT 48000
 
@@ -37,6 +37,7 @@ void initializeAudioStream(void) {
 		LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 	}
 	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFUALT_QUEUE_TIME);
+    lastSeq = 0;
 }
 
 static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
