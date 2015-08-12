@@ -3,7 +3,7 @@
 #include "Video.h"
 
 #define RTPQ_DEFAULT_MAX_SIZE   16
-#define RTPQ_DEFUALT_QUEUE_TIME 40
+#define RTPQ_DEFAULT_QUEUE_TIME 40
 
 typedef struct _RTP_QUEUE_ENTRY {
 	PRTP_PACKET packet;

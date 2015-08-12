@@ -36,7 +36,7 @@ void initializeAudioStream(void) {
 	if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
 		LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 	}
-	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFUALT_QUEUE_TIME);
+	RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
 }
 
