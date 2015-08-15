@@ -32,6 +32,9 @@ typedef struct _STREAM_CONFIGURATION {
 	char remoteInputAesIv[16];
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
+// Use this function to zero the stream configuration when allocated on the stack or heap
+void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
+
 typedef struct _LENTRY {
 	// Pointer to the next entry or NULL if this is the last entry
 	struct _LENTRY *next;
@@ -82,6 +85,9 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 	int capabilities;
 } DECODER_RENDERER_CALLBACKS, *PDECODER_RENDERER_CALLBACKS;
 
+// Use this function to zero the video callbacks when allocated on the stack or heap
+void LiInitializeVideoCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks);
+
 // This callback initializes the audio renderer
 typedef void(*AudioRendererInit)(void);
 
@@ -97,6 +103,9 @@ typedef struct _AUDIO_RENDERER_CALLBACKS {
 	AudioRendererDecodeAndPlaySample decodeAndPlaySample;
 	int capabilities;
 } AUDIO_RENDERER_CALLBACKS, *PAUDIO_RENDERER_CALLBACKS;
+
+// Use this function to zero the audio callbacks when allocated on the stack or heap
+void LiInitializeAudioCallbacks(PAUDIO_RENDERER_CALLBACKS arCallbacks);
 
 // Subject to change in future releases
 // Use LiGetStageName() for stable stage names
@@ -146,6 +155,9 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 	ConnListenerDisplayMessage displayMessage;
 	ConnListenerDisplayTransientMessage displayTransientMessage;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
+
+// Use this function to zero the connection callbacks when allocated on the stack or heap
+void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 
 // This function begins streaming.
 //
