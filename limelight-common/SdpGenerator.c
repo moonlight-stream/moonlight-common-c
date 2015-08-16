@@ -133,16 +133,17 @@ static int addGen3Options(PSDP_OPTION *head, char* addrStr) {
 static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
+    unsigned char slicesPerFrame;
     
     sprintf(payloadStr, "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
     
     err |= addAttributeString(head, "x-nv-video[0].rateControlMode", "4");
     
-	if (VideoCallbacks.capabilities & CAPABILITY_SLICING) {
-		// Use slicing for increased performance on some decoders
-		err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", "4");
-	}
+    // Use slicing for increased performance on some decoders
+    slicesPerFrame = (unsigned char) (VideoCallbacks.capabilities >> 24);
+    sprintf(payloadStr, "%d", slicesPerFrame);
+    err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
     
     return err;
 }
