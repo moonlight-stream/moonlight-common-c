@@ -165,11 +165,11 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
-    
-	if (StreamConfig.remote) {
-		err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
-        	err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
-    	}
+
+    if (StreamConfig.streamingRemotely) {
+        err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
+        err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
+    }
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
@@ -214,7 +214,7 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
     
-    if (StreamConfig.remote) {
+    if (StreamConfig.streamingRemotely) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "0");
         err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "0");
     } else {
