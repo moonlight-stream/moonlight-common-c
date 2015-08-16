@@ -62,6 +62,10 @@ typedef struct _DECODE_UNIT {
 // supports reference frame invalidation. This flag is only valid on video renderers.
 #define CAPABILITY_REFERENCE_FRAME_INVALIDATION 0x2
 
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// supports slicing to increase decoding performance. This flag is only valid on video renderers.
+#define CAPABILITY_SLICING 0x4
+
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder
 typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void* context, int drFlags);
 
