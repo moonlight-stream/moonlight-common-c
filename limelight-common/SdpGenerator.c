@@ -142,6 +142,10 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     
     // Use slicing for increased performance on some decoders
     slicesPerFrame = (unsigned char) (VideoCallbacks.capabilities >> 24);
+    if (slicesPerFrame == 0) {
+        // If not using slicing, we request 1 slice per frame
+        slicesPerFrame = 1;
+    }
     sprintf(payloadStr, "%d", slicesPerFrame);
     err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
     
