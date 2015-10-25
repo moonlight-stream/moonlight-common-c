@@ -1,7 +1,7 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 
-#define RTSP_MAX_RESP_SIZE 16384
+#define RTSP_MAX_RESP_SIZE 32768
 
 static SOCKET sock = INVALID_SOCKET;
 static int currentSeqNumber;
