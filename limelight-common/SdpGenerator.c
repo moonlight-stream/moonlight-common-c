@@ -5,6 +5,12 @@
 #define MAX_SDP_HEADER_LEN 128
 #define MAX_SDP_TAIL_LEN 128
 
+#define CHANNEL_COUNT_STEREO 2
+#define CHANNEL_COUNT_51_SURROUND 6
+
+#define CHANNEL_MASK_STEREO 0x3
+#define CHANNEL_MASK_51_SURROUND 0xFC
+
 typedef struct _SDP_OPTION {
 	char name[MAX_OPTION_NAME_LEN+1];
 	void* payload;
@@ -134,6 +140,8 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
     unsigned char slicesPerFrame;
+    int audioChannelCount;
+    int audioChannelMask;
     
     sprintf(payloadStr, "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
@@ -148,6 +156,26 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     }
     sprintf(payloadStr, "%d", slicesPerFrame);
     err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
+
+    if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
+        audioChannelCount = CHANNEL_COUNT_51_SURROUND;
+        audioChannelMask = CHANNEL_MASK_51_SURROUND;
+    }
+    else {
+        audioChannelCount = CHANNEL_COUNT_STEREO;
+        audioChannelMask = CHANNEL_MASK_STEREO;
+    }
+
+    sprintf(payloadStr, "%d", audioChannelCount);
+    err |= addAttributeString(head, "x-nv-audio.surround.numChannels", payloadStr);
+    sprintf(payloadStr, "%d", audioChannelMask);
+    err |= addAttributeString(head, "x-nv-audio.surround.channelMask", payloadStr);
+    if (audioChannelCount > 2) {
+        err |= addAttributeString(head, "x-nv-audio.surround.enable", "1");
+    }
+    else {
+        err |= addAttributeString(head, "x-nv-audio.surround.enable", "0");
+    }
     
     return err;
 }

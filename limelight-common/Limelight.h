@@ -29,6 +29,10 @@ typedef struct _STREAM_CONFIGURATION {
     // streaming optimizations. If unsure, set to 0.
     int streamingRemotely;
 
+    // Specifies the channel configuration of the audio stream.
+    // See AUDIO_CONFIGURATION_XXX constants below.
+    int audioConfiguration;
+
 	// AES encryption data for the remote input stream. This must be
 	// the same as what was passed as rikey and rikeyid 
 	// in /launch and /resume requests.
@@ -58,6 +62,12 @@ typedef struct _DECODE_UNIT {
 	// Head of the buffer chain (never NULL)
 	PLENTRY bufferList;
 } DECODE_UNIT, *PDECODE_UNIT;
+
+// Specifies that the audio stream should be encoded in stereo (default)
+#define AUDIO_CONFIGURATION_STEREO 0
+
+// Specifies that the audio stream should be in 5.1 surround sound if the PC is able
+#define AUDIO_CONFIGURATION_51_SURROUND 1
 
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the
@@ -97,8 +107,21 @@ typedef struct _DECODER_RENDERER_CALLBACKS {
 // Use this function to zero the video callbacks when allocated on the stack or heap
 void LiInitializeVideoCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks);
 
-// This callback initializes the audio renderer
-typedef void(*AudioRendererInit)(void);
+// This structure provides the Opus multistream decoder parameters required to successfully
+// decode the audio stream being sent from the computer. See opus_multistream_decoder_init docs
+// for details about these fields.
+typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
+    int sampleRate;
+    int channelCount;
+    int streams;
+    int coupledStreams;
+    const unsigned char mapping[6];
+} OPUS_MULTISTREAM_CONFIGURATION, *POPUS_MULTISTREAM_CONFIGURATION;
+
+// This callback initializes the audio renderer. The audio configuration parameter
+// provides the negotiated audio configuration. This may differ from the one
+// specified in the stream configuration.
+typedef void(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig);
 
 // This callback performs the final teardown of the audio decoder
 typedef void(*AudioRendererCleanup)(void);

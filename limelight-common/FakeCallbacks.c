@@ -10,7 +10,7 @@ static DECODER_RENDERER_CALLBACKS fakeDrCallbacks = {
 	.submitDecodeUnit = fakeDrSubmitDecodeUnit,
 };
 
-static void fakeArInit(void) {}
+static void fakeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig) {}
 static void fakeArCleanup(void) {}
 static void fakeArDecodeAndPlaySample(char* sampleData, int sampleLength) {}
 
