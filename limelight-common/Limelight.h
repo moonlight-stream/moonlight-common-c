@@ -110,6 +110,17 @@ void LiInitializeVideoCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks);
 // This structure provides the Opus multistream decoder parameters required to successfully
 // decode the audio stream being sent from the computer. See opus_multistream_decoder_init docs
 // for details about these fields.
+//
+// The supplied mapping array is indexed according to the following output channel order:
+// 0 - Front Left
+// 1 - Front Right
+// 2 - Center
+// 3 - LFE
+// 4 - Surround Left
+// 5 - Surround Right
+//
+// If the mapping order does not match the channel order of the audio renderer, you may swap
+// the values in the mismatched indices until the mapping array matches the desired channel order.
 typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
     int sampleRate;
     int channelCount;
