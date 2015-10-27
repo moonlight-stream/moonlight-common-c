@@ -208,37 +208,12 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 
 	err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
 	err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
-    
-    // Lock the bitrate since we're not scaling resolution so the picture doesn't get too bad
-    if (StreamConfig.height >= 1080 && StreamConfig.fps >= 60) {
-        if (StreamConfig.bitrate < 10000) {
-            sprintf(payloadStr, "%d", StreamConfig.bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
-        }
-        else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "10000");
-        }
-    }
-    else if (StreamConfig.height >= 1080 || StreamConfig.fps >= 60) {
-        if (StreamConfig.bitrate < 7000) {
-            sprintf(payloadStr, "%d", StreamConfig.bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
-        }
-        else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "7000");
-        }
-    }
-    else {
-        if (StreamConfig.bitrate < 3000) {
-            sprintf(payloadStr, "%d", StreamConfig.bitrate);
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
-        }
-        else {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", "3000");
-        }
-    }
 
+    // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
+    // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
+    // to the requested value.
 	sprintf(payloadStr, "%d", StreamConfig.bitrate);
+    err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
 	err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
 
     // Using FEC turns padding on which makes us have to take the slow path
