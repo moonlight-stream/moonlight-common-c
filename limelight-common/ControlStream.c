@@ -6,14 +6,14 @@
 
 /* NV control stream packet header */
 typedef struct _NVCTL_PACKET_HEADER {
-	unsigned short type;
-	unsigned short payloadLength;
+    unsigned short type;
+    unsigned short payloadLength;
 } NVCTL_PACKET_HEADER, *PNVCTL_PACKET_HEADER;
 
 typedef struct _QUEUED_FRAME_INVALIDATION_TUPLE {
-	int startFrame;
-	int endFrame;
-	LINKED_BLOCKING_QUEUE_ENTRY entry;
+    int startFrame;
+    int endFrame;
+    LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_FRAME_INVALIDATION_TUPLE, *PQUEUED_FRAME_INVALIDATION_TUPLE;
 
 static SOCKET ctlSock = INVALID_SOCKET;
@@ -85,8 +85,8 @@ static char **preconstructedPayloads;
 
 /* Initializes the control stream */
 int initializeControlStream(void) {
-	PltCreateEvent(&invalidateRefFramesEvent);
-	LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
+    PltCreateEvent(&invalidateRefFramesEvent);
+    LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
     
     if (ServerMajorVersion == 3) {
         packetTypes = (short*)packetTypesGen3;
@@ -103,17 +103,17 @@ int initializeControlStream(void) {
     currentFrame = 0;
     lossCountSinceLastReport = 0;
 
-	return 0;
+    return 0;
 }
 
 void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
-	PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
+    PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
 
-	while (entry != NULL) {
-		nextEntry = entry->flink;
-		free(entry->data);
-		entry = nextEntry;
-	}
+    while (entry != NULL) {
+        nextEntry = entry->flink;
+        free(entry->data);
+        entry = nextEntry;
+    }
 }
 
 /* Cleans up control stream */
@@ -123,8 +123,8 @@ void destroyControlStream(void) {
 }
 
 int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE *qfit) {
-	int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**) qfit);
-	return (err == LBQ_SUCCESS);
+    int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**) qfit);
+    return (err == LBQ_SUCCESS);
 }
 
 void queueFrameInvalidationTuple(int startFrame, int endFrame) {
@@ -170,63 +170,63 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame) {
 
 /* When we receive a frame, update the number of our current frame */
 void connectionReceivedFrame(int frameIndex) {
-	currentFrame = frameIndex;
+    currentFrame = frameIndex;
 }
 
 /* When we lose packets, update our packet loss count */
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket) {
-	lossCountSinceLastReport += (nextReceivedPacket - lastReceivedPacket) - 1;
+    lossCountSinceLastReport += (nextReceivedPacket - lastReceivedPacket) - 1;
 }
 
 /* Reads an NV control stream packet */
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
-	NVCTL_PACKET_HEADER staticHeader;
-	PNVCTL_PACKET_HEADER fullPacket;
-	SOCK_RET err;
+    NVCTL_PACKET_HEADER staticHeader;
+    PNVCTL_PACKET_HEADER fullPacket;
+    SOCK_RET err;
 
-	err = recv(ctlSock, (char*) &staticHeader, sizeof(staticHeader), 0);
-	if (err != sizeof(staticHeader)) {
-		return NULL;
-	}
+    err = recv(ctlSock, (char*) &staticHeader, sizeof(staticHeader), 0);
+    if (err != sizeof(staticHeader)) {
+        return NULL;
+    }
 
-	fullPacket = (PNVCTL_PACKET_HEADER) malloc(staticHeader.payloadLength + sizeof(staticHeader));
-	if (fullPacket == NULL) {
-		return NULL;
-	}
+    fullPacket = (PNVCTL_PACKET_HEADER) malloc(staticHeader.payloadLength + sizeof(staticHeader));
+    if (fullPacket == NULL) {
+        return NULL;
+    }
 
-	memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
-	if (staticHeader.payloadLength != 0) {
-		err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
-		if (err != staticHeader.payloadLength) {
-			free(fullPacket);
-			return NULL;
-		}
-	}
+    memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
+    if (staticHeader.payloadLength != 0) {
+        err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
+        if (err != staticHeader.payloadLength) {
+            free(fullPacket);
+            return NULL;
+        }
+    }
 
-	return fullPacket;
+    return fullPacket;
 }
 
 static int sendMessageAndForget(short ptype, short paylen, const void* payload) {
-	PNVCTL_PACKET_HEADER packet;
-	SOCK_RET err;
+    PNVCTL_PACKET_HEADER packet;
+    SOCK_RET err;
 
-	packet = malloc(sizeof(*packet) + paylen);
-	if (packet == NULL) {
-		return 0;
-	}
+    packet = malloc(sizeof(*packet) + paylen);
+    if (packet == NULL) {
+        return 0;
+    }
 
-	packet->type = ptype;
-	packet->payloadLength = paylen;
-	memcpy(&packet[1], payload, paylen);
+    packet->type = ptype;
+    packet->payloadLength = paylen;
+    memcpy(&packet[1], payload, paylen);
 
-	err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
-	free(packet);
+    err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
+    free(packet);
 
-	if (err != sizeof(*packet) + paylen) {
-		return 0;
-	}
+    if (err != sizeof(*packet) + paylen) {
+        return 0;
+    }
 
-	return 1;
+    return 1;
 }
 
 static PNVCTL_PACKET_HEADER sendMessage(short ptype, short paylen, const void* payload) {
@@ -234,7 +234,7 @@ static PNVCTL_PACKET_HEADER sendMessage(short ptype, short paylen, const void* p
         return NULL;
     }
 
-	return readNvctlPacket();
+    return readNvctlPacket();
 }
 
 static int sendMessageAndDiscardReply(short ptype, short paylen, const void* payload) {
@@ -250,44 +250,44 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
 }
 
 static void lossStatsThreadFunc(void* context) {
-	char *lossStatsPayload;
-	BYTE_BUFFER byteBuffer;
+    char *lossStatsPayload;
+    BYTE_BUFFER byteBuffer;
 
-	lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
-	if (lossStatsPayload == NULL) {
-		Limelog("Loss Stats: malloc() failed\n");
-		ListenerCallbacks.connectionTerminated(-1);
-		return;
-	}
+    lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
+    if (lossStatsPayload == NULL) {
+        Limelog("Loss Stats: malloc() failed\n");
+        ListenerCallbacks.connectionTerminated(-1);
+        return;
+    }
 
-	while (!PltIsThreadInterrupted(&lossStatsThread)) {
-		// Construct the payload
-		BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
-		BbPutInt(&byteBuffer, lossCountSinceLastReport);
-		BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
-		BbPutInt(&byteBuffer, 1000);
-		BbPutLong(&byteBuffer, currentFrame);
-		BbPutInt(&byteBuffer, 0);
-		BbPutInt(&byteBuffer, 0);
-		BbPutInt(&byteBuffer, 0x14);
+    while (!PltIsThreadInterrupted(&lossStatsThread)) {
+        // Construct the payload
+        BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
+        BbPutInt(&byteBuffer, lossCountSinceLastReport);
+        BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
+        BbPutInt(&byteBuffer, 1000);
+        BbPutLong(&byteBuffer, currentFrame);
+        BbPutInt(&byteBuffer, 0);
+        BbPutInt(&byteBuffer, 0);
+        BbPutInt(&byteBuffer, 0x14);
 
-		// Send the message (and don't expect a response)
-		if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
-			payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
-			free(lossStatsPayload);
-			Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
+        // Send the message (and don't expect a response)
+        if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
+            payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
+            free(lossStatsPayload);
+            Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
-			return;
-		}
+            return;
+        }
 
-		// Clear the transient state
-		lossCountSinceLastReport = 0;
+        // Clear the transient state
+        lossCountSinceLastReport = 0;
 
-		// Wait a bit
-		PltSleepMs(LOSS_REPORT_INTERVAL_MS);
-	}
+        // Wait a bit
+        PltSleepMs(LOSS_REPORT_INTERVAL_MS);
+    }
 
-	free(lossStatsPayload);
+    free(lossStatsPayload);
 }
 
 static void requestIdrFrame(void) {
@@ -380,43 +380,43 @@ static void invalidateRefFramesFunc(void* context) {
 
 /* Stops the control stream */
 int stopControlStream(void) {
-	PltInterruptThread(&lossStatsThread);
-	PltInterruptThread(&invalidateRefFramesThread);
+    PltInterruptThread(&lossStatsThread);
+    PltInterruptThread(&invalidateRefFramesThread);
 
-	if (ctlSock != INVALID_SOCKET) {
-		closesocket(ctlSock);
-		ctlSock = INVALID_SOCKET;
-	}
+    if (ctlSock != INVALID_SOCKET) {
+        closesocket(ctlSock);
+        ctlSock = INVALID_SOCKET;
+    }
 
-	PltJoinThread(&lossStatsThread);
-	PltJoinThread(&invalidateRefFramesThread);
+    PltJoinThread(&lossStatsThread);
+    PltJoinThread(&invalidateRefFramesThread);
 
-	PltCloseThread(&lossStatsThread);
-	PltCloseThread(&invalidateRefFramesThread);
+    PltCloseThread(&lossStatsThread);
+    PltCloseThread(&invalidateRefFramesThread);
 
-	return 0;
+    return 0;
 }
 
 /* Starts the control stream */
 int startControlStream(void) {
-	int err;
+    int err;
 
-	ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 47995);
-	if (ctlSock == INVALID_SOCKET) {
-		return LastSocketFail();
-	}
+    ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 47995);
+    if (ctlSock == INVALID_SOCKET) {
+        return LastSocketFail();
+    }
 
-	enableNoDelay(ctlSock);
+    enableNoDelay(ctlSock);
 
-	// Send START A
-	if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
+    // Send START A
+    if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
                                     payloadLengths[IDX_START_A],
                                     preconstructedPayloads[IDX_START_A])) {
         Limelog("Start A failed: %d\n", (int)LastSocketError());
         return LastSocketFail();
     }
 
-	// Send START B
+    // Send START B
     if (!sendMessageAndDiscardReply(packetTypes[IDX_START_B],
                                     payloadLengths[IDX_START_B],
                                     preconstructedPayloads[IDX_START_B])) {
@@ -424,15 +424,15 @@ int startControlStream(void) {
         return LastSocketFail();
     }
 
-	err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
-	if (err != 0) {
-		return err;
-	}
+    err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
+    if (err != 0) {
+        return err;
+    }
 
-	err = PltCreateThread(invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
-	if (err != 0) {
-		return err;
-	}
+    err = PltCreateThread(invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
+    if (err != 0) {
+        return err;
+    }
 
-	return 0;
+    return 0;
 }

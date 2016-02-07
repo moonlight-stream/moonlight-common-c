@@ -3,8 +3,8 @@
 #include "LinkedBlockingQueue.h"
 
 typedef struct _QUEUED_DECODE_UNIT {
-	DECODE_UNIT decodeUnit;
-	LINKED_BLOCKING_QUEUE_ENTRY entry;
+    DECODE_UNIT decodeUnit;
+    LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_DECODE_UNIT, *PQUEUED_DECODE_UNIT;
 
 void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu);
@@ -17,11 +17,11 @@ int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu);
 #define FLAG_SOF 0x4
 
 typedef struct _NV_VIDEO_PACKET {
-	int streamPacketIndex;
-	int frameIndex;
-	char flags;
-	char reserved[3];
-	int reserved2;
+    int streamPacketIndex;
+    int frameIndex;
+    char flags;
+    char reserved[3];
+    int reserved2;
 } NV_VIDEO_PACKET, *PNV_VIDEO_PACKET;
 
 #define FLAG_EXTENSION 0x10
@@ -30,10 +30,10 @@ typedef struct _NV_VIDEO_PACKET {
 #define MAX_RTP_HEADER_SIZE 16
 
 typedef struct _RTP_PACKET {
-	char header;
-	char packetType;
-	unsigned short sequenceNumber;
-	char reserved[8];
+    char header;
+    char packetType;
+    unsigned short sequenceNumber;
+    char reserved[8];
 } RTP_PACKET, *PRTP_PACKET;
 
 #pragma pack(pop)

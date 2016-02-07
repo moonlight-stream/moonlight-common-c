@@ -6,26 +6,26 @@
 #define RTPQ_DEFAULT_QUEUE_TIME 40
 
 typedef struct _RTP_QUEUE_ENTRY {
-	PRTP_PACKET packet;
+    PRTP_PACKET packet;
 
-	uint64_t queueTimeMs;
+    uint64_t queueTimeMs;
 
-	struct _RTP_QUEUE_ENTRY *next;
-	struct _RTP_QUEUE_ENTRY *prev;
+    struct _RTP_QUEUE_ENTRY *next;
+    struct _RTP_QUEUE_ENTRY *prev;
 } RTP_QUEUE_ENTRY, *PRTP_QUEUE_ENTRY;
 
 typedef struct _RTP_REORDER_QUEUE {
-	int maxSize;
-	int maxQueueTimeMs;
+    int maxSize;
+    int maxQueueTimeMs;
 
-	PRTP_QUEUE_ENTRY queueHead;
-	PRTP_QUEUE_ENTRY queueTail;
-	int queueSize;
+    PRTP_QUEUE_ENTRY queueHead;
+    PRTP_QUEUE_ENTRY queueTail;
+    int queueSize;
 
-	unsigned short nextRtpSequenceNumber;
+    unsigned short nextRtpSequenceNumber;
 
-	uint64_t oldestQueuedTimeMs;
-	PRTP_QUEUE_ENTRY oldestQueuedEntry;
+    uint64_t oldestQueuedTimeMs;
+    PRTP_QUEUE_ENTRY oldestQueuedEntry;
 } RTP_REORDER_QUEUE, *PRTP_REORDER_QUEUE;
 
 #define RTPQ_RET_HANDLE_IMMEDIATELY   0

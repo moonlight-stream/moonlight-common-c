@@ -20,10 +20,10 @@
 
 /* Linked List to store the options */
 typedef struct _OPTION_ITEM {
-	char flags;
-	char *option;
-	char *content;
-	struct _OPTION_ITEM *next;
+    char flags;
+    char *option;
+    char *content;
+    struct _OPTION_ITEM *next;
 } OPTION_ITEM, *POPTION_ITEM;
 
 /* RTSP Message *
@@ -31,28 +31,28 @@ typedef struct _OPTION_ITEM {
 * TYPE_REQUEST = 0
 * TYPE_RESPONSE = 1 */
 typedef struct _RTSP_MESSAGE {
-	char type;
-	char flags;
-	int sequenceNumber;
-	char *protocol;
-	POPTION_ITEM options;
-	char *payload;
-	int payloadLength;
+    char type;
+    char flags;
+    int sequenceNumber;
+    char *protocol;
+    POPTION_ITEM options;
+    char *payload;
+    int payloadLength;
 
-	char* messageBuffer;
+    char* messageBuffer;
 
-	union {
-		struct {
-			/* Request fields */
-			char *command;
-			char *target;
-		} request;
-		struct {
-			/* Response fields */
-			char *statusString;
-			int statusCode;
-		} response;
-	} message;
+    union {
+        struct {
+            /* Request fields */
+            char *command;
+            char *target;
+        } request;
+        struct {
+            /* Response fields */
+            char *statusString;
+            int statusCode;
+        } response;
+    } message;
 } RTSP_MESSAGE, *PRTSP_MESSAGE;
 
 int parseRtspMessage(PRTSP_MESSAGE msg, char *rtspMessage, int length);

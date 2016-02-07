@@ -27,114 +27,114 @@ static PLT_THREAD decoderThread;
 
 /* Initialize the video stream */
 void initializeVideoStream(void) {
-	initializeVideoDepacketizer(StreamConfig.packetSize);
-	RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
+    initializeVideoDepacketizer(StreamConfig.packetSize);
+    RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
 }
 
 /* Clean up the video stream */
 void destroyVideoStream(void) {
-	destroyVideoDepacketizer();
-	RtpqCleanupQueue(&rtpQueue);
+    destroyVideoDepacketizer();
+    RtpqCleanupQueue(&rtpQueue);
 }
 
 /* UDP Ping proc */
 static void UdpPingThreadProc(void *context) {
-	char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
-	struct sockaddr_in6 saddr;
-	SOCK_RET err;
+    char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
+    struct sockaddr_in6 saddr;
+    SOCK_RET err;
 
-	memcpy(&saddr, &RemoteAddr, sizeof(saddr));
-	saddr.sin6_port = htons(RTP_PORT);
+    memcpy(&saddr, &RemoteAddr, sizeof(saddr));
+    saddr.sin6_port = htons(RTP_PORT);
 
-	while (!PltIsThreadInterrupted(&udpPingThread)) {
-		err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
-		if (err != sizeof(pingData)) {
-			Limelog("Video Ping: send() failed: %d\n", (int)LastSocketError());
-			ListenerCallbacks.connectionTerminated(LastSocketError());
-			return;
-		}
+    while (!PltIsThreadInterrupted(&udpPingThread)) {
+        err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
+        if (err != sizeof(pingData)) {
+            Limelog("Video Ping: send() failed: %d\n", (int)LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketError());
+            return;
+        }
 
-		PltSleepMs(500);
-	}
+        PltSleepMs(500);
+    }
 }
 
 /* Receive thread proc */
 static void ReceiveThreadProc(void* context) {
-	int err;
-	int bufferSize, receiveSize;
-	char* buffer;
-	int queueStatus;
+    int err;
+    int bufferSize, receiveSize;
+    char* buffer;
+    int queueStatus;
 
-	receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-	bufferSize = receiveSize + sizeof(int) + sizeof(RTP_QUEUE_ENTRY);
-	buffer = NULL;
+    receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
+    bufferSize = receiveSize + sizeof(int) + sizeof(RTP_QUEUE_ENTRY);
+    buffer = NULL;
 
-	while (!PltIsThreadInterrupted(&receiveThread)) {
+    while (!PltIsThreadInterrupted(&receiveThread)) {
         PRTP_PACKET packet;
         
-		if (buffer == NULL) {
-			buffer = (char*) malloc(bufferSize);
-			if (buffer == NULL) {
-				Limelog("Video Receive: malloc() failed\n");
-				ListenerCallbacks.connectionTerminated(-1);
-				return;
-			}
-		}
+        if (buffer == NULL) {
+            buffer = (char*) malloc(bufferSize);
+            if (buffer == NULL) {
+                Limelog("Video Receive: malloc() failed\n");
+                ListenerCallbacks.connectionTerminated(-1);
+                return;
+            }
+        }
 
-		err = (int) recv(rtpSocket, buffer, receiveSize, 0);
-		if (err <= 0) {
-			Limelog("Video Receive: recv() failed: %d\n", (int)LastSocketError());
-			ListenerCallbacks.connectionTerminated(LastSocketError());
-			break;
-		}
+        err = (int) recv(rtpSocket, buffer, receiveSize, 0);
+        if (err <= 0) {
+            Limelog("Video Receive: recv() failed: %d\n", (int)LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketError());
+            break;
+        }
 
-		memcpy(&buffer[receiveSize], &err, sizeof(int));
+        memcpy(&buffer[receiveSize], &err, sizeof(int));
         
         // RTP sequence number must be in host order for the RTP queue
         packet = (PRTP_PACKET) &buffer[0];
         packet->sequenceNumber = htons(packet->sequenceNumber);
 
-		queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
-		if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
-			// queueRtpPacket() copies the data it needs to we can reuse the buffer
-			queueRtpPacket(packet, err);
-		}
-		else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
-			// The packet queue now has packets ready
-			while ((buffer = (char*) RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
-				memcpy(&err, &buffer[receiveSize], sizeof(int));
-				queueRtpPacket((PRTP_PACKET) buffer, err);
-				free(buffer);
-			}
-		}
+        queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
+        if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
+            // queueRtpPacket() copies the data it needs to we can reuse the buffer
+            queueRtpPacket(packet, err);
+        }
+        else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
+            // The packet queue now has packets ready
+            while ((buffer = (char*) RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
+                memcpy(&err, &buffer[receiveSize], sizeof(int));
+                queueRtpPacket((PRTP_PACKET) buffer, err);
+                free(buffer);
+            }
+        }
         else if (queueStatus == RTPQ_RET_QUEUED_NOTHING_READY) {
             // The queue owns the buffer
             buffer = NULL;
         }
-	}
+    }
 
-	if (buffer != NULL) {
-		free(buffer);
-	}
+    if (buffer != NULL) {
+        free(buffer);
+    }
 }
 
 /* Decoder thread proc */
 static void DecoderThreadProc(void* context) {
-	PQUEUED_DECODE_UNIT qdu;
-	while (!PltIsThreadInterrupted(&decoderThread)) {
-		if (!getNextQueuedDecodeUnit(&qdu)) {
-			return;
-		}
+    PQUEUED_DECODE_UNIT qdu;
+    while (!PltIsThreadInterrupted(&decoderThread)) {
+        if (!getNextQueuedDecodeUnit(&qdu)) {
+            return;
+        }
 
-		int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
+        int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
-		freeQueuedDecodeUnit(qdu);
+        freeQueuedDecodeUnit(qdu);
         
         if (ret == DR_NEED_IDR) {
             Limelog("Requesting IDR frame on behalf of DR\n");
             requestIdrOnDemand();
         }
-	}
+    }
 }
 
 /* Read the first frame of the video stream */
@@ -145,66 +145,66 @@ int readFirstFrame(void) {
     closesocket(firstFrameSocket);
     firstFrameSocket = INVALID_SOCKET;
     
-	return 0;
+    return 0;
 }
 
 /* Terminate the video stream */
 void stopVideoStream(void) {
-	PltInterruptThread(&udpPingThread);
-	PltInterruptThread(&receiveThread);
-	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-		PltInterruptThread(&decoderThread);
-	}
+    PltInterruptThread(&udpPingThread);
+    PltInterruptThread(&receiveThread);
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        PltInterruptThread(&decoderThread);
+    }
 
-	if (firstFrameSocket != INVALID_SOCKET) {
-		closesocket(firstFrameSocket);
-		firstFrameSocket = INVALID_SOCKET;
-	}
-	if (rtpSocket != INVALID_SOCKET) {
-		closesocket(rtpSocket);
-		rtpSocket = INVALID_SOCKET;
-	}
+    if (firstFrameSocket != INVALID_SOCKET) {
+        closesocket(firstFrameSocket);
+        firstFrameSocket = INVALID_SOCKET;
+    }
+    if (rtpSocket != INVALID_SOCKET) {
+        closesocket(rtpSocket);
+        rtpSocket = INVALID_SOCKET;
+    }
 
-	PltJoinThread(&udpPingThread);
-	PltJoinThread(&receiveThread);
-	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-		PltJoinThread(&decoderThread);
-	}
+    PltJoinThread(&udpPingThread);
+    PltJoinThread(&receiveThread);
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        PltJoinThread(&decoderThread);
+    }
 
-	PltCloseThread(&udpPingThread);
-	PltCloseThread(&receiveThread);
-	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-		PltCloseThread(&decoderThread);
-	}
+    PltCloseThread(&udpPingThread);
+    PltCloseThread(&receiveThread);
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        PltCloseThread(&decoderThread);
+    }
 
     VideoCallbacks.cleanup();
 }
 
 /* Start the video stream */
 int startVideoStream(void* rendererContext, int drFlags) {
-	int err;
+    int err;
 
     // This must be called before the decoder thread starts submitting
     // decode units
-	VideoCallbacks.setup(StreamConfig.width,
-		StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
+    VideoCallbacks.setup(StreamConfig.width,
+        StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
     
-	rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
-	if (rtpSocket == INVALID_SOCKET) {
-		return LastSocketError();
-	}
+    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
+    if (rtpSocket == INVALID_SOCKET) {
+        return LastSocketError();
+    }
 
-	err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
-	if (err != 0) {
-		return err;
-	}
+    err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
+    if (err != 0) {
+        return err;
+    }
 
-	if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-		err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
-		if (err != 0) {
-			return err;
-		}
-	}
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
+        if (err != 0) {
+            return err;
+        }
+    }
     
     if (ServerMajorVersion == 3) {
         // Connect this socket to open port 47998 for our ping thread
@@ -229,5 +229,5 @@ int startVideoStream(void* rendererContext, int drFlags) {
         }
     }
 
-	return 0;
+    return 0;
 }

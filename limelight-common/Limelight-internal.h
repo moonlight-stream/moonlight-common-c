@@ -18,7 +18,7 @@ extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
-	PCONNECTION_LISTENER_CALLBACKS *clCallbacks);
+    PCONNECTION_LISTENER_CALLBACKS *clCallbacks);
 
 char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length);
 

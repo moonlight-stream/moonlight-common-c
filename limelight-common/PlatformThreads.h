@@ -6,18 +6,18 @@
 typedef void (*ThreadEntry)(void *context);
 
 struct thread_context {
-	ThreadEntry entry;
-	void* context;
+    ThreadEntry entry;
+    void* context;
 };
 
 #if defined(LC_WINDOWS)
 typedef struct _PLT_THREAD {
-	HANDLE handle;
-	int cancelled;
-	DWORD tid;
-	HANDLE termRequested;
+    HANDLE handle;
+    int cancelled;
+    DWORD tid;
+    HANDLE termRequested;
 
-	struct _PLT_THREAD *next;
+    struct _PLT_THREAD *next;
 } PLT_THREAD;
 typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
