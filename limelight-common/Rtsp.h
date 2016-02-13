@@ -18,11 +18,14 @@
 #define FLAG_ALLOCATED_OPTION_ITEMS 0x4
 #define FLAG_ALLOCATED_PAYLOAD 0x8
 
+#define CRLF_LENGTH 2
+#define MESSAGE_END_LENGTH (2 + CRLF_LENGTH)
+
 typedef struct _OPTION_ITEM {
     char flags;
     char* option;
     char* content;
-    struct _OPTION_ITEM *next;
+    struct _OPTION_ITEM* next;
 } OPTION_ITEM, *POPTION_ITEM;
 
 // In this implementation, a flag indicates the message type:
@@ -60,4 +63,4 @@ void createRtspRequest(PRTSP_MESSAGE msg, char* messageBuffer, int flags, char* 
 char* getOptionContent(POPTION_ITEM optionsHead, char* option);
 void insertOption(POPTION_ITEM* optionsHead, POPTION_ITEM opt);
 void freeOptionList(POPTION_ITEM optionsHead);
-char* serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength);
+char* serializeRtspMessage(PRTSP_MESSAGE msg, int* serializedLength);

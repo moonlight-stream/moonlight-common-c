@@ -25,8 +25,8 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
         count += strlen(msg->message.request.command);
         count += strlen(msg->message.request.target);
 
-        // Add 4 for the two spaces and \r\n
-        count += 4;
+        // two spaces and \r\n
+        count += MESSAGE_END_LENGTH;
     }
     // Add length of response-specific strings
     else {
@@ -34,8 +34,8 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
         sprintf(statusCodeStr, "%d", msg->message.response.statusCode);
         count += strlen(statusCodeStr);
         count += strlen(msg->message.response.statusString);
-        // Add 4 for two spaces and \r\n
-        count += 4;
+        // two spaces and \r\n
+        count += MESSAGE_END_LENGTH;
     }
     // Count the size of the options
     current = msg->options;
@@ -43,12 +43,12 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
     while (current != NULL) {
         count += strlen(current->option);
         count += strlen(current->content);
-        // Add 4 because of :[space] and \r\n
-        count += 4;
+        // :[space] and \r\n
+        count += MESSAGE_END_LENGTH;
         current = current->next;
     }
-    // Add 2 more for extra /r/n ending
-    count += 2;
+    // /r/n ending
+    count += CRLF_LENGTH;
 
     count += msg->payloadLength;
 
@@ -59,7 +59,9 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
 int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     char* token, *protocol, *endCheck, *target, *statusStr, *command, *sequence, flag;
     char messageEnded = 0, *payload = NULL, *opt = NULL;
-    int statusCode = 0, sequenceNum, exitCode;
+    int statusCode = 0;
+    int sequenceNum;
+    int exitCode;
     POPTION_ITEM options = NULL;
     POPTION_ITEM newOpt;
 
@@ -243,7 +245,7 @@ void createRtspRequest(PRTSP_MESSAGE msg, char* message, int flags,
 
 // Retrieves option content from the linked list given the option title
 char* getOptionContent(POPTION_ITEM optionsHead, char* option) {
-    OPTION_ITEM *current = optionsHead;
+    POPTION_ITEM current = optionsHead;
     while (current != NULL) {
         // Check if current node is what we're looking for
         if (!strcmp(current->option, option)) {
@@ -256,8 +258,8 @@ char* getOptionContent(POPTION_ITEM optionsHead, char* option) {
 }
 
 // Adds new option opt to the struct's option list
-void insertOption(POPTION_ITEM *optionsHead, POPTION_ITEM opt) {
-    OPTION_ITEM *current = *optionsHead;
+void insertOption(POPTION_ITEM* optionsHead, POPTION_ITEM opt) {
+    POPTION_ITEM current = *optionsHead;
     opt->next = NULL;
 
     // Empty options list
@@ -297,7 +299,7 @@ void freeOptionList(POPTION_ITEM optionsHead) {
 }
 
 // Serialize the message struct into a string containing the RTSP message
-char* serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength) {
+char* serializeRtspMessage(PRTSP_MESSAGE msg, int* serializedLength) {
     int size = getMessageLength(msg);
     char* serializedMessage;
     POPTION_ITEM current = msg->options;
