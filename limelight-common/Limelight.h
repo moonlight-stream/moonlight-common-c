@@ -45,7 +45,7 @@ extern "C" {
 
     typedef struct _LENTRY {
         // Pointer to the next entry or NULL if this is the last entry
-        struct _LENTRY *next;
+        struct _LENTRY* next;
 
         // Pointer to data (never NULL)
         char* data;

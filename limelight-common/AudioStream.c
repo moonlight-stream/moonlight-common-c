@@ -58,7 +58,7 @@ typedef struct _QUEUED_AUDIO_PACKET {
     } q;
 } QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
 
-/* Initialize the audio stream */
+// Initialize the audio stream
 void initializeAudioStream(void) {
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
@@ -80,7 +80,7 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     }
 }
 
-/* Tear down the audio stream once we're done with it */
+// Tear down the audio stream once we're done with it
 void destroyAudioStream(void) {
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
@@ -89,7 +89,7 @@ void destroyAudioStream(void) {
 }
 
 static void UdpPingThreadProc(void* context) {
-    /* Ping in ASCII */
+    // Ping in ASCII
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     struct sockaddr_in6 saddr;
     SOCK_RET err;
@@ -97,7 +97,7 @@ static void UdpPingThreadProc(void* context) {
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     saddr.sin6_port = htons(RTP_PORT);
 
-    /* Send PING every 500 milliseconds */
+    // Send PING every 500 milliseconds
     while (!PltIsThreadInterrupted(&udpPingThread)) {
         err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         if (err != sizeof(pingData)) {
@@ -110,7 +110,7 @@ static void UdpPingThreadProc(void* context) {
     }
 }
 
-static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
+static int queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
     int err;
 
     err = LbqOfferQueueItem(&packetQueue, *packet, &(*packet)->q.lentry);

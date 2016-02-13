@@ -8,7 +8,7 @@ typedef struct _QUEUED_DECODE_UNIT {
 } QUEUED_DECODE_UNIT, *PQUEUED_DECODE_UNIT;
 
 void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu);
-int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu);
+int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu);
 
 #pragma pack(push, 1)
 

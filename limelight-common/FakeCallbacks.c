@@ -38,8 +38,8 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .displayTransientMessage = fakeClDisplayTransientMessage,
 };
 
-void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
-    PCONNECTION_LISTENER_CALLBACKS *clCallbacks)
+void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
+    PCONNECTION_LISTENER_CALLBACKS* clCallbacks)
 {
     if (*drCallbacks == NULL) {
         *drCallbacks = &fakeDrCallbacks;

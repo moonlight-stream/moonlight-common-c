@@ -8,7 +8,7 @@ void BbInitializeWrappedBuffer(PBYTE_BUFFER buff, char* data, int offset, int le
     buff->byteOrder = byteOrder;
 }
 
-/* Get the long long in the correct byte order */
+// Get the long long in the correct byte order
 static long long byteSwapLongLong(PBYTE_BUFFER buff, long long l) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
         return HTONLL(l);
@@ -18,7 +18,7 @@ static long long byteSwapLongLong(PBYTE_BUFFER buff, long long l) {
     }
 }
 
-/* Get the int in the correct byte order */
+// Get the int in the correct byte order
 static int byteSwapInt(PBYTE_BUFFER buff, int i) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
         return htonl(i);
@@ -28,7 +28,7 @@ static int byteSwapInt(PBYTE_BUFFER buff, int i) {
     }
 }
 
-/* Get the short in the correct byte order */
+// Get the short in the correct byte order
 static int byteSwapShort(PBYTE_BUFFER buff, short s) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
         return htons(s);
@@ -38,7 +38,7 @@ static int byteSwapShort(PBYTE_BUFFER buff, short s) {
     }
 }
 
-/* Get a byte from the byte buffer */
+// Get a byte from the byte buffer
 int BbGet(PBYTE_BUFFER buff, char* c) {
     if (buff->position + sizeof(*c) > buff->length) {
         return 0;
@@ -50,7 +50,7 @@ int BbGet(PBYTE_BUFFER buff, char* c) {
     return 1;
 }
 
-/* Get a short from the byte buffer */
+// Get a short from the byte buffer
 int BbGetShort(PBYTE_BUFFER buff, short* s) {
     if (buff->position + sizeof(*s) >= buff->length) {
         return 0;
@@ -64,7 +64,7 @@ int BbGetShort(PBYTE_BUFFER buff, short* s) {
     return 1;
 }
 
-/* Get an int from the byte buffer */
+// Get an int from the byte buffer
 int BbGetInt(PBYTE_BUFFER buff, int* i) {
     if (buff->position + sizeof(*i) > buff->length) {
         return 0;
@@ -78,7 +78,7 @@ int BbGetInt(PBYTE_BUFFER buff, int* i) {
     return 1;
 }
 
-/* Get a long from the byte buffer */
+// Get a long from the byte buffer
 int BbGetLong(PBYTE_BUFFER buff, long long* l) {
     if (buff->position + sizeof(*l) > buff->length) {
         return 0;
@@ -92,7 +92,7 @@ int BbGetLong(PBYTE_BUFFER buff, long long* l) {
     return 1;
 }
 
-/* Put an int into the byte buffer */
+// Put an int into the byte buffer
 int BbPutInt(PBYTE_BUFFER buff, int i) {
     if (buff->position + sizeof(i) > buff->length) {
         return 0;
@@ -106,7 +106,7 @@ int BbPutInt(PBYTE_BUFFER buff, int i) {
     return 1;
 }
 
-/* Put a long into the byte buffer */
+// Put a long into the byte buffer
 int BbPutLong(PBYTE_BUFFER buff, long long l) {
     if (buff->position + sizeof(l) > buff->length) {
         return 0;
@@ -120,7 +120,7 @@ int BbPutLong(PBYTE_BUFFER buff, long long l) {
     return 1;
 }
 
-/* Put a short into the byte buffer */
+// Put a short into the byte buffer
 int BbPutShort(PBYTE_BUFFER buff, short s) {
     if (buff->position + sizeof(s) > buff->length) {
         return 0;
@@ -134,7 +134,7 @@ int BbPutShort(PBYTE_BUFFER buff, short s) {
     return 1;
 }
 
-/* Put a byte into the buffer */
+// Put a byte into the buffer
 int BbPut(PBYTE_BUFFER buff, char c) {
     if (buff->position + sizeof(c) > buff->length) {
         return 0;

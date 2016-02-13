@@ -15,7 +15,7 @@ typedef struct _SDP_OPTION {
     char name[MAX_OPTION_NAME_LEN + 1];
     void* payload;
     int payloadLen;
-    struct _SDP_OPTION *next;
+    struct _SDP_OPTION* next;
 } SDP_OPTION, *PSDP_OPTION;
 
 // Cleanup the attribute list
@@ -60,7 +60,7 @@ static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
 }
 
 // Add an attribute
-static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload, int payloadLen) {
+static int addAttributeBinary(PSDP_OPTION* head, char* name, const void* payload, int payloadLen) {
     PSDP_OPTION option, currentOption;
 
     option = malloc(sizeof(*option) + payloadLen);
@@ -89,12 +89,12 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload
 }
 
 // Add an attribute string
-static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload) {
+static int addAttributeString(PSDP_OPTION* head, char* name, const char* payload) {
     // We purposefully omit the null terminating character
     return addAttributeBinary(head, name, payload, (int)strlen(payload));
 }
 
-static int addGen3Options(PSDP_OPTION *head, char* addrStr) {
+static int addGen3Options(PSDP_OPTION* head, char* addrStr) {
     int payloadInt;
     int err = 0;
 
@@ -135,7 +135,7 @@ static int addGen3Options(PSDP_OPTION *head, char* addrStr) {
     return err;
 }
 
-static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
+static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
     unsigned char slicesPerFrame;

@@ -10,8 +10,8 @@ typedef struct _RTP_QUEUE_ENTRY {
 
     uint64_t queueTimeMs;
 
-    struct _RTP_QUEUE_ENTRY *next;
-    struct _RTP_QUEUE_ENTRY *prev;
+    struct _RTP_QUEUE_ENTRY* next;
+    struct _RTP_QUEUE_ENTRY* prev;
 } RTP_QUEUE_ENTRY, *PRTP_QUEUE_ENTRY;
 
 typedef struct _RTP_REORDER_QUEUE {

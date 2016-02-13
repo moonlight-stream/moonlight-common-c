@@ -57,8 +57,18 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
 
 // Given an RTSP message string rtspMessage, parse it into an RTSP_MESSAGE struct msg
 int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
-    char* token, *protocol, *endCheck, *target, *statusStr, *command, *sequence, flag;
-    char messageEnded = 0, *payload = NULL, *opt = NULL;
+    char* token;
+    char* protocol;
+    char* endCheck;
+    char* target;
+    char* statusStr;
+    char* command;
+    char* sequence;
+    char flag;
+    char messageEnded = 0;
+
+    char* payload = NULL;
+    char* opt = NULL;
     int statusCode = 0;
     int sequenceNum;
     int exitCode;

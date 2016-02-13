@@ -159,7 +159,7 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 }
 
 // Get the first decode unit available
-int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu) {
+int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
     int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)qdu);
     if (err == LBQ_SUCCESS) {
         return 1;

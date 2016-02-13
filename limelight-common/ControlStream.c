@@ -122,7 +122,7 @@ void destroyControlStream(void) {
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
 }
 
-int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE *qfit) {
+int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE* qfit) {
     int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**)qfit);
     return (err == LBQ_SUCCESS);
 }
