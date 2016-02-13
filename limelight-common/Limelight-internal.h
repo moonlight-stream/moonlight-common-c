@@ -20,7 +20,7 @@ int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS *drCallbacks, PAUDIO_RENDERER_CALLBACKS *arCallbacks,
     PCONNECTION_LISTENER_CALLBACKS *clCallbacks);
 
-char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length);
+char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length);
 
 int initializeControlStream(void);
 int startControlStream(void);

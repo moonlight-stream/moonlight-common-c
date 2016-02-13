@@ -88,7 +88,7 @@ void destroyAudioStream(void) {
     RtpqCleanupQueue(&rtpReorderQueue);
 }
 
-static void UdpPingThreadProc(void *context) {
+static void UdpPingThreadProc(void* context) {
     /* Ping in ASCII */
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     struct sockaddr_in6 saddr;
@@ -142,7 +142,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
     lastSeq = rtp->sequenceNumber;
 
-    AudioCallbacks.decodeAndPlaySample((char *)(rtp + 1), packet->size - sizeof(*rtp));
+    AudioCallbacks.decodeAndPlaySample((char*)(rtp + 1), packet->size - sizeof(*rtp));
 }
 
 static void ReceiveThreadProc(void* context) {

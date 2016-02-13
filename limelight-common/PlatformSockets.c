@@ -1,19 +1,19 @@
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
-void addrToUrlSafeString(struct sockaddr_storage *addr, char* string)
+void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
     char addrstr[INET6_ADDRSTRLEN];
 
     if (addr->ss_family == AF_INET6) {
-        struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
+        struct sockaddr_in6* sin6 = (struct sockaddr_in6 *)addr;
         inet_ntop(addr->ss_family, &sin6->sin6_addr, addrstr, sizeof(addrstr));
 
         // IPv6 addresses need to be enclosed in brackets for URLs
         sprintf(string, "[%s]", addrstr);
     }
     else {
-        struct sockaddr_in *sin = (struct sockaddr_in *)addr;
+        struct sockaddr_in* sin = (struct sockaddr_in *)addr;
         inet_ntop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
 
         // IPv4 addresses are returned without changes

@@ -19,10 +19,10 @@ void LimelogWindows(char* Format, ...) {
 
 #if defined(LC_WINDOWS)
 PLT_MUTEX thread_list_lock;
-PLT_THREAD *thread_head;
+PLT_THREAD* thread_head;
 
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
-    struct thread_context *ctx = (struct thread_context *)lpParameter;
+    struct thread_context* ctx = (struct thread_context*)lpParameter;
 
     ctx->entry(ctx->context);
 
@@ -32,7 +32,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 }
 #else
 void* ThreadProc(void* context) {
-    struct thread_context *ctx = (struct thread_context *)context;
+    struct thread_context* ctx = (struct thread_context*)context;
 
     ctx->entry(ctx->context);
 
@@ -51,7 +51,7 @@ void PltSleepMs(int ms) {
 #endif
 }
 
-int PltCreateMutex(PLT_MUTEX *mutex) {
+int PltCreateMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     *mutex = CreateMutexEx(NULL, NULL, 0, MUTEX_ALL_ACCESS);
     if (!*mutex) {
@@ -63,7 +63,7 @@ int PltCreateMutex(PLT_MUTEX *mutex) {
 #endif
 }
 
-void PltDeleteMutex(PLT_MUTEX *mutex) {
+void PltDeleteMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     CloseHandle(*mutex);
 #else
@@ -71,7 +71,7 @@ void PltDeleteMutex(PLT_MUTEX *mutex) {
 #endif
 }
 
-void PltLockMutex(PLT_MUTEX *mutex) {
+void PltLockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     int err;
     err = WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
@@ -83,7 +83,7 @@ void PltLockMutex(PLT_MUTEX *mutex) {
 #endif
 }
 
-void PltUnlockMutex(PLT_MUTEX *mutex) {
+void PltUnlockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     ReleaseMutex(*mutex);
 #else
@@ -91,7 +91,7 @@ void PltUnlockMutex(PLT_MUTEX *mutex) {
 #endif
 }
 
-void PltJoinThread(PLT_THREAD *thread) {
+void PltJoinThread(PLT_THREAD* thread) {
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
@@ -99,9 +99,9 @@ void PltJoinThread(PLT_THREAD *thread) {
 #endif
 }
 
-void PltCloseThread(PLT_THREAD *thread) {
+void PltCloseThread(PLT_THREAD* thread) {
 #if defined(LC_WINDOWS)
-    PLT_THREAD *current_thread;
+    PLT_THREAD* current_thread;
 
     PltLockMutex(&thread_list_lock);
 
@@ -136,7 +136,7 @@ void PltCloseThread(PLT_THREAD *thread) {
 #endif
 }
 
-int PltIsThreadInterrupted(PLT_THREAD *thread) {
+int PltIsThreadInterrupted(PLT_THREAD* thread) {
 #if defined(LC_WINDOWS)
     return thread->cancelled;
 #else
@@ -146,7 +146,7 @@ int PltIsThreadInterrupted(PLT_THREAD *thread) {
 #endif
 }
 
-void PltInterruptThread(PLT_THREAD *thread) {
+void PltInterruptThread(PLT_THREAD* thread) {
 #if defined(LC_WINDOWS)
     thread->cancelled = 1;
     SetEvent(thread->termRequested);
@@ -155,11 +155,11 @@ void PltInterruptThread(PLT_THREAD *thread) {
 #endif
 }
 
-int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
-    struct thread_context *ctx;
+int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
+    struct thread_context* ctx;
     int err;
 
-    ctx = (struct thread_context *)malloc(sizeof(*ctx));
+    ctx = (struct thread_context*)malloc(sizeof(*ctx));
     if (ctx == NULL) {
         return -1;
     }
@@ -208,7 +208,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
     return err;
 }
 
-int PltCreateEvent(PLT_EVENT *event) {
+int PltCreateEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     *event = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
     if (!*event) {
@@ -224,7 +224,7 @@ int PltCreateEvent(PLT_EVENT *event) {
 #endif
 }
 
-void PltCloseEvent(PLT_EVENT *event) {
+void PltCloseEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
 #else
@@ -233,7 +233,7 @@ void PltCloseEvent(PLT_EVENT *event) {
 #endif
 }
 
-void PltSetEvent(PLT_EVENT *event) {
+void PltSetEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     SetEvent(*event);
 #else
@@ -242,7 +242,7 @@ void PltSetEvent(PLT_EVENT *event) {
 #endif
 }
 
-void PltClearEvent(PLT_EVENT *event) {
+void PltClearEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     ResetEvent(*event);
 #else
@@ -250,10 +250,10 @@ void PltClearEvent(PLT_EVENT *event) {
 #endif
 }
 
-int PltWaitForEvent(PLT_EVENT *event) {
+int PltWaitForEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     DWORD error;
-    PLT_THREAD *current_thread;
+    PLT_THREAD* current_thread;
     HANDLE objects[2];
 
     PltLockMutex(&thread_list_lock);

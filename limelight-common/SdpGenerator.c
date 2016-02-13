@@ -179,7 +179,7 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     return err;
 }
 
-static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
+static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     PSDP_OPTION optionHead;
     char payloadStr[92];
     int err;
@@ -248,7 +248,7 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 }
 
 // Populate the SDP header with required information
-static int fillSdpHeader(char* buffer, int rtspClientVersion, char *urlSafeAddr) {
+static int fillSdpHeader(char* buffer, int rtspClientVersion, char*urlSafeAddr) {
     return sprintf(buffer,
         "v=0\r\n"
         "o=android 0 %d IN %s %s\r\n"
@@ -267,7 +267,7 @@ static int fillSdpTail(char* buffer) {
 }
 
 // Get the SDP attributes for the stream config
-char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length) {
+char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     PSDP_OPTION attributeList;
     int offset;
     char* payload;

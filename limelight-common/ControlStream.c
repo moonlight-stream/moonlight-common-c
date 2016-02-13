@@ -77,9 +77,9 @@ static const char* preconstructedPayloadsGen4[] = {
     startBGen4
 };
 
-static short *packetTypes;
-static short *payloadLengths;
-static char **preconstructedPayloads;
+static short* packetTypes;
+static short* payloadLengths;
+static char**preconstructedPayloads;
 
 #define LOSS_REPORT_INTERVAL_MS 50
 
@@ -249,7 +249,7 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
 }
 
 static void lossStatsThreadFunc(void* context) {
-    char *lossStatsPayload;
+    char*lossStatsPayload;
     BYTE_BUFFER byteBuffer;
 
     lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);

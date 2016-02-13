@@ -27,10 +27,10 @@ typedef struct _BYTE_BUFFER {
 
 void BbInitializeWrappedBuffer(PBYTE_BUFFER buff, char* data, int offset, int length, int byteOrder);
 
-int BbGet(PBYTE_BUFFER buff, char *c);
-int BbGetShort(PBYTE_BUFFER buff, short *s);
-int BbGetInt(PBYTE_BUFFER buff, int *i);
-int BbGetLong(PBYTE_BUFFER buff, long long *l);
+int BbGet(PBYTE_BUFFER buff, char* c);
+int BbGetShort(PBYTE_BUFFER buff, short* s);
+int BbGetInt(PBYTE_BUFFER buff, int* i);
+int BbGetLong(PBYTE_BUFFER buff, long long* l);
 
 int BbPutInt(PBYTE_BUFFER buff, int i);
 int BbPutShort(PBYTE_BUFFER buff, short s);

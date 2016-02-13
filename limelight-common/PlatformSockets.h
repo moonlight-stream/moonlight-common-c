@@ -36,9 +36,9 @@ typedef socklen_t SOCKADDR_LEN;
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)
 
 // IPv6 addresses have 2 extra characters for URL escaping
-#define URLSAFESTRING_LEN INET6_ADDRSTRLEN+2
-void addrToUrlSafeString(struct sockaddr_storage *addr, char* string);
+#define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
+void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
-SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
+SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);

@@ -144,7 +144,7 @@ static void ClInternalConnectionTerminated(long errorCode)
     PltCloseThread(&terminationCallbackThread);
 }
 
-static int resolveHostName(const char *host)
+static int resolveHostName(const char*host)
 {
     struct addrinfo hints, *res;
     int err;

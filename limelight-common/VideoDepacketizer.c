@@ -233,7 +233,7 @@ static void reassembleAvcFrame(int frameNumber) {
     }
 }
 
-static void queueFragment(char *data, int offset, int length) {
+static void queueFragment(char*data, int offset, int length) {
     PLENTRY entry = (PLENTRY)malloc(sizeof(*entry) + length);
     if (entry != NULL) {
         entry->next = NULL;

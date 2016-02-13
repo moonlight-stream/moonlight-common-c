@@ -39,7 +39,7 @@ static int byteSwapShort(PBYTE_BUFFER buff, short s) {
 }
 
 /* Get a byte from the byte buffer */
-int BbGet(PBYTE_BUFFER buff, char *c) {
+int BbGet(PBYTE_BUFFER buff, char* c) {
     if (buff->position + sizeof(*c) > buff->length) {
         return 0;
     }
@@ -51,7 +51,7 @@ int BbGet(PBYTE_BUFFER buff, char *c) {
 }
 
 /* Get a short from the byte buffer */
-int BbGetShort(PBYTE_BUFFER buff, short *s) {
+int BbGetShort(PBYTE_BUFFER buff, short* s) {
     if (buff->position + sizeof(*s) >= buff->length) {
         return 0;
     }
@@ -65,7 +65,7 @@ int BbGetShort(PBYTE_BUFFER buff, short *s) {
 }
 
 /* Get an int from the byte buffer */
-int BbGetInt(PBYTE_BUFFER buff, int *i) {
+int BbGetInt(PBYTE_BUFFER buff, int* i) {
     if (buff->position + sizeof(*i) > buff->length) {
         return 0;
     }
@@ -79,7 +79,7 @@ int BbGetInt(PBYTE_BUFFER buff, int *i) {
 }
 
 /* Get a long from the byte buffer */
-int BbGetLong(PBYTE_BUFFER buff, long long *l) {
+int BbGetLong(PBYTE_BUFFER buff, long long* l) {
     if (buff->position + sizeof(*l) > buff->length) {
         return 0;
     }

@@ -3,7 +3,7 @@
 #include "Limelight.h"
 #include "Platform.h"
 
-typedef void(*ThreadEntry)(void *context);
+typedef void(*ThreadEntry)(void* context);
 
 struct thread_context {
     ThreadEntry entry;
@@ -17,7 +17,7 @@ typedef struct _PLT_THREAD {
     DWORD tid;
     HANDLE termRequested;
 
-    struct _PLT_THREAD *next;
+    struct _PLT_THREAD* next;
 } PLT_THREAD;
 typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
@@ -33,22 +33,22 @@ typedef struct _PLT_EVENT {
 #error Unsupported platform
 #endif
 
-int PltCreateMutex(PLT_MUTEX *mutex);
-void PltDeleteMutex(PLT_MUTEX *mutex);
-void PltLockMutex(PLT_MUTEX *mutex);
-void PltUnlockMutex(PLT_MUTEX *mutex);
+int PltCreateMutex(PLT_MUTEX* mutex);
+void PltDeleteMutex(PLT_MUTEX* mutex);
+void PltLockMutex(PLT_MUTEX* mutex);
+void PltUnlockMutex(PLT_MUTEX* mutex);
 
-int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread);
-void PltCloseThread(PLT_THREAD *thread);
-void PltInterruptThread(PLT_THREAD *thread);
-int PltIsThreadInterrupted(PLT_THREAD *thread);
-void PltJoinThread(PLT_THREAD *thread);
+int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD*thread);
+void PltCloseThread(PLT_THREAD*thread);
+void PltInterruptThread(PLT_THREAD*thread);
+int PltIsThreadInterrupted(PLT_THREAD*thread);
+void PltJoinThread(PLT_THREAD*thread);
 
-int PltCreateEvent(PLT_EVENT *event);
-void PltCloseEvent(PLT_EVENT *event);
-void PltSetEvent(PLT_EVENT *event);
-void PltClearEvent(PLT_EVENT *event);
-int PltWaitForEvent(PLT_EVENT *event);
+int PltCreateEvent(PLT_EVENT* event);
+void PltCloseEvent(PLT_EVENT* event);
+void PltSetEvent(PLT_EVENT* event);
+void PltClearEvent(PLT_EVENT* event);
+int PltWaitForEvent(PLT_EVENT* event);
 
 void PltRunThreadProc(void);
 

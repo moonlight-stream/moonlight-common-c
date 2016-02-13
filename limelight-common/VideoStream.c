@@ -38,7 +38,7 @@ void destroyVideoStream(void) {
 }
 
 // UDP Ping proc
-static void UdpPingThreadProc(void *context) {
+static void UdpPingThreadProc(void* context) {
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     struct sockaddr_in6 saddr;
     SOCK_RET err;
