@@ -129,6 +129,9 @@ OAES_RET oaes_base64_decode(
   if( _out_len_req > *out_len )
       return OAES_RET_ERROR;
 
+  // Satisfy overzealous compiler
+  memset(_buf1, 0, sizeof(_buf1));
+  
   memset(out, 0, *out_len);
   *out_len = 0;
   while( in_len-- && strchr(_oaes_base64_table, in[_idx++]) )

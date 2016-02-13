@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #endif
 
 #ifdef _WIN32
@@ -47,7 +48,9 @@ void LimelogWindows(char* Format, ...);
  #endif
 #else
  #ifndef LC_DEBUG
-  #define NDEBUG
+  #ifndef NDEBUG
+   #define NDEBUG
+  #endif
  #endif
  #include <assert.h>
  #define LC_ASSERT(x) assert(x)
