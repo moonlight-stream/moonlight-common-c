@@ -8,14 +8,14 @@ void addrToUrlSafeString(struct sockaddr_storage *addr, char* string)
     if (addr->ss_family == AF_INET6) {
         struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr;
         inet_ntop(addr->ss_family, &sin6->sin6_addr, addrstr, sizeof(addrstr));
-        
+
         // IPv6 addresses need to be enclosed in brackets for URLs
         sprintf(string, "[%s]", addrstr);
     }
     else {
         struct sockaddr_in *sin = (struct sockaddr_in *)addr;
         inet_ntop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
-        
+
         // IPv4 addresses are returned without changes
         sprintf(string, "%s", addrstr);
     }
@@ -30,7 +30,7 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     int err;
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
-    
+
     s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
         Limelog("socket() failed: %d\n", (int)LastSocketError());
@@ -40,23 +40,23 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     memset(&addr, 0, sizeof(addr));
     addr.ss_family = addrfamily;
     if (bind(s, (struct sockaddr*) &addr,
-             addrfamily == AF_INET ?
-                sizeof(struct sockaddr_in) :
-                sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
+        addrfamily == AF_INET ?
+        sizeof(struct sockaddr_in) :
+        sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("bind() failed: %d\n", err);
         closesocket(s);
         SetLastSocketError(err);
         return INVALID_SOCKET;
     }
-    
+
 #ifdef LC_DARWIN
     // Disable SIGPIPE on iOS
     val = 1;
-    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
 #endif
 
-    setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*) &bufferSize, sizeof(bufferSize));
+    setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*)&bufferSize, sizeof(bufferSize));
 
     return s;
 }
@@ -74,11 +74,11 @@ SOCKET connectTcpSocket(struct sockaddr_storage *dstaddr, SOCKADDR_LEN addrlen, 
         Limelog("socket() failed: %d\n", (int)LastSocketError());
         return INVALID_SOCKET;
     }
-    
+
 #ifdef LC_DARWIN
     // Disable SIGPIPE on iOS
     val = 1;
-    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char* )&val, sizeof(val));
+    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
 #endif
 
     memcpy(&addr, dstaddr, sizeof(addr));

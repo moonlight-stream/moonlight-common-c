@@ -16,7 +16,7 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 
-/* Connection stages */
+// Connection stages
 static const char* stageNames[STAGE_MAX] = {
     "none",
     "platform initialization",
@@ -32,16 +32,16 @@ static const char* stageNames[STAGE_MAX] = {
     "input stream establishment"
 };
 
-/* Get the name of the current stage based on its number */
+// Get the name of the current stage based on its number
 const char* LiGetStageName(int stage) {
     return stageNames[stage];
 }
 
-/* Stop the connection by undoing the step at the current stage and those before it */
+// Stop the connection by undoing the step at the current stage and those before it
 void LiStopConnection(void) {
     // Disable termination callbacks now
     alreadyTerminated = 1;
-    
+
     if (stage == STAGE_INPUT_STREAM_START) {
         Limelog("Stopping input stream...");
         stopInputStream();
@@ -148,7 +148,7 @@ static int resolveHostName(const char *host)
 {
     struct addrinfo hints, *res;
     int err;
-    
+
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_flags = AI_ADDRCONFIG;
@@ -157,21 +157,21 @@ static int resolveHostName(const char *host)
         Limelog("getaddrinfo() failed: %d\n", err);
         return err;
     }
-    
+
     if (res == NULL) {
         Limelog("getaddrinfo() returned success without addresses\n");
         return -1;
     }
-    
+
     // Use the first address in the list
     memcpy(&RemoteAddr, res->ai_addr, res->ai_addrlen);
     RemoteAddrLen = res->ai_addrlen;
-    
+
     freeaddrinfo(res);
     return 0;
 }
 
-/* Starts the connection to the streaming machine */
+// Starts the connection to the streaming machine
 int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
     PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks,
     void* renderContext, int drFlags, int _serverMajorVersion) {
@@ -190,7 +190,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     originalTerminationCallback = clCallbacks->connectionTerminated;
     memcpy(&ListenerCallbacks, clCallbacks, sizeof(ListenerCallbacks));
     ListenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
-    
+
     alreadyTerminated = 0;
 
     Limelog("Initializing platform...");
@@ -205,7 +205,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     LC_ASSERT(stage == STAGE_PLATFORM_INIT);
     ListenerCallbacks.stageComplete(STAGE_PLATFORM_INIT);
     Limelog("done\n");
-    
+
     Limelog("Resolving host name...");
     ListenerCallbacks.stageStarting(STAGE_NAME_RESOLUTION);
     err = resolveHostName(host);

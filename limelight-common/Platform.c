@@ -35,9 +35,9 @@ void* ThreadProc(void* context) {
     struct thread_context *ctx = (struct thread_context *)context;
 
     ctx->entry(ctx->context);
-    
+
     free(ctx);
-    
+
     return NULL;
 }
 #endif
@@ -102,7 +102,7 @@ void PltJoinThread(PLT_THREAD *thread) {
 void PltCloseThread(PLT_THREAD *thread) {
 #if defined(LC_WINDOWS)
     PLT_THREAD *current_thread;
-    
+
     PltLockMutex(&thread_list_lock);
 
     if (thread_head == thread)
@@ -195,7 +195,6 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD *thread) {
 
             err = 0;
         }
-
     }
 #else
     {

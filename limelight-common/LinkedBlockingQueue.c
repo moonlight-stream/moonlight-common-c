@@ -1,17 +1,17 @@
 #include "LinkedBlockingQueue.h"
 
-/* Destroy the linked blocking queue and associated mutex and event */
+// Destroy the linked blocking queue and associated mutex and event
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead) {
     PltDeleteMutex(&queueHead->mutex);
     PltCloseEvent(&queueHead->containsDataEvent);
-    
+
     return queueHead->head;
 }
 
-/* Flush the queue */
+// Flush the queue
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead) {
     PLINKED_BLOCKING_QUEUE_ENTRY head;
-    
+
     PltLockMutex(&queueHead->mutex);
 
     // Save the old head
@@ -28,10 +28,10 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead
     return head;
 }
 
-/* Linked blocking queue init */
+// Linked blocking queue init
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
     int err;
-    
+
     err = PltCreateEvent(&queueHead->containsDataEvent);
     if (err != 0) {
         return err;
@@ -90,35 +90,35 @@ int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     if (queueHead->head == NULL) {
         return LBQ_NO_ELEMENT;
     }
-    
+
     PltLockMutex(&queueHead->mutex);
-    
+
     if (queueHead->head == NULL) {
         PltUnlockMutex(&queueHead->mutex);
         return LBQ_NO_ELEMENT;
     }
-    
+
     *data = queueHead->head->data;
-    
+
     PltUnlockMutex(&queueHead->mutex);
-    
+
     return LBQ_SUCCESS;
 }
 
 int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry;
-    
+
     if (queueHead->head == NULL) {
         return LBQ_NO_ELEMENT;
     }
-    
+
     PltLockMutex(&queueHead->mutex);
-    
+
     if (queueHead->head == NULL) {
         PltUnlockMutex(&queueHead->mutex);
         return LBQ_NO_ELEMENT;
     }
-    
+
     entry = queueHead->head;
     queueHead->head = entry->flink;
     queueHead->currentSize--;
@@ -131,11 +131,11 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
         LC_ASSERT(queueHead->currentSize != 0);
         queueHead->head->blink = NULL;
     }
-    
+
     *data = entry->data;
-    
+
     PltUnlockMutex(&queueHead->mutex);
-    
+
     return LBQ_SUCCESS;
 }
 

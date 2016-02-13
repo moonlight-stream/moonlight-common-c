@@ -16,7 +16,7 @@ static OAES_CTX* oaesContext;
 
 #define MAX_INPUT_PACKET_SIZE 128
 
-/* Contains input stream packets */
+// Contains input stream packets
 typedef struct _PACKET_HOLDER {
     int packetLength;
     union {
@@ -30,9 +30,9 @@ typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
-/* Initializes the input stream */
+// Initializes the input stream
 int initializeInputStream(char* aesKeyData, int aesKeyDataLength,
-                          char* aesIv, int aesIvLength) {
+    char* aesIv, int aesIvLength) {
     if (aesIvLength != OAES_BLOCK_SIZE)
     {
         Limelog("AES IV is incorrect length. Should be %d\n", aesIvLength);
@@ -64,7 +64,7 @@ int initializeInputStream(char* aesKeyData, int aesKeyDataLength,
     return 0;
 }
 
-/* Destroys and cleans up the input stream */
+// Destroys and cleans up the input stream
 void destroyInputStream(void) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
 
@@ -94,12 +94,12 @@ static int checkDirs(short currentVal, short newVal, int* dir) {
     if (currentVal == newVal) {
         return 1;
     }
-    
+
     // We want to send a new packet if we've now zeroed an axis
     if (newVal == 0) {
         return 0;
     }
-    
+
     if (*dir == 0) {
         if (newVal < currentVal) {
             *dir = -1;
@@ -114,13 +114,13 @@ static int checkDirs(short currentVal, short newVal, int* dir) {
     else if (newVal < currentVal) {
         return 0;
     }
-    
+
     return 1;
 }
 
 #define OAES_DATA_OFFSET 32
 
-/* Input thread proc */
+// Input thread proc
 static void inputSendThreadProc(void* context) {
     SOCK_RET err;
     PPACKET_HOLDER holder;
@@ -130,33 +130,33 @@ static void inputSendThreadProc(void* context) {
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         int encryptedLengthPrefix;
 
-        err = LbqWaitForQueueElement(&packetQueue, (void**) &holder);
+        err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
         if (err != LBQ_SUCCESS) {
             return;
         }
-        
+
         // If it's a multi-controller packet we can do batching
         if (holder->packet.multiController.header.packetType == htonl(PACKET_TYPE_MULTI_CONTROLLER)) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
             int dirs[6];
-            
+
             memset(dirs, 0, sizeof(dirs));
-            
+
             origPkt = &holder->packet.multiController;
             for (;;) {
                 PNV_MULTI_CONTROLLER_PACKET newPkt;
-                
+
                 // Peek at the next packet
                 if (LbqPeekQueueElement(&packetQueue, (void**)&controllerBatchHolder) != LBQ_SUCCESS) {
                     break;
                 }
-                
+
                 // If it's not a controller packet, we're done
                 if (controllerBatchHolder->packet.multiController.header.packetType != htonl(PACKET_TYPE_MULTI_CONTROLLER)) {
                     break;
                 }
-                
+
                 // Check if it's able to be batched
                 newPkt = &controllerBatchHolder->packet.multiController;
                 if (newPkt->buttonFlags != origPkt->buttonFlags ||
@@ -170,12 +170,12 @@ static void inputSendThreadProc(void* context) {
                     // Batching not allowed
                     break;
                 }
-                
+
                 // Remove the batchable controller packet
                 if (LbqPollQueueElement(&packetQueue, (void**)&controllerBatchHolder) != LBQ_SUCCESS) {
                     break;
                 }
-                
+
                 // Update the original packet
                 origPkt->leftTrigger = newPkt->leftTrigger;
                 origPkt->rightTrigger = newPkt->rightTrigger;
@@ -183,7 +183,7 @@ static void inputSendThreadProc(void* context) {
                 origPkt->leftStickY = newPkt->leftStickY;
                 origPkt->rightStickX = newPkt->rightStickX;
                 origPkt->rightStickY = newPkt->rightStickY;
-                
+
                 // Free the batched packet holder
                 free(controllerBatchHolder);
             }
@@ -193,24 +193,24 @@ static void inputSendThreadProc(void* context) {
             PPACKET_HOLDER mouseBatchHolder;
             int totalDeltaX = (short)htons(holder->packet.mouseMove.deltaX);
             int totalDeltaY = (short)htons(holder->packet.mouseMove.deltaY);
-            
+
             for (;;) {
                 int partialDeltaX;
                 int partialDeltaY;
-                
+
                 // Peek at the next packet
                 if (LbqPeekQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
                     break;
                 }
-                
+
                 // If it's not a mouse move packet, we're done
                 if (mouseBatchHolder->packet.mouseMove.header.packetType != htonl(PACKET_TYPE_MOUSE_MOVE)) {
                     break;
                 }
-                
+
                 partialDeltaX = (short)htons(mouseBatchHolder->packet.mouseMove.deltaX);
                 partialDeltaY = (short)htons(mouseBatchHolder->packet.mouseMove.deltaY);
-                
+
                 // Check for overflow
                 if (partialDeltaX + totalDeltaX > INT16_MAX ||
                     partialDeltaX + totalDeltaX < INT16_MIN ||
@@ -219,27 +219,27 @@ static void inputSendThreadProc(void* context) {
                     // Total delta would overflow our 16-bit short
                     break;
                 }
-                
+
                 // Remove the batchable mouse move packet
                 if (LbqPollQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
                     break;
                 }
-                
+
                 totalDeltaX += partialDeltaX;
                 totalDeltaY += partialDeltaY;
-                
+
                 // Free the batched packet holder
                 free(mouseBatchHolder);
             }
-            
+
             // Update the original packet
             holder->packet.mouseMove.deltaX = htons((short)totalDeltaX);
             holder->packet.mouseMove.deltaY = htons((short)totalDeltaY);
         }
 
         encryptedSize = sizeof(encryptedBuffer);
-        err = oaes_encrypt(oaesContext, (const unsigned char*) &holder->packet, holder->packetLength,
-            (unsigned char*) encryptedBuffer, &encryptedSize);
+        err = oaes_encrypt(oaesContext, (const unsigned char*)&holder->packet, holder->packetLength,
+            (unsigned char*)encryptedBuffer, &encryptedSize);
         free(holder);
         if (err != OAES_RET_SUCCESS) {
             Limelog("Input: Encryption failed: %d\n", (int)err);
@@ -253,12 +253,12 @@ static void inputSendThreadProc(void* context) {
         // Overwrite the last 4 bytes before the encrypted data with the length so
         // we can send the message all at once. GFE can choke if it gets the header
         // before the rest of the message.
-        encryptedLengthPrefix = htonl((unsigned long) encryptedSize);
+        encryptedLengthPrefix = htonl((unsigned long)encryptedSize);
         memcpy(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
             &encryptedLengthPrefix, sizeof(encryptedLengthPrefix));
 
         // Send the encrypted payload
-        err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+        err = send(inputSock, (const char*)&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
             (int)(encryptedSize + sizeof(encryptedLengthPrefix)), 0);
         if (err <= 0) {
             Limelog("Input: send() failed: %d\n", (int)LastSocketError());
@@ -268,7 +268,7 @@ static void inputSendThreadProc(void* context) {
     }
 }
 
-/* Begin the input stream */
+// Begin the input stream
 int startInputStream(void) {
     int err;
 
@@ -287,7 +287,7 @@ int startInputStream(void) {
     return err;
 }
 
-/* Stops the input stream */
+// Stops the input stream
 int stopInputStream(void) {
     PltInterruptThread(&inputSendThread);
 
@@ -302,7 +302,7 @@ int stopInputStream(void) {
     return 0;
 }
 
-/* Send a mouse move event to the streaming machine */
+// Send a mouse move event to the streaming machine
 int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     PPACKET_HOLDER holder;
     int err;
@@ -330,7 +330,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     return err;
 }
 
-/* Send a mouse button event to the streaming machine */
+// Send a mouse button event to the streaming machine
 int LiSendMouseButtonEvent(char action, int button) {
     PPACKET_HOLDER holder;
     int err;
@@ -357,7 +357,7 @@ int LiSendMouseButtonEvent(char action, int button) {
     return err;
 }
 
-/* Send a key press event to the streaming machine */
+// Send a key press event to the streaming machine
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     PPACKET_HOLDER holder;
     int err;
@@ -388,20 +388,20 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 }
 
 static int sendControllerEventInternal(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
-                                       short leftStickX, short leftStickY, short rightStickX, short rightStickY)
+    short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     PPACKET_HOLDER holder;
     int err;
-    
+
     if (!initialized) {
         return -2;
     }
-    
+
     holder = malloc(sizeof(*holder));
     if (holder == NULL) {
         return -1;
     }
-    
+
     if (ServerMajorVersion == 3) {
         // Generation 3 servers don't support multiple controllers so we send
         // the legacy packet
@@ -438,32 +438,32 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         holder->packet.multiController.tailA = MC_TAIL_A;
         holder->packet.multiController.tailB = MC_TAIL_B;
     }
-    
+
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
         free(holder);
     }
-    
+
     return err;
 }
 
-/* Send a controller event to the streaming machine */
+// Send a controller event to the streaming machine
 int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(0, buttonFlags, leftTrigger, rightTrigger,
-                                       leftStickX, leftStickY, rightStickX, rightStickY);
+        leftStickX, leftStickY, rightStickX, rightStickY);
 }
 
-/* Send a controller event to the streaming machine */
+// Send a controller event to the streaming machine
 int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
-                          short leftStickX, short leftStickY, short rightStickX, short rightStickY)
+    short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(controllerNumber, buttonFlags, leftTrigger, rightTrigger,
-                                       leftStickX, leftStickY, rightStickX, rightStickY);
+        leftStickX, leftStickY, rightStickX, rightStickY);
 }
 
-/* Send a scroll event to the streaming machine */
+// Send a scroll event to the streaming machine
 int LiSendScrollEvent(signed char scrollClicks) {
     PPACKET_HOLDER holder;
     int err;

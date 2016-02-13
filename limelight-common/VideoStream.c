@@ -25,21 +25,21 @@ static PLT_THREAD decoderThread;
 // the RTP queue will wait for missing/reordered packets.
 #define RTP_QUEUE_DELAY 10
 
-/* Initialize the video stream */
+// Initialize the video stream
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
     RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
 }
 
-/* Clean up the video stream */
+// Clean up the video stream
 void destroyVideoStream(void) {
     destroyVideoDepacketizer();
     RtpqCleanupQueue(&rtpQueue);
 }
 
-/* UDP Ping proc */
+// UDP Ping proc
 static void UdpPingThreadProc(void *context) {
-    char pingData [] = { 0x50, 0x49, 0x4E, 0x47 };
+    char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     struct sockaddr_in6 saddr;
     SOCK_RET err;
 
@@ -58,7 +58,7 @@ static void UdpPingThreadProc(void *context) {
     }
 }
 
-/* Receive thread proc */
+// Receive thread proc
 static void ReceiveThreadProc(void* context) {
     int err;
     int bufferSize, receiveSize;
@@ -71,9 +71,9 @@ static void ReceiveThreadProc(void* context) {
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
         PRTP_PACKET packet;
-        
+
         if (buffer == NULL) {
-            buffer = (char*) malloc(bufferSize);
+            buffer = (char*)malloc(bufferSize);
             if (buffer == NULL) {
                 Limelog("Video Receive: malloc() failed\n");
                 ListenerCallbacks.connectionTerminated(-1);
@@ -81,7 +81,7 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        err = (int) recv(rtpSocket, buffer, receiveSize, 0);
+        err = (int)recv(rtpSocket, buffer, receiveSize, 0);
         if (err <= 0) {
             Limelog("Video Receive: recv() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
@@ -89,21 +89,21 @@ static void ReceiveThreadProc(void* context) {
         }
 
         memcpy(&buffer[receiveSize], &err, sizeof(int));
-        
+
         // RTP sequence number must be in host order for the RTP queue
-        packet = (PRTP_PACKET) &buffer[0];
+        packet = (PRTP_PACKET)&buffer[0];
         packet->sequenceNumber = htons(packet->sequenceNumber);
 
-        queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY) &buffer[receiveSize + sizeof(int)]);
+        queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY)&buffer[receiveSize + sizeof(int)]);
         if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
             // queueRtpPacket() copies the data it needs to we can reuse the buffer
             queueRtpPacket(packet, err);
         }
         else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
             // The packet queue now has packets ready
-            while ((buffer = (char*) RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
+            while ((buffer = (char*)RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
                 memcpy(&err, &buffer[receiveSize], sizeof(int));
-                queueRtpPacket((PRTP_PACKET) buffer, err);
+                queueRtpPacket((PRTP_PACKET)buffer, err);
                 free(buffer);
             }
         }
@@ -118,7 +118,7 @@ static void ReceiveThreadProc(void* context) {
     }
 }
 
-/* Decoder thread proc */
+// Decoder thread proc
 static void DecoderThreadProc(void* context) {
     PQUEUED_DECODE_UNIT qdu;
     while (!PltIsThreadInterrupted(&decoderThread)) {
@@ -129,7 +129,7 @@ static void DecoderThreadProc(void* context) {
         int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
         freeQueuedDecodeUnit(qdu);
-        
+
         if (ret == DR_NEED_IDR) {
             Limelog("Requesting IDR frame on behalf of DR\n");
             requestIdrOnDemand();
@@ -137,18 +137,18 @@ static void DecoderThreadProc(void* context) {
     }
 }
 
-/* Read the first frame of the video stream */
+// Read the first frame of the video stream
 int readFirstFrame(void) {
     // All that matters is that we close this socket.
     // This starts the flow of video on Gen 3 servers.
-    
+
     closesocket(firstFrameSocket);
     firstFrameSocket = INVALID_SOCKET;
-    
+
     return 0;
 }
 
-/* Terminate the video stream */
+// Terminate the video stream
 void stopVideoStream(void) {
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
@@ -180,7 +180,7 @@ void stopVideoStream(void) {
     VideoCallbacks.cleanup();
 }
 
-/* Start the video stream */
+// Start the video stream
 int startVideoStream(void* rendererContext, int drFlags) {
     int err;
 
@@ -188,7 +188,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
     // decode units
     VideoCallbacks.setup(StreamConfig.width,
         StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
-    
+
     rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
     if (rtpSocket == INVALID_SOCKET) {
         return LastSocketError();
@@ -205,7 +205,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
             return err;
         }
     }
-    
+
     if (ServerMajorVersion == 3) {
         // Connect this socket to open port 47998 for our ping thread
         firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen, FIRST_FRAME_PORT);
@@ -213,14 +213,14 @@ int startVideoStream(void* rendererContext, int drFlags) {
             return LastSocketError();
         }
     }
-    
+
     // Start pinging before reading the first frame so GFE knows where
     // to send UDP data
     err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         return err;
     }
-    
+
     if (ServerMajorVersion == 3) {
         // Read the first frame to start the flow of video
         err = readFirstFrame();

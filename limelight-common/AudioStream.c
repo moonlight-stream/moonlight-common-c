@@ -133,8 +133,8 @@ static int queuePacketToLbq(PQUEUED_AUDIO_PACKET *packet) {
 static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
     PRTP_PACKET rtp;
 
-    rtp = (PRTP_PACKET) &packet->data[0];
-    if (lastSeq != 0 && (unsigned short) (lastSeq + 1) != rtp->sequenceNumber) {
+    rtp = (PRTP_PACKET)&packet->data[0];
+    if (lastSeq != 0 && (unsigned short)(lastSeq + 1) != rtp->sequenceNumber) {
         Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
 
         AudioCallbacks.decodeAndPlaySample(NULL, 0);
@@ -142,7 +142,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
     lastSeq = rtp->sequenceNumber;
 
-    AudioCallbacks.decodeAndPlaySample((char *) (rtp + 1), packet->size - sizeof(*rtp));
+    AudioCallbacks.decodeAndPlaySample((char *)(rtp + 1), packet->size - sizeof(*rtp));
 }
 
 static void ReceiveThreadProc(void* context) {
@@ -154,7 +154,7 @@ static void ReceiveThreadProc(void* context) {
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
         if (packet == NULL) {
-            packet = (PQUEUED_AUDIO_PACKET) malloc(sizeof(*packet));
+            packet = (PQUEUED_AUDIO_PACKET)malloc(sizeof(*packet));
             if (packet == NULL) {
                 Limelog("Audio Receive: malloc() failed\n");
                 ListenerCallbacks.connectionTerminated(-1);
@@ -162,7 +162,7 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        packet->size = (int) recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
+        packet->size = (int)recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
         if (packet->size <= 0) {
             Limelog("Audio Receive: recv() failed: %d\n", (int)LastSocketError());
             free(packet);
@@ -175,23 +175,24 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        rtp = (PRTP_PACKET) &packet->data[0];
+        rtp = (PRTP_PACKET)&packet->data[0];
         if (rtp->packetType != 97) {
             // Not audio
             continue;
         }
-        
+
         // RTP sequence number must be in host order for the RTP queue
         rtp->sequenceNumber = htons(rtp->sequenceNumber);
 
-        queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET) packet, &packet->q.rentry);
+        queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET)packet, &packet->q.rentry);
         if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
             if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                 if (!queuePacketToLbq(&packet)) {
                     // An exit signal was received
                     return;
                 }
-            } else {
+            }
+            else {
                 decodeInputData(packet);
             }
         }
@@ -203,13 +204,14 @@ static void ReceiveThreadProc(void* context) {
 
             if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
                 // If packets are ready, pull them and send them to the decoder
-                while ((packet = (PQUEUED_AUDIO_PACKET) RtpqGetQueuedPacket(&rtpReorderQueue)) != NULL) {
+                while ((packet = (PQUEUED_AUDIO_PACKET)RtpqGetQueuedPacket(&rtpReorderQueue)) != NULL) {
                     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                         if (!queuePacketToLbq(&packet)) {
                             // An exit signal was received
                             return;
                         }
-                    } else {
+                    }
+                    else {
                         decodeInputData(packet);
                     }
                 }
@@ -223,7 +225,7 @@ static void DecoderThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
 
     while (!PltIsThreadInterrupted(&decoderThread)) {
-        err = LbqWaitForQueueElement(&packetQueue, (void**) &packet);
+        err = LbqWaitForQueueElement(&packetQueue, (void**)&packet);
         if (err != LBQ_SUCCESS) {
             // An exit signal was received
             return;

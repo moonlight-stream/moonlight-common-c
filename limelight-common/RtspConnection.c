@@ -65,7 +65,7 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
     // FIXME: Hacked CSeq attribute due to RTSP parser bug
     createRtspRequest(msg, NULL, 0, command, target, "RTSP/1.0",
         0, NULL, NULL, 0);
-    
+
     sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
     sprintf(clientVersionStr, "%d", rtspClientVersion);
     if (!addOption(msg, "CSeq", sequenceNumberStr) ||
@@ -84,7 +84,7 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
     int offset;
     char* serializedMessage = NULL;
     int messageLen;
-    
+
     *error = -1;
 
     sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010);
@@ -156,7 +156,7 @@ void terminateRtspHandshake(void) {
 static int requestOptions(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
     int ret;
-    
+
     *error = -1;
 
     ret = initializeRtspRequest(&request, "OPTIONS", rtspTargetUrl);
@@ -172,13 +172,13 @@ static int requestOptions(PRTSP_MESSAGE response, int* error) {
 static int requestDescribe(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
     int ret;
-    
+
     *error = -1;
 
     ret = initializeRtspRequest(&request, "DESCRIBE", rtspTargetUrl);
     if (ret != 0) {
         if (addOption(&request, "Accept",
-                "application/sdp") &&
+            "application/sdp") &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
             ret = transactRtspMessage(&request, response, error);
@@ -196,7 +196,7 @@ static int requestDescribe(PRTSP_MESSAGE response, int* error) {
 static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
     int ret;
-    
+
     *error = -1;
 
     ret = initializeRtspRequest(&request, "SETUP", target);
@@ -228,7 +228,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
 static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
     int ret;
-    
+
     *error = -1;
 
     ret = initializeRtspRequest(&request, "PLAY", target);
@@ -251,7 +251,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
     int ret;
     int payloadLength;
     char payloadLengthStr[16];
-    
+
     *error = -1;
 
     ret = initializeRtspRequest(&request, "ANNOUNCE", "streamid=video");

@@ -142,6 +142,6 @@ int BbPut(PBYTE_BUFFER buff, char c) {
 
     memcpy(&buff->buffer[buff->position], &c, sizeof(c));
     buff->position += sizeof(c);
-    
+
     return 1;
 }

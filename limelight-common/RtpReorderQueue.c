@@ -94,7 +94,7 @@ static void updateOldestQueued(PRTP_REORDER_QUEUE queue) {
 
 static PRTP_QUEUE_ENTRY getEntryByLowestSeq(PRTP_REORDER_QUEUE queue) {
     PRTP_QUEUE_ENTRY lowestSeqEntry, entry;
-    
+
     lowestSeqEntry = queue->queueHead;
     entry = queue->queueHead;
     while (entry != NULL) {
@@ -225,7 +225,7 @@ int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY
             }
             else {
                 // Constraint validation may have changed the oldest packet to one that
-                // matches the next sequence number 
+                // matches the next sequence number
                 return (lowestEntry != NULL) ? RTPQ_RET_QUEUED_PACKETS_READY :
                     RTPQ_RET_QUEUED_NOTHING_READY;
             }

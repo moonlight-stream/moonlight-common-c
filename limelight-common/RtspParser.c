@@ -1,8 +1,7 @@
 #include "Rtsp.h"
 
-// Check if String s begins with the given prefix 
+// Check if String s begins with the given prefix
 static int startsWith(const char* s, const char* prefix) {
-
     if (strncmp(s, prefix, strlen(prefix)) == 0) {
         return 1;
     }
@@ -29,26 +28,26 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
         // Add 4 for the two spaces and \r\n
         count += 4;
     }
-    // Add length of response-specific strings 
+    // Add length of response-specific strings
     else {
         char statusCodeStr[16];
         sprintf(statusCodeStr, "%d", msg->message.response.statusCode);
         count += strlen(statusCodeStr);
         count += strlen(msg->message.response.statusString);
-        // Add 4 for two spaces and \r\n 
+        // Add 4 for two spaces and \r\n
         count += 4;
     }
-    // Count the size of the options 
+    // Count the size of the options
     current = msg->options;
 
     while (current != NULL) {
         count += strlen(current->option);
         count += strlen(current->content);
-        // Add 4 because of :[space] and \r\n 
+        // Add 4 because of :[space] and \r\n
         count += 4;
         current = current->next;
     }
-    // Add 2 more for extra /r/n ending 
+    // Add 2 more for extra /r/n ending
     count += 2;
 
     count += msg->payloadLength;
@@ -64,13 +63,13 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     POPTION_ITEM options = NULL;
     POPTION_ITEM newOpt;
 
-    // Delimeter sets for strtok() 
+    // Delimeter sets for strtok()
     char* delim = " \r\n";
     char* end = "\r\n";
     char* optDelim = " :\r\n";
     char typeFlag = TOKEN_OPTION;
 
-    // Put the raw message into a string we can use 
+    // Put the raw message into a string we can use
     char* messageBuffer = malloc(length + 1);
     if (messageBuffer == NULL) {
         exitCode = RTSP_ERROR_NO_MEMORY;
@@ -88,13 +87,13 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         goto ExitFailure;
     }
 
-    // The message is a response 
+    // The message is a response
     if (startsWith(token, "RTSP")) {
         flag = TYPE_RESPONSE;
-        // The current token is the protocol 
+        // The current token is the protocol
         protocol = token;
 
-        // Get the status code 
+        // Get the status code
         token = strtok(NULL, delim);
         statusCode = atoi(token);
         if (token == NULL) {
@@ -102,19 +101,19 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
             goto ExitFailure;
         }
 
-        // Get the status string 
+        // Get the status string
         statusStr = strtok(NULL, end);
         if (statusStr == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
 
-        // Request fields - we don't care about them here 
+        // Request fields - we don't care about them here
         target = NULL;
         command = NULL;
     }
 
-    // The message is a request 
+    // The message is a request
     else {
         flag = TYPE_REQUEST;
         command = token;
@@ -128,7 +127,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
-        // Response field - we don't care about it here 
+        // Response field - we don't care about it here
         statusStr = NULL;
     }
     if (strcmp(protocol, "RTSP/1.0")) {
@@ -140,13 +139,12 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     {
         token = strtok(NULL, typeFlag == TOKEN_OPTION ? optDelim : end);
         if (token != NULL) {
-
             if (typeFlag == TOKEN_OPTION) {
                 opt = token;
             }
-            // The token is content 
+            // The token is content
             else {
-                // Create a new node containing the option and content 
+                // Create a new node containing the option and content
                 newOpt = (POPTION_ITEM)malloc(sizeof(OPTION_ITEM));
                 if (newOpt == NULL) {
                     freeOptionList(options);
@@ -160,16 +158,15 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
                 insertOption(&options, newOpt);
 
                 // Check if we're at the end of the message portion marked by \r\n\r\n
-                //endCheck points to the remainder of messageBuffer after the token 
+                // endCheck points to the remainder of messageBuffer after the token
                 endCheck = &token[0] + strlen(token) + 1;
 
-                // See if we've hit the end of the message. The first \r is missing because it's been tokenized 
+                // See if we've hit the end of the message. The first \r is missing because it's been tokenized
                 if (startsWith(endCheck, "\n\r\n")) {
-
-                    // We've encountered the end of the message - mark it thus 
+                    // We've encountered the end of the message - mark it thus
                     messageEnded = 1;
 
-                    // The payload is the remainder of messageBuffer. If none, then payload = null 
+                    // The payload is the remainder of messageBuffer. If none, then payload = null
                     if (endCheck[3] != '\0')
                         payload = &endCheck[3];
 
@@ -179,13 +176,13 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         }
         typeFlag ^= 1; // flip the flag
     }
-    // If we never encountered the double CRLF, then the message is malformed! 
+    // If we never encountered the double CRLF, then the message is malformed!
     if (!messageEnded) {
         exitCode = RTSP_ERROR_MALFORMED;
         goto ExitFailure;
     }
 
-    // Get sequence number as an integer 
+    // Get sequence number as an integer
     sequence = getOptionContent(options, "CSeq");
     if (sequence != NULL) {
         sequenceNum = atoi(sequence);
@@ -193,7 +190,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     else {
         sequenceNum = SEQ_INVALID;
     }
-    // Package the new parsed message into the struct 
+    // Package the new parsed message into the struct
     if (flag == TYPE_REQUEST) {
         createRtspRequest(msg, messageBuffer, FLAG_ALLOCATED_MESSAGE_BUFFER | FLAG_ALLOCATED_OPTION_ITEMS, command, target,
             protocol, sequenceNum, options, payload, payload ? length - (int)(messageBuffer - payload) : 0);
@@ -248,7 +245,7 @@ void createRtspRequest(PRTSP_MESSAGE msg, char* message, int flags,
 char* getOptionContent(POPTION_ITEM optionsHead, char* option) {
     OPTION_ITEM *current = optionsHead;
     while (current != NULL) {
-        // Check if current node is what we're looking for 
+        // Check if current node is what we're looking for
         if (!strcmp(current->option, option)) {
             return current->content;
         }
@@ -263,15 +260,15 @@ void insertOption(POPTION_ITEM *optionsHead, POPTION_ITEM opt) {
     OPTION_ITEM *current = *optionsHead;
     opt->next = NULL;
 
-    // Empty options list 
+    // Empty options list
     if (*optionsHead == NULL) {
         *optionsHead = opt;
         return;
     }
 
-    // Traverse the list and insert the new option at the end 
+    // Traverse the list and insert the new option at the end
     while (current != NULL) {
-        // Check for duplicate option; if so, replace the option currently there 
+        // Check for duplicate option; if so, replace the option currently there
         if (!strcmp(current->option, opt->option)) {
             current->content = opt->content;
             return;
@@ -284,7 +281,7 @@ void insertOption(POPTION_ITEM *optionsHead, POPTION_ITEM opt) {
     }
 }
 
-// Free every node in the message's option list 
+// Free every node in the message's option list
 void freeOptionList(POPTION_ITEM optionsHead) {
     POPTION_ITEM current = optionsHead;
     POPTION_ITEM temp;
@@ -299,7 +296,7 @@ void freeOptionList(POPTION_ITEM optionsHead) {
     }
 }
 
-// Serialize the message struct into a string containing the RTSP message 
+// Serialize the message struct into a string containing the RTSP message
 char* serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength) {
     int size = getMessageLength(msg);
     char* serializedMessage;
@@ -345,7 +342,7 @@ char* serializeRtspMessage(PRTSP_MESSAGE msg, int *serializedLength) {
     // Final \r\n
     strcat(serializedMessage, "\r\n");
 
-    // payload 
+    // payload
     if (msg->payload != NULL) {
         int offset;
 

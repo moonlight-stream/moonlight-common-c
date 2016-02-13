@@ -28,7 +28,7 @@ typedef struct _BUFFER_DESC {
     unsigned int length;
 } BUFFER_DESC, *PBUFFER_DESC;
 
-/* Init */
+// Init
 void initializeVideoDepacketizer(int pktSize) {
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
@@ -46,7 +46,7 @@ void initializeVideoDepacketizer(int pktSize) {
     strictIdrFrameWait = !(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
 }
 
-/* Free malloced memory in AvcFrameState*/
+// Free malloced memory in AvcFrameState*/
 static void cleanupAvcFrameState(void) {
     PLENTRY lastEntry;
 
@@ -59,7 +59,7 @@ static void cleanupAvcFrameState(void) {
     nalChainDataLength = 0;
 }
 
-/* Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
+// Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
 static void dropAvcFrameState(void) {
     // We'll need an IDR frame now if we're in strict mode
     if (strictIdrFrameWait) {
@@ -68,36 +68,36 @@ static void dropAvcFrameState(void) {
 
     // Count the number of consecutive frames dropped
     consecutiveFrameDrops++;
-    
+
     // If we reach our limit, immediately request an IDR frame and reset
     if (consecutiveFrameDrops == CONSECUTIVE_DROP_LIMIT) {
         Limelog("Reached consecutive drop limit\n");
-        
+
         // Restart the count
         consecutiveFrameDrops = 0;
-        
+
         // Request an IDR frame
         waitingForIdrFrame = 1;
         requestIdrOnDemand();
     }
-    
+
     cleanupAvcFrameState();
 }
 
-/* Cleanup the list of decode units */
+// Cleanup the list of decode units
 static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
 
     while (entry != NULL) {
         nextEntry = entry->flink;
 
-        freeQueuedDecodeUnit((PQUEUED_DECODE_UNIT) entry->data);
+        freeQueuedDecodeUnit((PQUEUED_DECODE_UNIT)entry->data);
 
         entry = nextEntry;
     }
 }
 
-/* Cleanup video depacketizer and free malloced memory */
+// Cleanup video depacketizer and free malloced memory
 void destroyVideoDepacketizer(void) {
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
@@ -106,22 +106,22 @@ void destroyVideoDepacketizer(void) {
     cleanupAvcFrameState();
 }
 
-/* Returns 1 if candidate is a frame start and 0 otherwise */
+// Returns 1 if candidate is a frame start and 0 otherwise
 static int isSeqFrameStart(PBUFFER_DESC candidate) {
     return (candidate->length == 4 && candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
-/* Returns 1 if candidate an AVC start and 0 otherwise */
+// Returns 1 if candidate an AVC start and 0 otherwise
 static int isSeqAvcStart(PBUFFER_DESC candidate) {
     return (candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
-/* Returns 1 if candidate is padding and 0 otherwise */
+// Returns 1 if candidate is padding and 0 otherwise
 static int isSeqPadding(PBUFFER_DESC candidate) {
     return (candidate->data[candidate->offset + candidate->length - 1] == 0);
 }
 
-/* Returns 1 on success, 0 otherwise */
+// Returns 1 on success, 0 otherwise
 static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
     if (current->length < 3) {
         return 0;
@@ -158,9 +158,9 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
     return 0;
 }
 
-/* Get the first decode unit available */
+// Get the first decode unit available
 int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu) {
-    int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**) qdu);
+    int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)qdu);
     if (err == LBQ_SUCCESS) {
         return 1;
     }
@@ -169,7 +169,7 @@ int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT *qdu) {
     }
 }
 
-/* Cleanup a decode unit by freeing the buffer chain and the holder */
+// Cleanup a decode unit by freeing the buffer chain and the holder
 void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
     PLENTRY lastEntry;
 
@@ -182,10 +182,10 @@ void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
     free(qdu);
 }
 
-/* Reassemble the frame with the given frame number */
+// Reassemble the frame with the given frame number
 static void reassembleAvcFrame(int frameNumber) {
     if (nalChainHead != NULL) {
-        PQUEUED_DECODE_UNIT qdu = (PQUEUED_DECODE_UNIT) malloc(sizeof(*qdu));
+        PQUEUED_DECODE_UNIT qdu = (PQUEUED_DECODE_UNIT)malloc(sizeof(*qdu));
         if (qdu != NULL) {
             qdu->decodeUnit.bufferList = nalChainHead;
             qdu->decodeUnit.fullLength = nalChainDataLength;
@@ -212,7 +212,8 @@ static void reassembleAvcFrame(int frameNumber) {
                     connectionSinkTooSlow(0, frameNumber);
                     return;
                 }
-            } else {
+            }
+            else {
                 int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
                 freeQueuedDecodeUnit(qdu);
@@ -225,7 +226,7 @@ static void reassembleAvcFrame(int frameNumber) {
 
             // Notify the control connection
             connectionReceivedFrame(frameNumber);
-            
+
             // Clear frame drops
             consecutiveFrameDrops = 0;
         }
@@ -233,11 +234,11 @@ static void reassembleAvcFrame(int frameNumber) {
 }
 
 static void queueFragment(char *data, int offset, int length) {
-    PLENTRY entry = (PLENTRY) malloc(sizeof(*entry) + length);
+    PLENTRY entry = (PLENTRY)malloc(sizeof(*entry) + length);
     if (entry != NULL) {
         entry->next = NULL;
         entry->length = length;
-        entry->data = (char*) (entry + 1);
+        entry->data = (char*)(entry + 1);
 
         memcpy(entry->data, &data[offset], entry->length);
 
@@ -258,7 +259,7 @@ static void queueFragment(char *data, int offset, int length) {
     }
 }
 
-/* Process an RTP Payload */
+// Process an RTP Payload
 static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
     BUFFER_DESC specialSeq;
     int decodingAvc = 0;
@@ -323,22 +324,22 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
     }
 }
 
-/* Return 1 if packet is the first one in the frame */
+// Return 1 if packet is the first one in the frame
 static int isFirstPacket(char flags) {
     // Clear the picture data flag
     flags &= ~FLAG_CONTAINS_PIC_DATA;
-    
+
     // Check if it's just the start or both start and end of a frame
     return (flags == (FLAG_SOF | FLAG_EOF) ||
         flags == FLAG_SOF);
 }
 
-/* Adds a fragment directly to the queue */
+// Adds a fragment directly to the queue
 static void processRtpPayloadFast(BUFFER_DESC location) {
     queueFragment(location.data, location.offset, location.length);
 }
 
-/* Process an RTP Payload */
+// Process an RTP Payload
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     BUFFER_DESC currentPos, specialSeq;
     int frameIndex;
@@ -349,8 +350,8 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
     videoPacket->streamPacketIndex &= 0xFFFFFF;
-    
-    currentPos.data = (char*) (videoPacket + 1);
+
+    currentPos.data = (char*)(videoPacket + 1);
     currentPos.offset = 0;
     currentPos.length = length - sizeof(*videoPacket);
 
@@ -360,7 +361,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
     // Drop duplicates or re-ordered packets
     streamPacketIndex = videoPacket->streamPacketIndex;
-    if (isBeforeSignedInt((short) streamPacketIndex, (short) (lastPacketInStream + 1), 0)) {
+    if (isBeforeSignedInt((short)streamPacketIndex, (short)(lastPacketInStream + 1), 0)) {
         return;
     }
 
@@ -426,7 +427,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     // we need to drop it if the stream packet index
     // doesn't match
     if (!firstPacket && decodingFrame) {
-        if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
+        if (streamPacketIndex != (int)(lastPacketInStream + 1)) {
             Limelog("Network dropped middle of a frame\n");
             nextFrameNumber = frameIndex + 1;
 
@@ -440,7 +441,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     }
 
     // Notify the server of any packet losses
-    if (streamPacketIndex != (int) (lastPacketInStream + 1)) {
+    if (streamPacketIndex != (int)(lastPacketInStream + 1)) {
         // Packets were lost so report this to the server
         connectionLostPackets(lastPacketInStream, streamPacketIndex);
     }
@@ -486,7 +487,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     }
 }
 
-/* Add an RTP Packet to the queue */
+// Add an RTP Packet to the queue
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
     int dataOffset;
 

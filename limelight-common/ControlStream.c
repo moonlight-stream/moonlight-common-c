@@ -4,7 +4,7 @@
 
 #include "ByteBuffer.h"
 
-/* NV control stream packet header */
+// NV control stream packet header
 typedef struct _NVCTL_PACKET_HEADER {
     unsigned short type;
     unsigned short payloadLength;
@@ -47,11 +47,11 @@ static const short packetTypesGen4[] = {
     0x0611, // Frame Stats (unused)
 };
 
-static const char startAGen3[] = {0};
-static const int startBGen3[] = {0, 0, 0, 0xa};
+static const char startAGen3[] = { 0 };
+static const int startBGen3[] = { 0, 0, 0, 0xa };
 
-static const char requestIdrFrameGen4[] = {0, 0};
-static const char startBGen4[] = {0};
+static const char requestIdrFrameGen4[] = { 0, 0 };
+static const char startBGen4[] = { 0 };
 
 static const short payloadLengthsGen3[] = {
     sizeof(startAGen3), // Start A
@@ -83,11 +83,11 @@ static char **preconstructedPayloads;
 
 #define LOSS_REPORT_INTERVAL_MS 50
 
-/* Initializes the control stream */
+// Initializes the control stream
 int initializeControlStream(void) {
     PltCreateEvent(&invalidateRefFramesEvent);
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
-    
+
     if (ServerMajorVersion == 3) {
         packetTypes = (short*)packetTypesGen3;
         payloadLengths = (short*)payloadLengthsGen3;
@@ -116,19 +116,18 @@ void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     }
 }
 
-/* Cleans up control stream */
+// Cleans up control stream
 void destroyControlStream(void) {
     PltCloseEvent(&invalidateRefFramesEvent);
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
 }
 
 int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE *qfit) {
-    int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**) qfit);
+    int err = LbqPollQueueElement(&invalidReferenceFrameTuples, (void**)qfit);
     return (err == LBQ_SUCCESS);
 }
 
 void queueFrameInvalidationTuple(int startFrame, int endFrame) {
-
     if (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION) {
         PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
         qfit = malloc(sizeof(*qfit));
@@ -152,51 +151,51 @@ void queueFrameInvalidationTuple(int startFrame, int endFrame) {
     PltSetEvent(&invalidateRefFramesEvent);
 }
 
-/* Request an IDR frame on demand by the decoder */
+// Request an IDR frame on demand by the decoder
 void requestIdrOnDemand(void) {
     idrFrameRequired = 1;
     PltSetEvent(&invalidateRefFramesEvent);
 }
 
-/* Invalidate reference frames if the decoder is too slow */
+// Invalidate reference frames if the decoder is too slow
 void connectionSinkTooSlow(int startFrame, int endFrame) {
     queueFrameInvalidationTuple(startFrame, endFrame);
 }
 
-/* Invalidate reference frames lost by the network */
+// Invalidate reference frames lost by the network
 void connectionDetectedFrameLoss(int startFrame, int endFrame) {
     queueFrameInvalidationTuple(startFrame, endFrame);
 }
 
-/* When we receive a frame, update the number of our current frame */
+// When we receive a frame, update the number of our current frame
 void connectionReceivedFrame(int frameIndex) {
     currentFrame = frameIndex;
 }
 
-/* When we lose packets, update our packet loss count */
+// When we lose packets, update our packet loss count
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket) {
     lossCountSinceLastReport += (nextReceivedPacket - lastReceivedPacket) - 1;
 }
 
-/* Reads an NV control stream packet */
+// Reads an NV control stream packet
 static PNVCTL_PACKET_HEADER readNvctlPacket(void) {
     NVCTL_PACKET_HEADER staticHeader;
     PNVCTL_PACKET_HEADER fullPacket;
     SOCK_RET err;
 
-    err = recv(ctlSock, (char*) &staticHeader, sizeof(staticHeader), 0);
+    err = recv(ctlSock, (char*)&staticHeader, sizeof(staticHeader), 0);
     if (err != sizeof(staticHeader)) {
         return NULL;
     }
 
-    fullPacket = (PNVCTL_PACKET_HEADER) malloc(staticHeader.payloadLength + sizeof(staticHeader));
+    fullPacket = (PNVCTL_PACKET_HEADER)malloc(staticHeader.payloadLength + sizeof(staticHeader));
     if (fullPacket == NULL) {
         return NULL;
     }
 
     memcpy(fullPacket, &staticHeader, sizeof(staticHeader));
     if (staticHeader.payloadLength != 0) {
-        err = recv(ctlSock, (char*) (fullPacket + 1), staticHeader.payloadLength, 0);
+        err = recv(ctlSock, (char*)(fullPacket + 1), staticHeader.payloadLength, 0);
         if (err != staticHeader.payloadLength) {
             free(fullPacket);
             return NULL;
@@ -219,7 +218,7 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
     packet->payloadLength = paylen;
     memcpy(&packet[1], payload, paylen);
 
-    err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
+    err = send(ctlSock, (char*)packet, sizeof(*packet) + paylen, 0);
     free(packet);
 
     if (err != sizeof(*packet) + paylen) {
@@ -239,12 +238,12 @@ static PNVCTL_PACKET_HEADER sendMessage(short ptype, short paylen, const void* p
 
 static int sendMessageAndDiscardReply(short ptype, short paylen, const void* payload) {
     PNVCTL_PACKET_HEADER reply;
-    
+
     reply = sendMessage(ptype, paylen, payload);
     if (reply == NULL) {
         return 0;
     }
-    
+
     free(reply);
     return 1;
 }
@@ -302,7 +301,7 @@ static void requestIdrFrame(void) {
         // Send the reference frame invalidation request and read the response
         if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
             payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
-            Limelog("Request IDR Frame: Transaction failed: %d\n", (int) LastSocketError());
+            Limelog("Request IDR Frame: Transaction failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
             return;
         }
@@ -311,7 +310,7 @@ static void requestIdrFrame(void) {
         // Send IDR frame request and read the response
         if (!sendMessageAndDiscardReply(packetTypes[IDX_REQUEST_IDR_FRAME],
             payloadLengths[IDX_REQUEST_IDR_FRAME], preconstructedPayloads[IDX_REQUEST_IDR_FRAME])) {
-            Limelog("Request IDR Frame: Transaction failed: %d\n", (int) LastSocketError());
+            Limelog("Request IDR Frame: Transaction failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
             return;
         }
@@ -346,7 +345,7 @@ static void requestInvalidateReferenceFrames(void) {
     // Send the reference frame invalidation request and read the response
     if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
         payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
-        Limelog("Request Invaldiate Reference Frames: Transaction failed: %d\n", (int) LastSocketError());
+        Limelog("Request Invaldiate Reference Frames: Transaction failed: %d\n", (int)LastSocketError());
         ListenerCallbacks.connectionTerminated(LastSocketError());
         return;
     }
@@ -371,14 +370,15 @@ static void invalidateRefFramesFunc(void* context) {
             // Send an IDR frame request
             idrFrameRequired = 0;
             requestIdrFrame();
-        } else {
+        }
+        else {
             // Otherwise invalidate reference frames
             requestInvalidateReferenceFrames();
         }
     }
 }
 
-/* Stops the control stream */
+// Stops the control stream
 int stopControlStream(void) {
     PltInterruptThread(&lossStatsThread);
     PltInterruptThread(&invalidateRefFramesThread);
@@ -397,7 +397,7 @@ int stopControlStream(void) {
     return 0;
 }
 
-/* Starts the control stream */
+// Starts the control stream
 int startControlStream(void) {
     int err;
 
@@ -410,16 +410,16 @@ int startControlStream(void) {
 
     // Send START A
     if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
-                                    payloadLengths[IDX_START_A],
-                                    preconstructedPayloads[IDX_START_A])) {
+        payloadLengths[IDX_START_A],
+        preconstructedPayloads[IDX_START_A])) {
         Limelog("Start A failed: %d\n", (int)LastSocketError());
         return LastSocketFail();
     }
 
     // Send START B
     if (!sendMessageAndDiscardReply(packetTypes[IDX_START_B],
-                                    payloadLengths[IDX_START_B],
-                                    preconstructedPayloads[IDX_START_B])) {
+        payloadLengths[IDX_START_B],
+        preconstructedPayloads[IDX_START_B])) {
         Limelog("Start B failed: %d\n", (int)LastSocketError());
         return LastSocketFail();
     }

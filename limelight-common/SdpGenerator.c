@@ -12,13 +12,13 @@
 #define CHANNEL_MASK_51_SURROUND 0xFC
 
 typedef struct _SDP_OPTION {
-    char name[MAX_OPTION_NAME_LEN+1];
+    char name[MAX_OPTION_NAME_LEN + 1];
     void* payload;
     int payloadLen;
     struct _SDP_OPTION *next;
 } SDP_OPTION, *PSDP_OPTION;
 
-/* Cleanup the attribute list */
+// Cleanup the attribute list
 static void freeAttributeList(PSDP_OPTION head) {
     PSDP_OPTION next;
     while (head != NULL) {
@@ -28,7 +28,7 @@ static void freeAttributeList(PSDP_OPTION head) {
     }
 }
 
-/* Get the size of the attribute list */
+// Get the size of the attribute list
 static int getSerializedAttributeListSize(PSDP_OPTION head) {
     PSDP_OPTION currentEntry = head;
     size_t size = 0;
@@ -44,7 +44,7 @@ static int getSerializedAttributeListSize(PSDP_OPTION head) {
     return (int)size;
 }
 
-/* Populate the serialized attribute list into a string */
+// Populate the serialized attribute list into a string
 static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
     PSDP_OPTION currentEntry = head;
     int offset = 0;
@@ -59,7 +59,7 @@ static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
     return offset;
 }
 
-/* Add an attribute */
+// Add an attribute
 static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload, int payloadLen) {
     PSDP_OPTION option, currentOption;
 
@@ -88,7 +88,7 @@ static int addAttributeBinary(PSDP_OPTION *head, char* name, const void* payload
     return 0;
 }
 
-/* Add an attribute string */
+// Add an attribute string
 static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload) {
     // We purposefully omit the null terminating character
     return addAttributeBinary(head, name, payload, (int)strlen(payload));
@@ -97,42 +97,41 @@ static int addAttributeString(PSDP_OPTION *head, char* name, const char* payload
 static int addGen3Options(PSDP_OPTION *head, char* addrStr) {
     int payloadInt;
     int err = 0;
-    
+
     err |= addAttributeString(head, "x-nv-general.serverAddress", addrStr);
-    
+
     payloadInt = htonl(0x42774141);
     err |= addAttributeBinary(head,
-                              "x-nv-general.featureFlags", &payloadInt, sizeof(payloadInt));
+        "x-nv-general.featureFlags", &payloadInt, sizeof(payloadInt));
 
-    
     payloadInt = htonl(0x41514141);
     err |= addAttributeBinary(head,
-                              "x-nv-video[0].transferProtocol", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[0].transferProtocol", &payloadInt, sizeof(payloadInt));
     err |= addAttributeBinary(head,
-                              "x-nv-video[1].transferProtocol", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[1].transferProtocol", &payloadInt, sizeof(payloadInt));
     err |= addAttributeBinary(head,
-                              "x-nv-video[2].transferProtocol", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[2].transferProtocol", &payloadInt, sizeof(payloadInt));
     err |= addAttributeBinary(head,
-                              "x-nv-video[3].transferProtocol", &payloadInt, sizeof(payloadInt));
-    
+        "x-nv-video[3].transferProtocol", &payloadInt, sizeof(payloadInt));
+
     payloadInt = htonl(0x42414141);
     err |= addAttributeBinary(head,
-                              "x-nv-video[0].rateControlMode", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[0].rateControlMode", &payloadInt, sizeof(payloadInt));
     payloadInt = htonl(0x42514141);
     err |= addAttributeBinary(head,
-                              "x-nv-video[1].rateControlMode", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[1].rateControlMode", &payloadInt, sizeof(payloadInt));
     err |= addAttributeBinary(head,
-                              "x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
+        "x-nv-video[2].rateControlMode", &payloadInt, sizeof(payloadInt));
     err |= addAttributeBinary(head,
-                              "x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
-    
+        "x-nv-video[3].rateControlMode", &payloadInt, sizeof(payloadInt));
+
     err |= addAttributeString(head, "x-nv-vqos[0].bw.flags", "14083");
-    
+
     err |= addAttributeString(head, "x-nv-vqos[0].videoQosMaxConsecutiveDrops", "0");
     err |= addAttributeString(head, "x-nv-vqos[1].videoQosMaxConsecutiveDrops", "0");
     err |= addAttributeString(head, "x-nv-vqos[2].videoQosMaxConsecutiveDrops", "0");
     err |= addAttributeString(head, "x-nv-vqos[3].videoQosMaxConsecutiveDrops", "0");
-    
+
     return err;
 }
 
@@ -142,14 +141,14 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     unsigned char slicesPerFrame;
     int audioChannelCount;
     int audioChannelMask;
-    
+
     sprintf(payloadStr, "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
-    
+
     err |= addAttributeString(head, "x-nv-video[0].rateControlMode", "4");
-    
+
     // Use slicing for increased performance on some decoders
-    slicesPerFrame = (unsigned char) (VideoCallbacks.capabilities >> 24);
+    slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
     if (slicesPerFrame == 0) {
         // If not using slicing, we request 1 slice per frame
         slicesPerFrame = 1;
@@ -176,7 +175,7 @@ static int addGen4Options(PSDP_OPTION *head, char* addrStr) {
     else {
         err |= addAttributeString(head, "x-nv-audio.surround.enable", "0");
     }
-    
+
     return err;
 }
 
@@ -195,7 +194,7 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
 
     sprintf(payloadStr, "%d", StreamConfig.fps);
     err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
-    
+
     sprintf(payloadStr, "%d", StreamConfig.packetSize);
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
@@ -223,15 +222,16 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.enable", "0");
 
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
-    
+
     if (StreamConfig.streamingRemotely) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "0");
         err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "0");
-    } else {
+    }
+    else {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
         err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
     }
-    
+
     if (ServerMajorVersion == 3) {
         err |= addGen3Options(&optionHead, urlSafeAddr);
     }
@@ -247,32 +247,32 @@ static PSDP_OPTION getAttributesList(char *urlSafeAddr) {
     return NULL;
 }
 
-/* Populate the SDP header with required information */
+// Populate the SDP header with required information
 static int fillSdpHeader(char* buffer, int rtspClientVersion, char *urlSafeAddr) {
     return sprintf(buffer,
         "v=0\r\n"
         "o=android 0 %d IN %s %s\r\n"
         "s=NVIDIA Streaming Client\r\n",
-                   rtspClientVersion,
-                   RemoteAddr.ss_family == AF_INET ? "IPv4" : "IPv6",
-                   urlSafeAddr);
+        rtspClientVersion,
+        RemoteAddr.ss_family == AF_INET ? "IPv4" : "IPv6",
+        urlSafeAddr);
 }
 
-/* Populate the SDP tail with required information */
+// Populate the SDP tail with required information
 static int fillSdpTail(char* buffer) {
     return sprintf(buffer,
         "t=0 0\r\n"
         "m=video %d  \r\n",
-                   ServerMajorVersion < 4 ? 47996 : 47998);
+        ServerMajorVersion < 4 ? 47996 : 47998);
 }
 
-/* Get the SDP attributes for the stream config */
+// Get the SDP attributes for the stream config
 char* getSdpPayloadForStreamConfig(int rtspClientVersion, int *length) {
     PSDP_OPTION attributeList;
     int offset;
     char* payload;
     char urlSafeAddr[URLSAFESTRING_LEN];
-    
+
     addrToUrlSafeString(&RemoteAddr, urlSafeAddr);
 
     attributeList = getAttributesList(urlSafeAddr);

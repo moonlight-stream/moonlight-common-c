@@ -3,7 +3,7 @@
 #include "Limelight.h"
 #include "Platform.h"
 
-typedef void (*ThreadEntry)(void *context);
+typedef void(*ThreadEntry)(void *context);
 
 struct thread_context {
     ThreadEntry entry;
