@@ -11,7 +11,7 @@ static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
 static int rtspClientVersion;
 
-/* Create RTSP Option */
+// Create RTSP Option
 static POPTION_ITEM createOptionItem(char* option, char* content)
 {
     POPTION_ITEM item = malloc(sizeof(*item));
@@ -42,7 +42,7 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
     return item;
 }
 
-/* Add an option to the RTSP Message */
+// Add an option to the RTSP Message
 static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
 {
     POPTION_ITEM item = createOptionItem(option, content);
@@ -56,7 +56,7 @@ static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
     return 1;
 }
 
-/* Create an RTSP Request */
+// Create an RTSP Request
 static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 {
     char sequenceNumberStr[16];
@@ -77,7 +77,7 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
     return 1;
 }
 
-/* Send RTSP message and get response */
+// Send RTSP message and get response
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int* error) {
     SOCK_RET err;
     int ret = 0;
@@ -144,7 +144,7 @@ Exit:
     return ret;
 }
 
-/* Terminate the RTSP Handshake process by closing the socket */
+// Terminate the RTSP Handshake process by closing the socket
 void terminateRtspHandshake(void) {
     if (sock != INVALID_SOCKET) {
         closesocket(sock);
@@ -152,7 +152,7 @@ void terminateRtspHandshake(void) {
     }
 }
 
-/* Send RTSP OPTIONS request */
+// Send RTSP OPTIONS request
 static int requestOptions(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
     int ret;
@@ -168,7 +168,7 @@ static int requestOptions(PRTSP_MESSAGE response, int* error) {
     return ret;
 }
 
-/* Send RTSP DESCRIBE request */
+// Send RTSP DESCRIBE request
 static int requestDescribe(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
     int ret;
@@ -192,7 +192,7 @@ static int requestDescribe(PRTSP_MESSAGE response, int* error) {
     return ret;
 }
 
-/* Send RTSP SETUP request */
+// Send RTSP SETUP request
 static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
     int ret;
@@ -224,7 +224,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
     return ret;
 }
 
-/* Send RTSP PLAY request*/
+// Send RTSP PLAY request
 static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
     int ret;
@@ -245,7 +245,7 @@ static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
     return ret;
 }
 
-/* Send RTSP ANNOUNCE message */
+// Send RTSP ANNOUNCE message
 static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
     int ret;
@@ -284,16 +284,16 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
     return ret;
 }
 
-/* Perform RTSP Handshake with the streaming server machine as part of the connection process */
+// Perform RTSP Handshake with the streaming server machine as part of the connection process
 int performRtspHandshake(void) {
     char urlAddr[URLSAFESTRING_LEN];
-    
+
     // Initialize global state
     addrToUrlSafeString(&RemoteAddr, urlAddr);
     sprintf(rtspTargetUrl, "rtsp://%s", urlAddr);
     currentSeqNumber = 1;
     hasSessionId = 0;
-    
+
     if (ServerMajorVersion == 3) {
         rtspClientVersion = 10;
     }
