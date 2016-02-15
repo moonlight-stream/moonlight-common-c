@@ -158,7 +158,7 @@ static void ReceiveThreadProc(void* context) {
             if (packet == NULL) {
                 Limelog("Audio Receive: malloc() failed\n");
                 ListenerCallbacks.connectionTerminated(-1);
-                return;
+                break;
             }
         }
 
@@ -167,7 +167,7 @@ static void ReceiveThreadProc(void* context) {
             Limelog("Audio Receive: recv() failed: %d\n", (int)LastSocketError());
             free(packet);
             ListenerCallbacks.connectionTerminated(LastSocketError());
-            return;
+            break;
         }
 
         if (packet->size < sizeof(RTP_PACKET)) {
@@ -189,7 +189,7 @@ static void ReceiveThreadProc(void* context) {
             if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                 if (!queuePacketToLbq(&packet)) {
                     // An exit signal was received
-                    return;
+                    break;
                 }
             }
             else {
@@ -208,15 +208,24 @@ static void ReceiveThreadProc(void* context) {
                     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                         if (!queuePacketToLbq(&packet)) {
                             // An exit signal was received
-                            return;
+                            break;
                         }
                     }
                     else {
                         decodeInputData(packet);
                     }
                 }
+                
+                // Break on exit
+                if (packet != NULL) {
+                    break;
+                }
             }
         }
+    }
+    
+    if (packet != NULL) {
+        free(packet);
     }
 }
 
