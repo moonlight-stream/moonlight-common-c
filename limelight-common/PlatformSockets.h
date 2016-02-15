@@ -26,7 +26,6 @@ typedef int SOCKADDR_LEN;
 #define SetLastSocketError(x) errno = x
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
-#define closesocket(x) close(x)
 
 typedef int SOCKET;
 typedef ssize_t SOCK_RET;
@@ -42,3 +41,4 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
+void closeSocket(SOCKET s);

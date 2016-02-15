@@ -245,7 +245,7 @@ void stopAudioStream(void) {
     }
 
     if (rtpSocket != INVALID_SOCKET) {
-        closesocket(rtpSocket);
+        closeSocket(rtpSocket);
         rtpSocket = INVALID_SOCKET;
     }
 

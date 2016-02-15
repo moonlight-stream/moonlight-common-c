@@ -96,7 +96,7 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
 
     serializedMessage = serializeRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {
-        closesocket(sock);
+        closeSocket(sock);
         sock = INVALID_SOCKET;
         return ret;
     }
@@ -139,7 +139,7 @@ Exit:
         free(serializedMessage);
     }
 
-    closesocket(sock);
+    closeSocket(sock);
     sock = INVALID_SOCKET;
     return ret;
 }
@@ -147,7 +147,7 @@ Exit:
 // Terminate the RTSP Handshake process by closing the socket
 void terminateRtspHandshake(void) {
     if (sock != INVALID_SOCKET) {
-        closesocket(sock);
+        closeSocket(sock);
         sock = INVALID_SOCKET;
     }
 }

@@ -21,6 +21,19 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
     }
 }
 
+void closeSocket(SOCKET s) {
+    // Calling shutdown() prior to close wakes up callers
+    // blocked in connect(), recv(), and friends.
+    shutdown(s, SHUT_RDWR);
+    
+    // Now close the socket fd
+#ifdef _WIN32
+    closesocket(s);
+#else
+    close(s);
+#endif
+}
+
 SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     SOCKET s;
     struct sockaddr_storage addr;
@@ -45,7 +58,7 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
         sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("bind() failed: %d\n", err);
-        closesocket(s);
+        closeSocket(s);
         SetLastSocketError(err);
         return INVALID_SOCKET;
     }
@@ -86,7 +99,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     if (connect(s, (struct sockaddr*) &addr, addrlen) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("connect() failed: %d\n", err);
-        closesocket(s);
+        closeSocket(s);
         SetLastSocketError(err);
         return INVALID_SOCKET;
     }

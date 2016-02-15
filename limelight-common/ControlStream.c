@@ -384,7 +384,7 @@ int stopControlStream(void) {
     PltInterruptThread(&invalidateRefFramesThread);
 
     if (ctlSock != INVALID_SOCKET) {
-        closesocket(ctlSock);
+        closeSocket(ctlSock);
         ctlSock = INVALID_SOCKET;
     }
 

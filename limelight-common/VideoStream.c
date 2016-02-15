@@ -142,7 +142,7 @@ int readFirstFrame(void) {
     // All that matters is that we close this socket.
     // This starts the flow of video on Gen 3 servers.
 
-    closesocket(firstFrameSocket);
+    closeSocket(firstFrameSocket);
     firstFrameSocket = INVALID_SOCKET;
 
     return 0;
@@ -157,11 +157,11 @@ void stopVideoStream(void) {
     }
 
     if (firstFrameSocket != INVALID_SOCKET) {
-        closesocket(firstFrameSocket);
+        closeSocket(firstFrameSocket);
         firstFrameSocket = INVALID_SOCKET;
     }
     if (rtpSocket != INVALID_SOCKET) {
-        closesocket(rtpSocket);
+        closeSocket(rtpSocket);
         rtpSocket = INVALID_SOCKET;
     }
 
