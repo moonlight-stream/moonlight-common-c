@@ -123,7 +123,6 @@ static int queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
         freePacketList(LbqFlushQueueItems(&packetQueue));
     }
     else if (err == LBQ_INTERRUPTED) {
-        free(*packet);
         return 0;
     }
 
