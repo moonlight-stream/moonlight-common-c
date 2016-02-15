@@ -9,6 +9,8 @@
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 
+#define SHUT_RDWR SD_BOTH
+
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
 
