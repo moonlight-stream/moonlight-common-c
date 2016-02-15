@@ -289,6 +289,8 @@ int startInputStream(void) {
 
 // Stops the input stream
 int stopInputStream(void) {
+    // Signal the input send thread
+    LbqSignalQueueShutdown(&packetQueue);
     PltInterruptThread(&inputSendThread);
 
     if (inputSock != INVALID_SOCKET) {

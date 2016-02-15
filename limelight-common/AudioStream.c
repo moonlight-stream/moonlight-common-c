@@ -249,7 +249,9 @@ static void DecoderThreadProc(void* context) {
 void stopAudioStream(void) {
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
-    if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+    if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {        
+        // Signal threads waiting on the LBQ
+        LbqSignalQueueShutdown(&packetQueue);
         PltInterruptThread(&decoderThread);
     }
 

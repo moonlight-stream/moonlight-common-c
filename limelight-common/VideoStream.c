@@ -1,7 +1,6 @@
 #include "Limelight-internal.h"
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
-#include "LinkedBlockingQueue.h"
 #include "RtpReorderQueue.h"
 
 #define FIRST_FRAME_MAX 1500
@@ -150,6 +149,9 @@ int readFirstFrame(void) {
 
 // Terminate the video stream
 void stopVideoStream(void) {
+    // Wake up client code that may be waiting on the decode unit queue
+    stopVideoDepacketizer();
+    
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {

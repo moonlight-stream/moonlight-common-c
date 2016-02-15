@@ -2,6 +2,8 @@
 
 // Destroy the linked blocking queue and associated mutex and event
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead) {
+    LC_ASSERT(queueHead->shutdown);
+    
     PltDeleteMutex(&queueHead->mutex);
     PltCloseEvent(&queueHead->containsDataEvent);
 
@@ -46,11 +48,21 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
     queueHead->tail = NULL;
     queueHead->sizeBound = sizeBound;
     queueHead->currentSize = 0;
+    queueHead->shutdown = 0;
 
     return 0;
 }
 
+void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead) {
+    queueHead->shutdown = 1;
+    PltSetEvent(&queueHead->containsDataEvent);
+}
+
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+    if (queueHead->shutdown) {
+        return LBQ_INTERRUPTED;
+    }
+    
     entry->flink = NULL;
     entry->data = data;
 
@@ -87,6 +99,10 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
 
 // This must be synchronized with LbqFlushQueueItems by the caller
 int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
+    if (queueHead->shutdown) {
+        return LBQ_INTERRUPTED;
+    }
+    
     if (queueHead->head == NULL) {
         return LBQ_NO_ELEMENT;
     }
@@ -107,6 +123,10 @@ int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
 int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry;
+    
+    if (queueHead->shutdown) {
+        return LBQ_INTERRUPTED;
+    }
 
     if (queueHead->head == NULL) {
         return LBQ_NO_ELEMENT;
@@ -142,10 +162,18 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry;
     int err;
+    
+    if (queueHead->shutdown) {
+        return LBQ_INTERRUPTED;
+    }
 
     for (;;) {
         err = PltWaitForEvent(&queueHead->containsDataEvent);
         if (err != PLT_WAIT_SUCCESS) {
+            return LBQ_INTERRUPTED;
+        }
+
+        if (queueHead->shutdown) {
             return LBQ_INTERRUPTED;
         }
 

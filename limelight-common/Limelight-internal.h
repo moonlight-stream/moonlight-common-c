@@ -39,6 +39,7 @@ void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
 void queueRtpPacket(PRTP_PACKET rtpPacket, int length);
+void stopVideoDepacketizer(void);
 
 void initializeVideoStream(void);
 void destroyVideoStream(void);

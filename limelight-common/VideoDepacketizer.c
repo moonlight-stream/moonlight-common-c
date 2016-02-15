@@ -97,6 +97,12 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     }
 }
 
+void stopVideoDepacketizer(void) {
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        LbqSignalQueueShutdown(&decodeUnitQueue);
+    }
+}
+
 // Cleanup video depacketizer and free malloced memory
 void destroyVideoDepacketizer(void) {
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {

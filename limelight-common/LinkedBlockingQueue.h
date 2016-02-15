@@ -19,6 +19,7 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     PLT_EVENT containsDataEvent;
     int sizeBound;
     int currentSize;
+    int shutdown;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
 } LINKED_BLOCKING_QUEUE, *PLINKED_BLOCKING_QUEUE;
@@ -30,3 +31,4 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead);
+void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead);
