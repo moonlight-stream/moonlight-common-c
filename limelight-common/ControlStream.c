@@ -22,6 +22,7 @@ static PLT_THREAD invalidateRefFramesThread;
 static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport;
 static long currentFrame;
+static int stopping;
 
 static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
@@ -85,6 +86,7 @@ static char**preconstructedPayloads;
 
 // Initializes the control stream
 int initializeControlStream(void) {
+    stopping = 0;
     PltCreateEvent(&invalidateRefFramesEvent);
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
 
@@ -118,6 +120,7 @@ void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 // Cleans up control stream
 void destroyControlStream(void) {
+    LC_ASSERT(stopping);
     PltCloseEvent(&invalidateRefFramesEvent);
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
 }
@@ -358,6 +361,11 @@ static void invalidateRefFramesFunc(void* context) {
         // Wait for a request to invalidate reference frames
         PltWaitForEvent(&invalidateRefFramesEvent);
         PltClearEvent(&invalidateRefFramesEvent);
+        
+        // Bail if we've been shutdown
+        if (stopping) {
+            break;
+        }
 
         // Sometimes we absolutely need an IDR frame
         if (idrFrameRequired) {
@@ -380,6 +388,10 @@ static void invalidateRefFramesFunc(void* context) {
 
 // Stops the control stream
 int stopControlStream(void) {
+    stopping = 1;
+    LbqSignalQueueShutdown(&invalidReferenceFrameTuples);
+    PltSetEvent(&invalidateRefFramesEvent);
+    
     PltInterruptThread(&lossStatsThread);
     PltInterruptThread(&invalidateRefFramesThread);
 
