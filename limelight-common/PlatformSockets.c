@@ -27,23 +27,26 @@ void shutdownTcpSocket(SOCKET s) {
     shutdown(s, SHUT_RDWR);
 }
 
-void shutdownUdpSocket(SOCKET s) {
-    SOCKADDR_LEN len;
-    struct sockaddr_storage addr;
-    unsigned char buf[1];
+int recvUdpSocket(SOCKET s, char* buffer, int size) {
+    fd_set readfds;
+    int err;
+    struct timeval tv;
     
-    // UDP sockets can't be shutdown(), so we'll indicate
-    // termination by sending a 0 byte packet to ourselves
-
-    if (getsockname(s, (struct sockaddr*)&addr, &len) < 0) {
-        Limelog("getsockname() failed: %d\n", (int)LastSocketError());
-        return;
+    FD_ZERO(&readfds);
+    FD_SET(s, &readfds);
+    
+    // Wait up to 500 ms for the socket to be readable
+    tv.tv_sec = 0;
+    tv.tv_usec = 500 * 1000;
+    
+    err = select((int)(s) + 1, &readfds, NULL, NULL, &tv);
+    if (err <= 0) {
+        // Return if an error or timeout occurs
+        return err;
     }
     
-    if (sendto(s, buf, 0, 0, (struct sockaddr*)&addr, len) < 0) {
-        Limelog("sendto() failed: %d\n", (int)LastSocketError());
-        return;
-    }
+    // This won't block since the socket is readable
+    return (int)recv(s, buffer, size, 0);
 }
 
 void closeSocket(SOCKET s) {

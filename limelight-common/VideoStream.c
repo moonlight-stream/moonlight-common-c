@@ -80,11 +80,15 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        err = (int)recv(rtpSocket, buffer, receiveSize, 0);
-        if (err <= 0) {
-            Limelog("Video Receive: recv() failed: %d\n", (int)LastSocketError());
+        err = recvUdpSocket(rtpSocket, buffer, receiveSize);
+        if (err < 0) {
+            Limelog("Video Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
             break;
+        }
+        else if  (err == 0) {
+            // Receive timed out; try again
+            continue;
         }
 
         memcpy(&buffer[receiveSize], &err, sizeof(int));
@@ -160,9 +164,6 @@ void stopVideoStream(void) {
 
     if (firstFrameSocket != INVALID_SOCKET) {
         shutdownTcpSocket(firstFrameSocket);
-    }
-    if (rtpSocket != INVALID_SOCKET) {
-        shutdownUdpSocket(rtpSocket);
     }
 
     PltJoinThread(&udpPingThread);

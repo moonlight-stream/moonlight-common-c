@@ -17,6 +17,7 @@ typedef int SOCKADDR_LEN;
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -43,6 +44,6 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
-void shutdownUdpSocket(SOCKET s);
+int recvUdpSocket(SOCKET s, char* buffer, int size);
 void shutdownTcpSocket(SOCKET s);
 void closeSocket(SOCKET s);

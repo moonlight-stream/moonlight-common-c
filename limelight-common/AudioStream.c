@@ -161,11 +161,15 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        packet->size = (int)recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
-        if (packet->size <= 0) {
-            Limelog("Audio Receive: recv() failed: %d\n", (int)LastSocketError());
+        packet->size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE);
+        if (packet->size < 0) {
+            Limelog("Audio Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());
             break;
+        }
+        else if (packet->size == 0) {
+            // Receive timed out; try again
+            continue;
         }
 
         if (packet->size < sizeof(RTP_PACKET)) {
@@ -252,11 +256,7 @@ void stopAudioStream(void) {
         LbqSignalQueueShutdown(&packetQueue);
         PltInterruptThread(&decoderThread);
     }
-
-    if (rtpSocket != INVALID_SOCKET) {
-        shutdownUdpSocket(rtpSocket);
-    }
-
+    
     PltJoinThread(&udpPingThread);
     PltJoinThread(&receiveThread);
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
