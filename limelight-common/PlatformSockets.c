@@ -111,7 +111,7 @@ int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
-#elif defined(LC_POSIX)
+#elif defined(LC_POSIX) && !defined(LC_CHROME)
     // Disable SIGPIPE signals to avoid us getting
     // killed when a socket gets an EPIPE error
     struct sigaction sa;
