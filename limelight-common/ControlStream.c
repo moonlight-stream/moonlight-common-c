@@ -392,19 +392,23 @@ int stopControlStream(void) {
     LbqSignalQueueShutdown(&invalidReferenceFrameTuples);
     PltSetEvent(&invalidateRefFramesEvent);
     
+    if (ctlSock != INVALID_SOCKET) {
+        shutdownSocket(ctlSock);
+    }
+    
     PltInterruptThread(&lossStatsThread);
     PltInterruptThread(&invalidateRefFramesThread);
-
-    if (ctlSock != INVALID_SOCKET) {
-        closeSocket(ctlSock);
-        ctlSock = INVALID_SOCKET;
-    }
 
     PltJoinThread(&lossStatsThread);
     PltJoinThread(&invalidateRefFramesThread);
 
     PltCloseThread(&lossStatsThread);
     PltCloseThread(&invalidateRefFramesThread);
+    
+    if (ctlSock != INVALID_SOCKET) {
+        closeSocket(ctlSock);
+        ctlSock = INVALID_SOCKET;
+    }
 
     return 0;
 }

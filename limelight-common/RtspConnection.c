@@ -144,11 +144,11 @@ Exit:
     return ret;
 }
 
-// Terminate the RTSP Handshake process by closing the socket
+// Terminate the RTSP Handshake process by shutting down the socket.
+// The thread waiting on RTSP will close the socket.
 void terminateRtspHandshake(void) {
     if (sock != INVALID_SOCKET) {
-        closeSocket(sock);
-        sock = INVALID_SOCKET;
+        shutdownSocket(sock);
     }
 }
 

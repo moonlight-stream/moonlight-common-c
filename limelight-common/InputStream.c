@@ -294,12 +294,16 @@ int stopInputStream(void) {
     PltInterruptThread(&inputSendThread);
 
     if (inputSock != INVALID_SOCKET) {
-        closeSocket(inputSock);
-        inputSock = INVALID_SOCKET;
+        shutdownSocket(inputSock);
     }
 
     PltJoinThread(&inputSendThread);
     PltCloseThread(&inputSendThread);
+    
+    if (inputSock != INVALID_SOCKET) {
+        closeSocket(inputSock);
+        inputSock = INVALID_SOCKET;
+    }
 
     return 0;
 }

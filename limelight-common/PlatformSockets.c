@@ -21,12 +21,13 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
     }
 }
 
-void closeSocket(SOCKET s) {
+void shutdownSocket(SOCKET s) {
     // Calling shutdown() prior to close wakes up callers
     // blocked in connect(), recv(), and friends.
     shutdown(s, SHUT_RDWR);
-    
-    // Now close the socket fd
+}
+
+void closeSocket(SOCKET s) {
 #ifdef _WIN32
     closesocket(s);
 #else
