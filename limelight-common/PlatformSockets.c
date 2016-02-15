@@ -21,10 +21,29 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
     }
 }
 
-void shutdownSocket(SOCKET s) {
+void shutdownTcpSocket(SOCKET s) {
     // Calling shutdown() prior to close wakes up callers
     // blocked in connect(), recv(), and friends.
     shutdown(s, SHUT_RDWR);
+}
+
+void shutdownUdpSocket(SOCKET s) {
+    SOCKADDR_LEN len;
+    struct sockaddr_storage addr;
+    unsigned char buf[1];
+    
+    // UDP sockets can't be shutdown(), so we'll indicate
+    // termination by sending a 0 byte packet to ourselves
+
+    if (getsockname(s, (struct sockaddr*)&addr, &len) < 0) {
+        Limelog("getsockname() failed: %d\n", (int)LastSocketError());
+        return;
+    }
+    
+    if (sendto(s, buf, 0, 0, (struct sockaddr*)&addr, len) < 0) {
+        Limelog("sendto() failed: %d\n", (int)LastSocketError());
+        return;
+    }
 }
 
 void closeSocket(SOCKET s) {

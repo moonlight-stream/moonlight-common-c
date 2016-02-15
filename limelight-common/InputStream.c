@@ -294,7 +294,7 @@ int stopInputStream(void) {
     PltInterruptThread(&inputSendThread);
 
     if (inputSock != INVALID_SOCKET) {
-        shutdownSocket(inputSock);
+        shutdownTcpSocket(inputSock);
     }
 
     PltJoinThread(&inputSendThread);

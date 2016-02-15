@@ -255,8 +255,7 @@ void stopAudioStream(void) {
     }
 
     if (rtpSocket != INVALID_SOCKET) {
-        closeSocket(rtpSocket);
-        rtpSocket = INVALID_SOCKET;
+        shutdownUdpSocket(rtpSocket);
     }
 
     PltJoinThread(&udpPingThread);
@@ -269,6 +268,11 @@ void stopAudioStream(void) {
     PltCloseThread(&receiveThread);
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         PltCloseThread(&decoderThread);
+    }
+    
+    if (rtpSocket != INVALID_SOCKET) {
+        closeSocket(rtpSocket);
+        rtpSocket = INVALID_SOCKET;
     }
 
     AudioCallbacks.cleanup();

@@ -159,12 +159,10 @@ void stopVideoStream(void) {
     }
 
     if (firstFrameSocket != INVALID_SOCKET) {
-        closeSocket(firstFrameSocket);
-        firstFrameSocket = INVALID_SOCKET;
+        shutdownTcpSocket(firstFrameSocket);
     }
     if (rtpSocket != INVALID_SOCKET) {
-        closeSocket(rtpSocket);
-        rtpSocket = INVALID_SOCKET;
+        shutdownUdpSocket(rtpSocket);
     }
 
     PltJoinThread(&udpPingThread);
@@ -177,6 +175,15 @@ void stopVideoStream(void) {
     PltCloseThread(&receiveThread);
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         PltCloseThread(&decoderThread);
+    }
+    
+    if (firstFrameSocket != INVALID_SOCKET) {
+        closeSocket(firstFrameSocket);
+        firstFrameSocket = INVALID_SOCKET;
+    }
+    if (rtpSocket != INVALID_SOCKET) {
+        closeSocket(rtpSocket);
+        rtpSocket = INVALID_SOCKET;
     }
 
     VideoCallbacks.cleanup();

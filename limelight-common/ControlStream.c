@@ -393,7 +393,7 @@ int stopControlStream(void) {
     PltSetEvent(&invalidateRefFramesEvent);
     
     if (ctlSock != INVALID_SOCKET) {
-        shutdownSocket(ctlSock);
+        shutdownTcpSocket(ctlSock);
     }
     
     PltInterruptThread(&lossStatsThread);

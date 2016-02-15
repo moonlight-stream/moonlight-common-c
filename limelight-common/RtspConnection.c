@@ -148,7 +148,7 @@ Exit:
 // The thread waiting on RTSP will close the socket.
 void terminateRtspHandshake(void) {
     if (sock != INVALID_SOCKET) {
-        shutdownSocket(sock);
+        shutdownTcpSocket(sock);
     }
 }
 
