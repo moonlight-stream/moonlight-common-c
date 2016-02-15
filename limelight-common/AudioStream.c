@@ -165,7 +165,6 @@ static void ReceiveThreadProc(void* context) {
         packet->size = (int)recv(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, 0);
         if (packet->size <= 0) {
             Limelog("Audio Receive: recv() failed: %d\n", (int)LastSocketError());
-            free(packet);
             ListenerCallbacks.connectionTerminated(LastSocketError());
             break;
         }
