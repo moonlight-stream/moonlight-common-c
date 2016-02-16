@@ -2,6 +2,7 @@
 #include "Rtsp.h"
 
 #define RTSP_MAX_RESP_SIZE 32768
+#define RTSP_READ_TIMEOUT_SEC 10
 
 static SOCKET sock = INVALID_SOCKET;
 static int currentSeqNumber;
@@ -93,6 +94,7 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
         return ret;
     }
     enableNoDelay(sock);
+    setRecvTimeout(sock, RTSP_READ_TIMEOUT_SEC);
 
     serializedMessage = serializeRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {

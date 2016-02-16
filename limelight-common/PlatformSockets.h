@@ -46,4 +46,5 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
 int recvUdpSocket(SOCKET s, char* buffer, int size);
 void shutdownTcpSocket(SOCKET s);
+void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);

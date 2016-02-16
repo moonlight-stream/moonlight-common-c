@@ -27,6 +27,20 @@ void shutdownTcpSocket(SOCKET s) {
     shutdown(s, SHUT_RDWR);
 }
 
+void setRecvTimeout(SOCKET s, int timeoutSec) {
+#if defined(LC_WINDOWS)
+    int val = timeoutSec * 1000;
+#else
+    struct timeval val;
+    val.tv_sec = timeoutSec;
+    val.tv_usec = 0;
+#endif
+    
+    if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&val, sizeof(val)) < 0) {
+        Limelog("setsockopt(SO_RCVTIMEO) failed: %d\n", (int)LastSocketError());
+    }
+}
+
 int recvUdpSocket(SOCKET s, char* buffer, int size) {
     fd_set readfds;
     int err;
@@ -50,7 +64,7 @@ int recvUdpSocket(SOCKET s, char* buffer, int size) {
 }
 
 void closeSocket(SOCKET s) {
-#ifdef _WIN32
+#if defined(LC_WINDOWS)
     closesocket(s);
 #else
     close(s);
