@@ -139,7 +139,8 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // Start connection
     memcpy(&addr, dstaddr, sizeof(addr));
     addr.sin6_port = htons(port);
-    if (connect(s, (struct sockaddr*) &addr, addrlen) < 0) {
+    err = connect(s, (struct sockaddr*) &addr, addrlen);
+    if (err < 0) {
         err = (int)LastSocketError();
     }
     
