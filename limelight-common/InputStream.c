@@ -15,6 +15,7 @@ static PLT_THREAD inputSendThread;
 static OAES_CTX* oaesContext;
 
 #define MAX_INPUT_PACKET_SIZE 128
+#define INPUT_STREAM_TIMEOUT_SEC 10
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -272,7 +273,8 @@ static void inputSendThreadProc(void* context) {
 int startInputStream(void) {
     int err;
 
-    inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 35043);
+    inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+                                 35043, INPUT_STREAM_TIMEOUT_SEC);
     if (inputSock == INVALID_SOCKET) {
         return LastSocketFail();
     }

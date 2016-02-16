@@ -33,6 +33,8 @@ static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 #define IDX_INVALIDATE_REF_FRAMES 2
 #define IDX_LOSS_STATS 3
 
+#define CONTROL_STREAM_TIMEOUT_SEC 10
+
 static const short packetTypesGen3[] = {
     0x140b, // Start A
     0x1410, // Start B
@@ -417,7 +419,8 @@ int stopControlStream(void) {
 int startControlStream(void) {
     int err;
 
-    ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 47995);
+    ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+                               47995, CONTROL_STREAM_TIMEOUT_SEC);
     if (ctlSock == INVALID_SOCKET) {
         return LastSocketFail();
     }

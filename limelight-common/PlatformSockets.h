@@ -25,6 +25,7 @@ typedef int SOCKADDR_LEN;
 #include <errno.h>
 #include <signal.h>
 
+#define ioctlsocket ioctl
 #define LastSocketError() errno
 #define SetLastSocketError(x) errno = x
 #define INVALID_SOCKET -1
@@ -41,7 +42,7 @@ typedef socklen_t SOCKADDR_LEN;
 #define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
-SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
+SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
 int recvUdpSocket(SOCKET s, char* buffer, int size);

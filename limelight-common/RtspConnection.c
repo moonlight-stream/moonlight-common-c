@@ -2,7 +2,7 @@
 #include "Rtsp.h"
 
 #define RTSP_MAX_RESP_SIZE 32768
-#define RTSP_READ_TIMEOUT_SEC 10
+#define RTSP_TIMEOUT_SEC 10
 
 static SOCKET sock = INVALID_SOCKET;
 static int currentSeqNumber;
@@ -88,13 +88,13 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
 
     *error = -1;
 
-    sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010);
+    sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
     if (sock == INVALID_SOCKET) {
         *error = LastSocketError();
         return ret;
     }
     enableNoDelay(sock);
-    setRecvTimeout(sock, RTSP_READ_TIMEOUT_SEC);
+    setRecvTimeout(sock, RTSP_TIMEOUT_SEC);
 
     serializedMessage = serializeRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {

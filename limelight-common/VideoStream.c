@@ -4,6 +4,7 @@
 #include "RtpReorderQueue.h"
 
 #define FIRST_FRAME_MAX 1500
+#define FIRST_FRAME_TIMEOUT_SEC 10
 
 #define RTP_PORT 47998
 #define FIRST_FRAME_PORT 47996
@@ -218,7 +219,8 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     if (ServerMajorVersion == 3) {
         // Connect this socket to open port 47998 for our ping thread
-        firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen, FIRST_FRAME_PORT);
+        firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+                                            FIRST_FRAME_PORT, FIRST_FRAME_TIMEOUT_SEC);
         if (firstFrameSocket == INVALID_SOCKET) {
             return LastSocketError();
         }
