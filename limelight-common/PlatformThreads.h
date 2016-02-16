@@ -28,7 +28,6 @@ typedef struct _PLT_EVENT {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     int signalled;
-    int cancelled;
 } PLT_EVENT;
 #else
 #error Unsupported platform

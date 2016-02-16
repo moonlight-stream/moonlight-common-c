@@ -239,7 +239,6 @@ int PltCreateEvent(PLT_EVENT* event) {
     pthread_mutex_init(&event->mutex, NULL);
     pthread_cond_init(&event->cond, NULL);
     event->signalled = 0;
-    event->cancelled = 0;
     return 0;
 #endif
 }
@@ -248,12 +247,6 @@ void PltCloseEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
 #else
-    // Wake up anyone going to wait on this event.
-    // There's an inherent race condition in this technique
-    // but it shouldn't be too problematic for our purposes.
-    event->cancelled = 1;
-    pthread_cond_broadcast(&event->cond);
-
     pthread_mutex_destroy(&event->mutex);
     pthread_cond_destroy(&event->cond);
 #endif
@@ -295,20 +288,13 @@ int PltWaitForEvent(PLT_EVENT* event) {
         return -1;
     }
 #else
-    int ret;
-
-    if (event->cancelled) {
-        return PLT_WAIT_INTERRUPTED;
-    }
-
     pthread_mutex_lock(&event->mutex);
-    while (!event->signalled && !event->cancelled) {
+    while (!event->signalled) {
         pthread_cond_wait(&event->cond, &event->mutex);
     }
-    ret = event->cancelled ? PLT_WAIT_INTERRUPTED : PLT_WAIT_SUCCESS;
     pthread_mutex_unlock(&event->mutex);
     
-    return ret;
+    return PLT_WAIT_SUCCESS;
 #endif
 }
 
