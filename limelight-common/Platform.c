@@ -127,7 +127,7 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltJoinThread(PLT_THREAD* thread) {
-    LC_ASSERT(thread->cancelled != 0);
+    LC_ASSERT(thread->cancelled);
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
@@ -194,6 +194,8 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
     ctx->entry = entry;
     ctx->context = context;
     ctx->thread = thread;
+    
+    thread->cancelled = 0;
 
 #if defined(LC_WINDOWS)
     {
@@ -202,8 +204,6 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
             free(ctx);
             return -1;
         }
-
-        thread->cancelled = 0;
 
         thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
         if (thread->handle == NULL) {
