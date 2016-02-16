@@ -60,9 +60,6 @@ void closeSocket(SOCKET s) {
 SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     SOCKET s;
     struct sockaddr_storage addr;
-#ifdef LC_DARWIN
-    int val;
-#endif
     int err;
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
@@ -87,9 +84,11 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     }
 
 #ifdef LC_DARWIN
-    // Disable SIGPIPE on iOS
-    val = 1;
-    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    {
+        // Disable SIGPIPE on iOS
+        int val = 1;
+        setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    }
 #endif
 
     setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*)&bufferSize, sizeof(bufferSize));
@@ -101,9 +100,6 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     SOCKET s;
     struct sockaddr_in6 addr;
     int err;
-#ifdef LC_DARWIN
-    int val;
-#endif
 
     s = socket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (s == INVALID_SOCKET) {
@@ -112,9 +108,11 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     }
 
 #ifdef LC_DARWIN
-    // Disable SIGPIPE on iOS
-    val = 1;
-    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    {
+        // Disable SIGPIPE on iOS
+        int val = 1;
+        setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    }
 #endif
 
     memcpy(&addr, dstaddr, sizeof(addr));
