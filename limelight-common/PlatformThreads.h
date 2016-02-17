@@ -6,29 +6,31 @@
 typedef void(*ThreadEntry)(void* context);
 
 #if defined(LC_WINDOWS)
+typedef HANDLE PLT_MUTEX;
+typedef HANDLE PLT_EVENT;
 typedef struct _PLT_THREAD {
     HANDLE handle;
     int cancelled;
     DWORD tid;
     HANDLE termRequested;
+    PLT_EVENT insertedEvent;
 
     struct _PLT_THREAD* next;
 } PLT_THREAD;
-typedef HANDLE PLT_MUTEX;
-typedef HANDLE PLT_EVENT;
 #elif defined (LC_POSIX)
-typedef struct _PLT_THREAD {
-    pthread_t thread;
-    int cancelled;
-
-    struct _PLT_THREAD* next;
-} PLT_THREAD;
 typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     int signalled;
 } PLT_EVENT;
+typedef struct _PLT_THREAD {
+    pthread_t thread;
+    int cancelled;
+    PLT_EVENT insertedEvent;
+
+    struct _PLT_THREAD* next;
+} PLT_THREAD;
 #else
 #error Unsupported platform
 #endif

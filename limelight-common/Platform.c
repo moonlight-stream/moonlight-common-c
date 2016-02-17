@@ -40,6 +40,9 @@ void* ThreadProc(void* context) {
     ctx->thread->next = thread_head;
     thread_head = ctx->thread;
     PltUnlockMutex(&thread_list_lock);
+    
+    // Signal the event since the thread is now inserted
+    PltSetEvent(&ctx->thread->insertedEvent);
 
     ctx->entry(ctx->context);
 
@@ -164,6 +167,8 @@ void PltCloseThread(PLT_THREAD* thread) {
     }
 
     PltUnlockMutex(&thread_list_lock);
+    
+    PltCloseEvent(&thread->insertedEvent);
 
 #if defined(LC_WINDOWS)
     CloseHandle(thread->termRequested);
@@ -195,36 +200,49 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
     ctx->context = context;
     ctx->thread = thread;
     
+    err = PltCreateEvent(&thread->insertedEvent);
+    if (err != 0) {
+        free(ctx);
+        return err;
+    }
+    
     thread->cancelled = 0;
 
 #if defined(LC_WINDOWS)
     {
         thread->termRequested = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
         if (thread->termRequested == NULL) {
+            PltCloseEvent(&thread->insertedEvent);
             free(ctx);
             return -1;
         }
 
         thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
         if (thread->handle == NULL) {
+            PltCloseEvent(&thread->insertedEvent);
             CloseHandle(thread->termRequested);
             free(ctx);
             return -1;
-        }
-        else {            
-            err = 0;
         }
     }
 #else
     {
         err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
         if (err != 0) {
+            PltCloseEvent(&thread->insertedEvent);
             free(ctx);
+            return err;
         }
     }
 #endif
+    
+    // We shouldn't get this far with an error
+    LC_ASSERT(err == 0);
+    
+    // Wait for the thread to be started and inserted into the active threads list
+    PltWaitForEvent(&thread->insertedEvent);
 
-    return err;
+    return 0;
 }
 
 int PltCreateEvent(PLT_EVENT* event) {
