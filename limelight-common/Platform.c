@@ -4,12 +4,12 @@
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
 
-
 struct thread_context {
     ThreadEntry entry;
     void* context;
-    PLT_THREAD* thread;
 };
+
+static int running_threads = 0;
 
 #if defined(LC_WINDOWS)
 void LimelogWindows(char* Format, ...) {
@@ -24,9 +24,6 @@ void LimelogWindows(char* Format, ...) {
 }
 #endif
 
-PLT_MUTEX thread_list_lock;
-PLT_THREAD* thread_head;
-
 #if defined(LC_WINDOWS)
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     struct thread_context* ctx = (struct thread_context*)lpParameter;
@@ -34,15 +31,6 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
 #endif
-    
-    // Add this thread to the thread list
-    PltLockMutex(&thread_list_lock);
-    ctx->thread->next = thread_head;
-    thread_head = ctx->thread;
-    PltUnlockMutex(&thread_list_lock);
-    
-    // Signal the event since the thread is now inserted
-    PltSetEvent(&ctx->thread->insertedEvent);
 
     ctx->entry(ctx->context);
 
@@ -63,31 +51,6 @@ void PltSleepMs(int ms) {
     usleep(usecs);
 #endif
 }
-
-#if defined(LC_WINDOWS)
-static PLT_THREAD* findCurrentThread(void) {
-    PLT_THREAD* current_thread;
-
-    PltLockMutex(&thread_list_lock);
-    current_thread = thread_head;
-    while (current_thread != NULL) {
-#if defined(LC_WINDOWS)
-        if (current_thread->tid == GetCurrentThreadId()) {
-#else
-        if (pthread_equal(current_thread->thread, pthread_self())) {
-#endif
-            break;
-        }
-
-        current_thread = current_thread->next;
-    }
-    PltUnlockMutex(&thread_list_lock);
-
-    LC_ASSERT(current_thread != NULL);
-    
-    return current_thread;
-}
-#endif
 
 int PltCreateMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
@@ -139,39 +102,8 @@ void PltJoinThread(PLT_THREAD* thread) {
 }
 
 void PltCloseThread(PLT_THREAD* thread) {
-    PLT_THREAD* current_thread;
-
-    PltLockMutex(&thread_list_lock);
-
-    if (thread_head == thread)
-    {
-        // Remove the thread from the head
-        thread_head = thread_head->next;
-    }
-    else
-    {
-        // Find the thread in the list
-        current_thread = thread_head;
-        while (current_thread != NULL) {
-            if (current_thread->next == thread) {
-                break;
-            }
-
-            current_thread = current_thread->next;
-        }
-
-        LC_ASSERT(current_thread != NULL);
-
-        // Unlink this thread
-        current_thread->next = thread->next;
-    }
-
-    PltUnlockMutex(&thread_list_lock);
-    
-    PltCloseEvent(&thread->insertedEvent);
-
+	running_threads--;
 #if defined(LC_WINDOWS)
-    CloseHandle(thread->termRequested);
     CloseHandle(thread->handle);
 #endif
 }
@@ -189,7 +121,6 @@ void PltInterruptThread(PLT_THREAD* thread) {
 
 int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
     struct thread_context* ctx;
-    int err;
 
     ctx = (struct thread_context*)malloc(sizeof(*ctx));
     if (ctx == NULL) {
@@ -198,49 +129,28 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
 
     ctx->entry = entry;
     ctx->context = context;
-    ctx->thread = thread;
-    
-    err = PltCreateEvent(&thread->insertedEvent);
-    if (err != 0) {
-        free(ctx);
-        return err;
-    }
     
     thread->cancelled = 0;
 
 #if defined(LC_WINDOWS)
     {
-        thread->termRequested = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
-        if (thread->termRequested == NULL) {
-            PltCloseEvent(&thread->insertedEvent);
-            free(ctx);
-            return -1;
-        }
-
         thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
         if (thread->handle == NULL) {
-            PltCloseEvent(&thread->insertedEvent);
-            CloseHandle(thread->termRequested);
             free(ctx);
             return -1;
         }
     }
 #else
     {
-        err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
+        int err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
         if (err != 0) {
-            PltCloseEvent(&thread->insertedEvent);
             free(ctx);
             return err;
         }
     }
 #endif
-    
-    // We shouldn't get this far with an error
-    LC_ASSERT(err == 0);
-    
-    // Wait for the thread to be started and inserted into the active threads list
-    PltWaitForEvent(&thread->insertedEvent);
+
+	running_threads++;
 
     return 0;
 }
@@ -290,16 +200,10 @@ void PltClearEvent(PLT_EVENT* event) {
 int PltWaitForEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     DWORD error;
-    HANDLE objects[2];
 
-    objects[0] = *event;
-    objects[1] = findCurrentThread()->termRequested;
-    error = WaitForMultipleObjectsEx(2, objects, FALSE, INFINITE, FALSE);
+    error = WaitForSingleObjectEx(*event, INFINITE, FALSE);
     if (error == WAIT_OBJECT_0) {
         return PLT_WAIT_SUCCESS;
-    }
-    else if (error == WAIT_OBJECT_0 + 1) {
-        return PLT_WAIT_INTERRUPTED;
     }
     else {
         LC_ASSERT(0);
@@ -336,13 +240,11 @@ int initializePlatform(void) {
         return err;
     }
 
-    return PltCreateMutex(&thread_list_lock);
+	return 0;
 }
 
 void cleanupPlatform(void) {
     cleanupPlatformSockets();
 
-    LC_ASSERT(thread_head == NULL);
-
-    PltDeleteMutex(&thread_list_lock);
+	LC_ASSERT(running_threads == 0);
 }
