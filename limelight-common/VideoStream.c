@@ -136,7 +136,7 @@ static void DecoderThreadProc(void* context) {
 
         if (ret == DR_NEED_IDR) {
             Limelog("Requesting IDR frame on behalf of DR\n");
-            requestIdrOnDemand();
+            requestDecoderRefresh();
         }
     }
 }

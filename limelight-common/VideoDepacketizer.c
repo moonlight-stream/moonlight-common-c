@@ -225,8 +225,8 @@ static void reassembleAvcFrame(int frameNumber) {
                 freeQueuedDecodeUnit(qdu);
 
                 if (ret == DR_NEED_IDR) {
-                    Limelog("Request IDR frame on behalf of DR\n");
-                    requestIdrOnDemand();
+                    Limelog("Requesting IDR frame on behalf of DR\n");
+                    requestDecoderRefresh();
                 }
             }
 
@@ -328,6 +328,22 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
             queueFragment(currentPos->data, start, currentPos->offset - start);
         }
     }
+}
+
+// Dumps the decode unit queue and ensures the next frame submitted to the decoder will be
+// an IDR frame
+void requestDecoderRefresh(void) {
+    // Wait for the next IDR frame
+    waitingForIdrFrame = 1;
+    
+    // Flush the decode unit queue and pending state
+    dropAvcFrameState();
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
+    }
+    
+    // Request the IDR frame
+    requestIdrOnDemand();
 }
 
 // Return 1 if packet is the first one in the frame
