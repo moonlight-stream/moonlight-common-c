@@ -146,7 +146,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     
 #ifdef FIONBIO
     {
-        struct fd_set writefds, exceptfds;
+        fd_set writefds, exceptfds;
         struct timeval tv;
         
         FD_ZERO(&writefds);
