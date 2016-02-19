@@ -299,8 +299,11 @@ int performRtspHandshake(void) {
     if (ServerMajorVersion == 3) {
         rtspClientVersion = 10;
     }
-    else {
+    else if (ServerMajorVersion == 4) {
         rtspClientVersion = 11;
+    }
+    else {
+        rtspClientVersion = 12;
     }
 
     {

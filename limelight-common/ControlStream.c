@@ -21,7 +21,8 @@ static PLT_THREAD lossStatsThread;
 static PLT_THREAD invalidateRefFramesThread;
 static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport;
-static long currentFrame;
+static long lastGoodFrame;
+static long lastSeenFrame;
 static int stopping;
 
 static int idrFrameRequired;
@@ -49,12 +50,22 @@ static const short packetTypesGen4[] = {
     0x060a, // Loss Stats
     0x0611, // Frame Stats (unused)
 };
+static const short packetTypesGen5[] = {
+    0x0305, // Start A
+    0x0307, // Start B
+    0x0301, // Invalidate reference frames
+    0x0201, // Loss Stats
+    0x0204, // Frame Stats (unused)
+};
 
 static const char startAGen3[] = { 0 };
 static const int startBGen3[] = { 0, 0, 0, 0xa };
 
 static const char requestIdrFrameGen4[] = { 0, 0 };
 static const char startBGen4[] = { 0 };
+
+static const char startAGen5[] = { 0, 0 };
+static const char startBGen5[] = { 0 };
 
 static const short payloadLengthsGen3[] = {
     sizeof(startAGen3), // Start A
@@ -70,6 +81,13 @@ static const short payloadLengthsGen4[] = {
     32, // Loss Stats
     64, // Frame Stats
 };
+static const short payloadLengthsGen5[] = {
+    sizeof(startAGen5), // Start A
+    sizeof(startBGen5), // Start B
+    24, // Invalidate reference frames
+    32, // Loss Stats
+    80, // Frame Stats
+};
 
 static const char* preconstructedPayloadsGen3[] = {
     startAGen3,
@@ -78,6 +96,10 @@ static const char* preconstructedPayloadsGen3[] = {
 static const char* preconstructedPayloadsGen4[] = {
     requestIdrFrameGen4,
     startBGen4
+};
+static const char* preconstructedPayloadsGen5[] = {
+    startAGen5,
+    startBGen5
 };
 
 static short* packetTypes;
@@ -97,14 +119,20 @@ int initializeControlStream(void) {
         payloadLengths = (short*)payloadLengthsGen3;
         preconstructedPayloads = (char**)preconstructedPayloadsGen3;
     }
-    else {
+    else if (ServerMajorVersion == 4) {
         packetTypes = (short*)packetTypesGen4;
         payloadLengths = (short*)payloadLengthsGen4;
         preconstructedPayloads = (char**)preconstructedPayloadsGen4;
     }
+    else {
+        packetTypes = (short*)packetTypesGen5;
+        payloadLengths = (short*)payloadLengthsGen5;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen5;
+    }
 
     idrFrameRequired = 0;
-    currentFrame = 0;
+    lastGoodFrame = 0;
+    lastSeenFrame = 0;
     lossCountSinceLastReport = 0;
 
     return 0;
@@ -173,8 +201,12 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame) {
 }
 
 // When we receive a frame, update the number of our current frame
-void connectionReceivedFrame(int frameIndex) {
-    currentFrame = frameIndex;
+void connectionReceivedCompleteFrame(int frameIndex) {
+    lastGoodFrame = frameIndex;
+}
+
+void connectionSawFrame(int frameIndex) {
+    lastSeenFrame = frameIndex;
 }
 
 // When we lose packets, update our packet loss count
@@ -270,7 +302,7 @@ static void lossStatsThreadFunc(void* context) {
         BbPutInt(&byteBuffer, lossCountSinceLastReport);
         BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
         BbPutInt(&byteBuffer, 1000);
-        BbPutLong(&byteBuffer, currentFrame);
+        BbPutLong(&byteBuffer, lastGoodFrame);
         BbPutInt(&byteBuffer, 0);
         BbPutInt(&byteBuffer, 0);
         BbPutInt(&byteBuffer, 0x14);
@@ -297,10 +329,17 @@ static void lossStatsThreadFunc(void* context) {
 static void requestIdrFrame(void) {
     long long payload[3];
 
-    if (ServerMajorVersion == 3) {
+    if (ServerMajorVersion != 4) {
         // Form the payload
-        payload[0] = 0;
-        payload[1] = 0xFFFFF;
+        if (lastSeenFrame < 0x20) {
+            payload[0] = 0;
+            payload[1] = 0x20;
+        }
+        else {
+            payload[0] = lastSeenFrame - 0x20;
+            payload[1] = lastSeenFrame;
+        }
+
         payload[2] = 0;
 
         // Send the reference frame invalidation request and read the response
