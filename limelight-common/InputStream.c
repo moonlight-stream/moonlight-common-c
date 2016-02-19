@@ -326,7 +326,11 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 
     holder->packetLength = sizeof(NV_MOUSE_MOVE_PACKET);
     holder->packet.mouseMove.header.packetType = htonl(PACKET_TYPE_MOUSE_MOVE);
-    holder->packet.mouseMove.magic = htonl(MOUSE_MOVE_MAGIC);
+    holder->packet.mouseMove.magic = (MOUSE_MOVE_MAGIC);
+    // On Gen 5 servers, the header code is incremented by one
+    if (ServerMajorVersion >= 5) {
+        holder->packet.mouseMove.magic += 0x01000000;
+    }
     holder->packet.mouseMove.deltaX = htons(deltaX);
     holder->packet.mouseMove.deltaY = htons(deltaY);
 
@@ -355,6 +359,9 @@ int LiSendMouseButtonEvent(char action, int button) {
     holder->packetLength = sizeof(NV_MOUSE_BUTTON_PACKET);
     holder->packet.mouseButton.header.packetType = htonl(PACKET_TYPE_MOUSE_BUTTON);
     holder->packet.mouseButton.action = action;
+    if (ServerMajorVersion >= 5) {
+        holder->packet.mouseButton.action++;
+    }
     holder->packet.mouseButton.button = htonl(button);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
@@ -432,6 +439,10 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         holder->packetLength = sizeof(NV_MULTI_CONTROLLER_PACKET);
         holder->packet.multiController.header.packetType = htonl(PACKET_TYPE_MULTI_CONTROLLER);
         holder->packet.multiController.headerA = MC_HEADER_A;
+        // On Gen 5 servers, the header code is decremented by one
+        if (ServerMajorVersion >= 5) {
+            holder->packet.multiController.headerA--;
+        }
         holder->packet.multiController.headerB = MC_HEADER_B;
         holder->packet.multiController.controllerNumber = controllerNumber;
         holder->packet.multiController.midA = MC_ACTIVE_CONTROLLER_FLAGS;
@@ -488,6 +499,10 @@ int LiSendScrollEvent(signed char scrollClicks) {
     holder->packetLength = sizeof(NV_SCROLL_PACKET);
     holder->packet.scroll.header.packetType = htonl(PACKET_TYPE_SCROLL);
     holder->packet.scroll.magicA = MAGIC_A;
+    // On Gen 5 servers, the header code is incremented by one
+    if (ServerMajorVersion >= 5) {
+        holder->packet.scroll.magicA++;
+    }
     holder->packet.scroll.zero1 = 0;
     holder->packet.scroll.zero2 = 0;
     holder->packet.scroll.scrollAmt1 = htons(scrollClicks * 120);

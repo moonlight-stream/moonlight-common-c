@@ -29,7 +29,8 @@ void destroyControlStream(void);
 void requestIdrOnDemand(void);
 void connectionSinkTooSlow(int startFrame, int endFrame);
 void connectionDetectedFrameLoss(int startFrame, int endFrame);
-void connectionReceivedFrame(int frameIndex);
+void connectionReceivedCompleteFrame(int frameIndex);
+void connectionSawFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 
 int performRtspHandshake(void);

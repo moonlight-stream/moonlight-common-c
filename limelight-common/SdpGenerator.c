@@ -139,8 +139,6 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
     unsigned char slicesPerFrame;
-    int audioChannelCount;
-    int audioChannelMask;
 
     sprintf(payloadStr, "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
@@ -156,32 +154,25 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     sprintf(payloadStr, "%d", slicesPerFrame);
     err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
 
-    if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
-        audioChannelCount = CHANNEL_COUNT_51_SURROUND;
-        audioChannelMask = CHANNEL_MASK_51_SURROUND;
-    }
-    else {
-        audioChannelCount = CHANNEL_COUNT_STEREO;
-        audioChannelMask = CHANNEL_MASK_STEREO;
-    }
+    return err;
+}
 
-    sprintf(payloadStr, "%d", audioChannelCount);
-    err |= addAttributeString(head, "x-nv-audio.surround.numChannels", payloadStr);
-    sprintf(payloadStr, "%d", audioChannelMask);
-    err |= addAttributeString(head, "x-nv-audio.surround.channelMask", payloadStr);
-    if (audioChannelCount > 2) {
-        err |= addAttributeString(head, "x-nv-audio.surround.enable", "1");
-    }
-    else {
-        err |= addAttributeString(head, "x-nv-audio.surround.enable", "0");
-    }
+static int addGen5Options(PSDP_OPTION* head) {
+    int err = 0;
 
+    // We want to use the legacy TCP connections for control and input rather than the new UDP stuff
+    err |= addAttributeString(head, "x-nv-general.useReliableUdp", "0");
+    err |= addAttributeString(head, "x-nv-ri.useControlChannel", "0");
+    err |= addAttributeString(head, "x-nv-vqos[0].enableQec", "0");
+    
     return err;
 }
 
 static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     PSDP_OPTION optionHead;
     char payloadStr[92];
+    int audioChannelCount;
+    int audioChannelMask;
     int err;
 
     optionHead = NULL;
@@ -200,20 +191,26 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
     err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
 
-    if (StreamConfig.streamingRemotely) {
-        err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
-        err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
-    }
-
     err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
     err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 
-    // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
-    // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
-    // to the requested value.
     sprintf(payloadStr, "%d", StreamConfig.bitrate);
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+    if (ServerMajorVersion >= 5) {
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrateKbps", payloadStr);
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
+    }
+    else {
+        if (StreamConfig.streamingRemotely) {
+            err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
+            err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
+        }
+        // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
+        // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
+        // to the requested value.
+
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
+    }
 
     // Using FEC turns padding on which makes us have to take the slow path
     // in the depacketizer, not to mention exposing some ambiguous cases with
@@ -235,8 +232,33 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     if (ServerMajorVersion == 3) {
         err |= addGen3Options(&optionHead, urlSafeAddr);
     }
-    else {
+    else if (ServerMajorVersion == 4) {
         err |= addGen4Options(&optionHead, urlSafeAddr);
+    }
+    else {
+        err |= addGen5Options(&optionHead);
+    }
+
+    if (ServerMajorVersion >= 4) {
+        if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
+            audioChannelCount = CHANNEL_COUNT_51_SURROUND;
+            audioChannelMask = CHANNEL_MASK_51_SURROUND;
+        }
+        else {
+            audioChannelCount = CHANNEL_COUNT_STEREO;
+            audioChannelMask = CHANNEL_MASK_STEREO;
+        }
+
+        sprintf(payloadStr, "%d", audioChannelCount);
+        err |= addAttributeString(&optionHead, "x-nv-audio.surround.numChannels", payloadStr);
+        sprintf(payloadStr, "%d", audioChannelMask);
+        err |= addAttributeString(&optionHead, "x-nv-audio.surround.channelMask", payloadStr);
+        if (audioChannelCount > 2) {
+            err |= addAttributeString(&optionHead, "x-nv-audio.surround.enable", "1");
+        }
+        else {
+            err |= addAttributeString(&optionHead, "x-nv-audio.surround.enable", "0");
+        }
     }
 
     if (err == 0) {

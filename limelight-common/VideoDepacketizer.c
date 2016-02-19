@@ -231,7 +231,7 @@ static void reassembleAvcFrame(int frameNumber) {
             }
 
             // Notify the control connection
-            connectionReceivedFrame(frameNumber);
+            connectionReceivedCompleteFrame(frameNumber);
 
             // Clear frame drops
             consecutiveFrameDrops = 0;
@@ -392,6 +392,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
         return;
     }
 
+    // Notify the listener of the latest frame we've seen from the PC
+    connectionSawFrame(frameIndex);
+
     // Look for a frame start before receiving a frame end
     if (firstPacket && decodingFrame)
     {
@@ -468,6 +471,12 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
         connectionLostPackets(lastPacketInStream, streamPacketIndex);
     }
     lastPacketInStream = streamPacketIndex;
+
+    // If this is the first packet, skip the frame header (if one exists)
+    if (firstPacket && ServerMajorVersion >= 5) {
+        currentPos.offset += 8;
+        currentPos.length -= 8;
+    }
 
     if (firstPacket &&
         getSpecialSeq(&currentPos, &specialSeq) &&
