@@ -434,7 +434,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         holder->packet.multiController.headerA = MC_HEADER_A;
         holder->packet.multiController.headerB = MC_HEADER_B;
         holder->packet.multiController.controllerNumber = controllerNumber;
-        holder->packet.multiController.midA = MC_MID_A;
+        holder->packet.multiController.midA = MC_ACTIVE_CONTROLLER_FLAGS;
         holder->packet.multiController.midB = MC_MID_B;
         holder->packet.multiController.buttonFlags = buttonFlags;
         holder->packet.multiController.leftTrigger = leftTrigger;
