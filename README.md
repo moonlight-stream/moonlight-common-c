@@ -1,6 +1,6 @@
 #Moonlight
 
-Moonlight-common-c contains common C code between Moonlight clients, including 
+Moonlight-common-c contains common C code between [Moonlight](http://moonlight-stream.com) clients, including 
 [Moonlight Chrome](https://github.com/moonlight-stream/moonlight-chrome) and
 [Moonlight iOS](https://github.com/moonlight-stream/moonlight-ios).
 
