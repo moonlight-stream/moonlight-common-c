@@ -163,7 +163,9 @@ static int addGen5Options(PSDP_OPTION* head) {
     // We want to use the legacy TCP connections for control and input rather than the new UDP stuff
     err |= addAttributeString(head, "x-nv-general.useReliableUdp", "0");
     err |= addAttributeString(head, "x-nv-ri.useControlChannel", "0");
-    err |= addAttributeString(head, "x-nv-vqos[0].enableQec", "0");
+    
+    // Disable dynamic resolution switching
+    err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
     
     return err;
 }
