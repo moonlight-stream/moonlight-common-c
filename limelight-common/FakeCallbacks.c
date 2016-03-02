@@ -1,6 +1,6 @@
 #include "Limelight-internal.h"
 
-static void fakeDrSetup(int width, int height, int redrawRate, void* context, int drFlags) {}
+static void fakeDrSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags) {}
 static void fakeDrCleanup(void) {}
 static int fakeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) { return DR_OK; }
 

@@ -32,6 +32,10 @@ typedef struct _STREAM_CONFIGURATION {
     // Specifies the channel configuration of the audio stream.
     // See AUDIO_CONFIGURATION_XXX constants below.
     int audioConfiguration;
+    
+    // Specifies that the client can accept an H.265 video stream
+    // if the server is able to provide one.
+    int supportsHevc;
 
     // AES encryption data for the remote input stream. This must be
     // the same as what was passed as rikey and rikeyid
@@ -54,7 +58,7 @@ typedef struct _LENTRY {
     int length;
 } LENTRY, *PLENTRY;
 
-// A decode unit describes a buffer chain of H264 data from multiple packets
+// A decode unit describes a buffer chain of video data from multiple packets
 typedef struct _DECODE_UNIT {
     // Length of the entire buffer chain in bytes
     int fullLength;
@@ -69,6 +73,14 @@ typedef struct _DECODE_UNIT {
 // Specifies that the audio stream should be in 5.1 surround sound if the PC is able
 #define AUDIO_CONFIGURATION_51_SURROUND 1
 
+// Passed to DecoderRendererSetup to indicate that the following video stream will be
+// in H.264 format
+#define VIDEO_FORMAT_H264 1
+
+// Passed to DecoderRendererSetup to indicate that the following video stream will be
+// in H.265 format
+#define VIDEO_FORMAT_H265 2
+
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the
 // renderer is non-blocking. This flag is valid on both audio and video renderers.
@@ -80,17 +92,17 @@ typedef struct _DECODE_UNIT {
 #define CAPABILITY_REFERENCE_FRAME_INVALIDATION 0x2
 
 // If set in the video renderer capabilities field, this macro specifies that the renderer
-// supports H264 slicing to increase decoding performance. The parameter specifies the desired
+// supports slicing to increase decoding performance. The parameter specifies the desired
 // number of slices per frame. This capability is only valid on video renderers.
 #define CAPABILITY_SLICES_PER_FRAME(x) (((unsigned char)(x)) << 24)
 
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder
-typedef void(*DecoderRendererSetup)(int width, int height, int redrawRate, void* context, int drFlags);
+typedef void(*DecoderRendererSetup)(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
 
 // This callback performs the teardown of the video decoder
 typedef void(*DecoderRendererCleanup)(void);
 
-// This callback provides Annex B formatted H264 elementary stream data to the
+// This callback provides Annex B formatted elementary stream data to the
 // decoder. If the decoder is unable to process the submitted data for some reason,
 // it must return DR_NEED_IDR to generate a keyframe.
 #define DR_OK 0

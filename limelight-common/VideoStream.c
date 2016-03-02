@@ -197,7 +197,8 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     // This must be called before the decoder thread starts submitting
     // decode units
-    VideoCallbacks.setup(StreamConfig.width,
+    LC_ASSERT(NegotiatedVideoFormat != 0);
+    VideoCallbacks.setup(NegotiatedVideoFormat, StreamConfig.width,
         StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
 
     rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);

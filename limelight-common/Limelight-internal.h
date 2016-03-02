@@ -14,6 +14,7 @@ extern STREAM_CONFIGURATION StreamConfig;
 extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
 extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
+extern int NegotiatedVideoFormat;
 
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 

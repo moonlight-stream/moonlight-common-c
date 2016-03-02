@@ -15,6 +15,7 @@ STREAM_CONFIGURATION StreamConfig;
 CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
+int NegotiatedVideoFormat;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -177,6 +178,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     void* renderContext, int drFlags, int _serverMajorVersion) {
     int err;
 
+    NegotiatedVideoFormat = 0;
     ServerMajorVersion = _serverMajorVersion;
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
 

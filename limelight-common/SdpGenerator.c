@@ -138,21 +138,9 @@ static int addGen3Options(PSDP_OPTION* head, char* addrStr) {
 static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
-    unsigned char slicesPerFrame;
 
     sprintf(payloadStr, "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
-
-    err |= addAttributeString(head, "x-nv-video[0].rateControlMode", "4");
-
-    // Use slicing for increased performance on some decoders
-    slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
-    if (slicesPerFrame == 0) {
-        // If not using slicing, we request 1 slice per frame
-        slicesPerFrame = 1;
-    }
-    sprintf(payloadStr, "%d", slicesPerFrame);
-    err |= addAttributeString(head, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
 
     return err;
 }
@@ -242,6 +230,29 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     }
 
     if (ServerMajorVersion >= 4) {
+        if (NegotiatedVideoFormat == VIDEO_FORMAT_H265) {
+            err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
+            
+            // Disable slicing on HEVC
+            err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", "1");
+        }
+        else {
+            unsigned char slicesPerFrame;
+            
+            err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "0");
+            
+            // Use slicing for increased performance on some decoders
+            slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
+            if (slicesPerFrame == 0) {
+                // If not using slicing, we request 1 slice per frame
+                slicesPerFrame = 1;
+            }
+            sprintf(payloadStr, "%d", slicesPerFrame);
+            err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
+        }
+        
         if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
             audioChannelCount = CHANNEL_COUNT_51_SURROUND;
             audioChannelMask = CHANNEL_MASK_51_SURROUND;

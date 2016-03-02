@@ -338,6 +338,19 @@ int performRtspHandshake(void) {
                 response.message.response.statusCode);
             return response.message.response.statusCode;
         }
+        
+        // The RTSP DESCRIBE reply will contain a collection of SDP media attributes that
+        // describe the various supported video stream formats and include the SPS, PPS,
+        // and VPS (if applicable). We will use this information to determine whether the
+        // server can support HEVC. For some reason, they still set the MIME type of the HEVC
+        // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
+        // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
+        if (StreamConfig.supportsHevc && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
+            NegotiatedVideoFormat = VIDEO_FORMAT_H265;
+        }
+        else {
+            NegotiatedVideoFormat = VIDEO_FORMAT_H264;
+        }
 
         freeMessage(&response);
     }

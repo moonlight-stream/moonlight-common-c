@@ -46,8 +46,8 @@ void initializeVideoDepacketizer(int pktSize) {
     strictIdrFrameWait = !(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
 }
 
-// Free malloced memory in AvcFrameState*/
-static void cleanupAvcFrameState(void) {
+// Free the NAL chain
+static void cleanupFrameState(void) {
     PLENTRY lastEntry;
 
     while (nalChainHead != NULL) {
@@ -59,8 +59,8 @@ static void cleanupAvcFrameState(void) {
     nalChainDataLength = 0;
 }
 
-// Cleanup AVC frame state and set that we're waiting for an IDR Frame*/
-static void dropAvcFrameState(void) {
+// Cleanup frame state and set that we're waiting for an IDR Frame
+static void dropFrameState(void) {
     // We'll need an IDR frame now if we're in strict mode
     if (strictIdrFrameWait) {
         waitingForIdrFrame = 1;
@@ -81,7 +81,7 @@ static void dropAvcFrameState(void) {
         requestIdrOnDemand();
     }
 
-    cleanupAvcFrameState();
+    cleanupFrameState();
 }
 
 // Cleanup the list of decode units
@@ -109,7 +109,7 @@ void destroyVideoDepacketizer(void) {
         freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
     }
 
-    cleanupAvcFrameState();
+    cleanupFrameState();
 }
 
 // Returns 1 if candidate is a frame start and 0 otherwise
@@ -117,8 +117,8 @@ static int isSeqFrameStart(PBUFFER_DESC candidate) {
     return (candidate->length == 4 && candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
-// Returns 1 if candidate an AVC start and 0 otherwise
-static int isSeqAvcStart(PBUFFER_DESC candidate) {
+// Returns 1 if candidate is an Annex B start and 0 otherwise
+static int isSeqAnnexBStart(PBUFFER_DESC candidate) {
     return (candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
@@ -188,8 +188,39 @@ void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
     free(qdu);
 }
 
+
+// Returns 1 if the special sequence describes an I-frame
+static int isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
+    switch (specialSeq->data[specialSeq->offset + specialSeq->length]) {
+        case 0x20:
+        case 0x22:
+        case 0x24:
+        case 0x26:
+        case 0x28:
+        case 0x2A:
+            // H265
+            return 1;
+            
+        case 0x65:
+            // H264
+            return 1;
+            
+        default:
+            return 0;
+    }
+}
+
+// Returns 1 if this buffer describes an IDR frame
+static int isIdrFrameStart(PBUFFER_DESC buffer) {
+    BUFFER_DESC specialSeq;
+    return getSpecialSeq(buffer, &specialSeq) &&
+        isSeqFrameStart(&specialSeq) &&
+        (specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67 || // H264 SPS
+         specialSeq.data[specialSeq.offset + specialSeq.length] == 0x40); // H265 VPS
+}
+
 // Reassemble the frame with the given frame number
-static void reassembleAvcFrame(int frameNumber) {
+static void reassembleFrame(int frameNumber) {
     if (nalChainHead != NULL) {
         PQUEUED_DECODE_UNIT qdu = (PQUEUED_DECODE_UNIT)malloc(sizeof(*qdu));
         if (qdu != NULL) {
@@ -206,7 +237,7 @@ static void reassembleAvcFrame(int frameNumber) {
                     // Clear frame state and wait for an IDR
                     nalChainHead = qdu->decodeUnit.bufferList;
                     nalChainDataLength = qdu->decodeUnit.fullLength;
-                    dropAvcFrameState();
+                    dropFrameState();
 
                     // Free the DU
                     free(qdu);
@@ -268,25 +299,25 @@ static void queueFragment(char*data, int offset, int length) {
 // Process an RTP Payload
 static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC currentPos) {
     BUFFER_DESC specialSeq;
-    int decodingAvc = 0;
+    int decodingVideo = 0;
 
     while (currentPos->length != 0) {
         int start = currentPos->offset;
 
         if (getSpecialSeq(currentPos, &specialSeq)) {
-            if (isSeqAvcStart(&specialSeq)) {
-                // Now we're decoding AVC
-                decodingAvc = 1;
+            if (isSeqAnnexBStart(&specialSeq)) {
+                // Now we're decoding video
+                decodingVideo = 1;
 
                 if (isSeqFrameStart(&specialSeq)) {
                     // Now we're working on a frame
                     decodingFrame = 1;
 
                     // Reassemble any pending frame
-                    reassembleAvcFrame(videoPacket->frameIndex);
+                    reassembleFrame(videoPacket->frameIndex);
 
-                    if (specialSeq.data[specialSeq.offset + specialSeq.length] == 0x65) {
-                        // This is the NALU code for I-frame data
+                    if (isSeqReferenceFrameStart(&specialSeq)) {
+                        // No longer waiting for an IDR frame
                         waitingForIdrFrame = 0;
                     }
                 }
@@ -296,13 +327,13 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
                 currentPos->offset += specialSeq.length;
             }
             else {
-                // Check if this is padding after a full AVC frame
-                if (decodingAvc && isSeqPadding(currentPos)) {
-                    reassembleAvcFrame(videoPacket->frameIndex);
+                // Check if this is padding after a full frame
+                if (decodingVideo && isSeqPadding(currentPos)) {
+                    reassembleFrame(videoPacket->frameIndex);
                 }
 
-                // Not decoding AVC
-                decodingAvc = 0;
+                // Not decoding video
+                decodingVideo = 0;
 
                 // Just skip this byte
                 currentPos->length--;
@@ -314,7 +345,7 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
         while (currentPos->length != 0) {
             // Check if this should end the current NAL
             if (getSpecialSeq(currentPos, &specialSeq)) {
-                if (decodingAvc || !isSeqPadding(&specialSeq)) {
+                if (decodingVideo || !isSeqPadding(&specialSeq)) {
                     break;
                 }
             }
@@ -324,7 +355,7 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
             currentPos->length--;
         }
 
-        if (decodingAvc) {
+        if (decodingVideo) {
             queueFragment(currentPos->data, start, currentPos->offset - start);
         }
     }
@@ -337,7 +368,7 @@ void requestDecoderRefresh(void) {
     waitingForIdrFrame = 1;
     
     // Flush the decode unit queue and pending state
-    dropAvcFrameState();
+    dropFrameState();
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
     }
@@ -363,7 +394,7 @@ static void processRtpPayloadFast(BUFFER_DESC location) {
 
 // Process an RTP Payload
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
-    BUFFER_DESC currentPos, specialSeq;
+    BUFFER_DESC currentPos;
     int frameIndex;
     char flags;
     int firstPacket;
@@ -403,7 +434,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
         // Unexpected start of next frame before terminating the last
         waitingForNextSuccessfulFrame = 1;
-        dropAvcFrameState();
+        dropFrameState();
     }
     // Look for a non-frame start before a frame start
     else if (!firstPacket && !decodingFrame) {
@@ -417,7 +448,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
             waitingForNextSuccessfulFrame = 1;
 
-            dropAvcFrameState();
+            dropFrameState();
             decodingFrame = 0;
             return;
         }
@@ -436,7 +467,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
             // Wait until next complete frame
             waitingForNextSuccessfulFrame = 1;
-            dropAvcFrameState();
+            dropFrameState();
         }
         else if (nextFrameNumber != frameIndex) {
             // Duplicate packet or FEC dup
@@ -458,7 +489,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
             waitingForNextSuccessfulFrame = 1;
 
-            dropAvcFrameState();
+            dropFrameState();
             decodingFrame = 0;
 
             return;
@@ -478,10 +509,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
         currentPos.length -= 8;
     }
 
-    if (firstPacket &&
-        getSpecialSeq(&currentPos, &specialSeq) &&
-        isSeqFrameStart(&specialSeq) &&
-        specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67)
+    if (firstPacket && isIdrFrameStart(&currentPos))
     {
         // SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
         processRtpPayloadSlow(videoPacket, &currentPos);
@@ -508,11 +536,11 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
         if (waitingForIdrFrame) {
             Limelog("Waiting for IDR frame\n");
 
-            dropAvcFrameState();
+            dropFrameState();
             return;
         }
 
-        reassembleAvcFrame(frameIndex);
+        reassembleFrame(frameIndex);
 
         startFrameNumber = nextFrameNumber;
     }
