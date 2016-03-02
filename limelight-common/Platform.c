@@ -114,9 +114,6 @@ int PltIsThreadInterrupted(PLT_THREAD* thread) {
 
 void PltInterruptThread(PLT_THREAD* thread) {
     thread->cancelled = 1;
-#if defined(LC_WINDOWS)
-    SetEvent(thread->termRequested);
-#endif
 }
 
 int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
@@ -134,7 +131,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
 
 #if defined(LC_WINDOWS)
     {
-        thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, &thread->tid);
+        thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
         if (thread->handle == NULL) {
             free(ctx);
             return -1;
