@@ -1,6 +1,8 @@
 #include "PlatformThreads.h"
 #include "Platform.h"
 
+#include <enet/enet.h>
+
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
 
@@ -236,12 +238,19 @@ int initializePlatform(void) {
     if (err != 0) {
         return err;
     }
+    
+    err = enet_initialize();
+    if (err != 0) {
+        return err;
+    }
 
 	return 0;
 }
 
 void cleanupPlatform(void) {
     cleanupPlatformSockets();
+    
+    enet_deinitialize();
 
 	LC_ASSERT(running_threads == 0);
 }

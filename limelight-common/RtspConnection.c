@@ -1,16 +1,21 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 
+#include <enet/enet.h>
+
 #define RTSP_MAX_RESP_SIZE 32768
 #define RTSP_TIMEOUT_SEC 10
 
-static SOCKET sock = INVALID_SOCKET;
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
 static char sessionIdString[16];
 static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
 static int rtspClientVersion;
+
+static SOCKET sock = INVALID_SOCKET;
+static ENetHost* client;
+static ENetPeer* peer;
 
 // Create RTSP Option
 static POPTION_ITEM createOptionItem(char* option, char* content)
@@ -78,8 +83,120 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
     return 1;
 }
 
-// Send RTSP message and get response
-static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int* error) {
+// Send RTSP message and get response over ENet
+static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
+    ENetEvent event;
+    char* serializedMessage;
+    int messageLen;
+    int offset;
+    ENetPacket* packet;
+    char* payload;
+    int payloadLength;
+    int ret;
+
+    // We're going to handle the payload separately, so temporarily set the payload to NULL
+    payload = request->payload;
+    payloadLength = request->payloadLength;
+    request->payload = NULL;
+    request->payloadLength = 0;
+    
+    // Serialize the RTSP message into a message buffer
+    serializedMessage = serializeRtspMessage(request, &messageLen);
+    if (serializedMessage == NULL) {
+        ret = 0;
+        goto Exit;
+    }
+    
+    // Create the reliable packet that describes our outgoing message
+    packet = enet_packet_create(serializedMessage, messageLen, ENET_PACKET_FLAG_RELIABLE);
+    if (packet == NULL) {
+        ret = 0;
+        goto Exit;
+    }
+    
+    // Send the message
+    enet_peer_send(peer, 0, packet);
+    enet_host_flush(client);
+
+    // If we have a payload to send, we'll need to send that separately
+    if (payload != NULL) {
+        packet = enet_packet_create(payload, payloadLength, ENET_PACKET_FLAG_RELIABLE);
+        if (packet == NULL) {
+            ret = 0;
+            goto Exit;
+        }
+
+        // Send the payload
+        enet_peer_send(peer, 0, packet);
+        enet_host_flush(client);
+    }
+    
+    // Wait for a reply
+    if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+        event.type != ENET_EVENT_TYPE_RECEIVE) {
+        Limelog("Failed to receive RTSP reply\n");
+        ret = 0;
+        goto Exit;
+    }
+
+    if (event.packet->dataLength > RTSP_MAX_RESP_SIZE) {
+        Limelog("RTSP message too long\n");
+        ret = 0;
+        goto Exit;
+    }
+
+    // Copy the data out and destroy the packet
+    memcpy(responseBuffer, event.packet->data, event.packet->dataLength);
+    offset = event.packet->dataLength;
+    enet_packet_destroy(event.packet);
+
+    // Wait for the payload if we're expecting some
+    if (expectingPayload) {
+        // Only wait 1 second since the packets should be here immediately
+        // after the header.
+        if (enet_host_service(client, &event, 1000) <= 0 ||
+            event.type != ENET_EVENT_TYPE_RECEIVE) {
+            Limelog("Failed to receive RTSP reply payload\n");
+            ret = 0;
+            goto Exit;
+        }
+
+        if (event.packet->dataLength + offset > RTSP_MAX_RESP_SIZE) {
+            Limelog("RTSP message payload too long\n");
+            ret = 0;
+            goto Exit;
+        }
+
+        // Copy the payload out to the end of the response buffer and destroy the packet
+        memcpy(&responseBuffer[offset], event.packet->data, event.packet->dataLength);
+        offset += event.packet->dataLength;
+        enet_packet_destroy(event.packet);
+    }
+        
+    if (parseRtspMessage(response, responseBuffer, offset) == RTSP_ERROR_SUCCESS) {
+        // Successfully parsed response
+        ret = 1;
+    }
+    else {
+        Limelog("Failed to parse RTSP response\n");
+        ret = 0;
+    }
+
+Exit:
+    // Swap back the payload pointer to avoid leaking memory later
+    request->payload = payload;
+    request->payloadLength = payloadLength;
+
+    // Free the serialized buffer
+    if (serializedMessage != NULL) {
+        free(serializedMessage);
+    }
+
+    return ret;
+}
+
+// Send RTSP message and get response over TCP
+static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
     SOCK_RET err;
     int ret = 0;
     int offset;
@@ -146,11 +263,31 @@ Exit:
     return ret;
 }
 
+static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
+    // Gen 5+ does RTSP over ENet not TCP
+    if (ServerMajorVersion >= 5) {
+        return transactRtspMessageEnet(request, response, expectingPayload, error);
+    }
+    else {
+        return transactRtspMessageTcp(request, response, expectingPayload, error);
+    }
+}
+
 // Terminate the RTSP Handshake process by shutting down the socket.
 // The thread waiting on RTSP will close the socket.
 void terminateRtspHandshake(void) {
     if (sock != INVALID_SOCKET) {
         shutdownTcpSocket(sock);
+    }
+    
+    if (peer != NULL) {
+        enet_peer_reset(peer);
+        peer = NULL;
+    }
+    
+    if (client != NULL) {
+        enet_host_destroy(client);
+        client = NULL;
     }
 }
 
@@ -163,7 +300,7 @@ static int requestOptions(PRTSP_MESSAGE response, int* error) {
 
     ret = initializeRtspRequest(&request, "OPTIONS", rtspTargetUrl);
     if (ret != 0) {
-        ret = transactRtspMessage(&request, response, error);
+        ret = transactRtspMessage(&request, response, 0, error);
         freeMessage(&request);
     }
 
@@ -183,7 +320,7 @@ static int requestDescribe(PRTSP_MESSAGE response, int* error) {
             "application/sdp") &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
-            ret = transactRtspMessage(&request, response, error);
+            ret = transactRtspMessage(&request, response, 1, error);
         }
         else {
             ret = 0;
@@ -213,7 +350,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
         if (addOption(&request, "Transport", " ") &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
-            ret = transactRtspMessage(&request, response, error);
+            ret = transactRtspMessage(&request, response, 0, error);
         }
         else {
             ret = 0;
@@ -236,7 +373,7 @@ static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
     ret = initializeRtspRequest(&request, "PLAY", target);
     if (ret != 0) {
         if (addOption(&request, "Session", sessionIdString)) {
-            ret = transactRtspMessage(&request, response, error);
+            ret = transactRtspMessage(&request, response, 0, error);
         }
         else {
             ret = 0;
@@ -277,7 +414,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
             goto FreeMessage;
         }
 
-        ret = transactRtspMessage(&request, response, error);
+        ret = transactRtspMessage(&request, response, 0, error);
 
     FreeMessage:
         freeMessage(&request);
@@ -304,6 +441,37 @@ int performRtspHandshake(void) {
     }
     else {
         rtspClientVersion = 12;
+    }
+    
+    // Gen 5 servers use ENet to do the RTSP handshake
+    if (ServerMajorVersion >= 5) {
+        ENetAddress address;
+        ENetEvent event;
+        
+        // Create a client that can use 1 outgoing connection and 1 channel
+        client = enet_host_create(NULL, 1, 1, 0, 0);
+        if (client == NULL) {
+            return -1;
+        }
+    
+        enet_address_set_host(&address, RemoteAddrString);
+        address.port = 48010;
+    
+        // Connect to the host
+        peer = enet_host_connect(client, &address, 1, 0);
+        if (peer == NULL) {
+            return -1;
+        }
+    
+        // Wait for the connect to complete
+        if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+            event.type != ENET_EVENT_TYPE_CONNECT) {
+            Limelog("RTSP: Failed to connect to UDP port 48010\n");
+            return -1;
+        }
+
+        // Ensure the connect verify ACK is sent immediately
+        enet_host_flush(client);
     }
 
     {
@@ -453,6 +621,19 @@ int performRtspHandshake(void) {
         }
 
         freeMessage(&response);
+    }
+    
+    // Cleanup the ENet stuff
+    if (ServerMajorVersion >= 5) {
+        if (peer != NULL) {
+            enet_peer_reset(peer);
+            peer = NULL;
+        }
+        
+        if (client != NULL) {
+            enet_host_destroy(client);
+            client = NULL;
+        }
     }
 
     return 0;

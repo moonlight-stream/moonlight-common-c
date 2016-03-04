@@ -7,6 +7,7 @@
 #include "Video.h"
 
 // Common globals
+extern char* RemoteAddrString;
 extern struct sockaddr_storage RemoteAddr;
 extern SOCKADDR_LEN RemoteAddrLen;
 extern int ServerMajorVersion;

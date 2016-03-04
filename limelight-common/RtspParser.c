@@ -174,7 +174,13 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
                 endCheck = &token[0] + strlen(token) + 1;
 
                 // See if we've hit the end of the message. The first \r is missing because it's been tokenized
-                if (startsWith(endCheck, "\n\r\n")) {
+                if (startsWith(endCheck, "\n") && endCheck[1] == '\0') {
+                    // RTSP over ENet doesn't always have the second CRLF for some reason
+                    messageEnded = 1;
+
+                    break;
+                }
+                else if (startsWith(endCheck, "\n\r\n")) {
                     // We've encountered the end of the message - mark it thus
                     messageEnded = 1;
 

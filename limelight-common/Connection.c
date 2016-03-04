@@ -8,6 +8,7 @@ static PLT_THREAD terminationCallbackThread;
 static long terminationCallbackErrorCode;
 
 // Common globals
+char* RemoteAddrString;
 struct sockaddr_storage RemoteAddr;
 SOCKADDR_LEN RemoteAddrLen;
 int ServerMajorVersion;
@@ -108,6 +109,11 @@ void LiStopConnection(void) {
         Limelog("done\n");
     }
     LC_ASSERT(stage == STAGE_NONE);
+    
+    if (RemoteAddrString != NULL) {
+        free(RemoteAddrString);
+        RemoteAddrString = NULL;
+    }
 }
 
 static void terminationCallbackThreadFunc(void* context)
@@ -181,6 +187,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     NegotiatedVideoFormat = 0;
     ServerMajorVersion = _serverMajorVersion;
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
+    RemoteAddrString = strdup(host);
 
     // Replace missing callbacks with placeholders
     fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks);
