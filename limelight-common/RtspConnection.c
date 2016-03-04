@@ -147,7 +147,7 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
 
     // Copy the data out and destroy the packet
     memcpy(responseBuffer, event.packet->data, event.packet->dataLength);
-    offset = event.packet->dataLength;
+    offset = (int) event.packet->dataLength;
     enet_packet_destroy(event.packet);
 
     // Wait for the payload if we're expecting some
@@ -169,7 +169,7 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
 
         // Copy the payload out to the end of the response buffer and destroy the packet
         memcpy(&responseBuffer[offset], event.packet->data, event.packet->dataLength);
-        offset += event.packet->dataLength;
+        offset += (int) event.packet->dataLength;
         enet_packet_destroy(event.packet);
     }
         

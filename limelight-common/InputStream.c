@@ -269,10 +269,10 @@ static void inputSendThreadProc(void* context) {
             }
         }
         else {
-            err = sendInputPacketOnControlStream(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+            err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
             if (err < 0) {
-                Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", err);
+                Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(LastSocketError());
                 return;
             }
