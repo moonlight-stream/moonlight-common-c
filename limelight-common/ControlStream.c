@@ -257,7 +257,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     ENetPacket* enetPacket;
     ENetEvent event;
 
-    LC_ASSERT(ServerMajorVersion > 5);
+    LC_ASSERT(ServerMajorVersion >= 5);
 
     packet = malloc(sizeof(*packet) + paylen);
     if (packet == NULL) {
