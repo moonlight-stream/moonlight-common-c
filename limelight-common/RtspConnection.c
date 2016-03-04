@@ -281,7 +281,7 @@ void terminateRtspHandshake(void) {
     }
     
     if (peer != NULL) {
-        enet_peer_reset(peer);
+        enet_peer_disconnect_now(peer, 0);
         peer = NULL;
     }
     
@@ -626,7 +626,7 @@ int performRtspHandshake(void) {
     // Cleanup the ENet stuff
     if (ServerMajorVersion >= 5) {
         if (peer != NULL) {
-            enet_peer_reset(peer);
+            enet_peer_disconnect_now(peer, 0);
             peer = NULL;
         }
         

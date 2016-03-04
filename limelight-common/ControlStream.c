@@ -524,7 +524,7 @@ int stopControlStream(void) {
     PltSetEvent(&invalidateRefFramesEvent);
     
     if (peer != NULL) {
-        enet_peer_reset(peer);
+        enet_peer_disconnect_now(peer, 0);
     }
 
     if (ctlSock != INVALID_SOCKET) {
