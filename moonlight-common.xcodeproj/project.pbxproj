@@ -8,6 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		988814E81B044E570081B9A8 /* FakeCallbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = 988814E71B044E570081B9A8 /* FakeCallbacks.c */; };
+		98C875881C8973C800A5829E /* callbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C8757F1C8973C800A5829E /* callbacks.c */; };
+		98C875891C8973C800A5829E /* compress.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875801C8973C800A5829E /* compress.c */; };
+		98C8758A1C8973C800A5829E /* host.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875811C8973C800A5829E /* host.c */; };
+		98C8758B1C8973C800A5829E /* list.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875821C8973C800A5829E /* list.c */; };
+		98C8758C1C8973C800A5829E /* packet.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875831C8973C800A5829E /* packet.c */; };
+		98C8758D1C8973C800A5829E /* peer.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875841C8973C800A5829E /* peer.c */; };
+		98C8758E1C8973C800A5829E /* protocol.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875851C8973C800A5829E /* protocol.c */; };
+		98C8758F1C8973C800A5829E /* unix.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875861C8973C800A5829E /* unix.c */; };
+		98C875901C8973C800A5829E /* win32.c in Sources */ = {isa = PBXBuildFile; fileRef = 98C875871C8973C800A5829E /* win32.c */; };
 		98E197771B1752B200F421E2 /* Platform.c in Sources */ = {isa = PBXBuildFile; fileRef = 98E197761B1752B200F421E2 /* Platform.c */; };
 		98E1977A1B1752C300F421E2 /* RtpReorderQueue.c in Sources */ = {isa = PBXBuildFile; fileRef = 98E197781B1752C300F421E2 /* RtpReorderQueue.c */; };
 		98E1977B1B1752C300F421E2 /* RtpReorderQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = 98E197791B1752C300F421E2 /* RtpReorderQueue.h */; };
@@ -44,6 +53,15 @@
 
 /* Begin PBXFileReference section */
 		988814E71B044E570081B9A8 /* FakeCallbacks.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = FakeCallbacks.c; sourceTree = "<group>"; };
+		98C8757F1C8973C800A5829E /* callbacks.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = callbacks.c; path = enet/callbacks.c; sourceTree = "<group>"; };
+		98C875801C8973C800A5829E /* compress.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = compress.c; path = enet/compress.c; sourceTree = "<group>"; };
+		98C875811C8973C800A5829E /* host.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = host.c; path = enet/host.c; sourceTree = "<group>"; };
+		98C875821C8973C800A5829E /* list.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = list.c; path = enet/list.c; sourceTree = "<group>"; };
+		98C875831C8973C800A5829E /* packet.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = packet.c; path = enet/packet.c; sourceTree = "<group>"; };
+		98C875841C8973C800A5829E /* peer.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = peer.c; path = enet/peer.c; sourceTree = "<group>"; };
+		98C875851C8973C800A5829E /* protocol.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = protocol.c; path = enet/protocol.c; sourceTree = "<group>"; };
+		98C875861C8973C800A5829E /* unix.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = unix.c; path = enet/unix.c; sourceTree = "<group>"; };
+		98C875871C8973C800A5829E /* win32.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = win32.c; path = enet/win32.c; sourceTree = "<group>"; };
 		98E197761B1752B200F421E2 /* Platform.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = Platform.c; sourceTree = "<group>"; };
 		98E197781B1752C300F421E2 /* RtpReorderQueue.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = RtpReorderQueue.c; sourceTree = "<group>"; };
 		98E197791B1752C300F421E2 /* RtpReorderQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = RtpReorderQueue.h; sourceTree = "<group>"; };
@@ -93,9 +111,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		98C8757E1C89739200A5829E /* enet */ = {
+			isa = PBXGroup;
+			children = (
+				98C8757F1C8973C800A5829E /* callbacks.c */,
+				98C875801C8973C800A5829E /* compress.c */,
+				98C875811C8973C800A5829E /* host.c */,
+				98C875821C8973C800A5829E /* list.c */,
+				98C875831C8973C800A5829E /* packet.c */,
+				98C875841C8973C800A5829E /* peer.c */,
+				98C875851C8973C800A5829E /* protocol.c */,
+				98C875861C8973C800A5829E /* unix.c */,
+				98C875871C8973C800A5829E /* win32.c */,
+			);
+			name = enet;
+			sourceTree = "<group>";
+		};
 		FB290E2519B37A4E004C83CF = {
 			isa = PBXGroup;
 			children = (
+				98C8757E1C89739200A5829E /* enet */,
 				FB290E3519B37A8B004C83CF /* limelight-common */,
 				FB290E2F19B37A4E004C83CF /* Products */,
 			);
@@ -244,8 +279,15 @@
 				98E1977A1B1752C300F421E2 /* RtpReorderQueue.c in Sources */,
 				FB290E6C19B37A8B004C83CF /* PlatformSockets.c in Sources */,
 				FB290E6519B37A8B004C83CF /* oaes_base64.c in Sources */,
+				98C8758C1C8973C800A5829E /* packet.c in Sources */,
 				FB290E6319B37A8B004C83CF /* LinkedBlockingQueue.c in Sources */,
+				98C875881C8973C800A5829E /* callbacks.c in Sources */,
+				98C8758D1C8973C800A5829E /* peer.c in Sources */,
+				98C8758E1C8973C800A5829E /* protocol.c in Sources */,
+				98C8758F1C8973C800A5829E /* unix.c in Sources */,
 				988814E81B044E570081B9A8 /* FakeCallbacks.c in Sources */,
+				98C875901C8973C800A5829E /* win32.c in Sources */,
+				98C8758A1C8973C800A5829E /* host.c in Sources */,
 				FB290E7619B37A8B004C83CF /* VideoStream.c in Sources */,
 				FB290E5E19B37A8B004C83CF /* ControlStream.c in Sources */,
 				FB290E7519B37A8B004C83CF /* VideoDepacketizer.c in Sources */,
@@ -253,7 +295,9 @@
 				FB290E7319B37A8B004C83CF /* SdpGenerator.c in Sources */,
 				FB290E6019B37A8B004C83CF /* InputStream.c in Sources */,
 				FB290E5A19B37A8B004C83CF /* AudioStream.c in Sources */,
+				98C8758B1C8973C800A5829E /* list.c in Sources */,
 				FB290E5B19B37A8B004C83CF /* ByteBuffer.c in Sources */,
+				98C875891C8973C800A5829E /* compress.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,6 +386,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				EXECUTABLE_PREFIX = lib;
+				HEADER_SEARCH_PATHS = enet/include;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -355,6 +400,7 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				EXECUTABLE_PREFIX = lib;
+				HEADER_SEARCH_PATHS = enet/include;
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = "$(TARGET_NAME)";
