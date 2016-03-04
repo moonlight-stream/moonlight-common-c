@@ -258,13 +258,24 @@ static void inputSendThreadProc(void* context) {
         memcpy(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
             &encryptedLengthPrefix, sizeof(encryptedLengthPrefix));
 
-        // Send the encrypted payload
-        err = send(inputSock, (const char*)&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
-            (int)(encryptedSize + sizeof(encryptedLengthPrefix)), 0);
-        if (err <= 0) {
-            Limelog("Input: send() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
-            return;
+        if (ServerMajorVersion < 5) {
+            // Send the encrypted payload
+            err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+                (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
+            if (err <= 0) {
+                Limelog("Input: send() failed: %d\n", (int) LastSocketError());
+                ListenerCallbacks.connectionTerminated(LastSocketError());
+                return;
+            }
+        }
+        else {
+            err = sendInputPacketOnControlStream(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+                (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
+            if (err < 0) {
+                Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", err);
+                ListenerCallbacks.connectionTerminated(LastSocketError());
+                return;
+            }
         }
     }
 }
@@ -273,13 +284,16 @@ static void inputSendThreadProc(void* context) {
 int startInputStream(void) {
     int err;
 
-    inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
-                                 35043, INPUT_STREAM_TIMEOUT_SEC);
-    if (inputSock == INVALID_SOCKET) {
-        return LastSocketFail();
-    }
+    // After Gen 5, we send input on the control stream
+    if (ServerMajorVersion < 5) {
+        inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+            35043, INPUT_STREAM_TIMEOUT_SEC);
+        if (inputSock == INVALID_SOCKET) {
+            return LastSocketFail();
+        }
 
-    enableNoDelay(inputSock);
+        enableNoDelay(inputSock);
+    }
 
     err = PltCreateThread(inputSendThreadProc, NULL, &inputSendThread);
     if (err != 0) {

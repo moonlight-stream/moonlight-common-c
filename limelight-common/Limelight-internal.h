@@ -34,6 +34,7 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedCompleteFrame(int frameIndex);
 void connectionSawFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
+int sendInputPacketOnControlStream(unsigned char* data, int length);
 
 int performRtspHandshake(void);
 void terminateRtspHandshake(void);

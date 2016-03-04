@@ -148,9 +148,9 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
 static int addGen5Options(PSDP_OPTION* head) {
     int err = 0;
 
-    // We want to use the legacy TCP connections for control and input rather than the new UDP stuff
-    err |= addAttributeString(head, "x-nv-general.useReliableUdp", "0");
-    err |= addAttributeString(head, "x-nv-ri.useControlChannel", "0");
+    // We want to use the new ENet connections for control and input
+    err |= addAttributeString(head, "x-nv-general.useReliableUdp", "1");
+    err |= addAttributeString(head, "x-nv-ri.useControlChannel", "1");
     
     // Disable dynamic resolution switching
     err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
