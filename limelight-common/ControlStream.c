@@ -256,6 +256,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     PNVCTL_ENET_PACKET_HEADER packet;
     ENetPacket* enetPacket;
     ENetEvent event;
+    int err;
 
     LC_ASSERT(ServerMajorVersion >= 5);
 
@@ -268,7 +269,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     memcpy(&packet[1], payload, paylen);
 
     // Gen 5+ servers do control protocol over ENet instead of TCP
-    while (enet_host_service(client, &event, 0) > 0) {
+    while ((err = enet_host_service(client, &event, 0)) > 0) {
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
             enet_packet_destroy(event.packet);
         }
@@ -277,6 +278,11 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
             free(packet);
             return 0;
         }
+    }
+    
+    if (err < 0) {
+        Limelog("Control stream connection failed\n");
+        return 0;
     }
 
     enetPacket = enet_packet_create(packet, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
