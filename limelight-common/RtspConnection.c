@@ -455,7 +455,7 @@ int performRtspHandshake(void) {
         }
     
         enet_address_set_host(&address, RemoteAddrString);
-        address.port = 48010;
+        enet_address_set_port(&address, 48010);
     
         // Connect to the host
         peer = enet_host_connect(client, &address, 1, 0);
