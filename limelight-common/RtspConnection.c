@@ -115,7 +115,11 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     }
     
     // Send the message
-    enet_peer_send(peer, 0, packet);
+    if (enet_peer_send(peer, 0, packet) < 0) {
+        enet_packet_destroy(packet);
+        ret = 0;
+        goto Exit;
+    }
     enet_host_flush(client);
 
     // If we have a payload to send, we'll need to send that separately
@@ -127,7 +131,12 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         }
 
         // Send the payload
-        enet_peer_send(peer, 0, packet);
+        if (enet_peer_send(peer, 0, packet) < 0) {
+            enet_packet_destroy(packet);
+            ret = 0;
+            goto Exit;
+        }
+        
         enet_host_flush(client);
     }
     
@@ -282,12 +291,6 @@ void terminateRtspHandshake(void) {
     
     if (peer != NULL) {
         enet_peer_disconnect_now(peer, 0);
-        peer = NULL;
-    }
-    
-    if (client != NULL) {
-        enet_host_destroy(client);
-        client = NULL;
     }
 }
 
@@ -426,6 +429,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
 // Perform RTSP Handshake with the streaming server machine as part of the connection process
 int performRtspHandshake(void) {
     char urlAddr[URLSAFESTRING_LEN];
+    int ret;
 
     // Initialize global state
     addrToUrlSafeString(&RemoteAddr, urlAddr);
@@ -460,6 +464,8 @@ int performRtspHandshake(void) {
         // Connect to the host
         peer = enet_host_connect(client, &address, 1, 0);
         if (peer == NULL) {
+            enet_host_destroy(client);
+            client = NULL;
             return -1;
         }
     
@@ -467,6 +473,10 @@ int performRtspHandshake(void) {
         if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
             Limelog("RTSP: Failed to connect to UDP port 48010\n");
+            enet_peer_reset(peer);
+            peer = NULL;
+            enet_host_destroy(client);
+            client = NULL;
             return -1;
         }
 
@@ -480,13 +490,15 @@ int performRtspHandshake(void) {
 
         if (!requestOptions(&response, &error)) {
             Limelog("RTSP OPTIONS request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP OPTIONS request failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         freeMessage(&response);
@@ -498,13 +510,15 @@ int performRtspHandshake(void) {
 
         if (!requestDescribe(&response, &error)) {
             Limelog("RTSP DESCRIBE request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP DESCRIBE request failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
         
         // The RTSP DESCRIBE reply will contain a collection of SDP media attributes that
@@ -530,19 +544,22 @@ int performRtspHandshake(void) {
 
         if (!setupStream(&response, "streamid=audio", &error)) {
             Limelog("RTSP SETUP streamid=audio request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP SETUP streamid=audio request failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         sessionId = getOptionContent(response.options, "Session");
         if (sessionId == NULL) {
             Limelog("RTSP SETUP streamid=audio is missing session attribute");
-            return -1;
+            ret = -1;
+            goto Exit;
         }
 
         strcpy(sessionIdString, sessionId);
@@ -557,13 +574,15 @@ int performRtspHandshake(void) {
 
         if (!setupStream(&response, "streamid=video", &error)) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         freeMessage(&response);
@@ -575,13 +594,15 @@ int performRtspHandshake(void) {
 
         if (!sendVideoAnnounce(&response, &error)) {
             Limelog("RTSP ANNOUNCE request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP ANNOUNCE request failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         freeMessage(&response);
@@ -593,13 +614,15 @@ int performRtspHandshake(void) {
 
         if (!playStream(&response, "streamid=video", &error)) {
             Limelog("RTSP PLAY streamid=video request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP PLAY streamid=video failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         freeMessage(&response);
@@ -611,18 +634,23 @@ int performRtspHandshake(void) {
 
         if (!playStream(&response, "streamid=audio", &error)) {
             Limelog("RTSP PLAY streamid=audio request failed: %d\n", error);
-            return error;
+            ret = error;
+            goto Exit;
         }
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP PLAY streamid=audio failed: %d\n",
                 response.message.response.statusCode);
-            return response.message.response.statusCode;
+            ret = response.message.response.statusCode;
+            goto Exit;
         }
 
         freeMessage(&response);
     }
     
+    ret = 0;
+    
+Exit:
     // Cleanup the ENet stuff
     if (ServerMajorVersion >= 5) {
         if (peer != NULL) {
@@ -636,5 +664,5 @@ int performRtspHandshake(void) {
         }
     }
 
-    return 0;
+    return ret;
 }

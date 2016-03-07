@@ -291,7 +291,13 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
         return 0;
     }
 
-    enet_peer_send(peer, 0, enetPacket);
+    if (enet_peer_send(peer, 0, enetPacket) < 0) {
+        Limelog("Failed to send ENet control packet\n");
+        enet_packet_destroy(enetPacket);
+        free(packet);
+        return 0;
+    }
+    
     enet_host_flush(client);
 
     free(packet);
@@ -530,7 +536,9 @@ int stopControlStream(void) {
     PltSetEvent(&invalidateRefFramesEvent);
     
     if (peer != NULL) {
+        PltLockMutex(&enetMutex);
         enet_peer_disconnect_now(peer, 0);
+        PltUnlockMutex(&enetMutex);
     }
 
     if (ctlSock != INVALID_SOCKET) {
