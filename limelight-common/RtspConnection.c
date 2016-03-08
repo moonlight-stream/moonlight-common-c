@@ -161,9 +161,8 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
 
     // Wait for the payload if we're expecting some
     if (expectingPayload) {
-        // Only wait 1 second since the packets should be here immediately
-        // after the header.
-        if (enet_host_service(client, &event, 1000) <= 0 ||
+        // The payload comes in a second packet
+        if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             Limelog("Failed to receive RTSP reply payload\n");
             ret = 0;
