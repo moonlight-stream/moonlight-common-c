@@ -215,6 +215,7 @@ static void ReceiveThreadProc(void* context) {
                     }
                     else {
                         decodeInputData(packet);
+                        free(packet);
                     }
                 }
                 
