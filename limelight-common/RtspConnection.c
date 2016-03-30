@@ -337,6 +337,7 @@ static int requestDescribe(PRTSP_MESSAGE response, int* error) {
 static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
     int ret;
+    char* transportValue;
 
     *error = -1;
 
@@ -349,7 +350,17 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
             }
         }
 
-        if (addOption(&request, "Transport", " ") &&
+        if (ServerMajorVersion >= 6) {
+            // It looks like GFE doesn't care what we say our port is but
+            // we need to give it some port to successfully complete the
+            // handshake process.
+            transportValue = "unicast;X-GS-ClientPort=50000-50001";
+        }
+        else {
+            transportValue = " ";
+        }
+        
+        if (addOption(&request, "Transport", transportValue) &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
             ret = transactRtspMessage(&request, response, 0, error);
@@ -436,14 +447,24 @@ int performRtspHandshake(void) {
     currentSeqNumber = 1;
     hasSessionId = 0;
 
-    if (ServerMajorVersion == 3) {
-        rtspClientVersion = 10;
-    }
-    else if (ServerMajorVersion == 4) {
-        rtspClientVersion = 11;
-    }
-    else {
-        rtspClientVersion = 12;
+    switch (ServerMajorVersion) {
+        case 3:
+            rtspClientVersion = 10;
+            break;
+        case 4:
+            rtspClientVersion = 11;
+            break;
+        case 5:
+            rtspClientVersion = 12;
+            break;
+        case 6:
+            // Gen 6 has never been seen in the wild
+            rtspClientVersion = 13;
+            break;
+        case 7:
+        default:
+            rtspClientVersion = 14;
+            break;
     }
     
     // Gen 5 servers use ENet to do the RTSP handshake
@@ -544,7 +565,9 @@ int performRtspHandshake(void) {
         char* sessionId;
         int error = -1;
 
-        if (!setupStream(&response, "streamid=audio", &error)) {
+        if (!setupStream(&response,
+                         ServerMajorVersion >= 5 ? "streamid=audio/0/0" : "streamid=audio",
+                         &error)) {
             Limelog("RTSP SETUP streamid=audio request failed: %d\n", error);
             ret = error;
             goto Exit;
@@ -574,7 +597,9 @@ int performRtspHandshake(void) {
         RTSP_MESSAGE response;
         int error = -1;
 
-        if (!setupStream(&response, "streamid=video", &error)) {
+        if (!setupStream(&response,
+                         ServerMajorVersion >= 5 ? "streamid=video/0/0" : "streamid=video",
+                         &error)) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n", error);
             ret = error;
             goto Exit;
@@ -582,6 +607,26 @@ int performRtspHandshake(void) {
 
         if (response.message.response.statusCode != 200) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n",
+                response.message.response.statusCode);
+            ret = response.message.response.statusCode;
+            goto Exit;
+        }
+
+        freeMessage(&response);
+    }
+    
+    if (ServerMajorVersion >= 5) {
+        RTSP_MESSAGE response;
+        int error = -1;
+
+        if (!setupStream(&response, "streamid=control/1/0", &error)) {
+            Limelog("RTSP SETUP streamid=control request failed: %d\n", error);
+            ret = error;
+            goto Exit;
+        }
+
+        if (response.message.response.statusCode != 200) {
+            Limelog("RTSP SETUP streamid=control request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
             goto Exit;

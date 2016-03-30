@@ -43,6 +43,7 @@ static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 #define IDX_START_B 1
 #define IDX_INVALIDATE_REF_FRAMES 2
 #define IDX_LOSS_STATS 3
+#define IDX_INPUT_DATA 5
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 
@@ -52,6 +53,7 @@ static const short packetTypesGen3[] = {
     0x1404, // Invalidate reference frames
     0x140c, // Loss Stats
     0x1417, // Frame Stats (unused)
+    -1,     // Input data (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -59,6 +61,7 @@ static const short packetTypesGen4[] = {
     0x0604, // Invalidate reference frames
     0x060a, // Loss Stats
     0x0611, // Frame Stats (unused)
+    -1,     // Input data (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -66,6 +69,15 @@ static const short packetTypesGen5[] = {
     0x0301, // Invalidate reference frames
     0x0201, // Loss Stats
     0x0204, // Frame Stats (unused)
+    0x0207, // Input data
+};
+static const short packetTypesGen7[] = {
+    0x0305, // Start A
+    0x0307, // Start B
+    0x0301, // Invalidate reference frames
+    0x0201, // Loss Stats
+    0x0204, // Frame Stats (unused)
+    0x0206, // Input data
 };
 
 static const char startAGen3[] = { 0 };
@@ -83,6 +95,7 @@ static const short payloadLengthsGen3[] = {
     24, // Invalidate reference frames
     32, // Loss Stats
     64, // Frame Stats
+    -1, // Input data
 };
 static const short payloadLengthsGen4[] = {
     sizeof(requestIdrFrameGen4), // Request IDR frame
@@ -90,6 +103,7 @@ static const short payloadLengthsGen4[] = {
     24, // Invalidate reference frames
     32, // Loss Stats
     64, // Frame Stats
+    -1, // Input data
 };
 static const short payloadLengthsGen5[] = {
     sizeof(startAGen5), // Start A
@@ -97,6 +111,15 @@ static const short payloadLengthsGen5[] = {
     24, // Invalidate reference frames
     32, // Loss Stats
     80, // Frame Stats
+    -1, // Input data
+};
+static const short payloadLengthsGen7[] = {
+    sizeof(startAGen5), // Start A
+    sizeof(startBGen5), // Start B
+    24, // Invalidate reference frames
+    32, // Loss Stats
+    80, // Frame Stats
+    -1, // Input data
 };
 
 static const char* preconstructedPayloadsGen3[] = {
@@ -108,6 +131,10 @@ static const char* preconstructedPayloadsGen4[] = {
     startBGen4
 };
 static const char* preconstructedPayloadsGen5[] = {
+    startAGen5,
+    startBGen5
+};
+static const char* preconstructedPayloadsGen7[] = {
     startAGen5,
     startBGen5
 };
@@ -134,10 +161,15 @@ int initializeControlStream(void) {
         payloadLengths = (short*)payloadLengthsGen4;
         preconstructedPayloads = (char**)preconstructedPayloadsGen4;
     }
-    else {
+    else if (ServerMajorVersion == 5) {
         packetTypes = (short*)packetTypesGen5;
         payloadLengths = (short*)payloadLengthsGen5;
         preconstructedPayloads = (char**)preconstructedPayloadsGen5;
+    }
+    else {
+        packetTypes = (short*)packetTypesGen7;
+        payloadLengths = (short*)payloadLengthsGen7;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen7;
     }
 
     idrFrameRequired = 0;
@@ -575,7 +607,7 @@ int sendInputPacketOnControlStream(unsigned char* data, int length) {
     LC_ASSERT(ServerMajorVersion >= 5);
 
     // Send the input data (no reply expected)
-    if (sendMessageAndForget(0x0207, length, data) == 0) {
+    if (sendMessageAndForget(packetTypes[IDX_INPUT_DATA], length, data) == 0) {
         return -1;
     }
 
