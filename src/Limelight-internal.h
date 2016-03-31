@@ -56,7 +56,7 @@ void destroyAudioStream(void);
 int startAudioStream(void);
 void stopAudioStream(void);
 
-int initializeInputStream(char* aesKeyData, int aesKeyDataLength, char* aesIv, int aesIvLength);
+int initializeInputStream(void);
 void destroyInputStream(void);
 int startInputStream(void);
 int stopInputStream(void);

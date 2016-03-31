@@ -4,18 +4,21 @@
 #include "LinkedBlockingQueue.h"
 #include "Input.h"
 
-#include "OpenAES/oaes_lib.h"
-#include "OpenAES/oaes_common.h"
+#include <openssl/evp.h>
 
 static SOCKET inputSock = INVALID_SOCKET;
+static unsigned char currentAesIv[16];
 static int initialized;
+static EVP_CIPHER_CTX cipherContext;
+static int cipherInitialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
-static OAES_CTX* oaesContext;
 
 #define MAX_INPUT_PACKET_SIZE 128
 #define INPUT_STREAM_TIMEOUT_SEC 10
+
+#define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) + 15) / 16) * 16)
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -32,33 +35,12 @@ typedef struct _PACKET_HOLDER {
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
 // Initializes the input stream
-int initializeInputStream(char* aesKeyData, int aesKeyDataLength,
-    char* aesIv, int aesIvLength) {
-    if (aesIvLength != OAES_BLOCK_SIZE)
-    {
-        Limelog("AES IV is incorrect length. Should be %d\n", aesIvLength);
-        return -1;
-    }
-
-    oaesContext = oaes_alloc();
-    if (oaesContext == NULL)
-    {
-        Limelog("Failed to allocate OpenAES context\n");
-        return -1;
-    }
-
-    if (oaes_set_option(oaesContext, OAES_OPTION_CBC, aesIv) != OAES_RET_SUCCESS)
-    {
-        Limelog("Failed to set CBC and IV on OAES context\n");
-        return -1;
-    }
-
-    if (oaes_key_import_data(oaesContext, (const unsigned char*)aesKeyData, aesKeyDataLength) != OAES_RET_SUCCESS)
-    {
-        Limelog("Failed to import AES key data\n");
-        return -1;
-    }
-
+int initializeInputStream(void) {
+    memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
+    
+    // Initialized on first packet
+    cipherInitialized = 0;
+    
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
     initialized = 1;
@@ -68,12 +50,10 @@ int initializeInputStream(char* aesKeyData, int aesKeyDataLength,
 // Destroys and cleans up the input stream
 void destroyInputStream(void) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
-
-    if (oaesContext != NULL)
-    {
-        // FIXME: This crashes trying to free ctx->key
-        // oaes_free(oaesContext);
-        oaesContext = NULL;
+    
+    if (cipherInitialized) {
+        EVP_CIPHER_CTX_cleanup(&cipherContext);
+        cipherInitialized = 0;
     }
 
     entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
@@ -119,14 +99,113 @@ static int checkDirs(short currentVal, short newVal, int* dir) {
     return 1;
 }
 
-#define OAES_DATA_OFFSET 32
+static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
+    int i;
+    int paddedLength = ROUND_TO_PKCS7_PADDED_LEN(plaintextLen);
+    unsigned char paddingByte = (unsigned char)(16 - (plaintextLen % 16));
+    
+    for (i = plaintextLen; i < paddedLength; i++) {
+        plaintext[i] = paddingByte;
+    }
+    
+    return paddedLength;
+}
+
+static int encryptData(const unsigned char* plaintext, int plaintextLen,
+                       unsigned char* ciphertext, int* ciphertextLen) {
+    int ret;
+    int len;
+    
+    if (ServerMajorVersion >= 7) {
+        EVP_CIPHER_CTX_init(&cipherContext);
+
+        // Gen 7 servers use 128-bit AES GCM
+        if (EVP_EncryptInit_ex(&cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        
+        // Gen 7 servers uses 16 byte IVs
+        if (EVP_CIPHER_CTX_ctrl(&cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        
+        // Initialize again but now provide our key and current IV
+        if (EVP_EncryptInit_ex(&cipherContext, NULL, NULL,
+                               (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        
+        // Encrypt into the caller's buffer, leaving room for the auth tag to be prepended
+        if (EVP_EncryptUpdate(&cipherContext, &ciphertext[16], ciphertextLen, plaintext, plaintextLen) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        
+        // GCM encryption won't ever fill ciphertext here but we have to call it anyway
+        if (EVP_EncryptFinal_ex(&cipherContext, ciphertext, &len) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        LC_ASSERT(len == 0);
+        
+        // Read the tag into the caller's buffer
+        if (EVP_CIPHER_CTX_ctrl(&cipherContext, EVP_CTRL_GCM_GET_TAG, 16, ciphertext) != 1) {
+            ret = -1;
+            goto gcm_cleanup;
+        }
+        
+        // Increment the ciphertextLen to account for the tag
+        *ciphertextLen += 16;
+        
+        ret = 0;
+        
+    gcm_cleanup:
+        EVP_CIPHER_CTX_cleanup(&cipherContext);
+    }
+    else {
+        unsigned char paddedData[MAX_INPUT_PACKET_SIZE];
+        int paddedLength;
+        
+        if (!cipherInitialized) {
+            EVP_CIPHER_CTX_init(&cipherContext);
+            cipherInitialized = 1;
+
+            // Prior to Gen 7, 128-bit AES CBC is used for encryption
+            if (EVP_EncryptInit_ex(&cipherContext, EVP_aes_128_cbc(), NULL,
+                                   (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
+                ret = -1;
+                goto cbc_cleanup;
+            }
+        }
+        
+        // Pad the data to the required block length
+        memcpy(paddedData, plaintext, plaintextLen);
+        paddedLength = addPkcs7PaddingInPlace(paddedData, plaintextLen);
+        
+        if (EVP_EncryptUpdate(&cipherContext, ciphertext, ciphertextLen, paddedData, paddedLength) != 1) {
+            ret = -1;
+            goto cbc_cleanup;
+        }
+        
+        ret = 0;
+
+    cbc_cleanup:
+        // Nothing to do
+        ;
+    }
+    
+    return ret;
+}
 
 // Input thread proc
 static void inputSendThreadProc(void* context) {
     SOCK_RET err;
     PPACKET_HOLDER holder;
     char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
-    size_t encryptedSize;
+    int encryptedSize;
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         int encryptedLengthPrefix;
@@ -238,29 +317,24 @@ static void inputSendThreadProc(void* context) {
             holder->packet.mouseMove.deltaY = htons((short)totalDeltaY);
         }
 
-        encryptedSize = sizeof(encryptedBuffer);
-        err = oaes_encrypt(oaesContext, (const unsigned char*)&holder->packet, holder->packetLength,
-            (unsigned char*)encryptedBuffer, &encryptedSize);
+        // Encrypt the message into the output buffer while leaving room for the length
+        encryptedSize = sizeof(encryptedBuffer) - 4;
+        err = encryptData((const unsigned char*)&holder->packet, holder->packetLength,
+            (unsigned char*)&encryptedBuffer[4], &encryptedSize);
         free(holder);
-        if (err != OAES_RET_SUCCESS) {
+        if (err != 0) {
             Limelog("Input: Encryption failed: %d\n", (int)err);
             ListenerCallbacks.connectionTerminated(err);
             return;
         }
 
-        // The first 32-bytes of the output are internal OAES stuff that we want to ignore
-        encryptedSize -= OAES_DATA_OFFSET;
-
-        // Overwrite the last 4 bytes before the encrypted data with the length so
-        // we can send the message all at once. GFE can choke if it gets the header
-        // before the rest of the message.
+        // Prepend the length to the message
         encryptedLengthPrefix = htonl((unsigned long)encryptedSize);
-        memcpy(&encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
-            &encryptedLengthPrefix, sizeof(encryptedLengthPrefix));
+        memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, 4);
 
         if (ServerMajorVersion < 5) {
             // Send the encrypted payload
-            err = send(inputSock, (const char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+            err = send(inputSock, (const char*) encryptedBuffer,
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
             if (err <= 0) {
                 Limelog("Input: send() failed: %d\n", (int) LastSocketError());
@@ -269,7 +343,17 @@ static void inputSendThreadProc(void* context) {
             }
         }
         else {
-            err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) &encryptedBuffer[OAES_DATA_OFFSET - sizeof(encryptedLengthPrefix)],
+            // For reasons that I can't understand, NVIDIA decides to use the last 16
+            // bytes of ciphertext in the most recent game controller packet as the IV for
+            // future encryption. I think it may be a buffer overrun on their end but we'll have
+            // to mimic it to work correctly.
+            if (ServerMajorVersion >= 7 && encryptedSize >= 16 + sizeof(currentAesIv)) {
+                memcpy(currentAesIv,
+                       &encryptedBuffer[4 + encryptedSize - sizeof(currentAesIv)],
+                       sizeof(currentAesIv));
+            }
+            
+            err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
