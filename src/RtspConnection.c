@@ -472,10 +472,7 @@ int performRtspHandshake(void) {
         ENetAddress address;
         ENetEvent event;
         
-        // This will do DNS resolution if required
-        if (enet_address_set_host(&address, RemoteAddrString) < 0) {
-            return -1;
-        }
+        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, RemoteAddrLen);
         enet_address_set_port(&address, 48010);
         
         // Create a client that can use 1 outgoing connection and 1 channel
