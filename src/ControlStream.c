@@ -291,6 +291,12 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     int err;
 
     LC_ASSERT(ServerMajorVersion >= 5);
+    
+    // We may be trying to disconnect, so our peer could be gone.
+    // This check is safe because we're guaranteed to be holding enetMutex.
+    if (peer == NULL) {
+        return 0;
+    }
 
     packet = malloc(sizeof(*packet) + paylen);
     if (packet == NULL) {
@@ -570,6 +576,7 @@ int stopControlStream(void) {
     if (peer != NULL) {
         PltLockMutex(&enetMutex);
         enet_peer_disconnect_now(peer, 0);
+        peer = NULL;
         PltUnlockMutex(&enetMutex);
     }
 
@@ -586,7 +593,6 @@ int stopControlStream(void) {
     PltCloseThread(&lossStatsThread);
     PltCloseThread(&invalidateRefFramesThread);
 
-    peer = NULL;
     if (client != NULL) {
         enet_host_destroy(client);
         client = NULL;
