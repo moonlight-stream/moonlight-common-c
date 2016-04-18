@@ -288,9 +288,8 @@ void terminateRtspHandshake(void) {
         shutdownTcpSocket(sock);
     }
     
-    if (peer != NULL) {
-        enet_peer_disconnect_now(peer, 0);
-    }
+    // FIXME: We should try to interrupt ENet here, but we must
+    // be sure to do it safely. We may need to add a new lock for this.
 }
 
 // Send RTSP OPTIONS request
