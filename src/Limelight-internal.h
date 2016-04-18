@@ -6,6 +6,8 @@
 #include "PlatformThreads.h"
 #include "Video.h"
 
+#include <enet/enet.h>
+
 // Common globals
 extern char* RemoteAddrString;
 extern struct sockaddr_storage RemoteAddr;
@@ -18,6 +20,7 @@ extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
 
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
+int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
     PCONNECTION_LISTENER_CALLBACKS* clCallbacks);

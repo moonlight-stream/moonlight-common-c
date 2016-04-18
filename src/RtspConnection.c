@@ -141,7 +141,7 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     }
     
     // Wait for a reply
-    if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+    if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
         event.type != ENET_EVENT_TYPE_RECEIVE) {
         Limelog("Failed to receive RTSP reply\n");
         ret = 0;
@@ -162,7 +162,7 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // Wait for the payload if we're expecting some
     if (expectingPayload) {
         // The payload comes in a second packet
-        if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             Limelog("Failed to receive RTSP reply payload\n");
             ret = 0;
@@ -490,7 +490,7 @@ int performRtspHandshake(void) {
         }
     
         // Wait for the connect to complete
-        if (enet_host_service(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
             Limelog("RTSP: Failed to connect to UDP port 48010\n");
             enet_peer_reset(peer);

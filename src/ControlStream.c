@@ -301,7 +301,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     memcpy(&packet[1], payload, paylen);
 
     // Gen 5+ servers do control protocol over ENet instead of TCP
-    while ((err = enet_host_service(client, &event, 0)) > 0) {
+    while ((err = serviceEnetHost(client, &event, 0)) > 0) {
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
             enet_packet_destroy(event.packet);
         }
@@ -391,7 +391,7 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
             return 0;
         }
 
-        if (enet_host_service(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             PltUnlockMutex(&enetMutex);
             return 0;
@@ -642,7 +642,7 @@ int startControlStream(void) {
         }
 
         // Wait for the connect to complete
-        if (enet_host_service(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
             Limelog("RTSP: Failed to connect to UDP port 47999\n");
             enet_peer_reset(peer);
