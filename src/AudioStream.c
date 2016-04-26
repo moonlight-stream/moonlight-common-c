@@ -22,7 +22,7 @@ static unsigned short lastSeq;
 // This is much larger than we should typically have buffered, but
 // it needs to be. We need a cushion in case our thread gets blocked
 // for longer than normal.
-#define RTP_RECV_BUFFER (64 * MAX_PACKET_SIZE)
+#define RTP_RECV_BUFFER (64 * 1024)
 
 #define SAMPLE_RATE 48000
 
