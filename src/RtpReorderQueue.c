@@ -2,13 +2,11 @@
 #include "RtpReorderQueue.h"
 
 void RtpqInitializeQueue(PRTP_REORDER_QUEUE queue, int maxSize, int maxQueueTimeMs) {
+    memset(queue, 0, sizeof(*queue));
     queue->maxSize = maxSize;
     queue->maxQueueTimeMs = maxQueueTimeMs;
-    queue->queueHead = NULL;
-    queue->queueTail = NULL;
     queue->nextRtpSequenceNumber = UINT16_MAX;
     queue->oldestQueuedTimeMs = UINT64_MAX;
-    queue->oldestQueuedEntry = NULL;
 }
 
 void RtpqCleanupQueue(PRTP_REORDER_QUEUE queue) {

@@ -34,6 +34,8 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound) {
     int err;
 
+    memset(queueHead, 0, sizeof(*queueHead));
+
     err = PltCreateEvent(&queueHead->containsDataEvent);
     if (err != 0) {
         return err;
@@ -44,11 +46,7 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
         return err;
     }
 
-    queueHead->head = NULL;
-    queueHead->tail = NULL;
     queueHead->sizeBound = sizeBound;
-    queueHead->currentSize = 0;
-    queueHead->shutdown = 0;
 
     return 0;
 }
