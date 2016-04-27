@@ -7,7 +7,7 @@
 // replacement for enet_host_service().
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs) {
     int i;
-    int ret;
+    int ret = -1;
     
     // We need to call enet_host_service() multiple times to make sure retransmissions happen
     for (i = 0; i < ENET_SERVICE_RETRIES; i++) {
