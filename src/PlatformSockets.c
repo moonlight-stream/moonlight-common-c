@@ -1,6 +1,9 @@
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
+#define RCV_BUFFER_SIZE_MIN  32767
+#define RCV_BUFFER_SIZE_STEP 16384
+
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
     char addrstr[INET6_ADDRSTRLEN];
@@ -105,7 +108,36 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     }
 #endif
 
-    setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*)&bufferSize, sizeof(bufferSize));
+    // We start at the requested recv buffer value and step down until we find
+    // a value that the OS will accept.
+    for (;;) {
+        err = setsockopt(s, SOL_SOCKET, SO_RCVBUF, (char*)&bufferSize, sizeof(bufferSize));
+        if (err == 0) {
+            // Successfully set a buffer size
+            break;
+        }
+        else if (bufferSize <= RCV_BUFFER_SIZE_MIN) {
+            // Failed to set a buffer size within the allowable range
+            break;
+        }
+        else if (bufferSize - RCV_BUFFER_SIZE_STEP <= RCV_BUFFER_SIZE_MIN) {
+            // Last shot - we're trying the minimum
+            bufferSize = RCV_BUFFER_SIZE_MIN;
+        }
+        else {
+            // Lower the requested size by another step
+            bufferSize -= RCV_BUFFER_SIZE_STEP;
+        }
+    }
+    
+#if defined(LC_DEBUG)
+    if (err == 0) {
+        Limelog("Selected receive buffer size: %d\n", bufferSize);
+    }
+    else {
+        Limelog("Unable to set receive buffer size: %d\n", LastSocketError());
+    }
+#endif
 
     return s;
 }
