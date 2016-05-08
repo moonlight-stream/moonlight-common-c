@@ -25,7 +25,6 @@ typedef struct _RTP_REORDER_QUEUE {
     unsigned short nextRtpSequenceNumber;
 
     uint64_t oldestQueuedTimeMs;
-    PRTP_QUEUE_ENTRY oldestQueuedEntry;
 } RTP_REORDER_QUEUE, *PRTP_REORDER_QUEUE;
 
 #define RTPQ_RET_HANDLE_IMMEDIATELY   0

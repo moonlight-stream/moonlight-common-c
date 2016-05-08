@@ -45,7 +45,6 @@ static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int 
 
     if (queue->oldestQueuedTimeMs == UINT64_MAX) {
         queue->oldestQueuedTimeMs = newEntry->queueTimeMs;
-        queue->oldestQueuedEntry = newEntry;
     }
 
     if (queue->queueHead == NULL) {
@@ -77,12 +76,10 @@ static void updateOldestQueued(PRTP_REORDER_QUEUE queue) {
     PRTP_QUEUE_ENTRY entry;
 
     queue->oldestQueuedTimeMs = UINT64_MAX;
-    queue->oldestQueuedEntry = NULL;
 
     entry = queue->queueHead;
     while (entry != NULL) {
         if (entry->queueTimeMs < queue->oldestQueuedTimeMs) {
-            queue->oldestQueuedEntry = entry;
             queue->oldestQueuedTimeMs = entry->queueTimeMs;
         }
 
