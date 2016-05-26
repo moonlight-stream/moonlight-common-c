@@ -319,6 +319,9 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
                     if (isSeqReferenceFrameStart(&specialSeq)) {
                         // No longer waiting for an IDR frame
                         waitingForIdrFrame = 0;
+                        
+                        // Cancel any pending IDR frame request
+                        waitingForNextSuccessfulFrame = 0;
                     }
                 }
 
