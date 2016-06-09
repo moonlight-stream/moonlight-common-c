@@ -25,8 +25,8 @@ static void fakeClStageComplete(int stage) {}
 static void fakeClStageFailed(int stage, long errorCode) {}
 static void fakeClConnectionStarted(void) {}
 static void fakeClConnectionTerminated(long errorCode) {}
-static void fakeClDisplayMessage(char* message) {}
-static void fakeClDisplayTransientMessage(char* message) {}
+static void fakeClDisplayMessage(const char* message) {}
+static void fakeClDisplayTransientMessage(const char* message) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,

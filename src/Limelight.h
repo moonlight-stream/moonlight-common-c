@@ -195,11 +195,11 @@ typedef void(*ConnListenerConnectionStarted)(void);
 typedef void(*ConnListenerConnectionTerminated)(long errorCode);
 
 // This callback is invoked to display a dialog-type message to the user
-typedef void(*ConnListenerDisplayMessage)(char* message);
+typedef void(*ConnListenerDisplayMessage)(const char* message);
 
 // This callback is invoked to display a transient message for the user
 // while streaming
-typedef void(*ConnListenerDisplayTransientMessage)(char* message);
+typedef void(*ConnListenerDisplayTransientMessage)(const char* message);
 
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
