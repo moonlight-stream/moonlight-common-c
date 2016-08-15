@@ -153,7 +153,6 @@ static void ClInternalConnectionTerminated(long errorCode)
 
 static int resolveHostName(const char* host)
 {
-    struct addrinfo hints, *res;
     int err;
 
     // We must first try IPv4-only because GFE doesn't listen on IPv6,
@@ -161,6 +160,10 @@ static int resolveHostName(const char* host)
     // For NAT64 networks, the IPv4 address resolution will fail but the IPv6 address
     // will give us working connectivity to the host. All other networks will use IPv4
     // addresses.
+#ifndef __vita__
+    struct addrinfo hints, *res;
+
+
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_flags = AI_ADDRCONFIG;
@@ -180,12 +183,28 @@ static int resolveHostName(const char* host)
             return -1;
         }
     }
+#else
+#warning TODO: resolveHostName
+#endif
+
+
 
     // Use the first address in the list
-    memcpy(&RemoteAddr, res->ai_addr, res->ai_addrlen);
-    RemoteAddrLen = res->ai_addrlen;
+    // memcpy(&RemoteAddr, res->ai_addr, res->ai_addrlen);
+    // RemoteAddrLen = res->ai_addrlen;
+    SceNetSockaddrIn tmp = {0};
+    tmp.sin_len = sizeof(tmp);
+    tmp.sin_family = SCE_NET_AF_INET;
 
+
+    RemoteAddrLen = sizeof(SceNetSockaddr);
+    err = sceNetInetPton(SCE_NET_AF_INET, "192.168.140.1", &tmp.sin_addr);
+    printf("resolve addr 0x%x\n", err);
+    memcpy(&RemoteAddr, &tmp, sizeof(tmp));
+
+#ifndef __vita__
     freeaddrinfo(res);
+#endif
     return 0;
 }
 
@@ -315,6 +334,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     ListenerCallbacks.stageComplete(STAGE_VIDEO_STREAM_START);
     Limelog("done\n");
 
+#ifndef __vita__
     Limelog("Starting audio stream...");
     ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_START);
     err = startAudioStream();
@@ -340,6 +360,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     LC_ASSERT(stage == STAGE_INPUT_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_INPUT_STREAM_START);
     Limelog("done\n");
+#endif
 
     ListenerCallbacks.connectionStarted();
 

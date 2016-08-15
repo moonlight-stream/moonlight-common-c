@@ -5,7 +5,14 @@
 
 typedef void(*ThreadEntry)(void* context);
 
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+typedef int PLT_MUTEX;
+typedef int PLT_EVENT;
+typedef struct _PLT_THREAD {
+    int handle;
+    int cancelled;
+} PLT_THREAD;
+#elif defined(LC_WINDOWS)
 typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
 typedef struct _PLT_THREAD {

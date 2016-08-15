@@ -308,7 +308,11 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     char* payload;
     char urlSafeAddr[URLSAFESTRING_LEN];
 
+    #ifdef __vita__
+    #warning TODO: getSdpPayloadForStreamConfig
+    #else
     addrToUrlSafeString(&RemoteAddr, urlSafeAddr);
+    #endif
 
     attributeList = getAttributesList(urlSafeAddr);
     if (attributeList == NULL) {

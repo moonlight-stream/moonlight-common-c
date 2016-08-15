@@ -29,6 +29,9 @@ void LimelogWindows(char* Format, ...) {
 #if defined(LC_WINDOWS)
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     struct thread_context* ctx = (struct thread_context*)lpParameter;
+#elif defined(__vita__)
+int ThreadProc(SceSize args, void *argp) {
+    struct thread_context* ctx = (struct thread_context*)argp;
 #else
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
@@ -38,7 +41,7 @@ void* ThreadProc(void* context) {
 
     free(ctx);
 
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) || defined(__vita__)
     return 0;
 #else
     return NULL;
@@ -46,7 +49,9 @@ void* ThreadProc(void* context) {
 }
 
 void PltSleepMs(int ms) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    sceKernelDelayThread(ms * 1000);
+#elif defined(LC_WINDOWS)
     WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
 #else
     useconds_t usecs = ms * 1000;
@@ -55,7 +60,9 @@ void PltSleepMs(int ms) {
 }
 
 int PltCreateMutex(PLT_MUTEX* mutex) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    *mutex = sceKernelCreateMutex("", 0, 0, NULL);
+#elif defined(LC_WINDOWS)
     *mutex = CreateMutexEx(NULL, NULL, 0, MUTEX_ALL_ACCESS);
     if (!*mutex) {
         return -1;
@@ -67,7 +74,9 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
 }
 
 void PltDeleteMutex(PLT_MUTEX* mutex) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    sceKernelDeleteMutex(*mutex);
+#elif defined(LC_WINDOWS)
     CloseHandle(*mutex);
 #else
     pthread_mutex_destroy(mutex);
@@ -75,7 +84,9 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
 }
 
 void PltLockMutex(PLT_MUTEX* mutex) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    sceKernelLockMutex(*mutex, 1, NULL);
+#elif defined(LC_WINDOWS)
     int err;
     err = WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
     if (err != WAIT_OBJECT_0) {
@@ -87,7 +98,9 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltUnlockMutex(PLT_MUTEX* mutex) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    sceKernelUnlockMutex(*mutex, 1);
+#elif defined(LC_WINDOWS)
     ReleaseMutex(*mutex);
 #else
     pthread_mutex_unlock(mutex);
@@ -96,7 +109,9 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 
 void PltJoinThread(PLT_THREAD* thread) {
     LC_ASSERT(thread->cancelled);
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    sceKernelWaitThreadEnd(thread->handle, NULL, NULL);
+#elif defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
     pthread_join(thread->thread, NULL);
@@ -131,7 +146,12 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
     
     thread->cancelled = 0;
 
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    {
+        thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x10000, 0, 0, NULL);
+        sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
+    }
+#elif defined(LC_WINDOWS)
     {
         thread->handle = CreateThread(NULL, 0, ThreadProc, ctx, 0, NULL);
         if (thread->handle == NULL) {
@@ -155,7 +175,9 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
 }
 
 int PltCreateEvent(PLT_EVENT* event) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+
+#elif defined(LC_WINDOWS)
     *event = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
     if (!*event) {
         return -1;
@@ -171,7 +193,8 @@ int PltCreateEvent(PLT_EVENT* event) {
 }
 
 void PltCloseEvent(PLT_EVENT* event) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+#elif defined(LC_WINDOWS)
     CloseHandle(*event);
 #else
     pthread_mutex_destroy(&event->mutex);
@@ -180,7 +203,9 @@ void PltCloseEvent(PLT_EVENT* event) {
 }
 
 void PltSetEvent(PLT_EVENT* event) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+
+#elif defined(LC_WINDOWS)
     SetEvent(*event);
 #else
     event->signalled = 1;
@@ -189,7 +214,8 @@ void PltSetEvent(PLT_EVENT* event) {
 }
 
 void PltClearEvent(PLT_EVENT* event) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+#elif defined(LC_WINDOWS)
     ResetEvent(*event);
 #else
     event->signalled = 0;
@@ -197,7 +223,9 @@ void PltClearEvent(PLT_EVENT* event) {
 }
 
 int PltWaitForEvent(PLT_EVENT* event) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    #warning TODO: PltWaitForEvent
+#elif defined(LC_WINDOWS)
     DWORD error;
 
     error = WaitForSingleObjectEx(*event, INFINITE, FALSE);

@@ -4,8 +4,12 @@
 #define RCV_BUFFER_SIZE_MIN  32767
 #define RCV_BUFFER_SIZE_STEP 16384
 
-void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
+void addrToUrlSafeString(void* addr, char* string)
 {
+    #ifdef __vita__
+    #warning TODO: addrToUrlSafeString
+    strcpy(string, "unk");
+    #else
     char addrstr[INET6_ADDRSTRLEN];
 
     if (addr->ss_family == AF_INET6) {
@@ -22,6 +26,7 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
         // IPv4 addresses are returned without changes
         sprintf(string, "%s", addrstr);
     }
+    #endif
 }
 
 void shutdownTcpSocket(SOCKET s) {
@@ -80,6 +85,9 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     int err;
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
+#ifdef __vita__
+    addrfamily = AF_INET;
+#endif
 
     s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
@@ -250,7 +258,9 @@ int enableNoDelay(SOCKET s) {
 }
 
 int initializePlatformSockets(void) {
-#if defined(LC_WINDOWS)
+#if defined(__vita__)
+    return 0; // already initialized
+#elif defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
 #elif defined(LC_POSIX) && !defined(LC_CHROME)
