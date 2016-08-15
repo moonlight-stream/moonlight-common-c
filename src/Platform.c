@@ -176,7 +176,11 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
 
 int PltCreateEvent(PLT_EVENT* event) {
 #if defined(__vita__)
-
+    event->mutex = sceKernelCreateMutex("", 0, 0, NULL);
+    event->cond = sceKernelCreateCond("", 0, event->mutex, NULL);
+    event->signalled = 0;
+    printf("mutex: 0x%x cond: 0x%x\n", event->mutex, event->cond);
+    return 0;
 #elif defined(LC_WINDOWS)
     *event = CreateEventEx(NULL, NULL, CREATE_EVENT_MANUAL_RESET, EVENT_ALL_ACCESS);
     if (!*event) {
@@ -194,6 +198,8 @@ int PltCreateEvent(PLT_EVENT* event) {
 
 void PltCloseEvent(PLT_EVENT* event) {
 #if defined(__vita__)
+    sceKernelDeleteCond(event->cond);
+    sceKernelDeleteMutex(event->mutex);
 #elif defined(LC_WINDOWS)
     CloseHandle(*event);
 #else
@@ -204,7 +210,8 @@ void PltCloseEvent(PLT_EVENT* event) {
 
 void PltSetEvent(PLT_EVENT* event) {
 #if defined(__vita__)
-
+    event->signalled = 1;
+    sceKernelSignalCondAll(event->cond);
 #elif defined(LC_WINDOWS)
     SetEvent(*event);
 #else
@@ -215,6 +222,7 @@ void PltSetEvent(PLT_EVENT* event) {
 
 void PltClearEvent(PLT_EVENT* event) {
 #if defined(__vita__)
+    event->signalled = 0;
 #elif defined(LC_WINDOWS)
     ResetEvent(*event);
 #else
@@ -224,7 +232,13 @@ void PltClearEvent(PLT_EVENT* event) {
 
 int PltWaitForEvent(PLT_EVENT* event) {
 #if defined(__vita__)
-    #warning TODO: PltWaitForEvent
+    sceKernelLockMutex(event->mutex, 1, NULL);
+    while (!event->signalled) {
+        sceKernelWaitCond(event->cond, NULL);
+    }
+    sceKernelUnlockMutex(event->mutex, 1);
+
+    return PLT_WAIT_SUCCESS;
 #elif defined(LC_WINDOWS)
     DWORD error;
 

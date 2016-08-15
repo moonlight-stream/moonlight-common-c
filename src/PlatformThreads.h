@@ -7,7 +7,11 @@ typedef void(*ThreadEntry)(void* context);
 
 #if defined(__vita__)
 typedef int PLT_MUTEX;
-typedef int PLT_EVENT;
+typedef struct _PLT_EVENT {
+    int mutex;
+    int cond;
+    int signalled;
+} PLT_EVENT;
 typedef struct _PLT_THREAD {
     int handle;
     int cancelled;

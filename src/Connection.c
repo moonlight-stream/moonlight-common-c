@@ -347,6 +347,7 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     LC_ASSERT(stage == STAGE_AUDIO_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_AUDIO_STREAM_START);
     Limelog("done\n");
+#endif
 
     Limelog("Starting input stream...");
     ListenerCallbacks.stageStarting(STAGE_INPUT_STREAM_START);
@@ -360,7 +361,6 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     LC_ASSERT(stage == STAGE_INPUT_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_INPUT_STREAM_START);
     Limelog("done\n");
-#endif
 
     ListenerCallbacks.connectionStarted();
 
