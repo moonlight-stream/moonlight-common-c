@@ -376,7 +376,6 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     ListenerCallbacks.stageComplete(STAGE_VIDEO_STREAM_START);
     Limelog("done\n");
 
-#ifndef __vita__
     Limelog("Starting audio stream...");
     ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_START);
     err = startAudioStream();
@@ -389,7 +388,6 @@ int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCON
     LC_ASSERT(stage == STAGE_AUDIO_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_AUDIO_STREAM_START);
     Limelog("done\n");
-#endif
 
     Limelog("Starting input stream...");
     ListenerCallbacks.stageStarting(STAGE_INPUT_STREAM_START);
