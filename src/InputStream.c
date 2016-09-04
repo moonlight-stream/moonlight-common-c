@@ -393,14 +393,11 @@ int stopInputStream(void) {
     LbqSignalQueueShutdown(&packetQueue);
     PltInterruptThread(&inputSendThread);
 
-    if (inputSock != INVALID_SOCKET) {
-        shutdownTcpSocket(inputSock);
-    }
-
     PltJoinThread(&inputSendThread);
     PltCloseThread(&inputSendThread);
-    
+
     if (inputSock != INVALID_SOCKET) {
+        shutdownTcpSocket(inputSock);
         closeSocket(inputSock);
         inputSock = INVALID_SOCKET;
     }

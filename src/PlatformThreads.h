@@ -15,6 +15,8 @@ typedef struct _PLT_EVENT {
 typedef struct _PLT_THREAD {
     int handle;
     int cancelled;
+    void *context;
+    int alive;
 } PLT_THREAD;
 #elif defined(LC_WINDOWS)
 typedef HANDLE PLT_MUTEX;

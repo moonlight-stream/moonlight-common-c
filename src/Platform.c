@@ -9,6 +9,9 @@ void cleanupPlatformSockets(void);
 struct thread_context {
     ThreadEntry entry;
     void* context;
+#if defined(__vita__)
+    PLT_THREAD* thread;
+#endif
 };
 
 static int running_threads = 0;
@@ -38,8 +41,11 @@ void* ThreadProc(void* context) {
 #endif
 
     ctx->entry(ctx->context);
-
+#if defined(__vita__)
+    ctx->thread->alive = 0;
+#else
     free(ctx);
+#endif
 
 #if defined(LC_WINDOWS) || defined(__vita__)
     return 0;
@@ -110,7 +116,11 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 void PltJoinThread(PLT_THREAD* thread) {
     LC_ASSERT(thread->cancelled);
 #if defined(__vita__)
-    sceKernelWaitThreadEnd(thread->handle, NULL, NULL);
+    while(thread->alive) {
+        PltSleepMs(10);
+    }
+    if (thread->context != NULL)
+        free(thread->context);
 #elif defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #else
@@ -143,11 +153,14 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
 
     ctx->entry = entry;
     ctx->context = context;
-    
+
     thread->cancelled = 0;
 
 #if defined(__vita__)
     {
+        thread->alive = 1;
+        thread->context = ctx;
+        ctx->thread = thread;
         thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x10000, 0, 0, NULL);
         sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
     }
