@@ -162,6 +162,10 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
         thread->context = ctx;
         ctx->thread = thread;
         thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x10000, 0, 0, NULL);
+        if (thread->handle < 0) {
+            free(ctx);
+            return -1;
+        }
         sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
     }
 #elif defined(LC_WINDOWS)
