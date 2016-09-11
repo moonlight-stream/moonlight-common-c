@@ -132,6 +132,8 @@ void PltCloseThread(PLT_THREAD* thread) {
 	running_threads--;
 #if defined(LC_WINDOWS)
     CloseHandle(thread->handle);
+#elif defined(__vita__)
+    sceKernelDeleteThread(thread->handle);
 #endif
 }
 

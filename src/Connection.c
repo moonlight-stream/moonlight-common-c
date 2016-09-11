@@ -151,48 +151,6 @@ static void ClInternalConnectionTerminated(long errorCode)
     PltCloseThread(&terminationCallbackThread);
 }
 
-#ifdef __vita__
-struct hostent{
-  char  *h_name;         /* official (cannonical) name of host               */
-  char **h_aliases;      /* pointer to array of pointers of alias names      */
-  int    h_addrtype;     /* host address type: AF_INET                       */
-  int    h_length;       /* length of address: 4                             */
-  char **h_addr_list;    /* pointer to array of pointers with IPv4 addresses */
-};
-#define h_addr h_addr_list[0]
-
-#define MAX_NAME 512
-static struct hostent *gethostbyname(const char *name)
-{
-    static struct hostent ent;
-    static char sname[MAX_NAME] = "";
-    static struct SceNetInAddr saddr = { 0 };
-    static char *addrlist[2] = { (char *) &saddr, NULL };
-
-    int rid;
-    int err;
-    rid = sceNetResolverCreate("resolver", NULL, 0);
-    if(rid < 0) {
-        return NULL;
-    }
-
-    err = sceNetResolverStartNtoa(rid, name, &saddr, 0, 0, 0);
-    sceNetResolverDestroy(rid);
-    if(err < 0) {
-        return NULL;
-    }
-
-    ent.h_name = sname;
-    ent.h_aliases = 0;
-    ent.h_addrtype = SCE_NET_AF_INET;
-    ent.h_length = sizeof(struct SceNetInAddr);
-    ent.h_addr_list = addrlist;
-    ent.h_addr = addrlist[0];
-
-    return &ent;
-}
-#endif
-
 static int resolveHostName(const char* host)
 {
 #ifndef __vita__
@@ -239,7 +197,7 @@ static int resolveHostName(const char* host)
         Limelog("gethostbyname() failed for host %s\n", host);
         return -1;
     }
-    SceNetSockaddrIn tmp = {0};
+    struct sockaddr_in tmp = {0};
     tmp.sin_len = sizeof(tmp);
     tmp.sin_family = SCE_NET_AF_INET;
     memcpy(&tmp.sin_addr, phost->h_addr, phost->h_length);

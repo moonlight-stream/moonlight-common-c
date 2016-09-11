@@ -163,6 +163,10 @@ void stopVideoStream(void) {
         PltInterruptThread(&decoderThread);
     }
 
+    if (firstFrameSocket != INVALID_SOCKET) {
+        shutdownTcpSocket(firstFrameSocket);
+    }
+
     PltJoinThread(&udpPingThread);
     PltJoinThread(&receiveThread);
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
@@ -176,7 +180,6 @@ void stopVideoStream(void) {
     }
     
     if (firstFrameSocket != INVALID_SOCKET) {
-        shutdownTcpSocket(firstFrameSocket);
         closeSocket(firstFrameSocket);
         firstFrameSocket = INVALID_SOCKET;
     }

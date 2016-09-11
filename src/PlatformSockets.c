@@ -1,3 +1,4 @@
+#include <psp2/net/net.h>
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
@@ -6,10 +7,16 @@
 
 void addrToUrlSafeString(void* addr, char* string)
 {
-    #ifdef __vita__
-    #warning TODO: addrToUrlSafeString
-    strcpy(string, "unk");
-    #else
+#ifdef __vita__
+    char addrstr[48];
+    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
+    sceNetInetNtop(sin->sin_family, &sin->sin_addr, addrstr, sizeof(addrstr));
+    if (sin->sin_family == AF_INET6) {
+        sprintf(string, "[%s]", addrstr);
+    } else {
+        sprintf(string, "%s", addrstr);
+    }
+#else
     char addrstr[INET6_ADDRSTRLEN];
 
     if (addr->ss_family == AF_INET6) {
@@ -26,7 +33,7 @@ void addrToUrlSafeString(void* addr, char* string)
         // IPv4 addresses are returned without changes
         sprintf(string, "%s", addrstr);
     }
-    #endif
+#endif
 }
 
 void shutdownTcpSocket(SOCKET s) {

@@ -61,11 +61,15 @@ void cleanupPlatform(void);
 uint64_t PltGetMillis(void);
 
 #ifdef __vita__
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+
 #define __ss_aligntype  unsigned long int
 #define _SS_SIZE        128
 #define _SS_PADSIZE     (_SS_SIZE - (2 * sizeof (__ss_aligntype)))
 
-typedef unsigned short int sa_family_t;
 #define __SOCKADDR_COMMON(sa_prefix) \
   sa_family_t sa_prefix##family
 
