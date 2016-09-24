@@ -48,7 +48,7 @@ static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 
 static const short packetTypesGen3[] = {
-    0x140b, // Start A
+    0x1407, // Request IDR frame
     0x1410, // Start B
     0x1404, // Invalidate reference frames
     0x140c, // Loss Stats
@@ -80,7 +80,7 @@ static const short packetTypesGen7[] = {
     0x0206, // Input data
 };
 
-static const char startAGen3[] = { 0 };
+static const char requestIdrFrameGen3[] = { 0, 0 };
 static const int startBGen3[] = { 0, 0, 0, 0xa };
 
 static const char requestIdrFrameGen4[] = { 0, 0 };
@@ -90,7 +90,7 @@ static const char startAGen5[] = { 0, 0 };
 static const char startBGen5[] = { 0 };
 
 static const short payloadLengthsGen3[] = {
-    sizeof(startAGen3), // Start A
+    sizeof(requestIdrFrameGen3), // Request IDR frame
     sizeof(startBGen3), // Start B
     24, // Invalidate reference frames
     32, // Loss Stats
@@ -123,7 +123,7 @@ static const short payloadLengthsGen7[] = {
 };
 
 static const char* preconstructedPayloadsGen3[] = {
-    startAGen3,
+    requestIdrFrameGen3,
     (char*)startBGen3
 };
 static const char* preconstructedPayloadsGen4[] = {
@@ -469,7 +469,7 @@ static void lossStatsThreadFunc(void* context) {
 static void requestIdrFrame(void) {
     long long payload[3];
 
-    if (ServerMajorVersion != 4) {
+    if (ServerMajorVersion >= 5) {
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
