@@ -154,6 +154,7 @@ static void ClInternalConnectionTerminated(long errorCode)
 static int resolveHostName(const char* host)
 {
 #ifndef __vita__
+    struct addrinfo hints, *res;
     int err;
 
     // We must first try IPv4-only because GFE doesn't listen on IPv6,
@@ -161,9 +162,6 @@ static int resolveHostName(const char* host)
     // For NAT64 networks, the IPv4 address resolution will fail but the IPv6 address
     // will give us working connectivity to the host. All other networks will use IPv4
     // addresses.
-
-    struct addrinfo hints, *res;
-
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_flags = AI_ADDRCONFIG;
@@ -189,7 +187,6 @@ static int resolveHostName(const char* host)
     RemoteAddrLen = res->ai_addrlen;
 
     freeaddrinfo(res);
-
     return 0;
 #else
     struct hostent *phost = gethostbyname(host);

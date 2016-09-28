@@ -9,9 +9,18 @@
 #include <Windows.h>
 #include <Winsock2.h>
 #include <ws2tcpip.h>
-#else
+#elif defined(__vita__)
 #include <unistd.h>
 #include <sys/time.h>
+#include <netinet/in.h>
+#include <psp2/kernel/threadmgr.h>
+#else
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #endif
 
 #ifdef _WIN32
@@ -59,27 +68,3 @@ int initializePlatform(void);
 void cleanupPlatform(void);
 
 uint64_t PltGetMillis(void);
-
-#ifdef __vita__
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <unistd.h>
-
-#define __ss_aligntype  unsigned long int
-#define _SS_SIZE        128
-#define _SS_PADSIZE     (_SS_SIZE - (2 * sizeof (__ss_aligntype)))
-
-#define __SOCKADDR_COMMON(sa_prefix) \
-  sa_family_t sa_prefix##family
-
-struct sockaddr_storage
-  {
-    __SOCKADDR_COMMON (ss_);    /* Address family, etc.  */
-    __ss_aligntype __ss_align;  /* Force desired alignment.  */
-    char __ss_padding[_SS_PADSIZE];
-  };
-
-#include <psp2/kernel/threadmgr.h>
-
-#endif

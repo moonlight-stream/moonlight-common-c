@@ -3,7 +3,7 @@
 #include "Limelight.h"
 #include "Platform.h"
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #define SetLastSocketError(x) WSASetLastError(x)
@@ -15,8 +15,24 @@ typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
 
 #else
+#if defined(__vita__)
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include <errno.h>
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
+#include <signal.h>
+#endif
 
 #define ioctlsocket ioctl
 #define LastSocketError() errno
@@ -26,25 +42,23 @@ typedef int SOCKADDR_LEN;
 
 typedef int SOCKET;
 typedef ssize_t SOCK_RET;
-typedef unsigned SOCKADDR_LEN;
-
+typedef socklen_t SOCKADDR_LEN;
 #endif
 
 #if defined(__vita__)
-
 #define TCP_NODELAY SCE_NET_TCP_NODELAY
 #define INADDR_ANY SCE_NET_INADDR_ANY
 
 #define sockaddr_in6 sockaddr_in
 #define sin6_port sin_port
-
+#define INET6_ADDRSTRLEN 128
 #endif
 
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)
 
 // IPv6 addresses have 2 extra characters for URL escaping
-#define URLSAFESTRING_LEN (128+2)
-void addrToUrlSafeString(void* addr, char* string);
+#define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
+void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);

@@ -1,17 +1,20 @@
+#ifdef __vita__
 #include <psp2/net/net.h>
+#include <enet/enet.h>
+#endif
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
 #define RCV_BUFFER_SIZE_MIN  32767
 #define RCV_BUFFER_SIZE_STEP 16384
 
-void addrToUrlSafeString(void* addr, char* string)
+void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
-#ifdef __vita__
     char addrstr[48];
+#ifdef __vita__
     struct sockaddr_in* sin = (struct sockaddr_in*)addr;
-    sceNetInetNtop(sin->sin_family, &sin->sin_addr, addrstr, sizeof(addrstr));
-    if (sin->sin_family == AF_INET6) {
+    sceNetInetNtop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
+    if (addr->ss_family == AF_INET6) {
         sprintf(string, "[%s]", addrstr);
     } else {
         sprintf(string, "%s", addrstr);
@@ -265,11 +268,11 @@ int enableNoDelay(SOCKET s) {
 }
 
 int initializePlatformSockets(void) {
-#if defined(__vita__)
-    return 0; // already initialized
-#elif defined(LC_WINDOWS)
+#if defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
+#elif defined(__vita__)
+    return 0; // already initialized
 #elif defined(LC_POSIX) && !defined(LC_CHROME)
     // Disable SIGPIPE signals to avoid us getting
     // killed when a socket gets an EPIPE error
