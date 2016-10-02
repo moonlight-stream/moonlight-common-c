@@ -16,6 +16,8 @@ typedef int SOCKADDR_LEN;
 
 #else
 #if defined(__vita__)
+#include <psp2/net/net.h>
+#include <enet/enet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -50,8 +52,10 @@ typedef socklen_t SOCKADDR_LEN;
 #define INADDR_ANY SCE_NET_INADDR_ANY
 
 #define sockaddr_in6 sockaddr_in
+#define sin6_addr sin_addr
 #define sin6_port sin_port
 #define INET6_ADDRSTRLEN 128
+#define inet_ntop sceNetInetNtop
 #endif
 
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)

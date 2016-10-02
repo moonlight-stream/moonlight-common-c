@@ -1,7 +1,3 @@
-#ifdef __vita__
-#include <psp2/net/net.h>
-#include <enet/enet.h>
-#endif
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
@@ -10,16 +6,6 @@
 
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
-    char addrstr[48];
-#ifdef __vita__
-    struct sockaddr_in* sin = (struct sockaddr_in*)addr;
-    sceNetInetNtop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
-    if (addr->ss_family == AF_INET6) {
-        sprintf(string, "[%s]", addrstr);
-    } else {
-        sprintf(string, "%s", addrstr);
-    }
-#else
     char addrstr[INET6_ADDRSTRLEN];
 
     if (addr->ss_family == AF_INET6) {
@@ -36,7 +22,6 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
         // IPv4 addresses are returned without changes
         sprintf(string, "%s", addrstr);
     }
-#endif
 }
 
 void shutdownTcpSocket(SOCKET s) {
@@ -94,9 +79,10 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     struct sockaddr_storage addr;
     int err;
 
+#ifndef __vita__
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
-#ifdef __vita__
-    addrfamily = AF_INET;
+#else
+    LC_ASSERT(addrfamily == AF_INET);
 #endif
 
     s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);

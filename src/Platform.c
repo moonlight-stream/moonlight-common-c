@@ -75,6 +75,10 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
     return 0;
 #elif defined(__vita__)
     *mutex = sceKernelCreateMutex("", 0, 0, NULL);
+    if (*mutex < 0) {
+        return -1;
+    }
+    return 0;
 #else
     return pthread_mutex_init(mutex, NULL);
 #endif
@@ -204,9 +208,15 @@ int PltCreateEvent(PLT_EVENT* event) {
     return 0;
 #elif defined(__vita__)
     event->mutex = sceKernelCreateMutex("", 0, 0, NULL);
+    if (event->mutex < 0) {
+        return -1;
+    }
     event->cond = sceKernelCreateCond("", 0, event->mutex, NULL);
+    if (event->cond < 0) {
+        sceKernelDeleteMutex(event->mutex);
+        return -1;
+    }
     event->signalled = 0;
-    printf("mutex: 0x%x cond: 0x%x\n", event->mutex, event->cond);
     return 0;
 #else
     pthread_mutex_init(&event->mutex, NULL);
