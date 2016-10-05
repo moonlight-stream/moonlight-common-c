@@ -153,6 +153,7 @@ static void ClInternalConnectionTerminated(long errorCode)
 
 static int resolveHostName(const char* host)
 {
+#ifndef __vita__
     struct addrinfo hints, *res;
     int err;
 
@@ -187,6 +188,21 @@ static int resolveHostName(const char* host)
 
     freeaddrinfo(res);
     return 0;
+#else
+    struct hostent *phost = gethostbyname(host);
+    if (!phost) {
+        Limelog("gethostbyname() failed for host %s\n", host);
+        return -1;
+    }
+    struct sockaddr_in tmp = {0};
+    tmp.sin_len = sizeof(tmp);
+    tmp.sin_family = SCE_NET_AF_INET;
+    memcpy(&tmp.sin_addr, phost->h_addr, phost->h_length);
+
+    memcpy(&RemoteAddr, &tmp, sizeof(tmp));
+    RemoteAddrLen = sizeof(tmp);
+    return 0;
+#endif
 }
 
 // Starts the connection to the streaming machine

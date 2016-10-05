@@ -12,6 +12,19 @@ typedef struct _PLT_THREAD {
     HANDLE handle;
     int cancelled;
 } PLT_THREAD;
+#elif defined(__vita__)
+typedef int PLT_MUTEX;
+typedef struct _PLT_EVENT {
+    int mutex;
+    int cond;
+    int signalled;
+} PLT_EVENT;
+typedef struct _PLT_THREAD {
+    int handle;
+    int cancelled;
+    void *context;
+    int alive;
+} PLT_THREAD;
 #elif defined (LC_POSIX)
 typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {

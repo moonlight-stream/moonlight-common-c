@@ -79,7 +79,11 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     struct sockaddr_storage addr;
     int err;
 
+#ifndef __vita__
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
+#else
+    LC_ASSERT(addrfamily == AF_INET);
+#endif
 
     s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
@@ -253,6 +257,8 @@ int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
+#elif defined(__vita__)
+    return 0; // already initialized
 #elif defined(LC_POSIX) && !defined(LC_CHROME)
     // Disable SIGPIPE signals to avoid us getting
     // killed when a socket gets an EPIPE error

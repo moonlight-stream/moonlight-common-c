@@ -15,6 +15,16 @@ typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
 
 #else
+#if defined(__vita__)
+#include <psp2/net/net.h>
+#include <enet/enet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -24,6 +34,7 @@ typedef int SOCKADDR_LEN;
 #include <netdb.h>
 #include <errno.h>
 #include <signal.h>
+#endif
 
 #define ioctlsocket ioctl
 #define LastSocketError() errno
@@ -34,6 +45,17 @@ typedef int SOCKADDR_LEN;
 typedef int SOCKET;
 typedef ssize_t SOCK_RET;
 typedef socklen_t SOCKADDR_LEN;
+#endif
+
+#if defined(__vita__)
+#define TCP_NODELAY SCE_NET_TCP_NODELAY
+#define INADDR_ANY SCE_NET_INADDR_ANY
+
+#define sockaddr_in6 sockaddr_in
+#define sin6_addr sin_addr
+#define sin6_port sin_port
+#define INET6_ADDRSTRLEN 128
+#define inet_ntop sceNetInetNtop
 #endif
 
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)

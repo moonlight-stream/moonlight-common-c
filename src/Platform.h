@@ -9,6 +9,11 @@
 #include <Windows.h>
 #include <Winsock2.h>
 #include <ws2tcpip.h>
+#elif defined(__vita__)
+#include <unistd.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <psp2/kernel/threadmgr.h>
 #else
 #include <unistd.h>
 #include <pthread.h>
@@ -34,6 +39,8 @@
 void LimelogWindows(char* Format, ...);
 #define Limelog(s, ...) \
     LimelogWindows(s, ##__VA_ARGS__)
+#elif defined(__vita__)
+#define Limelog sceClibPrintf
 #else
 #define Limelog(s, ...) \
     fprintf(stderr, s, ##__VA_ARGS__)

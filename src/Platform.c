@@ -9,6 +9,9 @@ void cleanupPlatformSockets(void);
 struct thread_context {
     ThreadEntry entry;
     void* context;
+#if defined(__vita__)
+    PLT_THREAD* thread;
+#endif
 };
 
 static int running_threads = 0;
@@ -29,6 +32,9 @@ void LimelogWindows(char* Format, ...) {
 #if defined(LC_WINDOWS)
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     struct thread_context* ctx = (struct thread_context*)lpParameter;
+#elif defined(__vita__)
+int ThreadProc(SceSize args, void *argp) {
+    struct thread_context* ctx = (struct thread_context*)argp;
 #else
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
@@ -36,9 +42,13 @@ void* ThreadProc(void* context) {
 
     ctx->entry(ctx->context);
 
+#if defined(__vita__)
+    ctx->thread->alive = 0;
+#else
     free(ctx);
+#endif
 
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) || defined(__vita__)
     return 0;
 #else
     return NULL;
@@ -48,6 +58,8 @@ void* ThreadProc(void* context) {
 void PltSleepMs(int ms) {
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
+#elif defined(__vita__)
+    sceKernelDelayThread(ms * 1000);
 #else
     useconds_t usecs = ms * 1000;
     usleep(usecs);
@@ -61,6 +73,12 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
         return -1;
     }
     return 0;
+#elif defined(__vita__)
+    *mutex = sceKernelCreateMutex("", 0, 0, NULL);
+    if (*mutex < 0) {
+        return -1;
+    }
+    return 0;
 #else
     return pthread_mutex_init(mutex, NULL);
 #endif
@@ -69,6 +87,8 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
 void PltDeleteMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     CloseHandle(*mutex);
+#elif defined(__vita__)
+    sceKernelDeleteMutex(*mutex);
 #else
     pthread_mutex_destroy(mutex);
 #endif
@@ -81,6 +101,8 @@ void PltLockMutex(PLT_MUTEX* mutex) {
     if (err != WAIT_OBJECT_0) {
         LC_ASSERT(FALSE);
     }
+#elif defined(__vita__)
+    sceKernelLockMutex(*mutex, 1, NULL);
 #else
     pthread_mutex_lock(mutex);
 #endif
@@ -89,6 +111,8 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 void PltUnlockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     ReleaseMutex(*mutex);
+#elif defined(__vita__)
+    sceKernelUnlockMutex(*mutex, 1);
 #else
     pthread_mutex_unlock(mutex);
 #endif
@@ -98,6 +122,12 @@ void PltJoinThread(PLT_THREAD* thread) {
     LC_ASSERT(thread->cancelled);
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
+#elif defined(__vita__)
+    while(thread->alive) {
+        PltSleepMs(10);
+    }
+    if (thread->context != NULL)
+        free(thread->context);
 #else
     pthread_join(thread->thread, NULL);
 #endif
@@ -107,6 +137,8 @@ void PltCloseThread(PLT_THREAD* thread) {
 	running_threads--;
 #if defined(LC_WINDOWS)
     CloseHandle(thread->handle);
+#elif defined(__vita__)
+    sceKernelDeleteThread(thread->handle);
 #endif
 }
 
@@ -139,6 +171,18 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
             return -1;
         }
     }
+#elif defined(__vita__)
+    {
+        thread->alive = 1;
+        thread->context = ctx;
+        ctx->thread = thread;
+        thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x10000, 0, 0, NULL);
+        if (thread->handle < 0) {
+            free(ctx);
+            return -1;
+        }
+        sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
+    }
 #else
     {
         int err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
@@ -162,6 +206,18 @@ int PltCreateEvent(PLT_EVENT* event) {
     }
 
     return 0;
+#elif defined(__vita__)
+    event->mutex = sceKernelCreateMutex("", 0, 0, NULL);
+    if (event->mutex < 0) {
+        return -1;
+    }
+    event->cond = sceKernelCreateCond("", 0, event->mutex, NULL);
+    if (event->cond < 0) {
+        sceKernelDeleteMutex(event->mutex);
+        return -1;
+    }
+    event->signalled = 0;
+    return 0;
 #else
     pthread_mutex_init(&event->mutex, NULL);
     pthread_cond_init(&event->cond, NULL);
@@ -173,6 +229,9 @@ int PltCreateEvent(PLT_EVENT* event) {
 void PltCloseEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
+#elif defined(__vita__)
+    sceKernelDeleteCond(event->cond);
+    sceKernelDeleteMutex(event->mutex);
 #else
     pthread_mutex_destroy(&event->mutex);
     pthread_cond_destroy(&event->cond);
@@ -182,6 +241,9 @@ void PltCloseEvent(PLT_EVENT* event) {
 void PltSetEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     SetEvent(*event);
+#elif defined(__vita__)
+    event->signalled = 1;
+    sceKernelSignalCondAll(event->cond);
 #else
     event->signalled = 1;
     pthread_cond_broadcast(&event->cond);
@@ -208,6 +270,14 @@ int PltWaitForEvent(PLT_EVENT* event) {
         LC_ASSERT(0);
         return -1;
     }
+#elif defined(__vita__)
+    sceKernelLockMutex(event->mutex, 1, NULL);
+    while (!event->signalled) {
+        sceKernelWaitCond(event->cond, NULL);
+    }
+    sceKernelUnlockMutex(event->mutex, 1);
+
+    return PLT_WAIT_SUCCESS;
 #else
     pthread_mutex_lock(&event->mutex);
     while (!event->signalled) {
