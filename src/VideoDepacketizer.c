@@ -507,9 +507,22 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
-    if (firstPacket && AppVersionQuad[0] >= 5) {
-        currentPos.offset += 8;
-        currentPos.length -= 8;
+    if (firstPacket){
+        if ((AppVersionQuad[0] > 7) ||
+            (AppVersionQuad[0] == 7 && AppVersionQuad[1] > 1) ||
+            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 320)) {
+            // Anything over 7.1.320 should use the 12 byte frame header
+            currentPos.offset += 12;
+            currentPos.length -= 12;
+        }
+        else if (AppVersionQuad[0] >= 5) {
+            // 5.x to 7.1.310 should use the 8 byte header
+            currentPos.offset += 8;
+            currentPos.length -= 8;
+        }
+        else {
+            // Other versions don't have a frame header at all
+        }
     }
 
     if (firstPacket && isIdrFrameStart(&currentPos))
