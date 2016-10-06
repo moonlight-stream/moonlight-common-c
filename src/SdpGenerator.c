@@ -185,7 +185,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 
     sprintf(payloadStr, "%d", StreamConfig.bitrate);
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
     }
@@ -219,17 +219,17 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
     }
 
-    if (ServerMajorVersion == 3) {
+    if (AppVersionQuad[0] == 3) {
         err |= addGen3Options(&optionHead, urlSafeAddr);
     }
-    else if (ServerMajorVersion == 4) {
+    else if (AppVersionQuad[0] == 4) {
         err |= addGen4Options(&optionHead, urlSafeAddr);
     }
     else {
         err |= addGen5Options(&optionHead);
     }
 
-    if (ServerMajorVersion >= 4) {
+    if (AppVersionQuad[0] >= 4) {
         if (NegotiatedVideoFormat == VIDEO_FORMAT_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
@@ -298,7 +298,7 @@ static int fillSdpTail(char* buffer) {
     return sprintf(buffer,
         "t=0 0\r\n"
         "m=video %d  \r\n",
-        ServerMajorVersion < 4 ? 47996 : 47998);
+        AppVersionQuad[0] < 4 ? 47996 : 47998);
 }
 
 // Get the SDP attributes for the stream config

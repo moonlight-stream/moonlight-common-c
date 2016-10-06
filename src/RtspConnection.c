@@ -273,7 +273,7 @@ Exit:
 
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
     // Gen 5+ does RTSP over ENet not TCP
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
     else {
@@ -349,7 +349,7 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
             }
         }
 
-        if (ServerMajorVersion >= 6) {
+        if (AppVersionQuad[0] >= 6) {
             // It looks like GFE doesn't care what we say our port is but
             // we need to give it some port to successfully complete the
             // handshake process.
@@ -446,7 +446,7 @@ int performRtspHandshake(void) {
     currentSeqNumber = 1;
     hasSessionId = 0;
 
-    switch (ServerMajorVersion) {
+    switch (AppVersionQuad[0]) {
         case 3:
             rtspClientVersion = 10;
             break;
@@ -467,7 +467,7 @@ int performRtspHandshake(void) {
     }
     
     // Gen 5 servers use ENet to do the RTSP handshake
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         ENetAddress address;
         ENetEvent event;
         
@@ -562,7 +562,7 @@ int performRtspHandshake(void) {
         int error = -1;
 
         if (!setupStream(&response,
-                         ServerMajorVersion >= 5 ? "streamid=audio/0/0" : "streamid=audio",
+                         AppVersionQuad[0] >= 5 ? "streamid=audio/0/0" : "streamid=audio",
                          &error)) {
             Limelog("RTSP SETUP streamid=audio request failed: %d\n", error);
             ret = error;
@@ -594,7 +594,7 @@ int performRtspHandshake(void) {
         int error = -1;
 
         if (!setupStream(&response,
-                         ServerMajorVersion >= 5 ? "streamid=video/0/0" : "streamid=video",
+                         AppVersionQuad[0] >= 5 ? "streamid=video/0/0" : "streamid=video",
                          &error)) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n", error);
             ret = error;
@@ -611,7 +611,7 @@ int performRtspHandshake(void) {
         freeMessage(&response);
     }
     
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         RTSP_MESSAGE response;
         int error = -1;
 
@@ -695,7 +695,7 @@ int performRtspHandshake(void) {
     
 Exit:
     // Cleanup the ENet stuff
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         if (peer != NULL) {
             enet_peer_disconnect_now(peer, 0);
             peer = NULL;

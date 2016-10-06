@@ -507,7 +507,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
-    if (firstPacket && ServerMajorVersion >= 5) {
+    if (firstPacket && AppVersionQuad[0] >= 5) {
         currentPos.offset += 8;
         currentPos.length -= 8;
     }

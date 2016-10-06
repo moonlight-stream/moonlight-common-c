@@ -12,7 +12,7 @@
 extern char* RemoteAddrString;
 extern struct sockaddr_storage RemoteAddr;
 extern SOCKADDR_LEN RemoteAddrLen;
-extern int ServerMajorVersion;
+extern int AppVersionQuad[4];
 extern STREAM_CONFIGURATION StreamConfig;
 extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
@@ -21,6 +21,7 @@ extern int NegotiatedVideoFormat;
 
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
+int extractVersionQuadFromString(const char* string, int* quad);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
     PCONNECTION_LISTENER_CALLBACKS* clCallbacks);

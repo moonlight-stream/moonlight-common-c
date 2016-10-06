@@ -214,15 +214,28 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 // Use this function to zero the connection callbacks when allocated on the stack or heap
 void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 
+
+typedef struct _SERVER_INFORMATION {
+    // Server host name or IP address in text form
+    const char* address;
+    
+    // Text inside 'appversion' tag in /serverinfo
+    const char* serverInfoAppVersion;
+    
+    // Text inside 'GfeVersion' tag in /serverinfo (if present)
+    const char* serverInfoGfeVersion;
+} SERVER_INFORMATION, *PSERVER_INFORMATION;
+
+// Use this function to zero the server information when allocated on the stack or heap
+void LiInitializeServerInformation(PSERVER_INFORMATION serverInfo);
+
 // This function begins streaming.
 //
 // Callbacks are all optional. Pass NULL for individual callbacks within each struct or pass NULL for the entire struct
 // to use the defaults for all callbacks.
 //
-// _serverMajorVersion is the major version number of the 'appversion' tag in the /serverinfo request
-//
-int LiStartConnection(const char* host, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags, int _serverMajorVersion);
+int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
+    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 
 // This function stops streaming.
 void LiStopConnection(void);

@@ -116,7 +116,7 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
     int ret;
     int len;
     
-    if (ServerMajorVersion >= 7) {
+    if (AppVersionQuad[0] >= 7) {
         EVP_CIPHER_CTX_init(&cipherContext);
 
         // Gen 7 servers use 128-bit AES GCM
@@ -332,7 +332,7 @@ static void inputSendThreadProc(void* context) {
         encryptedLengthPrefix = htonl((unsigned long)encryptedSize);
         memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, 4);
 
-        if (ServerMajorVersion < 5) {
+        if (AppVersionQuad[0] < 5) {
             // Send the encrypted payload
             err = send(inputSock, (const char*) encryptedBuffer,
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
@@ -347,7 +347,7 @@ static void inputSendThreadProc(void* context) {
             // bytes of ciphertext in the most recent game controller packet as the IV for
             // future encryption. I think it may be a buffer overrun on their end but we'll have
             // to mimic it to work correctly.
-            if (ServerMajorVersion >= 7 && encryptedSize >= 16 + sizeof(currentAesIv)) {
+            if (AppVersionQuad[0] >= 7 && encryptedSize >= 16 + sizeof(currentAesIv)) {
                 memcpy(currentAesIv,
                        &encryptedBuffer[4 + encryptedSize - sizeof(currentAesIv)],
                        sizeof(currentAesIv));
@@ -369,7 +369,7 @@ int startInputStream(void) {
     int err;
 
     // After Gen 5, we send input on the control stream
-    if (ServerMajorVersion < 5) {
+    if (AppVersionQuad[0] < 5) {
         inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
             35043, INPUT_STREAM_TIMEOUT_SEC);
         if (inputSock == INVALID_SOCKET) {
@@ -426,7 +426,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     holder->packet.mouseMove.header.packetType = htonl(PACKET_TYPE_MOUSE_MOVE);
     holder->packet.mouseMove.magic = MOUSE_MOVE_MAGIC;
     // On Gen 5 servers, the header code is incremented by one
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         holder->packet.mouseMove.magic++;
     }
     holder->packet.mouseMove.deltaX = htons(deltaX);
@@ -457,7 +457,7 @@ int LiSendMouseButtonEvent(char action, int button) {
     holder->packetLength = sizeof(NV_MOUSE_BUTTON_PACKET);
     holder->packet.mouseButton.header.packetType = htonl(PACKET_TYPE_MOUSE_BUTTON);
     holder->packet.mouseButton.action = action;
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         holder->packet.mouseButton.action++;
     }
     holder->packet.mouseButton.button = htonl(button);
@@ -515,7 +515,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         return -1;
     }
 
-    if (ServerMajorVersion == 3) {
+    if (AppVersionQuad[0] == 3) {
         // Generation 3 servers don't support multiple controllers so we send
         // the legacy packet
         holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
@@ -538,7 +538,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         holder->packet.multiController.header.packetType = htonl(PACKET_TYPE_MULTI_CONTROLLER);
         holder->packet.multiController.headerA = MC_HEADER_A;
         // On Gen 5 servers, the header code is decremented by one
-        if (ServerMajorVersion >= 5) {
+        if (AppVersionQuad[0] >= 5) {
             holder->packet.multiController.headerA--;
         }
         holder->packet.multiController.headerB = MC_HEADER_B;
@@ -598,7 +598,7 @@ int LiSendScrollEvent(signed char scrollClicks) {
     holder->packet.scroll.header.packetType = htonl(PACKET_TYPE_SCROLL);
     holder->packet.scroll.magicA = MAGIC_A;
     // On Gen 5 servers, the header code is incremented by one
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         holder->packet.scroll.magicA++;
     }
     holder->packet.scroll.zero1 = 0;

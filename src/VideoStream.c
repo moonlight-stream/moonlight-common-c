@@ -218,7 +218,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         }
     }
 
-    if (ServerMajorVersion == 3) {
+    if (AppVersionQuad[0] == 3) {
         // Connect this socket to open port 47998 for our ping thread
         firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
                                             FIRST_FRAME_PORT, FIRST_FRAME_TIMEOUT_SEC);
@@ -234,7 +234,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         return err;
     }
 
-    if (ServerMajorVersion == 3) {
+    if (AppVersionQuad[0] == 3) {
         // Read the first frame to start the flow of video
         err = readFirstFrame();
         if (err != 0) {

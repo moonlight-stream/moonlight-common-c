@@ -151,17 +151,17 @@ int initializeControlStream(void) {
     PltCreateEvent(&invalidateRefFramesEvent);
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
 
-    if (ServerMajorVersion == 3) {
+    if (AppVersionQuad[0] == 3) {
         packetTypes = (short*)packetTypesGen3;
         payloadLengths = (short*)payloadLengthsGen3;
         preconstructedPayloads = (char**)preconstructedPayloadsGen3;
     }
-    else if (ServerMajorVersion == 4) {
+    else if (AppVersionQuad[0] == 4) {
         packetTypes = (short*)packetTypesGen4;
         payloadLengths = (short*)payloadLengthsGen4;
         preconstructedPayloads = (char**)preconstructedPayloadsGen4;
     }
-    else if (ServerMajorVersion == 5) {
+    else if (AppVersionQuad[0] == 5) {
         packetTypes = (short*)packetTypesGen5;
         payloadLengths = (short*)payloadLengthsGen5;
         preconstructedPayloads = (char**)preconstructedPayloadsGen5;
@@ -290,7 +290,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     ENetEvent event;
     int err;
 
-    LC_ASSERT(ServerMajorVersion >= 5);
+    LC_ASSERT(AppVersionQuad[0] >= 5);
     
     // We may be trying to disconnect, so our peer could be gone.
     // This check is safe because we're guaranteed to be holding enetMutex.
@@ -347,7 +347,7 @@ static int sendMessageTcp(short ptype, short paylen, const void* payload) {
     PNVCTL_TCP_PACKET_HEADER packet;
     SOCK_RET err;
 
-    LC_ASSERT(ServerMajorVersion < 5);
+    LC_ASSERT(AppVersionQuad[0] < 5);
 
     packet = malloc(sizeof(*packet) + paylen);
     if (packet == NULL) {
@@ -373,7 +373,7 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
 
     // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
     // threads at once. We have to synchronize them with a lock.
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         PltLockMutex(&enetMutex);
         ret = sendMessageEnet(ptype, paylen, payload);
         PltUnlockMutex(&enetMutex);
@@ -387,7 +387,7 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
 
 static int sendMessageAndDiscardReply(short ptype, short paylen, const void* payload) {
     // Discard the response
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         ENetEvent event;
 
         PltLockMutex(&enetMutex);
@@ -469,7 +469,7 @@ static void lossStatsThreadFunc(void* context) {
 static void requestIdrFrame(void) {
     long long payload[3];
 
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
@@ -610,7 +610,7 @@ int stopControlStream(void) {
 
 // Called by the input stream to send a packet for Gen 5+ servers
 int sendInputPacketOnControlStream(unsigned char* data, int length) {
-    LC_ASSERT(ServerMajorVersion >= 5);
+    LC_ASSERT(AppVersionQuad[0] >= 5);
 
     // Send the input data (no reply expected)
     if (sendMessageAndForget(packetTypes[IDX_INPUT_DATA], length, data) == 0) {
@@ -626,7 +626,7 @@ int startControlStream(void) {
 
     PltCreateMutex(&enetMutex);
 
-    if (ServerMajorVersion >= 5) {
+    if (AppVersionQuad[0] >= 5) {
         ENetAddress address;
         ENetEvent event;
         
