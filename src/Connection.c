@@ -361,6 +361,12 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     LC_ASSERT(stage == STAGE_INPUT_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_INPUT_STREAM_START);
     Limelog("done\n");
+    
+    // Wiggle the mouse a bit to wake the display up
+    LiSendMouseMoveEvent(1, 1);
+    PltSleepMs(10);
+    LiSendMouseMoveEvent(-1, -1);
+    PltSleepMs(10);
 
     ListenerCallbacks.connectionStarted();
 
