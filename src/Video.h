@@ -21,7 +21,7 @@ typedef struct _NV_VIDEO_PACKET {
     int frameIndex;
     char flags;
     char reserved[3];
-    int reserved2;
+    int fecInfo;
 } NV_VIDEO_PACKET, *PNV_VIDEO_PACKET;
 
 #define FLAG_EXTENSION 0x10
