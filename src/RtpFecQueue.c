@@ -90,6 +90,14 @@ static void queueRecoveredPacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry
 }
 
 static void repairPackets(PRTP_FEC_QUEUE queue) {
+    int totalPackets = ushort(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
+    int parityPackets = totalPackets - queue->bufferDataPackets;
+    int missingPackets = totalPackets - queue->bufferSize;
+    
+    if (parityPackets < missingPackets || parityPackets <= 0) {
+        return;
+    }
+    
     //TODO repair packets and add through queueRecoveredPacket()
 }
 
