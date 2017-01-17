@@ -67,8 +67,30 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     return 1;
 }
 
+static void queueRecoveredPacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry, PRTP_PACKET packet, int sequenceNumber) {
+    //Correct RTP header as it isn't in the FEC data
+    packet->header = queue->queueHead->packet->header;
+    packet->sequenceNumber = sequenceNumber;
+    
+    int dataOffset = sizeof(*packet);
+    if (packet->header & FLAG_EXTENSION) {
+       dataOffset += 4; // 2 additional fields
+    }
+
+    PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)packet) + dataOffset);
+    nvPacket->frameIndex = queue->currentFrameNumber;
+    
+    //Set size of generated packet
+    int size = StreamConfig.packetSize + dataOffset;
+
+    int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
+    memcpy(&((unsigned char*) packet)[receiveSize], &size, sizeof(int));
+    
+    queuePacket(queue, entry, 0, packet);
+}
+
 static void repairPackets(PRTP_FEC_QUEUE queue) {
-    //TODO repair packets and add through queuePacket()
+    //TODO repair packets and add through queueRecoveredPacket()
 }
 
 static void removeEntry(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry) {
