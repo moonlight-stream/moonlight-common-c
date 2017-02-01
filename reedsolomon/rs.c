@@ -434,8 +434,10 @@ reed_solomon* reed_solomon_new(int data_shards, int parity_shards) {
             break;
         }
 
-        for (int i = 0; i < data_shards; i++)
-            rs->m[data_shards*data_shards + i] = inverse[i + 1];
+        for (int j = 0; j < parity_shards; j++) {
+            for (int i = 0; i < data_shards; i++)
+                rs->m[(data_shards + j)*data_shards + i] = inverse[(parity_shards + i) ^ j];
+        }
 
         rs->parity = sub_matrix(rs->m, data_shards, 0, rs->shards, data_shards, rs->shards, data_shards);
         if (NULL == rs->parity) {

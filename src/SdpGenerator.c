@@ -202,10 +202,6 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
     }
 
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairPercent", "1");
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairMaxPercent", "1");
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.repairMinPercent", "1");
-
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 
     if (StreamConfig.streamingRemotely) {

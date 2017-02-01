@@ -93,6 +93,7 @@ static void queueRecoveredPacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry
 
 static void repairPackets(PRTP_FEC_QUEUE queue) {
     int totalPackets = ushort(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
+    int totalParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
     int parityPackets = totalPackets - queue->bufferDataPackets;
     int missingPackets = totalPackets - queue->bufferSize;
     
@@ -100,13 +101,15 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
         return;
     }
     
-    reed_solomon* rs = reed_solomon_new(queue->bufferDataPackets, 1);
+    reed_solomon* rs = reed_solomon_new(queue->bufferDataPackets, totalParityPackets);
 
     int* missing = malloc(missingPackets * sizeof(int));
     unsigned char** packets = malloc(totalPackets * sizeof(unsigned char*));
     unsigned char* marks = malloc(totalPackets * sizeof(unsigned char));
     if (rs == NULL || missing == NULL || packets == NULL || marks == NULL)
         goto cleanup;
+
+    rs->shards = queue->bufferDataPackets + missingPackets; //Don't let RS complain about missing parity packets
 
     memset(marks, 1, sizeof(char) * (totalPackets));
     
@@ -245,6 +248,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
         queue->bufferSize = 0;
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
         queue->bufferDataPackets = ((nvPacket->fecInfo & 0xFF00000) >> 20) / 4;
+        queue->fecPercentage = ((nvPacket->fecInfo & 0xFF0) >> 4);
     } else if (isBefore(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
