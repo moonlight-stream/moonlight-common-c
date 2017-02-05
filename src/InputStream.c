@@ -241,6 +241,7 @@ static void inputSendThreadProc(void* context) {
                 newPkt = &controllerBatchHolder->packet.multiController;
                 if (newPkt->buttonFlags != origPkt->buttonFlags ||
                     newPkt->controllerNumber != origPkt->controllerNumber ||
+                    newPkt->activeGamepadMask != origPkt->activeGamepadMask ||
                     !checkDirs(origPkt->leftTrigger, newPkt->leftTrigger, &dirs[0]) ||
                     !checkDirs(origPkt->rightTrigger, newPkt->rightTrigger, &dirs[1]) ||
                     !checkDirs(origPkt->leftStickX, newPkt->leftStickX, &dirs[2]) ||
@@ -500,7 +501,8 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     return err;
 }
 
-static int sendControllerEventInternal(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+static int sendControllerEventInternal(short controllerNumber, short activeGamepadMask,
+    short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     PPACKET_HOLDER holder;
@@ -543,7 +545,7 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
         }
         holder->packet.multiController.headerB = MC_HEADER_B;
         holder->packet.multiController.controllerNumber = controllerNumber;
-        holder->packet.multiController.midA = MC_ACTIVE_CONTROLLER_FLAGS;
+        holder->packet.multiController.activeGamepadMask = activeGamepadMask;
         holder->packet.multiController.midB = MC_MID_B;
         holder->packet.multiController.buttonFlags = buttonFlags;
         holder->packet.multiController.leftTrigger = leftTrigger;
@@ -568,15 +570,17 @@ static int sendControllerEventInternal(short controllerNumber, short buttonFlags
 int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
-    return sendControllerEventInternal(0, buttonFlags, leftTrigger, rightTrigger,
+    return sendControllerEventInternal(0, 0x1, buttonFlags, leftTrigger, rightTrigger,
         leftStickX, leftStickY, rightStickX, rightStickY);
 }
 
 // Send a controller event to the streaming machine
-int LiSendMultiControllerEvent(short controllerNumber, short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
+    short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
-    return sendControllerEventInternal(controllerNumber, buttonFlags, leftTrigger, rightTrigger,
+    return sendControllerEventInternal(controllerNumber, activeGamepadMask,
+        buttonFlags, leftTrigger, rightTrigger,
         leftStickX, leftStickY, rightStickX, rightStickY);
 }
 

@@ -55,7 +55,6 @@ typedef struct _NV_CONTROLLER_PACKET {
 #define PACKET_TYPE_MULTI_CONTROLLER 0x1E
 #define MC_HEADER_A 0x0000000D
 #define MC_HEADER_B 0x001A
-#define MC_ACTIVE_CONTROLLER_FLAGS 0x000F
 #define MC_MID_B 0x0014
 #define MC_TAIL_A 0x0000009C
 #define MC_TAIL_B 0x0055
@@ -64,7 +63,7 @@ typedef struct _NV_MULTI_CONTROLLER_PACKET {
     int headerA;
     short headerB;
     short controllerNumber;
-    short midA;
+    short activeGamepadMask;
     short midB;
     short buttonFlags;
     unsigned char leftTrigger;
