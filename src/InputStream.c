@@ -34,6 +34,18 @@ typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
+#define EVP_CIPHER_CTX_free(x) EVP_CIPHER_CTX_cleanup(x)
+
+static EVP_CIPHER_CTX preallocatedCipherContext;
+
+EVP_CIPHER_CTX* EVP_CIPHER_CTX_new() {
+    EVP_CIPHER_CTX_init(&preallocatedCipherContext);
+    return &preallocatedCipherContext;
+}
+#endif
+
 // Initializes the input stream
 int initializeInputStream(void) {
     memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
