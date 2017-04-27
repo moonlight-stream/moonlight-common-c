@@ -117,9 +117,11 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
     int len;
     
     if (AppVersionQuad[0] >= 7) {
-        if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
-            ret = -1;
-            goto gcm_cleanup;
+        if (!cipherInitialized) {
+            if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
+                return -1;
+            }
+            cipherInitialized = 1;
         }
 
         // Gen 7 servers use 128-bit AES GCM
@@ -166,7 +168,7 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
         ret = 0;
         
     gcm_cleanup:
-        EVP_CIPHER_CTX_free(cipherContext);
+        EVP_CIPHER_CTX_reset(cipherContext);
     }
     else {
         unsigned char paddedData[MAX_INPUT_PACKET_SIZE];
