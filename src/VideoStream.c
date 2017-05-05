@@ -1,7 +1,7 @@
 #include "Limelight-internal.h"
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
-#include "RtpReorderQueue.h"
+#include "RtpFecQueue.h"
 
 #define FIRST_FRAME_MAX 1500
 #define FIRST_FRAME_TIMEOUT_SEC 10
@@ -11,7 +11,7 @@
 
 #define RTP_RECV_BUFFER (512 * 1024)
 
-static RTP_REORDER_QUEUE rtpQueue;
+static RTP_FEC_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 static SOCKET firstFrameSocket = INVALID_SOCKET;
@@ -25,16 +25,17 @@ static PLT_THREAD decoderThread;
 // the RTP queue will wait for missing/reordered packets.
 #define RTP_QUEUE_DELAY 10
 
+
 // Initialize the video stream
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
-    RtpqInitializeQueue(&rtpQueue, RTPQ_DEFAULT_MAX_SIZE, RTP_QUEUE_DELAY);
+    RtpfInitializeQueue(&rtpQueue); //TODO RTP_QUEUE_DELAY
 }
 
 // Clean up the video stream
 void destroyVideoStream(void) {
     destroyVideoDepacketizer();
-    RtpqCleanupQueue(&rtpQueue);
+    RtpfCleanupQueue(&rtpQueue);
 }
 
 // UDP Ping proc
@@ -66,7 +67,7 @@ static void ReceiveThreadProc(void* context) {
     int queueStatus;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    bufferSize = receiveSize + sizeof(int) + sizeof(RTP_QUEUE_ENTRY);
+    bufferSize = receiveSize + sizeof(int) + sizeof(RTPFEC_QUEUE_ENTRY);
     buffer = NULL;
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
@@ -98,20 +99,16 @@ static void ReceiveThreadProc(void* context) {
         packet = (PRTP_PACKET)&buffer[0];
         packet->sequenceNumber = htons(packet->sequenceNumber);
 
-        queueStatus = RtpqAddPacket(&rtpQueue, packet, (PRTP_QUEUE_ENTRY)&buffer[receiveSize + sizeof(int)]);
-        if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
-            // queueRtpPacket() copies the data it needs to we can reuse the buffer
-            queueRtpPacket(packet, err);
-        }
-        else if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
+        queueStatus = RtpfAddPacket(&rtpQueue, packet, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize + sizeof(int)]);
+        if (queueStatus == RTPF_RET_QUEUED_PACKETS_READY) {
             // The packet queue now has packets ready
-            while ((buffer = (char*)RtpqGetQueuedPacket(&rtpQueue)) != NULL) {
+            while ((buffer = (char*)RtpfGetQueuedPacket(&rtpQueue)) != NULL) {
                 memcpy(&err, &buffer[receiveSize], sizeof(int));
                 queueRtpPacket((PRTP_PACKET)buffer, err);
                 free(buffer);
             }
         }
-        else if (queueStatus == RTPQ_RET_QUEUED_NOTHING_READY) {
+        else if (queueStatus == RTPF_RET_QUEUED_NOTHING_READY) {
             // The queue owns the buffer
             buffer = NULL;
         }

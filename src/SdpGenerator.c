@@ -202,12 +202,6 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
     }
 
-    // Using FEC turns padding on which makes us have to take the slow path
-    // in the depacketizer, not to mention exposing some ambiguous cases with
-    // distinguishing padding from valid sequences. Since we can only perform
-    // execute an FEC recovery on a 1 packet frame, we'll just turn it off completely.
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].fec.enable", "0");
-
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 
     if (StreamConfig.streamingRemotely) {
