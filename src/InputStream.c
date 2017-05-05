@@ -9,7 +9,7 @@
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
 static int initialized;
-static EVP_CIPHER_CTX cipherContext;
+static EVP_CIPHER_CTX* cipherContext;
 static int cipherInitialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -34,6 +34,18 @@ typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
+#define EVP_CIPHER_CTX_free(x) EVP_CIPHER_CTX_cleanup(x)
+
+static EVP_CIPHER_CTX preallocatedCipherContext;
+
+EVP_CIPHER_CTX* EVP_CIPHER_CTX_new() {
+    EVP_CIPHER_CTX_init(&preallocatedCipherContext);
+    return &preallocatedCipherContext;
+}
+#endif
+
 // Initializes the input stream
 int initializeInputStream(void) {
     memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
@@ -52,7 +64,7 @@ void destroyInputStream(void) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
     
     if (cipherInitialized) {
-        EVP_CIPHER_CTX_cleanup(&cipherContext);
+        EVP_CIPHER_CTX_free(cipherContext);
         cipherInitialized = 0;
     }
 
@@ -117,42 +129,47 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
     int len;
     
     if (AppVersionQuad[0] >= 7) {
-        EVP_CIPHER_CTX_init(&cipherContext);
+        if (!cipherInitialized) {
+            if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
+                return -1;
+            }
+            cipherInitialized = 1;
+        }
 
         // Gen 7 servers use 128-bit AES GCM
-        if (EVP_EncryptInit_ex(&cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
+        if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
         
         // Gen 7 servers uses 16 byte IVs
-        if (EVP_CIPHER_CTX_ctrl(&cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
+        if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
         
         // Initialize again but now provide our key and current IV
-        if (EVP_EncryptInit_ex(&cipherContext, NULL, NULL,
+        if (EVP_EncryptInit_ex(cipherContext, NULL, NULL,
                                (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
         
         // Encrypt into the caller's buffer, leaving room for the auth tag to be prepended
-        if (EVP_EncryptUpdate(&cipherContext, &ciphertext[16], ciphertextLen, plaintext, plaintextLen) != 1) {
+        if (EVP_EncryptUpdate(cipherContext, &ciphertext[16], ciphertextLen, plaintext, plaintextLen) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
         
         // GCM encryption won't ever fill ciphertext here but we have to call it anyway
-        if (EVP_EncryptFinal_ex(&cipherContext, ciphertext, &len) != 1) {
+        if (EVP_EncryptFinal_ex(cipherContext, ciphertext, &len) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
         LC_ASSERT(len == 0);
         
         // Read the tag into the caller's buffer
-        if (EVP_CIPHER_CTX_ctrl(&cipherContext, EVP_CTRL_GCM_GET_TAG, 16, ciphertext) != 1) {
+        if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_GET_TAG, 16, ciphertext) != 1) {
             ret = -1;
             goto gcm_cleanup;
         }
@@ -163,18 +180,21 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
         ret = 0;
         
     gcm_cleanup:
-        EVP_CIPHER_CTX_cleanup(&cipherContext);
+        EVP_CIPHER_CTX_reset(cipherContext);
     }
     else {
         unsigned char paddedData[MAX_INPUT_PACKET_SIZE];
         int paddedLength;
         
         if (!cipherInitialized) {
-            EVP_CIPHER_CTX_init(&cipherContext);
+            if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
+                ret = -1;
+                goto cbc_cleanup;
+            }
             cipherInitialized = 1;
 
             // Prior to Gen 7, 128-bit AES CBC is used for encryption
-            if (EVP_EncryptInit_ex(&cipherContext, EVP_aes_128_cbc(), NULL,
+            if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_cbc(), NULL,
                                    (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
                 ret = -1;
                 goto cbc_cleanup;
@@ -185,7 +205,7 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
         memcpy(paddedData, plaintext, plaintextLen);
         paddedLength = addPkcs7PaddingInPlace(paddedData, plaintextLen);
         
-        if (EVP_EncryptUpdate(&cipherContext, ciphertext, ciphertextLen, paddedData, paddedLength) != 1) {
+        if (EVP_EncryptUpdate(cipherContext, ciphertext, ciphertextLen, paddedData, paddedLength) != 1) {
             ret = -1;
             goto cbc_cleanup;
         }
