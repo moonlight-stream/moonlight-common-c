@@ -176,7 +176,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
         thread->alive = 1;
         thread->context = ctx;
         ctx->thread = thread;
-        thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x10000, 0, 0, NULL);
+        thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x40000, 0, 0, NULL);
         if (thread->handle < 0) {
             free(ctx);
             return -1;
