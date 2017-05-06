@@ -214,6 +214,9 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
     RemoteAddrString = strdup(serverInfo->address);
     
+    // Because FEC is now supported, we can only support 1024 byte packets
+    StreamConfig.packetSize = 1024;
+    
     // Extract the appversion from the supplied string
     if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
                                      AppVersionQuad) < 0) {
