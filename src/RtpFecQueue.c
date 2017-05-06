@@ -69,28 +69,6 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     return 1;
 }
 
-static void queueRecoveredPacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry, PRTP_PACKET packet, int sequenceNumber) {
-    //Correct RTP header as it isn't in the FEC data
-    packet->header = queue->queueHead->packet->header;
-    packet->sequenceNumber = sequenceNumber;
-    
-    int dataOffset = sizeof(*packet);
-    if (packet->header & FLAG_EXTENSION) {
-       dataOffset += 4; // 2 additional fields
-    }
-
-    PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)packet) + dataOffset);
-    nvPacket->frameIndex = queue->currentFrameNumber;
-    
-    //Set size of generated packet
-    int size = StreamConfig.packetSize + dataOffset;
-
-    int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    memcpy(&((unsigned char*) packet)[receiveSize], &size, sizeof(int));
-    
-    queuePacket(queue, entry, 0, packet);
-}
-
 static void repairPackets(PRTP_FEC_QUEUE queue) {
     int totalPackets = ushort(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
     int totalParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
@@ -146,7 +124,7 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
     
     ret = reed_solomon_reconstruct(rs, packets, marks, totalPackets, receiveSize);
 
-    cleanup_packets:
+cleanup_packets:
     for (i = 0; i < totalPackets; i++) {
         if (marks[i]) {
             if (ret == 0) {
@@ -179,7 +157,7 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
         }
     }
 
-    cleanup:
+cleanup:
     reed_solomon_release(rs);
 
     if (missing != NULL)
@@ -195,8 +173,8 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
 static void removeEntry(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry) {
     LC_ASSERT(entry != NULL);
     LC_ASSERT(queue->queueSize > 0);
-    LC_ASSERT(queue->readyQueueHead != NULL);
-    LC_ASSERT(queue->readyQueueTail != NULL);
+    LC_ASSERT(queue->queueHead != NULL);
+    LC_ASSERT(queue->queueTail != NULL);
 
     if (queue->queueHead == entry) {
         queue->queueHead = entry->next;
