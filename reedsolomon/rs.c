@@ -108,24 +108,6 @@ static void mul(gf *dst1, gf *src1, gf c, int sz) {
         memset(dst1, 0, c);
 }
 
-/* y = a**n */
-static gf galExp(gf a, gf n) {
-    int logA;
-    int logResult;
-    if (0 == n)
-        return 1;
-
-    if (0 == a)
-        return 0;
-
-    logA = gf_log[a];
-    logResult = logA * n;
-    while(logResult >= 255)
-        logResult -= 255;
-
-    return gf_exp[logResult];
-}
-
 /* y = a.dot(b) */
 static gf* multiply1(gf *a, int ar, int ac, gf *b, int br, int bc) {
     gf *new_m, tg;
