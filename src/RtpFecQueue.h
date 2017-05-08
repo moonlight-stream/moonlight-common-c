@@ -22,7 +22,7 @@ typedef struct _RTP_FEC_QUEUE {
     int bufferDataPackets;
     int fecPercentage;
     
-    unsigned short currentFrameNumber;
+    int currentFrameNumber;
     unsigned int nextRtpSequenceNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
 
