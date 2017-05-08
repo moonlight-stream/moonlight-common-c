@@ -211,14 +211,18 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
         if (queue->queueTail == NULL) {
             queue->queueHead = queue->bufferHead;
             queue->queueTail = queue->bufferTail;
-        } else {
+        } else if (queue->bufferHead != NULL) {
             queue->queueTail->next = queue->bufferHead;
             queue->queueTail = queue->bufferTail;
+        } else {
+            LC_ASSERT(queue->bufferTail == NULL);
+            LC_ASSERT(queue->bufferSize == 0);
         }
+        
         queue->bufferHead = NULL;
         queue->bufferTail = NULL;
 
-        queue->queueSize = queue->bufferSize;
+        queue->queueSize += queue->bufferSize;
         queue->nextRtpSequenceNumber = queue->bufferHighestSequenceNumber;
         
         int fecIndex = (nvPacket->fecInfo & 0xFF000) >> 12;
