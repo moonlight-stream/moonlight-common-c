@@ -140,15 +140,13 @@ cleanup_packets:
 
                 PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset);
                 nvPacket->frameIndex = queue->currentFrameNumber;
-                
-                //Remove padding of generated packet
-                int size = StreamConfig.packetSize + dataOffset;
-                if (rtpPacket->sequenceNumber == ushort(queue->bufferLowestSequenceNumber + queue->bufferDataPackets - 1)) {
-                    while (packets[i][size-1] == 0) {
-                        size--;
-                    }
-                }
 
+                // FEC recovered frames may have extra zero padding at the end. This is
+                // fine per H.264 Annex B which states trailing zero bytes must be
+                // discarded by decoders. It's not safe to strip all zero padding because
+                // it may be a legitimate part of the H.264 bytestream.
+
+                int size = StreamConfig.packetSize + dataOffset;
                 memcpy(&packets[i][receiveSize], &size, sizeof(int));
                 queuePacket(queue, queueEntry, 0, rtpPacket);
             } else if (packets[i] != NULL) {
