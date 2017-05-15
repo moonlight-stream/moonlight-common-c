@@ -41,6 +41,10 @@ void LimelogWindows(char* Format, ...);
     LimelogWindows(s, ##__VA_ARGS__)
 #elif defined(__vita__)
 #define Limelog sceClibPrintf
+#elif defined(LC_ANDROID)
+#include <android/log.h>
+#define Limelog(s, ...) \
+    __android_log_print(ANDROID_LOG_INFO, "moonlight-common-c", s, ##__VA_ARGS__)
 #else
 #define Limelog(s, ...) \
     fprintf(stderr, s, ##__VA_ARGS__)
