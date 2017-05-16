@@ -86,10 +86,15 @@ typedef struct _DECODE_UNIT {
 // renderer is non-blocking. This flag is valid on both audio and video renderers.
 #define CAPABILITY_DIRECT_SUBMIT 0x1
 
-// !!! HIGHLY EXPERIMENTAL - DO NOT SET IN PRODUCTION CODE !!!
 // If set in the video renderer capabilities field, this flag specifies that the renderer
-// supports reference frame invalidation. This flag is only valid on video renderers.
-#define CAPABILITY_REFERENCE_FRAME_INVALIDATION 0x2
+// supports reference frame invalidation for AVC/H.264 streams. This flag is only valid on video renderers.
+// If using this feature, the bitstream may not be patched (changing num_ref_frames or max_dec_frame_buffering)
+// to avoid video corruption on packet loss.
+#define CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC 0x2
+
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// supports reference frame invalidation for HEVC/H.265 streams. This flag is only valid on video renderers.
+#define CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC 0x4
 
 // If set in the video renderer capabilities field, this macro specifies that the renderer
 // supports slicing to increase decoding performance. The parameter specifies the desired

@@ -43,7 +43,11 @@ void initializeVideoDepacketizer(int pktSize) {
     gotNextFrameStart = 0;
     lastPacketInStream = -1;
     decodingFrame = 0;
-    strictIdrFrameWait = !(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
+
+    LC_ASSERT(NegotiatedVideoFormat != 0);
+    strictIdrFrameWait =
+            !((NegotiatedVideoFormat == VIDEO_FORMAT_H264 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
+              ((NegotiatedVideoFormat == VIDEO_FORMAT_H265 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC))));
 }
 
 // Free the NAL chain
