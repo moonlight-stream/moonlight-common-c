@@ -680,7 +680,19 @@ int startControlStream(void) {
         payloadLengths[IDX_START_A],
         preconstructedPayloads[IDX_START_A])) {
         Limelog("Start A failed: %d\n", (int)LastSocketError());
-        return LastSocketFail();
+        err = LastSocketFail();
+        stopping = 1;
+        if (ctlSock != INVALID_SOCKET) {
+            closeSocket(ctlSock);
+            ctlSock = INVALID_SOCKET;
+        }
+        else {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
+            enet_host_destroy(client);
+            client = NULL;
+        }
+        return err;
     }
 
     // Send START B
@@ -688,16 +700,63 @@ int startControlStream(void) {
         payloadLengths[IDX_START_B],
         preconstructedPayloads[IDX_START_B])) {
         Limelog("Start B failed: %d\n", (int)LastSocketError());
-        return LastSocketFail();
+        err = LastSocketFail();
+        stopping = 1;
+        if (ctlSock != INVALID_SOCKET) {
+            closeSocket(ctlSock);
+            ctlSock = INVALID_SOCKET;
+        }
+        else {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
+            enet_host_destroy(client);
+            client = NULL;
+        }
+        return err;
     }
 
     err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
     if (err != 0) {
+        stopping = 1;
+        if (ctlSock != INVALID_SOCKET) {
+            closeSocket(ctlSock);
+            ctlSock = INVALID_SOCKET;
+        }
+        else {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
+            enet_host_destroy(client);
+            client = NULL;
+        }
         return err;
     }
 
     err = PltCreateThread(invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
     if (err != 0) {
+        stopping = 1;
+
+        if (ctlSock != INVALID_SOCKET) {
+            shutdownTcpSocket(ctlSock);
+        }
+
+        if (peer != NULL) {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
+        }
+
+        PltInterruptThread(&lossStatsThread);
+        PltJoinThread(&lossStatsThread);
+        PltCloseThread(&lossStatsThread);
+
+        if (ctlSock != INVALID_SOCKET) {
+            closeSocket(ctlSock);
+            ctlSock = INVALID_SOCKET;
+        }
+        else {
+            enet_host_destroy(client);
+            client = NULL;
+        }
+
         return err;
     }
 

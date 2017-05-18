@@ -101,8 +101,9 @@ typedef struct _DECODE_UNIT {
 // number of slices per frame. This capability is only valid on video renderers.
 #define CAPABILITY_SLICES_PER_FRAME(x) (((unsigned char)(x)) << 24)
 
-// This callback is invoked to provide details about the video stream and allow configuration of the decoder
-typedef void(*DecoderRendererSetup)(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
+// This callback is invoked to provide details about the video stream and allow configuration of the decoder.
+// Returns 0 on success, non-zero on failure.
+typedef int(*DecoderRendererSetup)(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
 
 // This callback performs the teardown of the video decoder
 typedef void(*DecoderRendererCleanup)(void);
@@ -148,8 +149,8 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
 
 // This callback initializes the audio renderer. The audio configuration parameter
 // provides the negotiated audio configuration. This may differ from the one
-// specified in the stream configuration.
-typedef void(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig);
+// specified in the stream configuration. Returns 0 on success, non-zero on failure.
+typedef int(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig);
 
 // This callback performs the final teardown of the audio decoder
 typedef void(*AudioRendererCleanup)(void);

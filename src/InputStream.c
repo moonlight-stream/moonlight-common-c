@@ -394,6 +394,10 @@ int startInputStream(void) {
 
     err = PltCreateThread(inputSendThreadProc, NULL, &inputSendThread);
     if (err != 0) {
+        if (inputSock != INVALID_SOCKET) {
+            closeSocket(inputSock);
+            inputSock = INVALID_SOCKET;
+        }
         return err;
     }
 

@@ -374,5 +374,9 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     ListenerCallbacks.connectionStarted();
 
 Cleanup:
+    if (err != 0) {
+        // Undo any work we've done here before failing
+        LiStopConnection();
+    }
     return err;
 }

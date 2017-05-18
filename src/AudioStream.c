@@ -281,27 +281,47 @@ void stopAudioStream(void) {
 int startAudioStream(void) {
     int err;
 
-    AudioCallbacks.init(StreamConfig.audioConfiguration,
+    err = AudioCallbacks.init(StreamConfig.audioConfiguration,
         opusConfigArray[StreamConfig.audioConfiguration]);
+    if (err != 0) {
+        return err;
+    }
 
     rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
     if (rtpSocket == INVALID_SOCKET) {
-        return LastSocketFail();
+        err = LastSocketFail();
+        AudioCallbacks.cleanup();
+        return err;
     }
 
     err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
+        AudioCallbacks.cleanup();
+        closeSocket(rtpSocket);
         return err;
     }
 
     err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
+        PltInterruptThread(&udpPingThread);
+        PltJoinThread(&udpPingThread);
+        PltCloseThread(&udpPingThread);
+        closeSocket(rtpSocket);
+        AudioCallbacks.cleanup();
         return err;
     }
 
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
+            PltInterruptThread(&udpPingThread);
+            PltInterruptThread(&receiveThread);
+            PltJoinThread(&udpPingThread);
+            PltJoinThread(&receiveThread);
+            PltCloseThread(&udpPingThread);
+            PltCloseThread(&receiveThread);
+            closeSocket(rtpSocket);
+            AudioCallbacks.cleanup();
             return err;
         }
     }

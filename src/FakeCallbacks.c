@@ -1,6 +1,6 @@
 #include "Limelight-internal.h"
 
-static void fakeDrSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags) {}
+static int fakeDrSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags) { return 0; }
 static void fakeDrCleanup(void) {}
 static int fakeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) { return DR_OK; }
 
@@ -10,7 +10,7 @@ static DECODER_RENDERER_CALLBACKS fakeDrCallbacks = {
     .submitDecodeUnit = fakeDrSubmitDecodeUnit,
 };
 
-static void fakeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig) {}
+static int fakeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig) { return 0; }
 static void fakeArCleanup(void) {}
 static void fakeArDecodeAndPlaySample(char* sampleData, int sampleLength) {}
 

@@ -192,25 +192,38 @@ void stopVideoStream(void) {
 int startVideoStream(void* rendererContext, int drFlags) {
     int err;
 
+    firstFrameSocket = INVALID_SOCKET;
+
     // This must be called before the decoder thread starts submitting
     // decode units
     LC_ASSERT(NegotiatedVideoFormat != 0);
-    VideoCallbacks.setup(NegotiatedVideoFormat, StreamConfig.width,
+    err = VideoCallbacks.setup(NegotiatedVideoFormat, StreamConfig.width,
         StreamConfig.height, StreamConfig.fps, rendererContext, drFlags);
+    if (err != 0) {
+        return err;
+    }
 
     rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
     if (rtpSocket == INVALID_SOCKET) {
+        VideoCallbacks.cleanup();
         return LastSocketError();
     }
 
     err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
+        closeSocket(rtpSocket);
+        VideoCallbacks.cleanup();
         return err;
     }
 
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
+            PltInterruptThread(&receiveThread);
+            PltJoinThread(&receiveThread);
+            PltCloseThread(&receiveThread);
+            closeSocket(rtpSocket);
+            VideoCallbacks.cleanup();
             return err;
         }
     }
@@ -220,6 +233,21 @@ int startVideoStream(void* rendererContext, int drFlags) {
         firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
                                             FIRST_FRAME_PORT, FIRST_FRAME_TIMEOUT_SEC);
         if (firstFrameSocket == INVALID_SOCKET) {
+            stopVideoDepacketizer();
+            PltInterruptThread(&receiveThread);
+            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+                PltInterruptThread(&decoderThread);
+            }
+            PltJoinThread(&receiveThread);
+            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+                PltJoinThread(&decoderThread);
+            }
+            PltCloseThread(&receiveThread);
+            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+                PltCloseThread(&decoderThread);
+            }
+            closeSocket(rtpSocket);
+            VideoCallbacks.cleanup();
             return LastSocketError();
         }
     }
@@ -228,6 +256,25 @@ int startVideoStream(void* rendererContext, int drFlags) {
     // to send UDP data
     err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
+        stopVideoDepacketizer();
+        PltInterruptThread(&receiveThread);
+        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            PltInterruptThread(&decoderThread);
+        }
+        PltJoinThread(&receiveThread);
+        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            PltJoinThread(&decoderThread);
+        }
+        PltCloseThread(&receiveThread);
+        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            PltCloseThread(&decoderThread);
+        }
+        closeSocket(rtpSocket);
+        if (firstFrameSocket != INVALID_SOCKET) {
+            closeSocket(firstFrameSocket);
+            firstFrameSocket = INVALID_SOCKET;
+        }
+        VideoCallbacks.cleanup();
         return err;
     }
 
@@ -235,6 +282,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         // Read the first frame to start the flow of video
         err = readFirstFrame();
         if (err != 0) {
+            stopVideoStream();
             return err;
         }
     }
