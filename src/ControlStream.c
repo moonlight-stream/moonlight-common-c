@@ -322,7 +322,7 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     }
 
     enetPacket = enet_packet_create(packet, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
-    if (packet == NULL) {
+    if (enetPacket == NULL) {
         free(packet);
         return 0;
     }
