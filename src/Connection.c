@@ -17,6 +17,7 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
+volatile int ConnectionInterrupted;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -39,10 +40,20 @@ const char* LiGetStageName(int stage) {
     return stageNames[stage];
 }
 
+// Interrupt a pending connection attempt. This interruption happens asynchronously
+// so it is not safe to start another connection before LiStartConnection() returns.
+void LiInterruptConnection(void) {
+    // Signal anyone waiting on the global interrupted flag
+    ConnectionInterrupted = 1;
+}
+
 // Stop the connection by undoing the step at the current stage and those before it
 void LiStopConnection(void) {
     // Disable termination callbacks now
     alreadyTerminated = 1;
+
+    // Set the interrupted flag
+    LiInterruptConnection();
 
     if (stage == STAGE_INPUT_STREAM_START) {
         Limelog("Stopping input stream...");
@@ -93,10 +104,8 @@ void LiStopConnection(void) {
         Limelog("done\n");
     }
     if (stage == STAGE_RTSP_HANDSHAKE) {
-        Limelog("Terminating RTSP handshake...");
-        terminateRtspHandshake();
+        // Nothing to do
         stage--;
-        Limelog("done\n");
     }
     if (stage == STAGE_NAME_RESOLUTION) {
         // Nothing to do
@@ -236,6 +245,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     ListenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
 
     alreadyTerminated = 0;
+    ConnectionInterrupted = 0;
 
     Limelog("Initializing platform...");
     ListenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);

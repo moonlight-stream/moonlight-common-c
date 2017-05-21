@@ -289,10 +289,20 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     int err;
 
     LC_ASSERT(AppVersionQuad[0] >= 5);
+
+    // Gen 5+ servers do control protocol over ENet instead of TCP
+    while ((err = serviceEnetHost(client, &event, 0)) > 0) {
+        if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+            enet_packet_destroy(event.packet);
+        }
+        else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
+            Limelog("Control stream received disconnect event\n");
+            return 0;
+        }
+    }
     
-    // We may be trying to disconnect, so our peer could be gone.
-    // This check is safe because we're guaranteed to be holding enetMutex.
-    if (peer == NULL) {
+    if (err < 0) {
+        Limelog("Control stream connection failed\n");
         return 0;
     }
 
@@ -303,23 +313,6 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
 
     packet->type = ptype;
     memcpy(&packet[1], payload, paylen);
-
-    // Gen 5+ servers do control protocol over ENet instead of TCP
-    while ((err = serviceEnetHost(client, &event, 0)) > 0) {
-        if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-            enet_packet_destroy(event.packet);
-        }
-        else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
-            Limelog("Control stream received disconnect event\n");
-            free(packet);
-            return 0;
-        }
-    }
-    
-    if (err < 0) {
-        Limelog("Control stream connection failed\n");
-        return 0;
-    }
 
     enetPacket = enet_packet_create(packet, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
     if (enetPacket == NULL) {
@@ -570,13 +563,9 @@ int stopControlStream(void) {
     stopping = 1;
     LbqSignalQueueShutdown(&invalidReferenceFrameTuples);
     PltSetEvent(&invalidateRefFramesEvent);
-    
-    if (peer != NULL) {
-        PltLockMutex(&enetMutex);
-        enet_peer_disconnect_now(peer, 0);
-        peer = NULL;
-        PltUnlockMutex(&enetMutex);
-    }
+
+    // This must be set to stop in a timely manner
+    LC_ASSERT(ConnectionInterrupted);
 
     if (ctlSock != INVALID_SOCKET) {
         shutdownTcpSocket(ctlSock);
@@ -591,6 +580,10 @@ int stopControlStream(void) {
     PltCloseThread(&lossStatsThread);
     PltCloseThread(&invalidateRefFramesThread);
 
+    if (peer != NULL) {
+        enet_peer_reset(peer);
+        peer = NULL;
+    }
     if (client != NULL) {
         enet_host_destroy(client);
         client = NULL;
@@ -731,13 +724,8 @@ int startControlStream(void) {
         if (ctlSock != INVALID_SOCKET) {
             shutdownTcpSocket(ctlSock);
         }
-
-        if (peer != NULL) {
-            // We must use the mutex here because we have a live thread now.
-            PltLockMutex(&enetMutex);
-            enet_peer_disconnect_now(peer, 0);
-            peer = NULL;
-            PltUnlockMutex(&enetMutex);
+        else {
+            ConnectionInterrupted = 1;
         }
 
         PltInterruptThread(&lossStatsThread);
@@ -749,6 +737,8 @@ int startControlStream(void) {
             ctlSock = INVALID_SOCKET;
         }
         else {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
             enet_host_destroy(client);
             client = NULL;
         }

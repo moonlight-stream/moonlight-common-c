@@ -281,17 +281,6 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
     }
 }
 
-// Terminate the RTSP Handshake process by shutting down the socket.
-// The thread waiting on RTSP will close the socket.
-void terminateRtspHandshake(void) {
-    if (sock != INVALID_SOCKET) {
-        shutdownTcpSocket(sock);
-    }
-    
-    // FIXME: We should try to interrupt ENet here, but we must
-    // be sure to do it safely. We may need to add a new lock for this.
-}
-
 // Send RTSP OPTIONS request
 static int requestOptions(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;

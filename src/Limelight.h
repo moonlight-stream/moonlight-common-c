@@ -240,11 +240,17 @@ void LiInitializeServerInformation(PSERVER_INFORMATION serverInfo);
 // Callbacks are all optional. Pass NULL for individual callbacks within each struct or pass NULL for the entire struct
 // to use the defaults for all callbacks.
 //
+// This function is not thread-safe.
+//
 int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
     PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
 
-// This function stops streaming.
+// This function stops streaming. This function is not thread-safe.
 void LiStopConnection(void);
+
+// This function interrupts a pending LiStartConnection() call. This interruption happens asynchronously
+// so it is not safe to start another connection before the first LiStartConnection() call returns.
+void LiInterruptConnection(void);
 
 // Use to get a user-visible string to display initialization progress
 // from the integer passed to the ConnListenerStageXXX callbacks

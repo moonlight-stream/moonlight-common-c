@@ -1,20 +1,31 @@
 #include "Limelight-internal.h"
 
-#define ENET_SERVICE_RETRIES 10
+#define ENET_INTERNAL_TIMEOUT_MS 100
 
 // This function wraps enet_host_service() and hides the fact that it must be called
 // multiple times for retransmissions to work correctly. It is meant to be a drop-in
-// replacement for enet_host_service().
+// replacement for enet_host_service(). It also handles cancellation of the connection
+// attempt during the wait.
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs) {
-    int i;
-    int ret = -1;
-    
+    int ret;
+
     // We need to call enet_host_service() multiple times to make sure retransmissions happen
-    for (i = 0; i < ENET_SERVICE_RETRIES; i++) {
-        ret = enet_host_service(client, event, timeoutMs / ENET_SERVICE_RETRIES);
+    for (;;) {
+        int selectedTimeout = timeoutMs < ENET_INTERNAL_TIMEOUT_MS ? timeoutMs : ENET_INTERNAL_TIMEOUT_MS;
+
+        // We want to report an interrupt event if we are able to read data
+        if (ConnectionInterrupted) {
+            Limelog("ENet wait interrupted\n");
+            ret = -1;
+            break;
+        }
+
+        ret = enet_host_service(client, event, selectedTimeout);
         if (ret != 0 || timeoutMs == 0) {
             break;
         }
+
+        timeoutMs -= selectedTimeout;
     }
     
     return ret;
