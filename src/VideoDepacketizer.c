@@ -555,7 +555,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
         // with an end flag, we can send a message to the server
         if (waitingForNextSuccessfulFrame) {
             // This is the next successful frame after a loss event
-            connectionDetectedFrameLoss(startFrameNumber, nextFrameNumber - 1);
+            connectionDetectedFrameLoss(startFrameNumber, frameIndex - 1);
             waitingForNextSuccessfulFrame = 0;
         }
 
