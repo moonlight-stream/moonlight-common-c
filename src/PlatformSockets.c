@@ -52,9 +52,9 @@ int recvUdpSocket(SOCKET s, char* buffer, int size) {
     FD_ZERO(&readfds);
     FD_SET(s, &readfds);
     
-    // Wait up to 500 ms for the socket to be readable
+    // Wait up to 100 ms for the socket to be readable
     tv.tv_sec = 0;
-    tv.tv_usec = 500 * 1000;
+    tv.tv_usec = 100 * 1000;
     
     err = select((int)(s) + 1, &readfds, NULL, NULL, &tv);
     if (err <= 0) {
