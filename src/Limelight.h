@@ -105,8 +105,15 @@ typedef struct _DECODE_UNIT {
 // Returns 0 on success, non-zero on failure.
 typedef int(*DecoderRendererSetup)(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
 
-// This callback performs the teardown of the video decoder
+// This callback notifies the decoder that the stream is starting. No frames can be submitted before this callback returns.
+typedef void(*DecoderRendererStart)(void);
+
+// This callback notifies the decoder that the stream is stopping. Frames may still be submitted but they may be safely discarded.
+typedef void(*DecoderRendererStop)(void);
+
+// This callback performs the teardown of the video decoder. No more frames will be submitted when this callback is invoked.
 typedef void(*DecoderRendererCleanup)(void);
+
 
 // This callback provides Annex B formatted elementary stream data to the
 // decoder. If the decoder is unable to process the submitted data for some reason,
@@ -117,6 +124,8 @@ typedef int(*DecoderRendererSubmitDecodeUnit)(PDECODE_UNIT decodeUnit);
 
 typedef struct _DECODER_RENDERER_CALLBACKS {
     DecoderRendererSetup setup;
+    DecoderRendererStart start;
+    DecoderRendererStop stop;
     DecoderRendererCleanup cleanup;
     DecoderRendererSubmitDecodeUnit submitDecodeUnit;
     int capabilities;
@@ -152,7 +161,13 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
 // specified in the stream configuration. Returns 0 on success, non-zero on failure.
 typedef int(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig);
 
-// This callback performs the final teardown of the audio decoder
+// This callback notifies the decoder that the stream is starting. No audio can be submitted before this callback returns.
+typedef void(*AudioRendererStart)(void);
+
+// This callback notifies the decoder that the stream is stopping. Audio samples may still be submitted but they may be safely discarded.
+typedef void(*AudioRendererStop)(void);
+
+// This callback performs the final teardown of the audio decoder. No additional audio will be submitted when this callback is invoked.
 typedef void(*AudioRendererCleanup)(void);
 
 // This callback provides Opus audio data to be decoded and played. sampleLength is in bytes.
@@ -160,6 +175,8 @@ typedef void(*AudioRendererDecodeAndPlaySample)(char* sampleData, int sampleLeng
 
 typedef struct _AUDIO_RENDERER_CALLBACKS {
     AudioRendererInit init;
+    AudioRendererStart start;
+    AudioRendererStop stop;
     AudioRendererCleanup cleanup;
     AudioRendererDecodeAndPlaySample decodeAndPlaySample;
     int capabilities;

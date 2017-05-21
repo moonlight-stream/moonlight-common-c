@@ -250,6 +250,8 @@ static void DecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
+    AudioCallbacks.stop();
+
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {        
@@ -301,8 +303,11 @@ int startAudioStream(void) {
         return err;
     }
 
+    AudioCallbacks.start();
+
     err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
+        AudioCallbacks.stop();
         PltInterruptThread(&udpPingThread);
         PltJoinThread(&udpPingThread);
         PltCloseThread(&udpPingThread);
@@ -314,6 +319,7 @@ int startAudioStream(void) {
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
+            AudioCallbacks.stop();
             PltInterruptThread(&udpPingThread);
             PltInterruptThread(&receiveThread);
             PltJoinThread(&udpPingThread);

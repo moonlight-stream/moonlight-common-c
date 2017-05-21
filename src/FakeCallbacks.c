@@ -1,21 +1,29 @@
 #include "Limelight-internal.h"
 
 static int fakeDrSetup(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags) { return 0; }
+static void fakeDrStart(void) {}
+static void fakeDrStop(void) {}
 static void fakeDrCleanup(void) {}
 static int fakeDrSubmitDecodeUnit(PDECODE_UNIT decodeUnit) { return DR_OK; }
 
 static DECODER_RENDERER_CALLBACKS fakeDrCallbacks = {
     .setup = fakeDrSetup,
+    .start = fakeDrStart,
+    .stop = fakeDrStop,
     .cleanup = fakeDrCleanup,
     .submitDecodeUnit = fakeDrSubmitDecodeUnit,
 };
 
 static int fakeArInit(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig) { return 0; }
+static void fakeArStart(void) {}
+static void fakeArStop(void) {}
 static void fakeArCleanup(void) {}
 static void fakeArDecodeAndPlaySample(char* sampleData, int sampleLength) {}
 
 AUDIO_RENDERER_CALLBACKS fakeArCallbacks = {
     .init = fakeArInit,
+    .start = fakeArStart,
+    .stop = fakeArStop,
     .cleanup = fakeArCleanup,
     .decodeAndPlaySample = fakeArDecodeAndPlaySample,
 };
@@ -48,6 +56,12 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         if ((*drCallbacks)->setup == NULL) {
             (*drCallbacks)->setup = fakeDrSetup;
         }
+        if ((*drCallbacks)->start == NULL) {
+            (*drCallbacks)->start = fakeDrStart;
+        }
+        if ((*drCallbacks)->stop == NULL) {
+            (*drCallbacks)->stop = fakeDrStop;
+        }
         if ((*drCallbacks)->cleanup == NULL) {
             (*drCallbacks)->cleanup = fakeDrCleanup;
         }
@@ -62,6 +76,12 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
     else {
         if ((*arCallbacks)->init == NULL) {
             (*arCallbacks)->init = fakeArInit;
+        }
+        if ((*arCallbacks)->start == NULL) {
+            (*arCallbacks)->start = fakeArStart;
+        }
+        if ((*arCallbacks)->stop == NULL) {
+            (*arCallbacks)->stop = fakeArStop;
         }
         if ((*arCallbacks)->cleanup == NULL) {
             (*arCallbacks)->cleanup = fakeArCleanup;
