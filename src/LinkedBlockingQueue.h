@@ -20,6 +20,7 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     int sizeBound;
     int currentSize;
     int shutdown;
+    int lifetimeSize;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
 } LINKED_BLOCKING_QUEUE, *PLINKED_BLOCKING_QUEUE;

@@ -2,7 +2,7 @@
 
 // Destroy the linked blocking queue and associated mutex and event
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead) {
-    LC_ASSERT(queueHead->shutdown);
+    LC_ASSERT(queueHead->shutdown || queueHead->lifetimeSize == 0);
     
     PltDeleteMutex(&queueHead->mutex);
     PltCloseEvent(&queueHead->containsDataEvent);
@@ -87,6 +87,7 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
     }
 
     queueHead->currentSize++;
+    queueHead->lifetimeSize++;
 
     PltUnlockMutex(&queueHead->mutex);
 
