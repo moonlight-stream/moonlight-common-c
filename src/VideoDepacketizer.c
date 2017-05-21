@@ -249,8 +249,8 @@ static void reassembleFrame(int frameNumber) {
                     // Flush the decode unit queue
                     freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
-                    // FIXME: Get proper lower bound
-                    connectionSinkTooSlow(0, frameNumber);
+                    // FIXME: Get proper bounds to use reference frame invalidation
+                    requestIdrOnDemand();
                     return;
                 }
             }

@@ -233,11 +233,6 @@ void requestIdrOnDemand(void) {
     PltSetEvent(&invalidateRefFramesEvent);
 }
 
-// Invalidate reference frames if the decoder is too slow
-void connectionSinkTooSlow(int startFrame, int endFrame) {
-    queueFrameInvalidationTuple(startFrame, endFrame);
-}
-
 // Invalidate reference frames lost by the network
 void connectionDetectedFrameLoss(int startFrame, int endFrame) {
     queueFrameInvalidationTuple(startFrame, endFrame);
