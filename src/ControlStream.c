@@ -150,6 +150,7 @@ int initializeControlStream(void) {
     stopping = 0;
     PltCreateEvent(&invalidateRefFramesEvent);
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
+    PltCreateMutex(&enetMutex);
 
     if (AppVersionQuad[0] == 3) {
         packetTypes = (short*)packetTypesGen3;
@@ -195,6 +196,7 @@ void destroyControlStream(void) {
     LC_ASSERT(stopping);
     PltCloseEvent(&invalidateRefFramesEvent);
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
+    PltDeleteMutex(&enetMutex);
 }
 
 int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE* qfit) {
@@ -599,8 +601,6 @@ int stopControlStream(void) {
         ctlSock = INVALID_SOCKET;
     }
 
-    PltDeleteMutex(&enetMutex);
-
     return 0;
 }
 
@@ -619,8 +619,6 @@ int sendInputPacketOnControlStream(unsigned char* data, int length) {
 // Starts the control stream
 int startControlStream(void) {
     int err;
-
-    PltCreateMutex(&enetMutex);
 
     if (AppVersionQuad[0] >= 5) {
         ENetAddress address;
@@ -735,8 +733,11 @@ int startControlStream(void) {
         }
 
         if (peer != NULL) {
+            // We must use the mutex here because we have a live thread now.
+            PltLockMutex(&enetMutex);
             enet_peer_disconnect_now(peer, 0);
             peer = NULL;
+            PltUnlockMutex(&enetMutex);
         }
 
         PltInterruptThread(&lossStatsThread);
