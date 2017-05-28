@@ -280,11 +280,11 @@ void stopAudioStream(void) {
     AudioCallbacks.cleanup();
 }
 
-int startAudioStream(void) {
+int startAudioStream(void* audioContext, int arFlags) {
     int err;
 
     err = AudioCallbacks.init(StreamConfig.audioConfiguration,
-        opusConfigArray[StreamConfig.audioConfiguration]);
+        opusConfigArray[StreamConfig.audioConfiguration], audioContext, arFlags);
     if (err != 0) {
         return err;
     }

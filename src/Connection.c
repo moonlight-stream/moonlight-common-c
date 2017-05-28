@@ -216,7 +216,8 @@ static int resolveHostName(const char* host)
 
 // Starts the connection to the streaming machine
 int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags) {
+    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags,
+    void* audioContext, int arFlags) {
     int err;
 
     NegotiatedVideoFormat = 0;
@@ -352,7 +353,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     Limelog("Starting audio stream...");
     ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_START);
-    err = startAudioStream();
+    err = startAudioStream(audioContext, arFlags);
     if (err != 0) {
         Limelog("Audio stream start failed: %d\n", err);
         ListenerCallbacks.stageFailed(STAGE_AUDIO_STREAM_START, err);

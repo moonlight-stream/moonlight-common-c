@@ -159,7 +159,7 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
 // This callback initializes the audio renderer. The audio configuration parameter
 // provides the negotiated audio configuration. This may differ from the one
 // specified in the stream configuration. Returns 0 on success, non-zero on failure.
-typedef int(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig);
+typedef int(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, void* context, int arFlags);
 
 // This callback notifies the decoder that the stream is starting. No audio can be submitted before this callback returns.
 typedef void(*AudioRendererStart)(void);
@@ -260,7 +260,8 @@ void LiInitializeServerInformation(PSERVER_INFORMATION serverInfo);
 // This function is not thread-safe.
 //
 int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
-    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags);
+    PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags,
+    void* audioContext, int arFlags);
 
 // This function stops streaming. This function is not thread-safe.
 void LiStopConnection(void);
