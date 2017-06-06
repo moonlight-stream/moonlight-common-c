@@ -223,7 +223,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
         queue->bufferLowestSequenceNumber = ushort(packet->sequenceNumber - fecIndex);
         queue->bufferSize = 0;
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
-        queue->bufferDataPackets = ((nvPacket->fecInfo & 0xFF00000) >> 20) / 4;
+        queue->bufferDataPackets = ((nvPacket->fecInfo & 0xFFF00000) >> 20) / 4;
         queue->fecPercentage = ((nvPacket->fecInfo & 0xFF0) >> 4);
     } else if (isBefore(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
