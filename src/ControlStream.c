@@ -498,7 +498,8 @@ static void requestInvalidateReferenceFrames(void) {
     long long payload[3];
     PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
 
-    LC_ASSERT(VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION);
+    LC_ASSERT((NegotiatedVideoFormat == VIDEO_FORMAT_H264 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
+              (NegotiatedVideoFormat == VIDEO_FORMAT_H265 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC)));
 
     if (!getNextFrameInvalidationTuple(&qfit)) {
         return;
