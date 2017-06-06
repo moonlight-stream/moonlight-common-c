@@ -81,10 +81,9 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
     
     reed_solomon* rs = reed_solomon_new(queue->bufferDataPackets, totalParityPackets);
 
-    int* missing = malloc(missingPackets * sizeof(int));
     unsigned char** packets = malloc(totalPackets * sizeof(unsigned char*));
     unsigned char* marks = malloc(totalPackets * sizeof(unsigned char));
-    if (rs == NULL || missing == NULL || packets == NULL || marks == NULL)
+    if (rs == NULL || packets == NULL || marks == NULL)
         goto cleanup;
 
     rs->shards = queue->bufferDataPackets + missingPackets; //Don't let RS complain about missing parity packets
@@ -157,9 +156,6 @@ cleanup_packets:
 
 cleanup:
     reed_solomon_release(rs);
-
-    if (missing != NULL)
-        free(missing);
 
     if (packets != NULL)
         free(packets);
