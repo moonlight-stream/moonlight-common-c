@@ -80,6 +80,10 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
     }
     
     reed_solomon* rs = reed_solomon_new(queue->bufferDataPackets, totalParityPackets);
+    
+    // This could happen in an OOM condition, but it could also mean the FEC data
+    // that we fed to reed_solomon_new() is bogus, so we'll assert to get a better look.
+    LC_ASSERT(rs != NULL);
 
     unsigned char** packets = malloc(totalPackets * sizeof(unsigned char*));
     unsigned char* marks = malloc(totalPackets * sizeof(unsigned char));
@@ -122,6 +126,10 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
     }
     
     ret = reed_solomon_reconstruct(rs, packets, marks, totalPackets, receiveSize);
+    
+    // We should always provide enough parity to recover the missing data successfully.
+    // If this fails, something is probably wrong with our FEC state.
+    LC_ASSERT(ret == 0);
 
 cleanup_packets:
     for (i = 0; i < totalPackets; i++) {
