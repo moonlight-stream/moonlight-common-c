@@ -528,7 +528,7 @@ static void requestInvalidateReferenceFrames(void) {
         return;
     }
 
-    Limelog("Invalidate reference frame request sent\n");
+    Limelog("Invalidate reference frame request sent (%d to %d)\n", (int)payload[0], (int)payload[1]);
 }
 
 static void invalidateRefFramesFunc(void* context) {

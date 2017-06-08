@@ -236,6 +236,14 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
     // Reinitialize the queue if it's empty after a frame delivery or
     // if we can't finish a frame before receiving the next one.
     if (queue->bufferSize == 0 || queue->currentFrameNumber != nvPacket->frameIndex) {
+        if (queue->currentFrameNumber != nvPacket->frameIndex && queue->bufferSize != 0) {
+            Limelog("Unrecoverable frame %d: %d+%d=%d received < %d needed\n",
+                    queue->currentFrameNumber, queue->receivedBufferDataPackets,
+                    queue->bufferSize - queue->receivedBufferDataPackets,
+                    queue->bufferSize,
+                    queue->bufferDataPackets);
+        }
+        
         queue->currentFrameNumber = nvPacket->frameIndex;
         queue->nextRtpSequenceNumber = queue->bufferHighestSequenceNumber;
         
