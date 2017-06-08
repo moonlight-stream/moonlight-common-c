@@ -19,7 +19,9 @@ typedef struct _RTP_FEC_QUEUE {
     int bufferSize;
     int bufferLowestSequenceNumber;
     int bufferHighestSequenceNumber;
+    int bufferFirstParitySequenceNumber;
     int bufferDataPackets;
+    int receivedBufferDataPackets;
     int fecPercentage;
     
     int currentFrameNumber;
