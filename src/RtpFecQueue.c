@@ -80,7 +80,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int missingPackets = totalPackets - queue->bufferSize;
     int ret;
     
-    if (parityPackets < missingPackets || parityPackets <= 0) {
+    if (parityPackets < missingPackets) {
         // Not enough parity data to recover yet
         return -1;
     }
