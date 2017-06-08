@@ -2,8 +2,8 @@
 #include "RtpFecQueue.h"
 #include "rs.h"
 
-#define ushort(x) (unsigned short) ((x) % (UINT16_MAX+1))
-#define isBefore(x, y) ushort((x) - (y)) > (UINT16_MAX/2)
+#define ushort(x) ((unsigned short) ((x) % (UINT16_MAX+1)))
+#define isBefore(x, y) (ushort((x) - (y)) > (UINT16_MAX/2))
 
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
     reed_solomon_init();
@@ -19,16 +19,19 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
         queue->bufferHead = entry->next;
         free(entry->packet);
     }
+    
+    while (queue->queueHead != NULL) {
+        PRTPFEC_QUEUE_ENTRY entry = queue->queueHead;
+        queue->queueHead = entry->next;
+        free(entry->packet);
+    }
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
 static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet) {
     PRTPFEC_QUEUE_ENTRY entry;
-
-    // Don't queue packets we're already ahead of
-    if (isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
-        return 0;
-    }
+    
+    LC_ASSERT(!isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber));
 
     // Don't queue duplicates either
     entry = queue->bufferHead;
@@ -134,7 +137,8 @@ static void repairPackets(PRTP_FEC_QUEUE queue) {
 cleanup_packets:
     for (i = 0; i < totalPackets; i++) {
         if (marks[i]) {
-            if (ret == 0) {
+            // Only submit frame data, not FEC packets
+            if (ret == 0 && i < queue->bufferDataPackets) {
                 PRTPFEC_QUEUE_ENTRY queueEntry = (PRTPFEC_QUEUE_ENTRY)&packets[i][receiveSize + sizeof(int)];
                 PRTP_PACKET rtpPacket = (PRTP_PACKET) packets[i];
                 rtpPacket->sequenceNumber = ushort(i + queue->bufferLowestSequenceNumber);
