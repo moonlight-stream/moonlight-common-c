@@ -272,7 +272,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
         return RTPF_RET_REJECTED;
     }
     else {
-        if (packet->sequenceNumber < queue->bufferFirstParitySequenceNumber) {
+        if (isBefore(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber)) {
             queue->receivedBufferDataPackets++;
         }
         
