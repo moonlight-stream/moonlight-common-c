@@ -63,6 +63,10 @@ void LimelogWindows(char* Format, ...);
 #ifndef NDEBUG
 #define NDEBUG
 #endif
+#else
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #endif
 #include <assert.h>
 #define LC_ASSERT(x) assert(x)
