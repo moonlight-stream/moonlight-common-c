@@ -292,6 +292,12 @@ int PltWaitForEvent(PLT_EVENT* event) {
 uint64_t PltGetMillis(void) {
 #if defined(LC_WINDOWS)
     return GetTickCount64();
+#elif HAVE_CLOCK_GETTIME
+    struct timespec tv;
+    
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+    
+    return (tv.tv_sec * 1000) + (tv.tv_nsec / 1000000);
 #else
     struct timeval tv;
 
