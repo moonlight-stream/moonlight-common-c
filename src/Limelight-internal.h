@@ -5,6 +5,7 @@
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
 #include "Video.h"
+#include "RtpFecQueue.h"
 
 #include <enet/enet.h>
 
@@ -45,7 +46,7 @@ int performRtspHandshake(void);
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
 void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length);
-void queueRtpPacket(PRTP_PACKET rtpPacket, int length);
+void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry);
 void stopVideoDepacketizer(void);
 void requestDecoderRefresh(void);
 

@@ -574,13 +574,14 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 }
 
 // Add an RTP Packet to the queue
-void queueRtpPacket(PRTP_PACKET rtpPacket, int length) {
+void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry) {
     int dataOffset;
 
-    dataOffset = sizeof(*rtpPacket);
-    if (rtpPacket->header & FLAG_EXTENSION) {
+    dataOffset = sizeof(*queueEntry->packet);
+    if (queueEntry->packet->header & FLAG_EXTENSION) {
         dataOffset += 4; // 2 additional fields
     }
 
-    processRtpPayload((PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset), length - dataOffset);
+    processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry->packet) + dataOffset),
+                      queueEntry->length - dataOffset);
 }

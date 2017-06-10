@@ -28,7 +28,7 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet) {
+static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length) {
     PRTPFEC_QUEUE_ENTRY entry;
     
     LC_ASSERT(!isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber));
@@ -44,6 +44,7 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     }
     
     newEntry->packet = packet;
+    newEntry->length = length;
     newEntry->prev = NULL;
     newEntry->next = NULL;
 
@@ -113,20 +114,17 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     memset(marks, 1, sizeof(char) * (totalPackets));
     
     int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    int packetBufferSize = receiveSize + sizeof(int) + sizeof(RTPFEC_QUEUE_ENTRY);
+    int packetBufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
 
     PRTPFEC_QUEUE_ENTRY entry = queue->bufferHead;
     while (entry != NULL) {
         int index = ushort(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
         packets[index] = (unsigned char*) entry->packet;
         marks[index] = 0;
-
-        int size;
-        memcpy(&size, &packets[index][StreamConfig.packetSize + MAX_RTP_HEADER_SIZE], sizeof(int));
         
         //Set padding to zero
-        if (size < receiveSize) {
-            memset(&packets[index][size], 0, receiveSize - size);
+        if (entry->length < receiveSize) {
+            memset(&packets[index][entry->length], 0, receiveSize - entry->length);
         }
 
         entry = entry->next;
@@ -154,7 +152,7 @@ cleanup_packets:
         if (marks[i]) {
             // Only submit frame data, not FEC packets
             if (ret == 0 && i < queue->bufferDataPackets) {
-                PRTPFEC_QUEUE_ENTRY queueEntry = (PRTPFEC_QUEUE_ENTRY)&packets[i][receiveSize + sizeof(int)];
+                PRTPFEC_QUEUE_ENTRY queueEntry = (PRTPFEC_QUEUE_ENTRY)&packets[i][receiveSize];
                 PRTP_PACKET rtpPacket = (PRTP_PACKET) packets[i];
                 rtpPacket->sequenceNumber = ushort(i + queue->bufferLowestSequenceNumber);
                 rtpPacket->header = queue->bufferHead->packet->header;
@@ -172,9 +170,7 @@ cleanup_packets:
                 // discarded by decoders. It's not safe to strip all zero padding because
                 // it may be a legitimate part of the H.264 bytestream.
 
-                int size = StreamConfig.packetSize + dataOffset;
-                memcpy(&packets[i][receiveSize], &size, sizeof(int));
-                queuePacket(queue, queueEntry, 0, rtpPacket);
+                queuePacket(queue, queueEntry, 0, rtpPacket, StreamConfig.packetSize + dataOffset);
             } else if (packets[i] != NULL) {
                 free(packets[i]);
             }
@@ -215,7 +211,7 @@ static void removeEntry(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry) {
     queue->queueSize--;
 }
 
-int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY packetEntry) {
+int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry) {
     if (isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
         // Reject packets behind our current sequence number
         return RTPF_RET_REJECTED;
@@ -268,7 +264,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
     
-    if (!queuePacket(queue, packetEntry, 0, packet)) {
+    if (!queuePacket(queue, packetEntry, 0, packet, length)) {
         return RTPF_RET_REJECTED;
     }
     else {
@@ -302,7 +298,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY 
     }
 }
 
-PRTP_PACKET RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue) {
+PRTPFEC_QUEUE_ENTRY RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue) {
     PRTPFEC_QUEUE_ENTRY queuedEntry, entry;
 
     // Find the next queued packet
@@ -321,7 +317,8 @@ PRTP_PACKET RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue) {
 
     if (queuedEntry != NULL) {
         removeEntry(queue, queuedEntry);
-        return queuedEntry->packet;
+        queuedEntry->prev = queuedEntry->next = NULL;
+        return queuedEntry;
     } else {
         return NULL;
     }

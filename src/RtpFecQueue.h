@@ -4,6 +4,7 @@
 
 typedef struct _RTPFEC_QUEUE_ENTRY {
     PRTP_PACKET packet;
+    int length;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;
@@ -34,5 +35,5 @@ typedef struct _RTP_FEC_QUEUE {
 
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue);
 void RtpfCleanupQueue(PRTP_FEC_QUEUE queue);
-int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, PRTPFEC_QUEUE_ENTRY packetEntry);
-PRTP_PACKET RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue);
+int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry);
+PRTPFEC_QUEUE_ENTRY RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue);

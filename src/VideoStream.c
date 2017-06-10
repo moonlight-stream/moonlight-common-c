@@ -65,9 +65,11 @@ static void ReceiveThreadProc(void* context) {
     int bufferSize, receiveSize;
     char* buffer;
     int queueStatus;
+    int length;
+    PRTPFEC_QUEUE_ENTRY queueEntry;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    bufferSize = receiveSize + sizeof(int) + sizeof(RTPFEC_QUEUE_ENTRY);
+    bufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
     buffer = NULL;
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
@@ -93,19 +95,17 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        memcpy(&buffer[receiveSize], &err, sizeof(int));
-
         // RTP sequence number must be in host order for the RTP queue
         packet = (PRTP_PACKET)&buffer[0];
         packet->sequenceNumber = htons(packet->sequenceNumber);
 
-        queueStatus = RtpfAddPacket(&rtpQueue, packet, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize + sizeof(int)]);
+        queueStatus = RtpfAddPacket(&rtpQueue, packet, err, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize]);
         if (queueStatus == RTPF_RET_QUEUED_PACKETS_READY) {
             // The packet queue now has packets ready
-            while ((buffer = (char*)RtpfGetQueuedPacket(&rtpQueue)) != NULL) {
-                memcpy(&err, &buffer[receiveSize], sizeof(int));
-                queueRtpPacket((PRTP_PACKET)buffer, err);
-                free(buffer);
+            buffer = NULL;
+            while ((queueEntry = RtpfGetQueuedPacket(&rtpQueue)) != NULL) {
+                queueRtpPacket(queueEntry);
+                free(queueEntry->packet);
             }
         }
         else if (queueStatus == RTPF_RET_QUEUED_NOTHING_READY) {
