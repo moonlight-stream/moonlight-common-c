@@ -63,6 +63,11 @@ typedef struct _DECODE_UNIT {
     // Frame number
     int frameNumber;
 
+    // Receive time of first buffer
+    // NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
+    // populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME
+    unsigned long long receiveTimeMs;
+
     // Length of the entire buffer chain in bytes
     int fullLength;
 

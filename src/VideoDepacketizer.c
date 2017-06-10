@@ -7,20 +7,18 @@ static PLENTRY nalChainHead;
 static int nalChainDataLength;
 
 static int nextFrameNumber;
-static int nextPacketNumber;
 static int startFrameNumber;
 static int waitingForNextSuccessfulFrame;
 static int waitingForIdrFrame;
-static int gotNextFrameStart;
 static int lastPacketInStream;
 static int decodingFrame;
 static int strictIdrFrameWait;
+static unsigned long long firstPacketReceiveTime;
 
 #define CONSECUTIVE_DROP_LIMIT 120
 static int consecutiveFrameDrops;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
-static unsigned int nominalPacketDataLength;
 
 typedef struct _BUFFER_DESC {
     char* data;
@@ -33,16 +31,14 @@ void initializeVideoDepacketizer(int pktSize) {
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
     }
-    nominalPacketDataLength = pktSize - sizeof(NV_VIDEO_PACKET);
 
     nextFrameNumber = 1;
-    nextPacketNumber = 0;
     startFrameNumber = 0;
     waitingForNextSuccessfulFrame = 0;
     waitingForIdrFrame = 1;
-    gotNextFrameStart = 0;
     lastPacketInStream = -1;
     decodingFrame = 0;
+    firstPacketReceiveTime = 0;
 
     LC_ASSERT(NegotiatedVideoFormat != 0);
     strictIdrFrameWait =
@@ -231,6 +227,7 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.bufferList = nalChainHead;
             qdu->decodeUnit.fullLength = nalChainDataLength;
             qdu->decodeUnit.frameNumber = frameNumber;
+            qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
 
             nalChainHead = NULL;
             nalChainDataLength = 0;
@@ -401,7 +398,7 @@ static void processRtpPayloadFast(BUFFER_DESC location) {
 }
 
 // Process an RTP Payload
-void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
+void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long long receiveTimeMs) {
     BUFFER_DESC currentPos;
     int frameIndex;
     char flags;
@@ -450,6 +447,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
 
         // We're now decoding a frame
         decodingFrame = 1;
+        firstPacketReceiveTime = receiveTimeMs;
     }
 
     // This must be the first packet in a frame or be contiguous with the last
@@ -536,5 +534,6 @@ void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry) {
     }
 
     processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry->packet) + dataOffset),
-                      queueEntry->length - dataOffset);
+                      queueEntry->length - dataOffset,
+                      queueEntry->receiveTimeMs);
 }

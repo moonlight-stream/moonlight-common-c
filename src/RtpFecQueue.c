@@ -42,10 +42,11 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
 
         entry = entry->next;
     }
-    
+
     newEntry->packet = packet;
     newEntry->length = length;
     newEntry->isParity = isParity;
+    newEntry->receiveTimeMs = PltGetMillis();
     newEntry->prev = NULL;
     newEntry->next = NULL;
 

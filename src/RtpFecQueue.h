@@ -6,6 +6,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
     PRTP_PACKET packet;
     int length;
     int isParity;
+    unsigned long long receiveTimeMs;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;
@@ -25,7 +26,7 @@ typedef struct _RTP_FEC_QUEUE {
     int bufferDataPackets;
     int receivedBufferDataPackets;
     int fecPercentage;
-    
+
     int currentFrameNumber;
     unsigned int nextRtpSequenceNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
