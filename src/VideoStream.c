@@ -65,7 +65,6 @@ static void ReceiveThreadProc(void* context) {
     int bufferSize, receiveSize;
     char* buffer;
     int queueStatus;
-    int length;
     PRTPFEC_QUEUE_ENTRY queueEntry;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;

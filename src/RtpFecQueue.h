@@ -5,6 +5,7 @@
 typedef struct _RTPFEC_QUEUE_ENTRY {
     PRTP_PACKET packet;
     int length;
+    int isParity;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;

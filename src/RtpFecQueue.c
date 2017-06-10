@@ -28,7 +28,7 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length) {
+static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length, int isParity) {
     PRTPFEC_QUEUE_ENTRY entry;
     
     LC_ASSERT(!isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber));
@@ -45,6 +45,7 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     
     newEntry->packet = packet;
     newEntry->length = length;
+    newEntry->isParity = isParity;
     newEntry->prev = NULL;
     newEntry->next = NULL;
 
@@ -170,7 +171,8 @@ cleanup_packets:
                 // discarded by decoders. It's not safe to strip all zero padding because
                 // it may be a legitimate part of the H.264 bytestream.
 
-                queuePacket(queue, queueEntry, 0, rtpPacket, StreamConfig.packetSize + dataOffset);
+                LC_ASSERT(isBefore(rtpPacket->sequenceNumber, queue->bufferFirstParitySequenceNumber));                
+                queuePacket(queue, queueEntry, 0, rtpPacket, StreamConfig.packetSize + dataOffset, 0);
             } else if (packets[i] != NULL) {
                 free(packets[i]);
             }
@@ -264,7 +266,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
     
-    if (!queuePacket(queue, packetEntry, 0, packet, length)) {
+    if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
         return RTPF_RET_REJECTED;
     }
     else {
@@ -307,6 +309,22 @@ PRTPFEC_QUEUE_ENTRY RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue) {
     unsigned int lowestRtpSequenceNumber = UINT16_MAX;
     
     while (entry != NULL) {
+        // Never return parity packets
+        if (entry->isParity) {
+            PRTPFEC_QUEUE_ENTRY parityEntry = entry;
+            
+            // Skip this entry
+            entry = parityEntry->next;
+            
+            // Remove this entry
+            removeEntry(queue, parityEntry);
+            
+            // Free the entry and packet
+            free(parityEntry->packet);
+            
+            continue;
+        }
+        
         if (queuedEntry == NULL || isBefore(entry->packet->sequenceNumber, lowestRtpSequenceNumber)) {
             lowestRtpSequenceNumber = entry->packet->sequenceNumber;
             queuedEntry = entry;
