@@ -230,6 +230,7 @@ static void reassembleFrame(int frameNumber) {
         if (qdu != NULL) {
             qdu->decodeUnit.bufferList = nalChainHead;
             qdu->decodeUnit.fullLength = nalChainDataLength;
+            qdu->decodeUnit.frameNumber = frameNumber;
 
             nalChainHead = NULL;
             nalChainDataLength = 0;

@@ -60,6 +60,9 @@ typedef struct _LENTRY {
 
 // A decode unit describes a buffer chain of video data from multiple packets
 typedef struct _DECODE_UNIT {
+    // Frame number
+    int frameNumber;
+
     // Length of the entire buffer chain in bytes
     int fullLength;
 
