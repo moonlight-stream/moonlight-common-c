@@ -420,54 +420,21 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
     flags = videoPacket->flags;
     firstPacket = isFirstPacket(flags);
 
-    // Drop duplicates or re-ordered packets
     streamPacketIndex = videoPacket->streamPacketIndex;
-    if (isBeforeSignedInt((short)streamPacketIndex, (short)(lastPacketInStream + 1), 0)) {
-        return;
-    }
-
-    // Drop packets from a previously completed frame
-    if (isBeforeSignedInt(frameIndex, nextFrameNumber, 0)) {
-        return;
-    }
+    
+    // The packets and frames must be in sequence from the FEC queue
+    LC_ASSERT(!isBeforeSignedInt((short)streamPacketIndex, (short)(lastPacketInStream + 1), 0));
+    LC_ASSERT(!isBeforeSignedInt(frameIndex, nextFrameNumber, 0));
 
     // Notify the listener of the latest frame we've seen from the PC
     connectionSawFrame(frameIndex);
-
-    // Look for a frame start before receiving a frame end
-    if (firstPacket && decodingFrame)
-    {
-        Limelog("Network dropped end of a frame\n");
-        nextFrameNumber = frameIndex;
-
-        // Unexpected start of next frame before terminating the last
-        waitingForNextSuccessfulFrame = 1;
-        dropFrameState();
-    }
-    // Look for a non-frame start before a frame start
-    else if (!firstPacket && !decodingFrame) {
-        // Check if this looks like a real frame
-        if (flags == FLAG_CONTAINS_PIC_DATA ||
-            flags == FLAG_EOF ||
-            currentPos.length < nominalPacketDataLength)
-        {
-            Limelog("Network dropped beginning of a frame\n");
-            nextFrameNumber = frameIndex + 1;
-
-            waitingForNextSuccessfulFrame = 1;
-
-            dropFrameState();
-            decodingFrame = 0;
-            return;
-        }
-        else {
-            // FEC data
-            return;
-        }
-    }
+    
+    // Verify that we didn't receive an incomplete frame
+    LC_ASSERT(firstPacket ^ decodingFrame);
+    
     // Check sequencing of this frame to ensure we didn't
     // miss one in between
-    else if (firstPacket) {
+    if (firstPacket) {
         // Make sure this is the next consecutive frame
         if (isBeforeSignedInt(nextFrameNumber, frameIndex, 1)) {
             Limelog("Network dropped an entire frame\n");
@@ -477,32 +444,17 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length) {
             waitingForNextSuccessfulFrame = 1;
             dropFrameState();
         }
-        else if (nextFrameNumber != frameIndex) {
-            // Duplicate packet or FEC dup
-            decodingFrame = 0;
-            return;
+        else {
+            LC_ASSERT(nextFrameNumber == frameIndex);
         }
 
         // We're now decoding a frame
         decodingFrame = 1;
     }
 
-    // If it's not the first packet of a frame
-    // we need to drop it if the stream packet index
-    // doesn't match
-    if (!firstPacket && decodingFrame) {
-        if (streamPacketIndex != (int)(lastPacketInStream + 1)) {
-            Limelog("Network dropped middle of a frame\n");
-            nextFrameNumber = frameIndex + 1;
-
-            waitingForNextSuccessfulFrame = 1;
-
-            dropFrameState();
-            decodingFrame = 0;
-
-            return;
-        }
-    }
+    // This must be the first packet in a frame or be contiguous with the last
+    // packet received.
+    LC_ASSERT(firstPacket || streamPacketIndex == (int)(lastPacketInStream + 1));
 
     // Notify the server of any packet losses
     if (streamPacketIndex != (int)(lastPacketInStream + 1)) {
