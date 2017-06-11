@@ -15,6 +15,8 @@ static int decodingFrame;
 static int strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
 
+#define TRUNCATE_24BIT(x) ((x) & 0xFFFFFF)
+
 #define CONSECUTIVE_DROP_LIMIT 120
 static int consecutiveFrameDrops;
 
@@ -420,6 +422,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     streamPacketIndex = videoPacket->streamPacketIndex;
     
     // The packets and frames must be in sequence from the FEC queue
+    LC_ASSERT(!isBeforeSignedInt(streamPacketIndex, TRUNCATE_24BIT(lastPacketInStream + 1), 0));
     LC_ASSERT(!isBeforeSignedInt(frameIndex, nextFrameNumber, 0));
 
     // Notify the listener of the latest frame we've seen from the PC
@@ -451,7 +454,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 
     // This must be the first packet in a frame or be contiguous with the last
     // packet received.
-    LC_ASSERT(firstPacket || streamPacketIndex == lastPacketInStream + 1);
+    LC_ASSERT(firstPacket || streamPacketIndex == TRUNCATE_24BIT(lastPacketInStream + 1));
 
     lastPacketInStream = streamPacketIndex;
 
