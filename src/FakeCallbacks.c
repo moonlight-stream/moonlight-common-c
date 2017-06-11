@@ -35,6 +35,7 @@ static void fakeClConnectionStarted(void) {}
 static void fakeClConnectionTerminated(long errorCode) {}
 static void fakeClDisplayMessage(const char* message) {}
 static void fakeClDisplayTransientMessage(const char* message) {}
+static void fakeClLogMessage(const char* format, ...) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,
@@ -44,6 +45,7 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .connectionTerminated = fakeClConnectionTerminated,
     .displayMessage = fakeClDisplayMessage,
     .displayTransientMessage = fakeClDisplayTransientMessage,
+    .logMessage = fakeClLogMessage,
 };
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
@@ -115,6 +117,9 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         }
         if ((*clCallbacks)->displayTransientMessage == NULL) {
             (*clCallbacks)->displayTransientMessage = fakeClDisplayTransientMessage;
+        }
+        if ((*clCallbacks)->logMessage == NULL) {
+            (*clCallbacks)->logMessage = fakeClLogMessage;
         }
     }
 }

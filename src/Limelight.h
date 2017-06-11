@@ -232,6 +232,9 @@ typedef void(*ConnListenerDisplayMessage)(const char* message);
 // while streaming
 typedef void(*ConnListenerDisplayTransientMessage)(const char* message);
 
+// This callback is invoked to log debug message
+typedef void(*ConnListenerLogMessage)(const char* format, ...);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -240,6 +243,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerConnectionTerminated connectionTerminated;
     ConnListenerDisplayMessage displayMessage;
     ConnListenerDisplayTransientMessage displayTransientMessage;
+    ConnListenerLogMessage logMessage;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
