@@ -420,7 +420,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     streamPacketIndex = videoPacket->streamPacketIndex;
     
     // The packets and frames must be in sequence from the FEC queue
-    LC_ASSERT(!isBeforeSignedInt(streamPacketIndex, lastPacketInStream + 1, 0));
     LC_ASSERT(!isBeforeSignedInt(frameIndex, nextFrameNumber, 0));
 
     // Notify the listener of the latest frame we've seen from the PC
