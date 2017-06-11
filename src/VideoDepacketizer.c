@@ -420,7 +420,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     streamPacketIndex = videoPacket->streamPacketIndex;
     
     // The packets and frames must be in sequence from the FEC queue
-    LC_ASSERT(!isBeforeSignedInt((short)streamPacketIndex, (short)(lastPacketInStream + 1), 0));
+    LC_ASSERT(!isBeforeSignedInt(streamPacketIndex, lastPacketInStream + 1, 0));
     LC_ASSERT(!isBeforeSignedInt(frameIndex, nextFrameNumber, 0));
 
     // Notify the listener of the latest frame we've seen from the PC
@@ -452,10 +452,10 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 
     // This must be the first packet in a frame or be contiguous with the last
     // packet received.
-    LC_ASSERT(firstPacket || streamPacketIndex == (int)(lastPacketInStream + 1));
+    LC_ASSERT(firstPacket || streamPacketIndex == lastPacketInStream + 1);
 
     // Notify the server of any packet losses
-    if (streamPacketIndex != (int)(lastPacketInStream + 1)) {
+    if (streamPacketIndex != lastPacketInStream + 1) {
         // Packets were lost so report this to the server
         connectionLostPackets(lastPacketInStream, streamPacketIndex);
     }
