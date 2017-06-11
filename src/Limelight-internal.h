@@ -57,7 +57,7 @@ void stopVideoStream(void);
 
 void initializeAudioStream(void);
 void destroyAudioStream(void);
-int startAudioStream(void);
+int startAudioStream(void* audioContext, int arFlags);
 void stopAudioStream(void);
 
 int initializeInputStream(void);
