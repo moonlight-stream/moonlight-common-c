@@ -35,20 +35,8 @@
 #include <stdio.h>
 #include "Limelight.h"
 
-#if defined(LC_WINDOWS)
-void LimelogWindows(char* Format, ...);
 #define Limelog(s, ...) \
-    LimelogWindows(s, ##__VA_ARGS__)
-#elif defined(__vita__)
-#define Limelog sceClibPrintf
-#elif defined(LC_ANDROID)
-#include <android/log.h>
-#define Limelog(s, ...) \
-    __android_log_print(ANDROID_LOG_INFO, "moonlight-common-c", s, ##__VA_ARGS__)
-#else
-#define Limelog(s, ...) \
-    fprintf(stderr, s, ##__VA_ARGS__)
-#endif
+    ListenerCallbacks.logMessage(s, ##__VA_ARGS__)
 
 #if defined(LC_WINDOWS)
 #include <crtdbg.h>
