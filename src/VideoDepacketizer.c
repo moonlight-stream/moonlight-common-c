@@ -453,11 +453,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     // packet received.
     LC_ASSERT(firstPacket || streamPacketIndex == lastPacketInStream + 1);
 
-    // Notify the server of any packet losses
-    if (streamPacketIndex != lastPacketInStream + 1) {
-        // Packets were lost so report this to the server
-        connectionLostPackets(lastPacketInStream, streamPacketIndex);
-    }
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
