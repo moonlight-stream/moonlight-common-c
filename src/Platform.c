@@ -242,10 +242,14 @@ void PltSetEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     SetEvent(*event);
 #elif defined(__vita__)
+    sceKernelLockMutex(event->mutex, 1, NULL);
     event->signalled = 1;
+    sceKernelUnlockMutex(event->mutex, 1);
     sceKernelSignalCondAll(event->cond);
 #else
+    pthread_mutex_lock(&event->mutex);
     event->signalled = 1;
+    pthread_mutex_unlock(&event->mutex);
     pthread_cond_broadcast(&event->cond);
 #endif
 }
