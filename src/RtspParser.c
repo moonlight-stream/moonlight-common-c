@@ -159,7 +159,6 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
                 // Create a new node containing the option and content
                 newOpt = (POPTION_ITEM)malloc(sizeof(OPTION_ITEM));
                 if (newOpt == NULL) {
-                    freeOptionList(options);
                     exitCode = RTSP_ERROR_NO_MEMORY;
                     goto ExitFailure;
                 }
@@ -221,7 +220,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
 
 ExitFailure:
     if (options) {
-        free(options);
+        freeOptionList(options);
     }
     if (messageBuffer) {
         free(messageBuffer);
