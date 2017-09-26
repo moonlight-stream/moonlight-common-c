@@ -537,6 +537,12 @@ int performRtspHandshake(void) {
         // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
         if (StreamConfig.supportsHevc && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
             NegotiatedVideoFormat = VIDEO_FORMAT_H265;
+
+            // Apply bitrate adjustment for HEVC if the client requested one
+            if (StreamConfig.hevcBitratePercentageMultiplier != 0) {
+                StreamConfig.bitrate *= StreamConfig.hevcBitratePercentageMultiplier;
+                StreamConfig.bitrate /= 100;
+            }
         }
         else {
             NegotiatedVideoFormat = VIDEO_FORMAT_H264;

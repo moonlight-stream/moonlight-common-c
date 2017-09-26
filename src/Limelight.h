@@ -37,6 +37,12 @@ typedef struct _STREAM_CONFIGURATION {
     // if the server is able to provide one.
     int supportsHevc;
 
+    // Specifies the percentage that the specified bitrate will be adjusted
+    // when an HEVC stream will be delivered. This allows clients to opt to
+    // reduce bandwidth when HEVC is chosen as the video codec rather than
+    // (or in addition to) improving image quality.
+    int hevcBitratePercentageMultiplier;
+
     // AES encryption data for the remote input stream. This must be
     // the same as what was passed as rikey and rikeyid
     // in /launch and /resume requests.
