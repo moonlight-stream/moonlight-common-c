@@ -154,7 +154,12 @@ static int addGen5Options(PSDP_OPTION* head) {
     
     // Disable dynamic resolution switching
     err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
-    
+
+    // When streaming 4K, lower FEC levels to reduce stream overhead
+    if (StreamConfig.width >= 3840 && StreamConfig.height >= 2160) {
+        err |= addAttributeString(head, "x-nv-vqos[0].fec.repairPercent", "5");
+    }
+
     return err;
 }
 
@@ -184,8 +189,55 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
     err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 
-    sprintf(payloadStr, "%d", StreamConfig.bitrate);
+    // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
+    // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
+    // to the requested value.
     if (AppVersionQuad[0] >= 5) {
+        int maxEncodingBitrate;
+
+        if (StreamConfig.width <= 1280 || StreamConfig.height <= 720) {
+            // 720p
+            if (StreamConfig.fps <= 30) {
+                // 30 FPS
+                maxEncodingBitrate = 6000;
+            }
+            else {
+                // 60 FPS
+                maxEncodingBitrate = 12000;
+            }
+        }
+        else if (StreamConfig.width <= 1920 || StreamConfig.height <= 1080) {
+            // 1080p
+            if (StreamConfig.fps <= 30) {
+                // 30 FPS
+                maxEncodingBitrate = 15000;
+            }
+            else {
+                // 60 FPS
+                maxEncodingBitrate = 25000;
+            }
+        }
+        else {
+            // 4K
+            if (StreamConfig.fps <= 30) {
+                // 30 FPS
+                maxEncodingBitrate = 40000;
+            }
+            else {
+                // 60 FPS
+                maxEncodingBitrate = 60000;
+            }
+        }
+
+        // The encoding bitrate is the lesser of the max encoding bitrate and the
+        // max streaming bitrate
+        sprintf(payloadStr, "%d", maxEncodingBitrate < StreamConfig.bitrate ?
+                                  maxEncodingBitrate : StreamConfig.bitrate);
+
+        err |= addAttributeString(&optionHead, "x-nv-video[0].initialBitrateKbps", payloadStr);
+        err |= addAttributeString(&optionHead, "x-nv-video[0].initialPeakBitrateKbps", payloadStr);
+
+        sprintf(payloadStr, "%d", StreamConfig.bitrate);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
     }
@@ -194,10 +246,8 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
             err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
         }
-        // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
-        // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
-        // to the requested value.
 
+        sprintf(payloadStr, "%d", StreamConfig.bitrate);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
     }
