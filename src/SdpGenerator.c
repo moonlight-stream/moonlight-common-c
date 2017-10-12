@@ -283,13 +283,33 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             
             // Disable slicing on HEVC
             err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", "1");
+
+            if (AppVersionQuad[0] >= 5) {
+                // Enable HDR if requested
+                if (StreamConfig.enableHdr) {
+                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
+                }
+                else {
+                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
+                }
+            }
         }
         else {
             unsigned char slicesPerFrame;
             
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "0");
-            
+
+            if (AppVersionQuad[0] >= 5) {
+                // HDR is not supported on H.264
+                err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
+            }
+
+            // We shouldn't be able to reach this path with enableHdr set. If we did, that means
+            // the server or client doesn't support HEVC and the client didn't do the correct checks
+            // before requesting HDR streaming.
+            LC_ASSERT(!StreamConfig.enableHdr);
+
             // Use slicing for increased performance on some decoders
             slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
             if (slicesPerFrame == 0) {

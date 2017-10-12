@@ -538,8 +538,8 @@ int performRtspHandshake(void) {
         if (StreamConfig.supportsHevc && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
             NegotiatedVideoFormat = VIDEO_FORMAT_H265;
 
-            // Apply bitrate adjustment for HEVC if the client requested one
-            if (StreamConfig.hevcBitratePercentageMultiplier != 0) {
+            // Apply bitrate adjustment for SDR HEVC if the client requested one
+            if (StreamConfig.hevcBitratePercentageMultiplier != 0 && !StreamConfig.enableHdr) {
                 StreamConfig.bitrate *= StreamConfig.hevcBitratePercentageMultiplier;
                 StreamConfig.bitrate /= 100;
             }
