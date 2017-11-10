@@ -293,6 +293,10 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                     err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
                 }
             }
+
+            // This disables split frame encode on GFE 3.10 which seems to produce broken
+            // HEVC output at 1080p60 (full of artifacts even on the SHIELD itself, go figure)
+            err |= addAttributeString(&optionHead, "x-nv-video[0].encoderFeatureSetting", "0");
         }
         else {
             unsigned char slicesPerFrame;
