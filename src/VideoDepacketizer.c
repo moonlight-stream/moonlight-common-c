@@ -231,6 +231,14 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.frameNumber = frameNumber;
             qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
 
+            // IDR frames will have leading CSD buffers
+            if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
+                qdu->decodeUnit.frameType = FRAME_TYPE_IDR;
+            }
+            else {
+                qdu->decodeUnit.frameType = FRAME_TYPE_PFRAME;
+            }
+
             nalChainHead = NULL;
             nalChainDataLength = 0;
 
@@ -274,7 +282,43 @@ static void reassembleFrame(int frameNumber) {
     }
 }
 
-static void queueFragment(char*data, int offset, int length) {
+
+#define AVC_NAL_TYPE_SPS 0x67
+#define AVC_NAL_TYPE_PPS 0x68
+#define HEVC_NAL_TYPE_VPS 0x40
+#define HEVC_NAL_TYPE_SPS 0x42
+#define HEVC_NAL_TYPE_PPS 0x44
+
+static int getBufferFlags(char* data, int length) {
+    BUFFER_DESC buffer;
+    BUFFER_DESC candidate;
+
+    buffer.data = data;
+    buffer.length = (unsigned int)length;
+    buffer.offset = 0;
+
+    if (!getSpecialSeq(&buffer, &candidate) || !isSeqFrameStart(&candidate)) {
+        return BUFFER_TYPE_PICDATA;
+    }
+
+    switch (candidate.data[candidate.offset + candidate.length]) {
+        case AVC_NAL_TYPE_SPS:
+        case HEVC_NAL_TYPE_SPS:
+            return BUFFER_TYPE_SPS;
+
+        case AVC_NAL_TYPE_PPS:
+        case HEVC_NAL_TYPE_PPS:
+            return BUFFER_TYPE_PPS;
+
+        case HEVC_NAL_TYPE_VPS:
+            return BUFFER_TYPE_VPS;
+
+        default:
+            return BUFFER_TYPE_PICDATA;
+    }
+}
+
+static void queueFragment(char* data, int offset, int length) {
     PLENTRY entry = (PLENTRY)malloc(sizeof(*entry) + length);
     if (entry != NULL) {
         entry->next = NULL;
@@ -282,6 +326,8 @@ static void queueFragment(char*data, int offset, int length) {
         entry->data = (char*)(entry + 1);
 
         memcpy(entry->data, &data[offset], entry->length);
+
+        entry->bufferType = getBufferFlags(entry->data, entry->length);
 
         nalChainDataLength += entry->length;
 
@@ -305,6 +351,9 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
     BUFFER_DESC specialSeq;
     int decodingVideo = 0;
 
+    // We should not have any NALUs when processing the first packet in an IDR frame
+    LC_ASSERT(nalChainHead == NULL);
+
     while (currentPos->length != 0) {
         int start = currentPos->offset;
 
@@ -316,9 +365,6 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
                 if (isSeqFrameStart(&specialSeq)) {
                     // Now we're working on a frame
                     decodingFrame = 1;
-
-                    // Reassemble any pending frame
-                    reassembleFrame(videoPacket->frameIndex);
 
                     if (isSeqReferenceFrameStart(&specialSeq)) {
                         // No longer waiting for an IDR frame
@@ -334,11 +380,6 @@ static void processRtpPayloadSlow(PNV_VIDEO_PACKET videoPacket, PBUFFER_DESC cur
                 currentPos->offset += specialSeq.length;
             }
             else {
-                // Check if this is padding after a full frame
-                if (decodingVideo && isSeqPadding(currentPos)) {
-                    reassembleFrame(videoPacket->frameIndex);
-                }
-
                 // Not decoding video
                 decodingVideo = 0;
 

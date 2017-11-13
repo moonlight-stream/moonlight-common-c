@@ -61,6 +61,13 @@ typedef struct _STREAM_CONFIGURATION {
 // Use this function to zero the stream configuration when allocated on the stack or heap
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
 
+// These identify codec configuration data in the buffer lists
+// of frames identified as IDR frames.
+#define BUFFER_TYPE_PICDATA  0x00
+#define BUFFER_TYPE_SPS      0x01
+#define BUFFER_TYPE_PPS      0x02
+#define BUFFER_TYPE_VPS      0x03
+
 typedef struct _LENTRY {
     // Pointer to the next entry or NULL if this is the last entry
     struct _LENTRY* next;
@@ -70,12 +77,28 @@ typedef struct _LENTRY {
 
     // Size of data in bytes (never <= 0)
     int length;
+
+    // Buffer type (listed above)
+    int bufferType;
 } LENTRY, *PLENTRY;
+
+// This is a standard frame which references the IDR frame and
+// previous P-frames.
+#define FRAME_TYPE_PFRAME 0x00
+
+// Indicates this frame contains SPS, PPS, and VPS (if applicable)
+// as the first buffers in the list. Each NALU will appear as a separate
+// buffer in the buffer list. The I-frame data follows immediately
+// after the codec configuration NALUs.
+#define FRAME_TYPE_IDR    0x01
 
 // A decode unit describes a buffer chain of video data from multiple packets
 typedef struct _DECODE_UNIT {
     // Frame number
     int frameNumber;
+
+    // Frame type
+    int frameType;
 
     // Receive time of first buffer
     // NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
