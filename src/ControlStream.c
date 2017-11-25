@@ -207,8 +207,8 @@ int getNextFrameInvalidationTuple(PQUEUED_FRAME_INVALIDATION_TUPLE* qfit) {
 void queueFrameInvalidationTuple(int startFrame, int endFrame) {
     LC_ASSERT(startFrame <= endFrame);
     
-    if ((NegotiatedVideoFormat == VIDEO_FORMAT_H264 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
-            ((NegotiatedVideoFormat == VIDEO_FORMAT_H265 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC)))) {
+    if (((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
+            (((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC)))) {
         PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
         qfit = malloc(sizeof(*qfit));
         if (qfit != NULL) {
@@ -500,8 +500,8 @@ static void requestInvalidateReferenceFrames(void) {
     long long payload[3];
     PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
 
-    LC_ASSERT((NegotiatedVideoFormat == VIDEO_FORMAT_H264 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
-              (NegotiatedVideoFormat == VIDEO_FORMAT_H265 && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC)));
+    LC_ASSERT(((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
+              ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC)));
 
     if (!getNextFrameInvalidationTuple(&qfit)) {
         return;

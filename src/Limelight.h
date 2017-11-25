@@ -119,12 +119,20 @@ typedef struct _DECODE_UNIT {
 #define AUDIO_CONFIGURATION_51_SURROUND 1
 
 // Passed to DecoderRendererSetup to indicate that the following video stream will be
-// in H.264 format
-#define VIDEO_FORMAT_H264 1
+// in H.264 High Profile.
+#define VIDEO_FORMAT_H264 0x0001
 
 // Passed to DecoderRendererSetup to indicate that the following video stream will be
-// in H.265 format
-#define VIDEO_FORMAT_H265 2
+// in H.265 Main profile. This will only be passed if supportsHevc is true.
+#define VIDEO_FORMAT_H265 0x0100
+
+// Passed to DecoderRendererSetup to indicate that the following video stream will be
+// in H.265 Main10 (HDR10) profile. This will only be passed if enableHdr is true.
+#define VIDEO_FORMAT_H265_MAIN10 0x0200
+
+// Masks for clients to use to match video codecs without profile-specific details.
+#define VIDEO_FORMAT_MASK_H264 0x00FF
+#define VIDEO_FORMAT_MASK_H265 0xFF00
 
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the

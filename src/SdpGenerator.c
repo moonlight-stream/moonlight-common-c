@@ -277,7 +277,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     }
 
     if (AppVersionQuad[0] >= 4) {
-        if (NegotiatedVideoFormat == VIDEO_FORMAT_H265) {
+        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
             

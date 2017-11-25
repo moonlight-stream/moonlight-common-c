@@ -536,12 +536,17 @@ int performRtspHandshake(void) {
         // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
         // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
         if (StreamConfig.supportsHevc && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
-            NegotiatedVideoFormat = VIDEO_FORMAT_H265;
+            if (StreamConfig.enableHdr) {
+                NegotiatedVideoFormat = VIDEO_FORMAT_H265_MAIN10;
+            }
+            else {
+                NegotiatedVideoFormat = VIDEO_FORMAT_H265;
 
-            // Apply bitrate adjustment for SDR HEVC if the client requested one
-            if (StreamConfig.hevcBitratePercentageMultiplier != 0 && !StreamConfig.enableHdr) {
-                StreamConfig.bitrate *= StreamConfig.hevcBitratePercentageMultiplier;
-                StreamConfig.bitrate /= 100;
+                // Apply bitrate adjustment for SDR HEVC if the client requested one
+                if (StreamConfig.hevcBitratePercentageMultiplier != 0) {
+                    StreamConfig.bitrate *= StreamConfig.hevcBitratePercentageMultiplier;
+                    StreamConfig.bitrate /= 100;
+                }
             }
         }
         else {
