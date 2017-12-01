@@ -284,7 +284,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             // Disable slicing on HEVC
             err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", "1");
 
-            if (AppVersionQuad[0] >= 5) {
+            if (AppVersionQuad[0] >= 7) {
                 // Enable HDR if requested
                 if (StreamConfig.enableHdr) {
                     err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
@@ -304,7 +304,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "0");
 
-            if (AppVersionQuad[0] >= 5) {
+            if (AppVersionQuad[0] >= 7) {
                 // HDR is not supported on H.264
                 err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
             }
