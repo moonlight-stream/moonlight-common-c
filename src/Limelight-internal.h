@@ -24,6 +24,7 @@ extern volatile int ConnectionInterrupted;
 int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
+int isReferenceFrameInvalidationEnabled(void);
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
     PCONNECTION_LISTENER_CALLBACKS* clCallbacks);
