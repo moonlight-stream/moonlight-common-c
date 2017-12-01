@@ -323,6 +323,18 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             sprintf(payloadStr, "%d", slicesPerFrame);
             err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
         }
+
+        if (AppVersionQuad[0] >= 7) {
+            if (isReferenceFrameInvalidationEnabled()) {
+                err |= addAttributeString(&optionHead, "x-nv-video[0].maxNumReferenceFrames", "0");
+            }
+            else {
+                // Restrict the video stream to 1 reference frame if we're not using
+                // reference frame invalidation. This helps to improve compatibility with
+                // some decoders that don't like the default of having 16 reference frames.
+                err |= addAttributeString(&optionHead, "x-nv-video[0].maxNumReferenceFrames", "1");
+            }
+        }
         
         if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
             audioChannelCount = CHANNEL_COUNT_51_SURROUND;
