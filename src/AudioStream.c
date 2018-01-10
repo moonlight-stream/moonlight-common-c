@@ -17,7 +17,7 @@ static unsigned short lastSeq;
 
 #define RTP_PORT 48000
 
-#define MAX_PACKET_SIZE 250
+#define MAX_PACKET_SIZE 400
 
 // This is much larger than we should typically have buffered, but
 // it needs to be. We need a cushion in case our thread gets blocked
