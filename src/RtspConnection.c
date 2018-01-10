@@ -432,7 +432,7 @@ int performRtspHandshake(void) {
     int ret;
 
     // Initialize global state
-    useEnet = AppVersionQuad[0] >= 5;
+    useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
     addrToUrlSafeString(&RemoteAddr, urlAddr);
     sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
