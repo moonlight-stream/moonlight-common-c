@@ -12,6 +12,8 @@ static char sessionIdString[16];
 static int hasSessionId;
 static char responseBuffer[RTSP_MAX_RESP_SIZE];
 static int rtspClientVersion;
+static char urlAddr[URLSAFESTRING_LEN];
+static int useEnet;
 
 static SOCKET sock = INVALID_SOCKET;
 static ENetHost* client;
@@ -75,7 +77,8 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
     sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
     sprintf(clientVersionStr, "%d", rtspClientVersion);
     if (!addOption(msg, "CSeq", sequenceNumberStr) ||
-        !addOption(msg, "X-GS-ClientVersion", clientVersionStr)) {
+        !addOption(msg, "X-GS-ClientVersion", clientVersionStr) ||
+        (!useEnet && !addOption(msg, "Host", urlAddr))) {
         freeMessage(msg);
         return 0;
     }
@@ -273,7 +276,7 @@ Exit:
 
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
     // Gen 5+ does RTSP over ENet not TCP
-    if (AppVersionQuad[0] >= 5) {
+    if (useEnet) {
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
     else {
@@ -426,12 +429,12 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
 
 // Perform RTSP Handshake with the streaming server machine as part of the connection process
 int performRtspHandshake(void) {
-    char urlAddr[URLSAFESTRING_LEN];
     int ret;
 
     // Initialize global state
+    useEnet = AppVersionQuad[0] >= 5;
     addrToUrlSafeString(&RemoteAddr, urlAddr);
-    sprintf(rtspTargetUrl, "rtsp://%s", urlAddr);
+    sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
     hasSessionId = 0;
 
@@ -456,7 +459,7 @@ int performRtspHandshake(void) {
     }
     
     // Gen 5 servers use ENet to do the RTSP handshake
-    if (AppVersionQuad[0] >= 5) {
+    if (useEnet) {
         ENetAddress address;
         ENetEvent event;
         
@@ -464,7 +467,7 @@ int performRtspHandshake(void) {
         enet_address_set_port(&address, 48010);
         
         // Create a client that can use 1 outgoing connection and 1 channel
-        client = enet_host_create(address.address.ss_family, NULL, 1, 1, 0, 0);
+        client = enet_host_create(RemoteAddr.ss_family, NULL, 1, 1, 0, 0);
         if (client == NULL) {
             return -1;
         }
@@ -695,7 +698,7 @@ int performRtspHandshake(void) {
     
 Exit:
     // Cleanup the ENet stuff
-    if (AppVersionQuad[0] >= 5) {
+    if (useEnet) {
         if (peer != NULL) {
             enet_peer_disconnect_now(peer, 0);
             peer = NULL;
