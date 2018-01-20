@@ -275,7 +275,6 @@ Exit:
 }
 
 static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
-    // Gen 5+ does RTSP over ENet not TCP
     if (useEnet) {
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
@@ -458,7 +457,7 @@ int performRtspHandshake(void) {
             break;
     }
     
-    // Gen 5 servers use ENet to do the RTSP handshake
+    // Setup ENet if required by this GFE version
     if (useEnet) {
         ENetAddress address;
         ENetEvent event;
