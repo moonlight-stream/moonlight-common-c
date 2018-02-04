@@ -51,6 +51,11 @@ typedef struct _STREAM_CONFIGURATION {
     // (or in addition to) improving image quality.
     int hevcBitratePercentageMultiplier;
 
+    // If specified, the client's display refresh rate x 100. For example,
+    // 59.94 Hz would be specified as 5994. This is used by recent versions
+    // of GFE for enhanced frame pacing.
+    int clientRefreshRateX100;
+
     // AES encryption data for the remote input stream. This must be
     // the same as what was passed as rikey and rikeyid
     // in /launch and /resume requests.

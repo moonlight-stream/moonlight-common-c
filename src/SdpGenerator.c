@@ -334,6 +334,9 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                 // some decoders that don't like the default of having 16 reference frames.
                 err |= addAttributeString(&optionHead, "x-nv-video[0].maxNumReferenceFrames", "1");
             }
+
+            sprintf(payloadStr, "%d", StreamConfig.clientRefreshRateX100);
+            err |= addAttributeString(&optionHead, "x-nv-video[0].clientRefreshRateX100", payloadStr);
         }
         
         if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
