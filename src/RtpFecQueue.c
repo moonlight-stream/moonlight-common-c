@@ -2,9 +2,6 @@
 #include "RtpFecQueue.h"
 #include "rs.h"
 
-#define ushort(x) ((unsigned short) ((x) % (UINT16_MAX+1)))
-#define isBefore(x, y) (ushort((x) - (y)) > (UINT16_MAX/2))
-
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
     reed_solomon_init();
     memset(queue, 0, sizeof(*queue));
@@ -31,7 +28,7 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length, int isParity) {
     PRTPFEC_QUEUE_ENTRY entry;
     
-    LC_ASSERT(!isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber));
+    LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber));
 
     // Don't queue duplicates either
     entry = queue->bufferHead;
@@ -77,7 +74,7 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
 
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_FEC_QUEUE queue) {
-    int totalPackets = ushort(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
+    int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
     int totalParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
     int parityPackets = totalPackets - queue->bufferDataPackets;
     int missingPackets = totalPackets - queue->bufferSize;
@@ -120,7 +117,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
 
     PRTPFEC_QUEUE_ENTRY entry = queue->bufferHead;
     while (entry != NULL) {
-        int index = ushort(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
+        int index = U16(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
         packets[index] = (unsigned char*) entry->packet;
         marks[index] = 0;
         
@@ -156,7 +153,7 @@ cleanup_packets:
             if (ret == 0 && i < queue->bufferDataPackets) {
                 PRTPFEC_QUEUE_ENTRY queueEntry = (PRTPFEC_QUEUE_ENTRY)&packets[i][receiveSize];
                 PRTP_PACKET rtpPacket = (PRTP_PACKET) packets[i];
-                rtpPacket->sequenceNumber = ushort(i + queue->bufferLowestSequenceNumber);
+                rtpPacket->sequenceNumber = U16(i + queue->bufferLowestSequenceNumber);
                 rtpPacket->header = queue->bufferHead->packet->header;
                 
                 int dataOffset = sizeof(*rtpPacket);
@@ -172,7 +169,7 @@ cleanup_packets:
                 // discarded by decoders. It's not safe to strip all zero padding because
                 // it may be a legitimate part of the H.264 bytestream.
 
-                LC_ASSERT(isBefore(rtpPacket->sequenceNumber, queue->bufferFirstParitySequenceNumber));                
+                LC_ASSERT(isBefore16(rtpPacket->sequenceNumber, queue->bufferFirstParitySequenceNumber));
                 queuePacket(queue, queueEntry, 0, rtpPacket, StreamConfig.packetSize + dataOffset, 0);
             } else if (packets[i] != NULL) {
                 free(packets[i]);
@@ -215,7 +212,7 @@ static void removeEntry(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry) {
 }
 
 int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry) {
-    if (isBefore(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
+    if (isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
         // Reject packets behind our current sequence number
         return RTPF_RET_REJECTED;
     }
@@ -227,7 +224,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
 
     PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)packet) + dataOffset);
     
-    if (isBefore(nvPacket->frameIndex, queue->currentFrameNumber)) {
+    if (isBefore16(nvPacket->frameIndex, queue->currentFrameNumber)) {
         // Reject frames behind our current frame number
         return RTPF_RET_REJECTED;
     }
@@ -257,21 +254,21 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->bufferSize = 0;
         
         int fecIndex = (nvPacket->fecInfo & 0xFF000) >> 12;
-        queue->bufferLowestSequenceNumber = ushort(packet->sequenceNumber - fecIndex);
+        queue->bufferLowestSequenceNumber = U16(packet->sequenceNumber - fecIndex);
         queue->receivedBufferDataPackets = 0;
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
         queue->bufferDataPackets = ((nvPacket->fecInfo & 0xFFF00000) >> 20) / 4;
         queue->fecPercentage = ((nvPacket->fecInfo & 0xFF0) >> 4);
-        queue->bufferFirstParitySequenceNumber = ushort(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
-    } else if (isBefore(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
+        queue->bufferFirstParitySequenceNumber = U16(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
+    } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
     
-    if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
+    if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
         return RTPF_RET_REJECTED;
     }
     else {
-        if (isBefore(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber)) {
+        if (isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber)) {
             queue->receivedBufferDataPackets++;
         }
         
@@ -326,7 +323,7 @@ PRTPFEC_QUEUE_ENTRY RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue) {
             continue;
         }
         
-        if (queuedEntry == NULL || isBefore(entry->packet->sequenceNumber, lowestRtpSequenceNumber)) {
+        if (queuedEntry == NULL || isBefore16(entry->packet->sequenceNumber, lowestRtpSequenceNumber)) {
             lowestRtpSequenceNumber = entry->packet->sequenceNumber;
             queuedEntry = entry;
         }

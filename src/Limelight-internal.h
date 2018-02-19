@@ -21,7 +21,18 @@ extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
 extern volatile int ConnectionInterrupted;
 
-int isBeforeSignedInt(int numA, int numB, int ambiguousCase);
+#ifndef UINT24_MAX
+#define UINT24_MAX 0xFFFFFF
+#endif
+
+#define U16(x) ((unsigned short) ((x) & UINT16_MAX))
+#define U24(x) ((unsigned int) ((x) & UINT24_MAX))
+#define U32(x) ((unsigned int) ((x) & UINT32_MAX))
+
+#define isBefore16(x, y) (U16((x) - (y)) > (UINT16_MAX/2))
+#define isBefore24(x, y) (U24((x) - (y)) > (UINT24_MAX/2))
+#define isBefore32(x, y) (U32((x) - (y)) > (UINT32_MAX/2))
+
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
 int isReferenceFrameInvalidationEnabled(void);

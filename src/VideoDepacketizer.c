@@ -6,19 +6,17 @@
 static PLENTRY nalChainHead;
 static int nalChainDataLength;
 
-static int nextFrameNumber;
-static int startFrameNumber;
+static unsigned int nextFrameNumber;
+static unsigned int startFrameNumber;
 static int waitingForNextSuccessfulFrame;
 static int waitingForIdrFrame;
-static int lastPacketInStream;
+static unsigned int lastPacketInStream;
 static int decodingFrame;
 static int strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
 
-#define TRUNCATE_24BIT(x) ((x) & 0xFFFFFF)
-
 #define CONSECUTIVE_DROP_LIMIT 120
-static int consecutiveFrameDrops;
+static unsigned int consecutiveFrameDrops;
 
 static LINKED_BLOCKING_QUEUE decodeUnitQueue;
 
@@ -38,7 +36,7 @@ void initializeVideoDepacketizer(int pktSize) {
     startFrameNumber = 0;
     waitingForNextSuccessfulFrame = 0;
     waitingForIdrFrame = 1;
-    lastPacketInStream = -1;
+    lastPacketInStream = UINT32_MAX;
     decodingFrame = 0;
     firstPacketReceiveTime = 0;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
@@ -441,8 +439,8 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     BUFFER_DESC currentPos;
     int frameIndex;
     char flags;
-    int firstPacket;
-    int streamPacketIndex;
+    unsigned int firstPacket;
+    unsigned int streamPacketIndex;
 
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
@@ -459,8 +457,8 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     streamPacketIndex = videoPacket->streamPacketIndex;
     
     // The packets and frames must be in sequence from the FEC queue
-    LC_ASSERT(!isBeforeSignedInt(streamPacketIndex, TRUNCATE_24BIT(lastPacketInStream + 1), 0));
-    LC_ASSERT(!isBeforeSignedInt(frameIndex, nextFrameNumber, 0));
+    LC_ASSERT(!isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)));
+    LC_ASSERT(!isBefore32(frameIndex, nextFrameNumber));
 
     // Notify the listener of the latest frame we've seen from the PC
     connectionSawFrame(frameIndex);
@@ -472,7 +470,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     // miss one in between
     if (firstPacket) {
         // Make sure this is the next consecutive frame
-        if (isBeforeSignedInt(nextFrameNumber, frameIndex, 1)) {
+        if (isBefore32(nextFrameNumber, frameIndex)) {
             Limelog("Network dropped an entire frame\n");
             nextFrameNumber = frameIndex;
 
@@ -491,7 +489,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 
     // This must be the first packet in a frame or be contiguous with the last
     // packet received.
-    LC_ASSERT(firstPacket || streamPacketIndex == TRUNCATE_24BIT(lastPacketInStream + 1));
+    LC_ASSERT(firstPacket || streamPacketIndex == U24(lastPacketInStream + 1));
 
     lastPacketInStream = streamPacketIndex;
 

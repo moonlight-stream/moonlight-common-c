@@ -17,8 +17,8 @@ int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu);
 #define FLAG_SOF 0x4
 
 typedef struct _NV_VIDEO_PACKET {
-    int streamPacketIndex;
-    int frameIndex;
+    unsigned int streamPacketIndex;
+    unsigned int frameIndex;
     char flags;
     char reserved[3];
     int fecInfo;

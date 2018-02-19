@@ -19,23 +19,18 @@ void RtpqCleanupQueue(PRTP_REORDER_QUEUE queue) {
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
 static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet) {
-    if (queue->nextRtpSequenceNumber != UINT16_MAX) {
-        PRTP_QUEUE_ENTRY entry;
+    PRTP_QUEUE_ENTRY entry;
 
-        // Don't queue packets we're already ahead of
-        if (isBeforeSignedInt(packet->sequenceNumber, queue->nextRtpSequenceNumber, 0)) {
+    LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber));
+
+    // Don't queue duplicates
+    entry = queue->queueHead;
+    while (entry != NULL) {
+        if (entry->packet->sequenceNumber == packet->sequenceNumber) {
             return 0;
         }
 
-        // Don't queue duplicates either
-        entry = queue->queueHead;
-        while (entry != NULL) {
-            if (entry->packet->sequenceNumber == packet->sequenceNumber) {
-                return 0;
-            }
-
-            entry = entry->next;
-        }
+        entry = entry->next;
     }
 
     newEntry->packet = packet;
@@ -93,7 +88,7 @@ static PRTP_QUEUE_ENTRY getEntryByLowestSeq(PRTP_REORDER_QUEUE queue) {
     lowestSeqEntry = queue->queueHead;
     entry = queue->queueHead;
     while (entry != NULL) {
-        if (isBeforeSignedInt(entry->packet->sequenceNumber, lowestSeqEntry->packet->sequenceNumber, 1)) {
+        if (isBefore16(entry->packet->sequenceNumber, lowestSeqEntry->packet->sequenceNumber)) {
             lowestSeqEntry = entry;
         }
 
@@ -163,7 +158,7 @@ static PRTP_QUEUE_ENTRY validateQueueConstraints(PRTP_REORDER_QUEUE queue) {
 
 int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY packetEntry) {
     if (queue->nextRtpSequenceNumber != UINT16_MAX &&
-        isBeforeSignedInt(packet->sequenceNumber, queue->nextRtpSequenceNumber, 0)) {
+        isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
         // Reject packets behind our current sequence number
         return RTPQ_RET_REJECTED;
     }
