@@ -298,6 +298,10 @@ int startAudioStream(void* audioContext, int arFlags) {
             chosenConfig = &opus51SurroundConfig;
         }
     }
+    else {
+        Limelog("Invalid audio configuration: %d\n", StreamConfig.audioConfiguration);
+        return -1;
+    }
 
     err = AudioCallbacks.init(StreamConfig.audioConfiguration, chosenConfig, audioContext, arFlags);
     if (err != 0) {
