@@ -11,6 +11,8 @@
 #define CHANNEL_MASK_STEREO 0x3
 #define CHANNEL_MASK_51_SURROUND 0xFC
 
+#define LOW_BITRATE_THRESHOLD 5000
+
 typedef struct _SDP_OPTION {
     char name[MAX_OPTION_NAME_LEN + 1];
     void* payload;
@@ -357,6 +359,25 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         }
         else {
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.enable", "0");
+        }
+
+        if (AppVersionQuad[0] >= 7) {
+            if (StreamConfig.bitrate < LOW_BITRATE_THRESHOLD && audioChannelCount == 2) {
+                // At low bitrates, cap the stereo audio bitrate to reduce data usage. For some reason,
+                // GFE seems to always enable high quality (512 Kbps) mode for stereo even though we
+                // don't specify that we want it via SDP. 5.1 audio properly remains at normal quality
+                // mode by default. To work around high quality mode, use adaptive bitrate with a
+                // min = max clamp (like we do for video).
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.adaptiveBitrateEnable", "1");
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.local2chMin", "96");
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.local2chMax", "96");
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.remote2chMin", "96");
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.remote2chMax", "96");
+            }
+            else {
+                // Disable audio bitrate cap
+                err |= addAttributeString(&optionHead, "x-nv-audioBitrate.adaptiveBitrateEnable", "0");
+            }
         }
     }
 
