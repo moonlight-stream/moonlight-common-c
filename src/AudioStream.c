@@ -42,9 +42,12 @@ static OPUS_MULTISTREAM_CONFIGURATION opus51SurroundConfig = {
     .mapping = {0, 4, 1, 5, 2, 3}
 };
 
-static POPUS_MULTISTREAM_CONFIGURATION opusConfigArray[] = {
-    &opusStereoConfig,
-    &opus51SurroundConfig,
+static OPUS_MULTISTREAM_CONFIGURATION opus51HighSurroundConfig = {
+        .sampleRate = SAMPLE_RATE,
+        .channelCount = 6,
+        .streams = 6,
+        .coupledStreams = 0,
+        .mapping = {0, 1, 2, 3, 4, 5}
 };
 
 typedef struct _QUEUED_AUDIO_PACKET {
@@ -282,16 +285,21 @@ void stopAudioStream(void) {
 
 int startAudioStream(void* audioContext, int arFlags) {
     int err;
-    OPUS_MULTISTREAM_CONFIGURATION chosenConfig;
+    POPUS_MULTISTREAM_CONFIGURATION chosenConfig;
 
-    memcpy(&chosenConfig, opusConfigArray[StreamConfig.audioConfiguration], sizeof(chosenConfig));
-    if (HighQualitySurroundEnabled) {
-        // With high quality mode enabled, the encoder stops using coupled streams
-        chosenConfig.coupledStreams = 0;
-        chosenConfig.streams = chosenConfig.channelCount;
+    if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_STEREO) {
+        chosenConfig = &opusStereoConfig;
+    }
+    else if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
+        if (HighQualitySurroundEnabled) {
+            chosenConfig = &opus51HighSurroundConfig;
+        }
+        else {
+            chosenConfig = &opus51SurroundConfig;
+        }
     }
 
-    err = AudioCallbacks.init(StreamConfig.audioConfiguration, &chosenConfig, audioContext, arFlags);
+    err = AudioCallbacks.init(StreamConfig.audioConfiguration, chosenConfig, audioContext, arFlags);
     if (err != 0) {
         return err;
     }
