@@ -17,7 +17,7 @@ static unsigned short lastSeq;
 
 #define RTP_PORT 48000
 
-#define MAX_PACKET_SIZE 400
+#define MAX_PACKET_SIZE 1400
 
 // This is much larger than we should typically have buffered, but
 // it needs to be. We need a cushion in case our thread gets blocked
@@ -282,9 +282,16 @@ void stopAudioStream(void) {
 
 int startAudioStream(void* audioContext, int arFlags) {
     int err;
+    OPUS_MULTISTREAM_CONFIGURATION chosenConfig;
 
-    err = AudioCallbacks.init(StreamConfig.audioConfiguration,
-        opusConfigArray[StreamConfig.audioConfiguration], audioContext, arFlags);
+    memcpy(&chosenConfig, opusConfigArray[StreamConfig.audioConfiguration], sizeof(chosenConfig));
+    if (HighQualitySurroundEnabled) {
+        // With high quality mode enabled, the encoder stops using coupled streams
+        chosenConfig.coupledStreams = 0;
+        chosenConfig.streams = chosenConfig.channelCount;
+    }
+
+    err = AudioCallbacks.init(StreamConfig.audioConfiguration, &chosenConfig, audioContext, arFlags);
     if (err != 0) {
         return err;
     }

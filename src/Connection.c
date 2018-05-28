@@ -18,6 +18,7 @@ DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
 volatile int ConnectionInterrupted;
+int HighQualitySurroundEnabled;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {

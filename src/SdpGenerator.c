@@ -12,6 +12,7 @@
 #define CHANNEL_MASK_51_SURROUND 0xFC
 
 #define LOW_BITRATE_THRESHOLD 5000
+#define HIGH_BITRATE_THRESHOLD 15000
 
 typedef struct _SDP_OPTION {
     char name[MAX_OPTION_NAME_LEN + 1];
@@ -362,6 +363,19 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         }
 
         if (AppVersionQuad[0] >= 7) {
+            if (StreamConfig.bitrate > HIGH_BITRATE_THRESHOLD && audioChannelCount > 2) {
+                // Enable high quality mode for surround sound
+                err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "1");
+
+                // Let the audio stream code know that it needs to disable coupled streams when
+                // decoding this audio stream.
+                HighQualitySurroundEnabled = 1;
+            }
+            else {
+                err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "0");
+                HighQualitySurroundEnabled = 0;
+            }
+
             if (StreamConfig.bitrate < LOW_BITRATE_THRESHOLD && audioChannelCount == 2) {
                 // At low bitrates, cap the stereo audio bitrate to reduce data usage. For some reason,
                 // GFE seems to always enable high quality (512 Kbps) mode for stereo even though we
