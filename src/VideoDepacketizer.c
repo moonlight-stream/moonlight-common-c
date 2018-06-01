@@ -14,6 +14,7 @@ static unsigned int lastPacketInStream;
 static int decodingFrame;
 static int strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
+static int dropStatePending;
 
 #define CONSECUTIVE_DROP_LIMIT 120
 static unsigned int consecutiveFrameDrops;
@@ -39,6 +40,7 @@ void initializeVideoDepacketizer(int pktSize) {
     lastPacketInStream = UINT32_MAX;
     decodingFrame = 0;
     firstPacketReceiveTime = 0;
+    dropStatePending = 0;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
 }
 
@@ -409,11 +411,16 @@ void requestDecoderRefresh(void) {
     // Wait for the next IDR frame
     waitingForIdrFrame = 1;
     
-    // Flush the decode unit queue and pending state
-    dropFrameState();
+    // Flush the decode unit queue
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
     }
+    
+    // Request the receive thread drop its state
+    // on the next call. We can't do it here because
+    // it may be trying to queue DUs and we'll nuke
+    // the state out from under it.
+    dropStatePending = 1;
     
     // Request the IDR frame
     requestIdrOnDemand();
@@ -441,6 +448,13 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     char flags;
     unsigned int firstPacket;
     unsigned int streamPacketIndex;
+    
+    // Before processing this packet at all, drop depacketizer
+    // state if the decoder asked for it.
+    if (dropStatePending) {
+        dropStatePending = 0;
+        dropFrameState();
+    }
 
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
