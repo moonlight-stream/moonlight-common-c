@@ -582,7 +582,9 @@ int stopControlStream(void) {
     PltCloseThread(&invalidateRefFramesThread);
 
     if (peer != NULL) {
-        enet_peer_reset(peer);
+        // We use enet_peer_disconnect_now() so the host knows immediately
+        // of our termination and can cleanup properly for reconnection.
+        enet_peer_disconnect_now(peer, 0);
         peer = NULL;
     }
     if (client != NULL) {
