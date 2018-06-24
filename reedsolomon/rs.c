@@ -41,6 +41,10 @@
 #include <assert.h>
 #include "rs.h"
 
+#ifdef _MSC_VER
+#define alloca(x) _alloca(x)
+#endif
+
 typedef unsigned char gf;
 
 #define GF_BITS  8
@@ -70,7 +74,11 @@ typedef unsigned char gf;
 static gf gf_exp[2*GF_SIZE];
 static int gf_log[GF_SIZE + 1];
 static gf inverse[GF_SIZE+1];
+#ifdef _MSC_VER
+static gf __declspec(align (256)) gf_mul_table[(GF_SIZE + 1)*(GF_SIZE + 1)];
+#else
 static gf gf_mul_table[(GF_SIZE + 1)*(GF_SIZE + 1)] __attribute__((aligned (256)));
+#endif
 
 /*
  * modnn(x) computes x % GF_SIZE, where GF_SIZE is 2**GF_BITS - 1,
@@ -217,10 +225,10 @@ static int invert_mat(gf *src, int k) {
     int irow, icol, row, col, i, ix;
 
     int error = 1;
-    int indxc[k];
-    int indxr[k];
-    int ipiv[k];
-    gf id_row[k];
+    int *indxc = alloca(k*sizeof(int));
+    int *indxr = alloca(k*sizeof(int));
+    int *ipiv = alloca(k*sizeof(int));
+    gf *id_row = alloca(k*sizeof(gf));
 
     memset(id_row, 0, k*sizeof(gf));
     /*
