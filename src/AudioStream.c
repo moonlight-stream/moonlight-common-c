@@ -151,8 +151,18 @@ static void ReceiveThreadProc(void* context) {
     PRTP_PACKET rtp;
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
+    int useSelect;
 
     packet = NULL;
+
+    if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
+        // SO_RCVTIMEO failed, so use select() to wait
+        useSelect = 1;
+    }
+    else {
+        // SO_RCVTIMEO timeout set for recv()
+        useSelect = 0;
+    }
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
         if (packet == NULL) {
@@ -164,7 +174,7 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        packet->size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE);
+        packet->size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, useSelect);
         if (packet->size < 0) {
             Limelog("Audio Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());

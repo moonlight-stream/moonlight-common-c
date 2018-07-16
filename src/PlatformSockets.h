@@ -10,6 +10,7 @@
 #define LastSocketError() WSAGetLastError()
 
 #define SHUT_RDWR SD_BOTH
+#define EWOULDBLOCK WSAEWOULDBLOCK
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
@@ -67,7 +68,8 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
-int recvUdpSocket(SOCKET s, char* buffer, int size);
+int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect);
 void shutdownTcpSocket(SOCKET s);
+int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
 void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);

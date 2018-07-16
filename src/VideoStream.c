@@ -65,11 +65,21 @@ static void ReceiveThreadProc(void* context) {
     int bufferSize, receiveSize;
     char* buffer;
     int queueStatus;
+    int useSelect;
     PRTPFEC_QUEUE_ENTRY queueEntry;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
     bufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
     buffer = NULL;
+
+    if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
+        // SO_RCVTIMEO failed, so use select() to wait
+        useSelect = 1;
+    }
+    else {
+        // SO_RCVTIMEO timeout set for recv()
+        useSelect = 0;
+    }
 
     while (!PltIsThreadInterrupted(&receiveThread)) {
         PRTP_PACKET packet;
@@ -83,7 +93,7 @@ static void ReceiveThreadProc(void* context) {
             }
         }
 
-        err = recvUdpSocket(rtpSocket, buffer, receiveSize);
+        err = recvUdpSocket(rtpSocket, buffer, receiveSize, useSelect);
         if (err < 0) {
             Limelog("Video Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketError());

@@ -30,6 +30,22 @@ void shutdownTcpSocket(SOCKET s) {
     shutdown(s, SHUT_RDWR);
 }
 
+int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
+#if defined(LC_WINDOWS)
+    // Windows says that SO_RCVTIMEO puts the socket
+    // into an indeterminate state, so we won't use
+    // it for non-fatal socket operations.
+    return -1;
+#else
+    struct timeval val;
+
+    val.tv_sec = 0;
+    val.tv_usec = timeoutMs * 1000;
+
+    return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&val, sizeof(val));
+#endif
+}
+
 void setRecvTimeout(SOCKET s, int timeoutSec) {
 #if defined(LC_WINDOWS)
     int val = timeoutSec * 1000;
@@ -44,26 +60,40 @@ void setRecvTimeout(SOCKET s, int timeoutSec) {
     }
 }
 
-int recvUdpSocket(SOCKET s, char* buffer, int size) {
+int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
     fd_set readfds;
     int err;
     struct timeval tv;
     
-    FD_ZERO(&readfds);
-    FD_SET(s, &readfds);
-    
-    // Wait up to 100 ms for the socket to be readable
-    tv.tv_sec = 0;
-    tv.tv_usec = 100 * 1000;
-    
-    err = select((int)(s) + 1, &readfds, NULL, NULL, &tv);
-    if (err <= 0) {
-        // Return if an error or timeout occurs
+    if (useSelect) {
+        FD_ZERO(&readfds);
+        FD_SET(s, &readfds);
+
+        // Wait up to 100 ms for the socket to be readable
+        tv.tv_sec = 0;
+        tv.tv_usec = UDP_RECV_POLL_TIMEOUT_MS * 1000;
+
+        err = select((int)(s) + 1, &readfds, NULL, NULL, &tv);
+        if (err <= 0) {
+            // Return if an error or timeout occurs
+            return err;
+        }
+
+        // This won't block since the socket is readable
+        return (int)recv(s, buffer, size, 0);
+    }
+    else {
+        // The caller has already configured a timeout on this
+        // socket via SO_RCVTIMEO, so we can avoid a syscall
+        // for each packet.
+        err = (int)recv(s, buffer, size, 0);
+        if (err < 0 && LastSocketError() == EWOULDBLOCK) {
+            // Return 0 for timeout
+            return 0;
+        }
+
         return err;
     }
-    
-    // This won't block since the socket is readable
-    return (int)recv(s, buffer, size, 0);
 }
 
 void closeSocket(SOCKET s) {
@@ -207,11 +237,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
             // select() timed out
             Limelog("select() timed out after %d seconds\n", timeoutSec);
             closeSocket(s);
-#if defined(LC_WINDOWS)
-            SetLastSocketError(WSAEWOULDBLOCK);
-#else
             SetLastSocketError(EWOULDBLOCK);
-#endif
             return INVALID_SOCKET;
         }
         else if (FD_ISSET(s, &writefds) || FD_ISSET(s, &exceptfds)) {

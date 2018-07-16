@@ -34,6 +34,8 @@ extern int HighQualitySurroundEnabled;
 #define isBefore24(x, y) (U24((x) - (y)) > (UINT24_MAX/2))
 #define isBefore32(x, y) (U32((x) - (y)) > (UINT32_MAX/2))
 
+#define UDP_RECV_POLL_TIMEOUT_MS 100
+
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
 int isReferenceFrameInvalidationEnabled(void);
