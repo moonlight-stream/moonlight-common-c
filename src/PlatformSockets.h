@@ -11,6 +11,7 @@
 
 #define SHUT_RDWR SD_BOTH
 #define EWOULDBLOCK WSAEWOULDBLOCK
+#define EAGAIN WSAEWOULDBLOCK
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;

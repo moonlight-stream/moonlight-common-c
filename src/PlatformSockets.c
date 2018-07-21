@@ -87,7 +87,9 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
         // socket via SO_RCVTIMEO, so we can avoid a syscall
         // for each packet.
         err = (int)recv(s, buffer, size, 0);
-        if (err < 0 && LastSocketError() == EWOULDBLOCK) {
+        if (err < 0 &&
+                (LastSocketError() == EWOULDBLOCK ||
+                 LastSocketError() == EAGAIN)) {
             // Return 0 for timeout
             return 0;
         }
