@@ -50,7 +50,6 @@ typedef socklen_t SOCKADDR_LEN;
 
 #if defined(__vita__)
 #define TCP_NODELAY SCE_NET_TCP_NODELAY
-#define INADDR_ANY SCE_NET_INADDR_ANY
 
 #define sockaddr_in6 sockaddr_in
 #define sin6_addr sin_addr
