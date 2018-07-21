@@ -42,6 +42,7 @@
 #include "rs.h"
 
 #ifdef _MSC_VER
+#define NEED_ALLOCA
 #define alloca(x) _alloca(x)
 #endif
 
@@ -225,10 +226,17 @@ static int invert_mat(gf *src, int k) {
     int irow, icol, row, col, i, ix;
 
     int error = 1;
+#ifdef NEED_ALLOCA
     int *indxc = alloca(k*sizeof(int));
     int *indxr = alloca(k*sizeof(int));
     int *ipiv = alloca(k*sizeof(int));
     gf *id_row = alloca(k*sizeof(gf));
+#else
+    int indxc[k];
+    int indxr[k];
+    int ipiv[k];
+    gf id_row[k];
+#endif
 
     memset(id_row, 0, k*sizeof(gf));
     /*
