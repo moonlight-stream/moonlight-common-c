@@ -21,6 +21,7 @@ extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
 extern volatile int ConnectionInterrupted;
 extern int HighQualitySurroundEnabled;
+extern int OriginalVideoBitrate;
 
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF

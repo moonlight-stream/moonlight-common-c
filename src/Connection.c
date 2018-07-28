@@ -19,6 +19,7 @@ AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
 volatile int ConnectionInterrupted;
 int HighQualitySurroundEnabled;
+int OriginalVideoBitrate;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -223,6 +224,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     NegotiatedVideoFormat = 0;
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
+    OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
     
     // FEC only works in 16 byte chunks, so we must round down
