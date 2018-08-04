@@ -279,12 +279,20 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     }
 
     if (AppVersionQuad[0] >= 4) {
+        unsigned char slicesPerFrame;
+
+        // Use slicing for increased performance on some decoders
+        slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
+        if (slicesPerFrame == 0) {
+            // If not using slicing, we request 1 slice per frame
+            slicesPerFrame = 1;
+        }
+        sprintf(payloadStr, "%d", slicesPerFrame);
+        err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
+
         if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
-            
-            // Disable slicing on HEVC
-            err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", "1");
 
             if (AppVersionQuad[0] >= 7) {
                 // Enable HDR if requested
@@ -301,7 +309,6 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-video[0].encoderFeatureSetting", "0");
         }
         else {
-            unsigned char slicesPerFrame;
             
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "0");
@@ -315,15 +322,6 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             // the server or client doesn't support HEVC and the client didn't do the correct checks
             // before requesting HDR streaming.
             LC_ASSERT(!StreamConfig.enableHdr);
-
-            // Use slicing for increased performance on some decoders
-            slicesPerFrame = (unsigned char)(VideoCallbacks.capabilities >> 24);
-            if (slicesPerFrame == 0) {
-                // If not using slicing, we request 1 slice per frame
-                slicesPerFrame = 1;
-            }
-            sprintf(payloadStr, "%d", slicesPerFrame);
-            err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
         }
 
         if (AppVersionQuad[0] >= 7) {
