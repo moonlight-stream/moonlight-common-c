@@ -12,6 +12,7 @@
 #define SHUT_RDWR SD_BOTH
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define EAGAIN WSAEWOULDBLOCK
+#define EINTR WSAEINTR
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
@@ -53,8 +54,10 @@ typedef socklen_t SOCKADDR_LEN;
 #define TCP_NODELAY SCE_NET_TCP_NODELAY
 #undef EAGAIN
 #undef EWOULDBLOCK
+#undef EINTR
 #define EAGAIN SCE_NET_EAGAIN
 #define EWOULDBLOCK SCE_NET_EWOULDBLOCK
+#define EINTR SCE_NET_EINTR
 
 #define sockaddr_in6 sockaddr_in
 #define sin6_addr sin_addr

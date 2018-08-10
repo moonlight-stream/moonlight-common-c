@@ -89,6 +89,7 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
         err = (int)recv(s, buffer, size, 0);
         if (err < 0 &&
                 (LastSocketError() == EWOULDBLOCK ||
+                 LastSocketError() == EINTR ||
                  LastSocketError() == EAGAIN)) {
             // Return 0 for timeout
             return 0;
