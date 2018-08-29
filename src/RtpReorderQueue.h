@@ -27,10 +27,13 @@ typedef struct _RTP_REORDER_QUEUE {
     uint64_t oldestQueuedTimeMs;
 } RTP_REORDER_QUEUE, *PRTP_REORDER_QUEUE;
 
-#define RTPQ_RET_HANDLE_IMMEDIATELY   0
-#define RTPQ_RET_QUEUED_NOTHING_READY 1
-#define RTPQ_RET_QUEUED_PACKETS_READY 2
-#define RTPQ_RET_REJECTED             3
+#define RTPQ_RET_PACKET_CONSUMED 0x1
+#define RTPQ_RET_PACKET_READY    0x2
+#define RTPQ_RET_HANDLE_NOW      0x4
+
+#define RTPQ_PACKET_CONSUMED(x) ((x) & RTPQ_RET_PACKET_CONSUMED)
+#define RTPQ_PACKET_READY(x)    ((x) & RTPQ_RET_PACKET_READY)
+#define RTPQ_HANDLE_NOW(x)      ((x) == RTPQ_RET_HANDLE_NOW)
 
 void RtpqInitializeQueue(PRTP_REORDER_QUEUE queue, int maxSize, int maxQueueTimeMs);
 void RtpqCleanupQueue(PRTP_REORDER_QUEUE queue);

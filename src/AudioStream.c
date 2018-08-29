@@ -200,7 +200,7 @@ static void ReceiveThreadProc(void* context) {
         rtp->sequenceNumber = htons(rtp->sequenceNumber);
 
         queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET)packet, &packet->q.rentry);
-        if (queueStatus == RTPQ_RET_HANDLE_IMMEDIATELY) {
+        if (RTPQ_HANDLE_NOW(queueStatus)) {
             if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                 if (!queuePacketToLbq(&packet)) {
                     // An exit signal was received
@@ -212,12 +212,12 @@ static void ReceiveThreadProc(void* context) {
             }
         }
         else {
-            if (queueStatus != RTPQ_RET_REJECTED) {
+            if (RTPQ_PACKET_CONSUMED(queueStatus)) {
                 // The queue consumed our packet, so we must allocate a new one
                 packet = NULL;
             }
 
-            if (queueStatus == RTPQ_RET_QUEUED_PACKETS_READY) {
+            if (RTPQ_PACKET_READY(queueStatus)) {
                 // If packets are ready, pull them and send them to the decoder
                 while ((packet = (PQUEUED_AUDIO_PACKET)RtpqGetQueuedPacket(&rtpReorderQueue)) != NULL) {
                     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
