@@ -59,6 +59,12 @@ static void cleanupFrameState(void) {
 
 // Cleanup frame state and set that we're waiting for an IDR Frame
 static void dropFrameState(void) {
+    // This may only be called at frame boundaries
+    LC_ASSERT(!decodingFrame);
+
+    // We're dropping frame state now
+    dropStatePending = 0;
+
     // We'll need an IDR frame now if we're in strict mode
     if (strictIdrFrameWait) {
         waitingForIdrFrame = 1;
@@ -448,13 +454,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     char flags;
     unsigned int firstPacket;
     unsigned int streamPacketIndex;
-    
-    // Before processing this packet at all, drop depacketizer
-    // state if the decoder asked for it.
-    if (dropStatePending) {
-        dropStatePending = 0;
-        dropFrameState();
-    }
 
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
@@ -560,6 +559,17 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
         if (waitingForIdrFrame) {
             Limelog("Waiting for IDR frame\n");
 
+            dropFrameState();
+            return;
+        }
+
+        // Carry out any pending state drops. We can't just do this
+        // arbitrarily in the middle of processing a frame because
+        // may cause the depacketizer state to become corrupted. For
+        // example, if we drop state after the first packet, the
+        // depacketizer will next try to process a non-SOF packet,
+        // and cause it to assert.
+        if (dropStatePending) {
             dropFrameState();
             return;
         }
