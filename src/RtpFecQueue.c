@@ -5,7 +5,6 @@
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
     reed_solomon_init();
     memset(queue, 0, sizeof(*queue));
-    queue->nextRtpSequenceNumber = UINT16_MAX;
     
     queue->currentFrameNumber = UINT16_MAX;
 }
@@ -28,7 +27,7 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length, int isParity) {
     PRTPFEC_QUEUE_ENTRY entry;
     
-    LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber));
+    LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->bufferLowestSequenceNumber));
 
     // Don't queue duplicates either
     entry = queue->bufferHead;
@@ -212,8 +211,8 @@ static void removeEntry(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY entry) {
 }
 
 int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry) {
-    if (isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber)) {
-        // Reject packets behind our current sequence number
+    if (isBefore16(packet->sequenceNumber, queue->bufferLowestSequenceNumber)) {
+        // Reject packets behind our current buffer window
         return RTPF_RET_REJECTED;
     }
 
@@ -241,7 +240,6 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         }
         
         queue->currentFrameNumber = nvPacket->frameIndex;
-        queue->nextRtpSequenceNumber = queue->bufferHighestSequenceNumber;
         
         // Discard any unsubmitted buffers from the previous frame
         while (queue->bufferHead != NULL) {
@@ -263,6 +261,9 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
     } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
+
+    LC_ASSERT(((nvPacket->fecInfo & 0xFF0) >> 4) == queue->fecPercentage);
+    LC_ASSERT(((nvPacket->fecInfo & 0xFFF00000) >> 20) / 4 == queue->bufferDataPackets);
     
     if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
         return RTPF_RET_REJECTED;
