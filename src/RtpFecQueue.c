@@ -227,6 +227,8 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         // Reject frames behind our current frame number
         return RTPF_RET_REJECTED;
     }
+
+    int fecIndex = (nvPacket->fecInfo & 0x3FF000) >> 12;
     
     // Reinitialize the queue if it's empty after a frame delivery or
     // if we can't finish a frame before receiving the next one.
@@ -251,20 +253,20 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->bufferTail = NULL;
         queue->bufferSize = 0;
         
-        int fecIndex = (nvPacket->fecInfo & 0xFF000) >> 12;
         queue->bufferLowestSequenceNumber = U16(packet->sequenceNumber - fecIndex);
         queue->receivedBufferDataPackets = 0;
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
-        queue->bufferDataPackets = ((nvPacket->fecInfo & 0xFFF00000) >> 20) / 4;
-        queue->fecPercentage = ((nvPacket->fecInfo & 0xFF0) >> 4);
+        queue->bufferDataPackets = (nvPacket->fecInfo & 0xFFC00000) >> 22;
+        queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;
         queue->bufferFirstParitySequenceNumber = U16(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
     } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         queue->bufferHighestSequenceNumber = packet->sequenceNumber;
     }
 
-    LC_ASSERT(((nvPacket->fecInfo & 0xFF0) >> 4) == queue->fecPercentage);
-    LC_ASSERT(((nvPacket->fecInfo & 0xFFF00000) >> 20) / 4 == queue->bufferDataPackets);
-    
+    LC_ASSERT(U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
+    LC_ASSERT((nvPacket->fecInfo & 0xFF0) >> 4 == queue->fecPercentage);
+    LC_ASSERT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
+
     if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
         return RTPF_RET_REJECTED;
     }
