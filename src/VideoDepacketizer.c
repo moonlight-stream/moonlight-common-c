@@ -471,9 +471,23 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 
     streamPacketIndex = videoPacket->streamPacketIndex;
     
-    // The packets and frames must be in sequence from the FEC queue
-    LC_ASSERT(!isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)));
-    LC_ASSERT(!isBefore32(frameIndex, nextFrameNumber));
+    // Drop packets from a previously corrupt frame
+    if (isBefore32(frameIndex, nextFrameNumber)) {
+        return;
+    }
+
+    // The FEC queue can sometimes recover corrupt frames (see comments in RtpFecQueue).
+    // It almost always detects them before they get to us, but in case it doesn't
+    // the streamPacketIndex not matching correctly should find nearly all of the rest.
+    if (isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)) ||
+            (!firstPacket && streamPacketIndex != U24(lastPacketInStream + 1))) {
+        Limelog("Depacketizer detected corrupt frame: %d", frameIndex);
+        decodingFrame = 0;
+        nextFrameNumber = frameIndex + 1;
+        waitingForNextSuccessfulFrame = 1;
+        dropFrameState();
+        return;
+    }
 
     // Notify the listener of the latest frame we've seen from the PC
     connectionSawFrame(frameIndex);
@@ -501,10 +515,6 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
         decodingFrame = 1;
         firstPacketReceiveTime = receiveTimeMs;
     }
-
-    // This must be the first packet in a frame or be contiguous with the last
-    // packet received.
-    LC_ASSERT(firstPacket || streamPacketIndex == U24(lastPacketInStream + 1));
 
     lastPacketInStream = streamPacketIndex;
 

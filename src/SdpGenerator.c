@@ -162,6 +162,10 @@ static int addGen5Options(PSDP_OPTION* head) {
         err |= addAttributeString(head, "x-nv-vqos[0].fec.repairPercent", "5");
     }
 
+    // Recovery mode can cause the FEC percentage to change mid-frame, which
+    // breaks many assumptions in RTP FEC queue.
+    err |= addAttributeString(head, "x-nv-general.enableRecoveryMode", "0");
+
     return err;
 }
 

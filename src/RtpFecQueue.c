@@ -72,11 +72,11 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
 }
 
 #define PACKET_RECOVERY_FAILURE()                     \
-    free(packets[i]);                                 \
     ret = -1;                                         \
     Limelog("FEC recovery returned corrupt packet %d" \
             " (frame %d)", rtpPacket->sequenceNumber, \
             queue->currentFrameNumber);               \
+    free(packets[i]);                                 \
     continue
 
 // Returns 0 if the frame is completely constructed
