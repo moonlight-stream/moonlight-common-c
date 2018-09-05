@@ -74,12 +74,10 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
-    int parityPackets = totalPackets - queue->bufferDataPackets;
-    int missingPackets = totalPackets - queue->bufferSize;
     int ret;
     
-    if (parityPackets < missingPackets) {
-        // Not enough parity data to recover yet
+    if (queue->bufferSize < queue->bufferDataPackets) {
+        // Not enough data to recover yet
         return -1;
     }
     
@@ -268,7 +266,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;
         queue->bufferParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
         queue->bufferFirstParitySequenceNumber = U16(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
-        queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets);
+        queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets - 1);
     }
 
     LC_ASSERT(!queue->fecPercentage || U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
