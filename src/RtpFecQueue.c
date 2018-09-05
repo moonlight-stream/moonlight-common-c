@@ -74,7 +74,6 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
-    int totalParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
     int parityPackets = totalPackets - queue->bufferDataPackets;
     int missingPackets = totalPackets - queue->bufferSize;
     int ret;
@@ -97,7 +96,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
         goto cleanup;
     }
     
-    rs = reed_solomon_new(queue->bufferDataPackets, totalParityPackets);
+    rs = reed_solomon_new(queue->bufferDataPackets, queue->bufferParityPackets);
     
     // This could happen in an OOM condition, but it could also mean the FEC data
     // that we fed to reed_solomon_new() is bogus, so we'll assert to get a better look.
@@ -107,8 +106,6 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
         goto cleanup;
     }
     
-    rs->shards = queue->bufferDataPackets + missingPackets; //Don't let RS complain about missing parity packets
-
     memset(marks, 1, sizeof(char) * (totalPackets));
     
     int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
@@ -255,15 +252,16 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         
         queue->bufferLowestSequenceNumber = U16(packet->sequenceNumber - fecIndex);
         queue->receivedBufferDataPackets = 0;
-        queue->bufferHighestSequenceNumber = packet->sequenceNumber;
         queue->bufferDataPackets = (nvPacket->fecInfo & 0xFFC00000) >> 22;
         queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;
+        queue->bufferParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
         queue->bufferFirstParitySequenceNumber = U16(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
-    } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
-        queue->bufferHighestSequenceNumber = packet->sequenceNumber;
+        queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets);
     }
 
-    LC_ASSERT(U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
+    LC_ASSERT(!queue->fecPercentage || U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
+    LC_ASSERT(isBefore16(packet->sequenceNumber, queue->bufferHighestSequenceNumber) ||
+              packet->sequenceNumber == queue->bufferHighestSequenceNumber);
     LC_ASSERT((nvPacket->fecInfo & 0xFF0) >> 4 == queue->fecPercentage);
     LC_ASSERT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
 
