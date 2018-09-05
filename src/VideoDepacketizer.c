@@ -467,6 +467,8 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     flags = videoPacket->flags;
     firstPacket = isFirstPacket(flags);
 
+    LC_ASSERT((flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
+
     streamPacketIndex = videoPacket->streamPacketIndex;
     
     // The packets and frames must be in sequence from the FEC queue

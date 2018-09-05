@@ -160,6 +160,18 @@ cleanup_packets:
                 PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset);
                 nvPacket->frameIndex = queue->currentFrameNumber;
 
+                // Do some rudamentary checks to see that the recovered packet is sane
+                if (i == 0) {
+                    LC_ASSERT(nvPacket->flags & FLAG_SOF);
+                }
+                if (i == queue->bufferDataPackets - 1) {
+                    LC_ASSERT(nvPacket->flags & FLAG_EOF);
+                }
+                if (i > 0 && i < queue->bufferDataPackets - 1) {
+                    LC_ASSERT(nvPacket->flags & FLAG_CONTAINS_PIC_DATA);
+                }
+                LC_ASSERT((nvPacket->flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
+
                 // FEC recovered frames may have extra zero padding at the end. This is
                 // fine per H.264 Annex B which states trailing zero bytes must be
                 // discarded by decoders. It's not safe to strip all zero padding because
