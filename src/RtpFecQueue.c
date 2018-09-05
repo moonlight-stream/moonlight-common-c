@@ -71,6 +71,14 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     return 1;
 }
 
+#define PACKET_RECOVERY_FAILURE()                     \
+    free(packets[i]);                                 \
+    ret = -1;                                         \
+    Limelog("FEC recovery returned corrupt packet %d" \
+            " (frame %d)", rtpPacket->sequenceNumber, \
+            queue->currentFrameNumber);               \
+    continue
+
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
@@ -158,17 +166,23 @@ cleanup_packets:
                 PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset);
                 nvPacket->frameIndex = queue->currentFrameNumber;
 
-                // Do some rudamentary checks to see that the recovered packet is sane
-                if (i == 0) {
-                    LC_ASSERT(nvPacket->flags & FLAG_SOF);
+                // Do some rudamentary checks to see that the recovered packet is sane.
+                // In some cases (4K 30 FPS 80 Mbps), we seem to get some odd failures
+                // here in rare cases where FEC recovery is required. I'm unsure if it
+                // is our bug, NVIDIA's, or something else, but we don't want the corrupt
+                // packet to by ingested by our depacketizer (or worse, the decoder).
+                if (i == 0 && !(nvPacket->flags & FLAG_SOF)) {
+                    PACKET_RECOVERY_FAILURE();
                 }
-                if (i == queue->bufferDataPackets - 1) {
-                    LC_ASSERT(nvPacket->flags & FLAG_EOF);
+                if (i == queue->bufferDataPackets - 1 && !(nvPacket->flags & FLAG_EOF)) {
+                    PACKET_RECOVERY_FAILURE();
                 }
-                if (i > 0 && i < queue->bufferDataPackets - 1) {
-                    LC_ASSERT(nvPacket->flags & FLAG_CONTAINS_PIC_DATA);
+                if (i > 0 && i < queue->bufferDataPackets - 1 && !(nvPacket->flags & FLAG_CONTAINS_PIC_DATA)) {
+                    PACKET_RECOVERY_FAILURE();
                 }
-                LC_ASSERT((nvPacket->flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
+                if (nvPacket->flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) {
+                    PACKET_RECOVERY_FAILURE();
+                }
 
                 // FEC recovered frames may have extra zero padding at the end. This is
                 // fine per H.264 Annex B which states trailing zero bytes must be
@@ -267,11 +281,13 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->bufferParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
         queue->bufferFirstParitySequenceNumber = U16(queue->bufferLowestSequenceNumber + queue->bufferDataPackets);
         queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets - 1);
+    } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
+        // In rare cases, we get extra parity packets. It's rare enough that it's probably
+        // not worth handling, so we'll just drop them.
+        return RTPF_RET_REJECTED;
     }
 
     LC_ASSERT(!queue->fecPercentage || U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
-    LC_ASSERT(isBefore16(packet->sequenceNumber, queue->bufferHighestSequenceNumber) ||
-              packet->sequenceNumber == queue->bufferHighestSequenceNumber);
     LC_ASSERT((nvPacket->fecInfo & 0xFF0) >> 4 == queue->fecPercentage);
     LC_ASSERT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
 
