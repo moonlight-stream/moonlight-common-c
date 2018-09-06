@@ -201,7 +201,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     if (AppVersionQuad[0] >= 5) {
         int maxEncodingBitrate;
 
-        if (StreamConfig.width <= 1280 || StreamConfig.height <= 720) {
+        if (StreamConfig.width * StreamConfig.height <= 1366 * 768) {
             // 720p
             if (StreamConfig.fps <= 30) {
                 // 30 FPS
@@ -212,7 +212,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                 maxEncodingBitrate = 12000;
             }
         }
-        else if (StreamConfig.width <= 1920 || StreamConfig.height <= 1080) {
+        else if (StreamConfig.width * StreamConfig.height <= 1920 * 1200) {
             // 1080p
             if (StreamConfig.fps <= 30) {
                 // 30 FPS
@@ -221,6 +221,17 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             else {
                 // 60 FPS
                 maxEncodingBitrate = 25000;
+            }
+        }
+        else if (StreamConfig.width * StreamConfig.height <= 2560 * 1600) {
+            // 1440p
+            if (StreamConfig.fps <= 30) {
+                // 30 FPS
+                maxEncodingBitrate = 20000;
+            }
+            else {
+                // 60 FPS
+                maxEncodingBitrate = 35000;
             }
         }
         else {
