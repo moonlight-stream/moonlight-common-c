@@ -211,13 +211,13 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
     int channelCount;
     int streams;
     int coupledStreams;
-    const unsigned char mapping[6];
+    unsigned char mapping[6];
 } OPUS_MULTISTREAM_CONFIGURATION, *POPUS_MULTISTREAM_CONFIGURATION;
 
 // This callback initializes the audio renderer. The audio configuration parameter
 // provides the negotiated audio configuration. This may differ from the one
 // specified in the stream configuration. Returns 0 on success, non-zero on failure.
-typedef int(*AudioRendererInit)(int audioConfiguration, POPUS_MULTISTREAM_CONFIGURATION opusConfig, void* context, int arFlags);
+typedef int(*AudioRendererInit)(int audioConfiguration, const POPUS_MULTISTREAM_CONFIGURATION opusConfig, void* context, int arFlags);
 
 // This callback notifies the decoder that the stream is starting. No audio can be submitted before this callback returns.
 typedef void(*AudioRendererStart)(void);
