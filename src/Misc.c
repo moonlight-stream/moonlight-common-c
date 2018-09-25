@@ -89,6 +89,6 @@ void LiInitializeServerInformation(PSERVER_INFORMATION serverInfo) {
     memset(serverInfo, 0, sizeof(*serverInfo));
 }
 
-unsigned long long LiGetMillis(void) {
+uint64_t LiGetMillis(void) {
     return PltGetMillis();
 }

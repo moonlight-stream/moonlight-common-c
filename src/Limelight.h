@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -392,7 +394,7 @@ int LiSendScrollEvent(signed char scrollClicks);
 // This function returns a time in milliseconds with an implementation-defined epoch.
 // NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
 // populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME.
-unsigned long long LiGetMillis(void);
+uint64_t LiGetMillis(void);
 
 #ifdef __cplusplus
 }
