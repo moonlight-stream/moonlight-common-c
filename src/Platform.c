@@ -293,7 +293,7 @@ int PltWaitForEvent(PLT_EVENT* event) {
 #endif
 }
 
-uint64_t PltGetMillis(void) {
+unsigned long long PltGetMillis(void) {
 #if defined(LC_WINDOWS)
     return GetTickCount64();
 #elif HAVE_CLOCK_GETTIME

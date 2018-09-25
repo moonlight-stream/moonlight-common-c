@@ -105,9 +105,9 @@ typedef struct _DECODE_UNIT {
     // Frame type
     int frameType;
 
-    // Receive time of first buffer
-    // NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
-    // populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME
+    // Receive time of first buffer. This value uses an implementation-defined epoch.
+    // To compute actual latency values, use LiGetMillis() to get a timestamp that
+    // shares the same epoch as this value.
     unsigned long long receiveTimeMs;
 
     // Length of the entire buffer chain in bytes
@@ -388,6 +388,11 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 
 // This function queues a vertical scroll event to the remote server.
 int LiSendScrollEvent(signed char scrollClicks);
+
+// This function returns a time in milliseconds with an implementation-defined epoch.
+// NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
+// populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME.
+unsigned long long LiGetMillis(void);
 
 #ifdef __cplusplus
 }

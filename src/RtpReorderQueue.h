@@ -8,7 +8,7 @@
 typedef struct _RTP_QUEUE_ENTRY {
     PRTP_PACKET packet;
 
-    uint64_t queueTimeMs;
+    unsigned long long queueTimeMs;
 
     struct _RTP_QUEUE_ENTRY* next;
     struct _RTP_QUEUE_ENTRY* prev;
