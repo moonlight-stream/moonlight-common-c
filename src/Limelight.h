@@ -347,6 +347,8 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY);
 #define BUTTON_LEFT 0x01
 #define BUTTON_MIDDLE 0x02
 #define BUTTON_RIGHT 0x03
+#define BUTTON_X1 0x04
+#define BUTTON_X2 0x05
 int LiSendMouseButtonEvent(char action, int button);
 
 // This function queues a keyboard event to be sent to the remote server.
