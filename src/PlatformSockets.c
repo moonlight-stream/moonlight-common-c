@@ -282,6 +282,60 @@ int enableNoDelay(SOCKET s) {
     return 0;
 }
 
+int resolveHostName(const char* host, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
+{
+#ifndef __vita__
+    struct addrinfo hints, *res;
+    int err;
+
+    // We must first try IPv4-only because GFE doesn't listen on IPv6,
+    // so we'll only want to use an IPv6 address if it's the only address we have.
+    // For NAT64 networks, the IPv4 address resolution will fail but the IPv6 address
+    // will give us working connectivity to the host. All other networks will use IPv4
+    // addresses.
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_flags = AI_ADDRCONFIG;
+    err = getaddrinfo(host, NULL, &hints, &res);
+    if (err != 0 || res == NULL) {
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_flags = AI_ADDRCONFIG;
+        err = getaddrinfo(host, NULL, &hints, &res);
+        if (err != 0) {
+            Limelog("getaddrinfo() failed: %d\n", err);
+            return err;
+        }
+
+        if (res == NULL) {
+            Limelog("getaddrinfo() returned success without addresses\n");
+            return -1;
+        }
+    }
+
+    // Use the first address in the list
+    memcpy(addr, res->ai_addr, res->ai_addrlen);
+    *addrLen = res->ai_addrlen;
+
+    freeaddrinfo(res);
+    return 0;
+#else
+    struct hostent *phost = gethostbyname(host);
+    if (!phost) {
+        Limelog("gethostbyname() failed for host %s\n", host);
+        return -1;
+    }
+    struct sockaddr_in tmp = {0};
+    tmp.sin_len = sizeof(tmp);
+    tmp.sin_family = SCE_NET_AF_INET;
+    memcpy(&tmp.sin_addr, phost->h_addr, phost->h_length);
+
+    memcpy(addr, &tmp, sizeof(tmp));
+    *addrLen = sizeof(tmp);
+    return 0;
+#endif
+}
+
 int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;
