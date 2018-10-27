@@ -398,6 +398,12 @@ int LiSendScrollEvent(signed char scrollClicks);
 // populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME.
 uint64_t LiGetMillis(void);
 
+// This is a simplistic STUN function that can assist clients in getting the WAN address
+// for machines they find using mDNS over IPv4. This can be used to pre-populate the external
+// address for streaming after GFE stopped sending it a while back. wanAddr is returned in
+// network byte order.
+int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, unsigned int* wanAddr);
+
 #ifdef __cplusplus
 }
 #endif
