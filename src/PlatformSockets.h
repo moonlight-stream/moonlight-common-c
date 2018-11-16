@@ -72,7 +72,7 @@ typedef socklen_t SOCKADDR_LEN;
 #define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
-int resolveHostName(const char* host, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen);
+int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);

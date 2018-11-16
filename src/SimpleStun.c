@@ -52,16 +52,10 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         char buf[1024];
     } resp;
 
-    err = resolveHostName(stunServer, &stunAddr, &stunAddrLen);
+    err = resolveHostName(stunServer, AF_INET, 0, &stunAddr, &stunAddrLen);
     if (err != 0) {
         Limelog("Failed to resolve STUN server: %d\n", err);
         return err;
-    }
-
-    // We must use IPv4 to talk to the STUN server to get our IPv4 address back
-    if (stunAddr.ss_family != AF_INET) {
-        Limelog("STUN server was not reachable over IPv4\n");
-        return -1;
     }
 
     sock = bindUdpSocket(AF_INET, 2048);

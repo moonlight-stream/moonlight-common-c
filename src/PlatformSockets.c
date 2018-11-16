@@ -1,6 +1,8 @@
 #include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
+#define TEST_PORT_TIMEOUT_SEC 3
+
 #define RCV_BUFFER_SIZE_MIN  32767
 #define RCV_BUFFER_SIZE_STEP 16384
 
@@ -282,43 +284,53 @@ int enableNoDelay(SOCKET s) {
     return 0;
 }
 
-int resolveHostName(const char* host, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
+int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
 {
 #ifndef __vita__
-    struct addrinfo hints, *res;
+    struct addrinfo hints, *res, *currentAddr;
     int err;
 
-    // We must first try IPv4-only because GFE doesn't listen on IPv6,
-    // so we'll only want to use an IPv6 address if it's the only address we have.
-    // For NAT64 networks, the IPv4 address resolution will fail but the IPv6 address
-    // will give us working connectivity to the host. All other networks will use IPv4
-    // addresses.
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = family;
     hints.ai_flags = AI_ADDRCONFIG;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
     err = getaddrinfo(host, NULL, &hints, &res);
-    if (err != 0 || res == NULL) {
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_flags = AI_ADDRCONFIG;
-        err = getaddrinfo(host, NULL, &hints, &res);
-        if (err != 0) {
-            Limelog("getaddrinfo() failed: %d\n", err);
-            return err;
+    if (err != 0) {
+        Limelog("getaddrinfo(%s) failed: %d\n", host, err);
+        return err;
+    }
+    else if (res == NULL) {
+        Limelog("getaddrinfo(%s) returned success without addresses\n", host);
+        return -1;
+    }
+    
+    for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
+        // Use the test port to ensure this address is working
+        if (tcpTestPort != 0) {
+            SOCKET testSocket = connectTcpSocket((struct sockaddr_storage*)currentAddr->ai_addr,
+                                                 currentAddr->ai_addrlen,
+                                                 tcpTestPort,
+                                                 TEST_PORT_TIMEOUT_SEC);
+            if (testSocket == INVALID_SOCKET) {
+                // Try the next address
+                continue;
+            }
+            else {
+                closeSocket(testSocket);
+            }
         }
-
-        if (res == NULL) {
-            Limelog("getaddrinfo() returned success without addresses\n");
-            return -1;
-        }
+        
+        memcpy(addr, currentAddr->ai_addr, currentAddr->ai_addrlen);
+        *addrLen = currentAddr->ai_addrlen;
+        
+        freeaddrinfo(res);
+        return 0;
     }
 
-    // Use the first address in the list
-    memcpy(addr, res->ai_addr, res->ai_addrlen);
-    *addrLen = res->ai_addrlen;
-
+    Limelog("No working addresses found for host: %s\n", host);
     freeaddrinfo(res);
-    return 0;
+    return -1;
 #else
     struct hostent *phost = gethostbyname(host);
     if (!phost) {
