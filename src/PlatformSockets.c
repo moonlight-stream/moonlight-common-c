@@ -206,7 +206,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
 #endif
 
     // Start connection
-    memcpy(&addr, dstaddr, sizeof(addr));
+    memcpy(&addr, dstaddr, addrlen);
     addr.sin6_port = htons(port);
     err = connect(s, (struct sockaddr*) &addr, addrlen);
     if (err < 0) {
