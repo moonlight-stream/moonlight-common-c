@@ -13,6 +13,11 @@ extern "C" {
 // Enable this definition during debugging to enable assertions
 //#define LC_DEBUG
 
+// Values for the 'streamingRemotely' field below
+#define STREAM_CFG_LOCAL   0
+#define STREAM_CFG_REMOTE  1
+#define STREAM_CFG_AUTO    2
+
 typedef struct _STREAM_CONFIGURATION {
     // Dimensions in pixels of the desired video stream
     int width;
@@ -24,11 +29,16 @@ typedef struct _STREAM_CONFIGURATION {
     // Bitrate of the desired video stream (audio adds another ~1 Mbps)
     int bitrate;
 
-    // Max video packet size in bytes (use 1024 if unsure)
+    // Max video packet size in bytes (use 1024 if unsure). If STREAM_CFG_AUTO
+    // determines the stream is remote (see below), it will cap this value at
+    // 1024 to avoid MTU-related issues like packet loss and fragmentation.
     int packetSize;
 
-    // Set to non-zero value to enable remote (over the Internet)
-    // streaming optimizations. If unsure, set to 0.
+    // Determines whether to enable remote (over the Internet)
+    // streaming optimizations. If unsure, set to STREAM_CFG_AUTO.
+    // STREAM_CFG_AUTO uses a heuristic (whether the target address is
+    // in the RFC 1918 address blocks) to decide whether the stream
+    // is remote or not.
     int streamingRemotely;
 
     // Specifies the channel configuration of the audio stream.

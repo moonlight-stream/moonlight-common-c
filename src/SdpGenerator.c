@@ -176,6 +176,9 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     int audioChannelMask;
     int err;
 
+    // This must have been resolved to either local or remote by now
+    LC_ASSERT(StreamConfig.streamingRemotely != STREAM_CFG_AUTO);
+
     optionHead = NULL;
     err = 0;
 
@@ -259,7 +262,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
     }
     else {
-        if (StreamConfig.streamingRemotely) {
+        if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
             err |= addAttributeString(&optionHead, "x-nv-video[0].averageBitrate", "4");
             err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
         }
@@ -274,7 +277,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 
-    if (StreamConfig.streamingRemotely) {
+    if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "0");
         err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "0");
     }

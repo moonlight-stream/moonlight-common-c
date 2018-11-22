@@ -348,6 +348,33 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
 #endif
 }
 
+int isPrivateNetworkAddress(struct sockaddr_storage* address) {
+    unsigned int addr;
+
+    // We only count IPv4 addresses as possibly private for now
+    if (address->ss_family != AF_INET) {
+        return 0;
+    }
+
+    memcpy(&addr, &((struct sockaddr_in*)address)->sin_addr, sizeof(addr));
+    addr = htonl(addr);
+
+    // 10.0.0.0/8
+    if ((addr & 0xFF000000) == 0x0A000000) {
+        return 1;
+    }
+    // 172.16.0.0/12
+    else if ((addr & 0xFFF00000) == 0xAC100000) {
+        return 1;
+    }
+    // 192.168.0.0/16
+    else if ((addr & 0xFFFF0000) == 0xC0A80000) {
+        return 1;
+    }
+
+    return 0;
+}
+
 int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;

@@ -231,6 +231,25 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     ListenerCallbacks.stageComplete(STAGE_NAME_RESOLUTION);
     Limelog("done\n");
 
+    // If STREAM_CFG_AUTO was requested, determine the streamingRemotely value
+    // now that we have resolved the target address and impose the video packet
+    // size cap if required.
+    if (StreamConfig.streamingRemotely == STREAM_CFG_AUTO) {
+        if (isPrivateNetworkAddress(&RemoteAddr)) {
+            StreamConfig.streamingRemotely = STREAM_CFG_LOCAL;
+        }
+        else {
+            StreamConfig.streamingRemotely = STREAM_CFG_REMOTE;
+
+            if (StreamConfig.packetSize > 1024) {
+                // Cap packet size at 1024 for remote streaming to avoid
+                // MTU problems and fragmentation.
+                Limelog("Packet size capped at 1KB for remote streaming\n");
+                StreamConfig.packetSize = 1024;
+            }
+        }
+    }
+
     Limelog("Starting RTSP handshake...");
     ListenerCallbacks.stageStarting(STAGE_RTSP_HANDSHAKE);
     err = performRtspHandshake();
