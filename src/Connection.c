@@ -180,6 +180,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     if (StreamConfig.packetSize == 0) {
         Limelog("Invalid packet size specified\n");
         free(RemoteAddrString);
+        RemoteAddrString = NULL;
         return -1;
     }
     
@@ -188,6 +189,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
                                      AppVersionQuad) < 0) {
         Limelog("Invalid appversion string: %s\n", serverInfo->serverInfoAppVersion);
         free(RemoteAddrString);
+        RemoteAddrString = NULL;
         return -1;
     }
 
