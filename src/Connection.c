@@ -176,11 +176,18 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     // FEC only works in 16 byte chunks, so we must round down
     // the given packet size to the nearest multiple of 16.
     StreamConfig.packetSize -= StreamConfig.packetSize % 16;
+
+    if (StreamConfig.packetSize == 0) {
+        Limelog("Invalid packet size specified\n");
+        free(RemoteAddrString);
+        return -1;
+    }
     
     // Extract the appversion from the supplied string
     if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
                                      AppVersionQuad) < 0) {
         Limelog("Invalid appversion string: %s\n", serverInfo->serverInfoAppVersion);
+        free(RemoteAddrString);
         return -1;
     }
 
