@@ -74,35 +74,6 @@ void destroyInputStream(void) {
     initialized = 0;
 }
 
-// Checks if values are compatible with controller batching
-static int checkDirs(short currentVal, short newVal, int* dir) {
-    if (currentVal == newVal) {
-        return 1;
-    }
-
-    // We want to send a new packet if we've now zeroed an axis
-    if (newVal == 0) {
-        return 0;
-    }
-
-    if (*dir == 0) {
-        if (newVal < currentVal) {
-            *dir = -1;
-        }
-        else {
-            *dir = 1;
-        }
-    }
-    else if (*dir == -1) {
-        return newVal < currentVal;
-    }
-    else if (newVal < currentVal) {
-        return 0;
-    }
-
-    return 1;
-}
-
 static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
     int i;
     int paddedLength = ROUND_TO_PKCS7_PADDED_LEN(plaintextLen);
@@ -231,9 +202,6 @@ static void inputSendThreadProc(void* context) {
         if (holder->packet.multiController.header.packetType == htonl(PACKET_TYPE_MULTI_CONTROLLER)) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
-            int dirs[6];
-
-            memset(dirs, 0, sizeof(dirs));
 
             origPkt = &holder->packet.multiController;
             for (;;) {
@@ -250,16 +218,14 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // Check if it's able to be batched
+                // NB: GFE does some discarding of gamepad packets received very soon after another.
+                // Thus, this batching is needed for correctness in some cases, as GFE will inexplicably
+                // drop *newer* packets in that scenario. The brokenness can be tested with consecutive
+                // calls to LiSendMultiControllerEvent() with different values for analog sticks (max -> zero).
                 newPkt = &controllerBatchHolder->packet.multiController;
                 if (newPkt->buttonFlags != origPkt->buttonFlags ||
                     newPkt->controllerNumber != origPkt->controllerNumber ||
-                    newPkt->activeGamepadMask != origPkt->activeGamepadMask ||
-                    !checkDirs(origPkt->leftTrigger, newPkt->leftTrigger, &dirs[0]) ||
-                    !checkDirs(origPkt->rightTrigger, newPkt->rightTrigger, &dirs[1]) ||
-                    !checkDirs(origPkt->leftStickX, newPkt->leftStickX, &dirs[2]) ||
-                    !checkDirs(origPkt->leftStickY, newPkt->leftStickY, &dirs[3]) ||
-                    !checkDirs(origPkt->rightStickX, newPkt->rightStickX, &dirs[4]) ||
-                    !checkDirs(origPkt->rightStickY, newPkt->rightStickY, &dirs[5])) {
+                    newPkt->activeGamepadMask != origPkt->activeGamepadMask) {
                     // Batching not allowed
                     break;
                 }
