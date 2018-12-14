@@ -580,19 +580,20 @@ int performRtspHandshake(void) {
 
         sessionId = getOptionContent(response.options, "Session");
 
-        // Strips session id in the case the 
-        // RTSP server returns excess data.
-        // (i.e: DEADBEEF;timeout=)
-        char* session;
-        session = strtok(sessionId, ";");
-
-        if (session == NULL) {
+        if (sessionId == NULL) {
             Limelog("RTSP SETUP streamid=audio is missing session attribute");
             ret = -1;
             goto Exit;
         }
 
-        strcpy(sessionIdString, session);
+        // Given there is a non-null session id, get the
+        // first token of the session until ";", which 
+        // resolves any 454 session not found errors on
+        // standard RTSP server implementations.
+        // (i.e - sessionId = "DEADBEEFCAFE;timeout = 90") 
+        sessionId = strtok(sessionId, ";");
+
+        strcpy(sessionIdString, sessionId);
         hasSessionId = 1;
 
         freeMessage(&response);
