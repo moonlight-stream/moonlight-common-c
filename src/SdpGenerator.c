@@ -202,62 +202,14 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
     // to the requested value.
     if (AppVersionQuad[0] >= 5) {
-        int maxEncodingBitrate;
-
-        if (StreamConfig.width * StreamConfig.height <= 1366 * 768) {
-            // 720p
-            if (StreamConfig.fps <= 30) {
-                // 30 FPS
-                maxEncodingBitrate = 6000;
-            }
-            else {
-                // 60 FPS
-                maxEncodingBitrate = 12000;
-            }
-        }
-        else if (StreamConfig.width * StreamConfig.height <= 1920 * 1200) {
-            // 1080p
-            if (StreamConfig.fps <= 30) {
-                // 30 FPS
-                maxEncodingBitrate = 15000;
-            }
-            else {
-                // 60 FPS
-                maxEncodingBitrate = 25000;
-            }
-        }
-        else if (StreamConfig.width * StreamConfig.height <= 2560 * 1600) {
-            // 1440p
-            if (StreamConfig.fps <= 30) {
-                // 30 FPS
-                maxEncodingBitrate = 20000;
-            }
-            else {
-                // 60 FPS
-                maxEncodingBitrate = 35000;
-            }
-        }
-        else {
-            // 4K
-            if (StreamConfig.fps <= 30) {
-                // 30 FPS
-                maxEncodingBitrate = 40000;
-            }
-            else {
-                // 60 FPS
-                maxEncodingBitrate = 60000;
-            }
-        }
-
-        // The encoding bitrate is the lesser of the max encoding bitrate and the
-        // max streaming bitrate
-        sprintf(payloadStr, "%d", maxEncodingBitrate < StreamConfig.bitrate ?
-                                  maxEncodingBitrate : StreamConfig.bitrate);
+        // GFE currently imposes a limit of 100 Mbps for the video bitrate. It will automatically
+        // impose that on maximumBitrateKbps but not on initialBitrateKbps. We will impose the cap
+        // ourselves so initialBitrateKbps does not exceed maximumBitrateKbps.
+        sprintf(payloadStr, "%d", StreamConfig.bitrate > 100000 ? 100000 : StreamConfig.bitrate);
 
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialPeakBitrateKbps", payloadStr);
 
-        sprintf(payloadStr, "%d", StreamConfig.bitrate);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
     }
