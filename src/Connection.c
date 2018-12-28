@@ -144,7 +144,7 @@ static void ClInternalConnectionTerminated(long errorCode)
     int err;
 
     // Avoid recursion and issuing multiple callbacks
-    if (alreadyTerminated) {
+    if (alreadyTerminated || ConnectionInterrupted) {
         return;
     }
 
