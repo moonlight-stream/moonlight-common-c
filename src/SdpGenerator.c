@@ -199,8 +199,23 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
     err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 
-    // 20% of the video bitrate will added to the user-specified bitrate for FEC
-    bitrate = (int)(OriginalVideoBitrate * 0.80);
+    // Use more strict bitrate logic when streaming remotely. The theory here is that remote
+    // streaming is much more bandwidth sensitive. Someone might select 5 Mbps because that's
+    // really all they have, so we need to be careful not to exceed the cap, even counting
+    // things like audio and control data.
+    if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
+        // 20% of the video bitrate will added to the user-specified bitrate for FEC
+        bitrate = (int)(OriginalVideoBitrate * 0.80);
+
+        // Subtract 500 Kbps to leave room for audio and control. On remote streams,
+        // GFE will use 96Kbps stereo audio. For local streams, it will choose 512Kbps.
+        if (bitrate > 500) {
+            bitrate -= 500;
+        }
+    }
+    else {
+        bitrate = StreamConfig.bitrate;
+    }
 
     // If the calculated bitrate (with the HEVC multiplier in effect) is less than this,
     // use the lower of the two bitrate values.
