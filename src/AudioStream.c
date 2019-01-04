@@ -325,21 +325,11 @@ int startAudioStream(void* audioContext, int arFlags) {
         return err;
     }
 
-    err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
-    if (err != 0) {
-        AudioCallbacks.cleanup();
-        closeSocket(rtpSocket);
-        return err;
-    }
-
     AudioCallbacks.start();
 
     err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         AudioCallbacks.stop();
-        PltInterruptThread(&udpPingThread);
-        PltJoinThread(&udpPingThread);
-        PltCloseThread(&udpPingThread);
         closeSocket(rtpSocket);
         AudioCallbacks.cleanup();
         return err;
@@ -349,16 +339,39 @@ int startAudioStream(void* audioContext, int arFlags) {
         err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             AudioCallbacks.stop();
-            PltInterruptThread(&udpPingThread);
             PltInterruptThread(&receiveThread);
-            PltJoinThread(&udpPingThread);
             PltJoinThread(&receiveThread);
-            PltCloseThread(&udpPingThread);
             PltCloseThread(&receiveThread);
             closeSocket(rtpSocket);
             AudioCallbacks.cleanup();
             return err;
         }
+    }
+
+    // Don't start pinging (which will cause GFE to start sending us traffic)
+    // until everything else is started. Otherwise we could accumulate a
+    // bunch of audio packets in the socket receive buffer while our audio
+    // backend is starting up and create audio latency.
+    err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
+    if (err != 0) {
+        AudioCallbacks.stop();
+        PltInterruptThread(&receiveThread);
+        if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            // Signal threads waiting on the LBQ
+            LbqSignalQueueShutdown(&packetQueue);
+            PltInterruptThread(&decoderThread);
+        }
+        PltJoinThread(&receiveThread);
+        if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            PltJoinThread(&decoderThread);
+        }
+        PltCloseThread(&receiveThread);
+        if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            PltCloseThread(&decoderThread);
+        }
+        closeSocket(rtpSocket);
+        AudioCallbacks.cleanup();
+        return err;
     }
 
     return 0;
