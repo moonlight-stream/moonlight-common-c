@@ -152,6 +152,7 @@ static void ReceiveThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
     int useSelect;
+    int packetsToDrop = 100;
 
     packet = NULL;
 
@@ -182,6 +183,10 @@ static void ReceiveThreadProc(void* context) {
         }
         else if (packet->size == 0) {
             // Receive timed out; try again
+
+            // If we hit this path, there are no queued audio packets on the host PC,
+            // so we don't need to drop anything.
+            packetsToDrop = 0;
             continue;
         }
 
@@ -193,6 +198,14 @@ static void ReceiveThreadProc(void* context) {
         rtp = (PRTP_PACKET)&packet->data[0];
         if (rtp->packetType != 97) {
             // Not audio
+            continue;
+        }
+
+        // GFE accumulates audio samples before we are ready to receive them,
+        // so we will drop the first 100 packets to avoid accumulating latency
+        // by sending audio frames to the player faster than they can be played.
+        if (packetsToDrop > 0) {
+            packetsToDrop--;
             continue;
         }
 
