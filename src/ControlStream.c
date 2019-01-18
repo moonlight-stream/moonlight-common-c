@@ -455,7 +455,7 @@ static void requestIdrFrame(void) {
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
-            payload[1] = 0x20;
+            payload[1] = lastSeenFrame;
         }
         else {
             payload[0] = lastSeenFrame - 0x20;
