@@ -582,8 +582,17 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
         // depacketizer will next try to process a non-SOF packet,
         // and cause it to assert.
         if (dropStatePending) {
-            dropFrameState();
-            return;
+            if (nalChainHead && nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
+                // Don't drop the frame state if this frame is an IDR frame itself,
+                // otherwise we'll lose this IDR frame without another in flight
+                // and have to wait until we hit our consecutive drop limit to
+                // request a new one (potentially several seconds).
+                dropStatePending = 0;
+            }
+            else {
+                dropFrameState();
+                return;
+            }
         }
 
         reassembleFrame(frameIndex);
