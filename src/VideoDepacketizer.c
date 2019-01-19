@@ -15,6 +15,9 @@ static int decodingFrame;
 static int strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
 static int dropStatePending;
+static int idrFrameProcessed;
+
+#define DR_CLEANUP -1000
 
 #define CONSECUTIVE_DROP_LIMIT 120
 static unsigned int consecutiveFrameDrops;
@@ -41,6 +44,7 @@ void initializeVideoDepacketizer(int pktSize) {
     decodingFrame = 0;
     firstPacketReceiveTime = 0;
     dropStatePending = 0;
+    idrFrameProcessed = 0;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
 }
 
@@ -66,7 +70,8 @@ static void dropFrameState(void) {
     dropStatePending = 0;
 
     // We'll need an IDR frame now if we're in strict mode
-    if (strictIdrFrameWait) {
+    // or if we've never seen one before
+    if (strictIdrFrameWait || !idrFrameProcessed) {
         waitingForIdrFrame = 1;
     }
 
@@ -95,7 +100,8 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     while (entry != NULL) {
         nextEntry = entry->flink;
 
-        freeQueuedDecodeUnit((PQUEUED_DECODE_UNIT)entry->data);
+        // Complete this with a failure status
+        completeQueuedDecodeUnit((PQUEUED_DECODE_UNIT)entry->data, DR_CLEANUP);
 
         entry = nextEntry;
     }
@@ -180,8 +186,18 @@ int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
 }
 
 // Cleanup a decode unit by freeing the buffer chain and the holder
-void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
+void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
     PLENTRY lastEntry;
+
+    if (drStatus == DR_NEED_IDR) {
+        Limelog("Requesting IDR frame on behalf of DR\n");
+        requestDecoderRefresh();
+    }
+    else if (drStatus == DR_OK && qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
+        // Remember that the IDR frame was processed. We can now use
+        // reference frame invalidation.
+        idrFrameProcessed = 1;
+    }
 
     while (qdu->decodeUnit.bufferList != NULL) {
         lastEntry = qdu->decodeUnit.bufferList;
@@ -191,7 +207,6 @@ void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu) {
 
     free(qdu);
 }
-
 
 // Returns 1 if the special sequence describes an I-frame
 static int isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
@@ -267,12 +282,7 @@ static void reassembleFrame(int frameNumber) {
             else {
                 int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
-                freeQueuedDecodeUnit(qdu);
-
-                if (ret == DR_NEED_IDR) {
-                    Limelog("Requesting IDR frame on behalf of DR\n");
-                    requestDecoderRefresh();
-                }
+                completeQueuedDecodeUnit(qdu, ret);
             }
 
             // Notify the control connection

@@ -138,12 +138,7 @@ static void DecoderThreadProc(void* context) {
 
         int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
-        freeQueuedDecodeUnit(qdu);
-
-        if (ret == DR_NEED_IDR) {
-            Limelog("Requesting IDR frame on behalf of DR\n");
-            requestDecoderRefresh();
-        }
+        completeQueuedDecodeUnit(qdu, ret);
     }
 }
 

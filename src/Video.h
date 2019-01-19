@@ -7,7 +7,7 @@ typedef struct _QUEUED_DECODE_UNIT {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_DECODE_UNIT, *PQUEUED_DECODE_UNIT;
 
-void freeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu);
+void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus);
 int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu);
 
 #pragma pack(push, 1)
