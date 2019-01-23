@@ -133,7 +133,8 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
             Limelog("STUN attribute out of bounds: %d\n", htons(attribute->length));
             return -5;
         }
-        else if (htons(attribute->type) != STUN_ATTRIBUTE_XOR_MAPPED_ADDRESS) {
+        // Mask off the comprehension bit
+        else if ((htons(attribute->type) & 0x7FFF) != STUN_ATTRIBUTE_XOR_MAPPED_ADDRESS) {
             // Continue searching if this wasn't our address
             bytesRead -= sizeof(*attribute) + htons(attribute->length);
             attribute = (PSTUN_ATTRIBUTE_HEADER)(((char*)attribute) + sizeof(*attribute) + htons(attribute->length));
