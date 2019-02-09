@@ -297,6 +297,9 @@ typedef void(*ConnListenerDisplayTransientMessage)(const char* message);
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 
+// This callback is invoked to rumble a gamepad
+typedef void(*ConnListenerRumble)(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -306,6 +309,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerDisplayMessage displayMessage;
     ConnListenerDisplayTransientMessage displayTransientMessage;
     ConnListenerLogMessage logMessage;
+    ConnListenerRumble rumble;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap

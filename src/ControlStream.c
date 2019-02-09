@@ -29,6 +29,7 @@ static PLT_MUTEX enetMutex;
 
 static PLT_THREAD lossStatsThread;
 static PLT_THREAD invalidateRefFramesThread;
+static PLT_THREAD controlReceiveThread;
 static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport;
 static long lastGoodFrame;
@@ -44,6 +45,7 @@ static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 #define IDX_INVALIDATE_REF_FRAMES 2
 #define IDX_LOSS_STATS 3
 #define IDX_INPUT_DATA 5
+#define IDX_RUMBLE_DATA 6
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 
@@ -54,6 +56,7 @@ static const short packetTypesGen3[] = {
     0x140c, // Loss Stats
     0x1417, // Frame Stats (unused)
     -1,     // Input data (unused)
+    -1,     // Rumble data (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -62,6 +65,7 @@ static const short packetTypesGen4[] = {
     0x060a, // Loss Stats
     0x0611, // Frame Stats (unused)
     -1,     // Input data (unused)
+    -1,     // Rumble data (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -70,6 +74,7 @@ static const short packetTypesGen5[] = {
     0x0201, // Loss Stats
     0x0204, // Frame Stats (unused)
     0x0207, // Input data
+    -1,     // Rumble data (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -78,6 +83,7 @@ static const short packetTypesGen7[] = {
     0x0201, // Loss Stats
     0x0204, // Frame Stats (unused)
     0x0206, // Input data
+    0x010b, // Rumble data (unused)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -291,22 +297,6 @@ static int sendMessageEnet(short ptype, short paylen, const void* payload) {
 
     LC_ASSERT(AppVersionQuad[0] >= 5);
 
-    // Gen 5+ servers do control protocol over ENet instead of TCP
-    while ((err = serviceEnetHost(client, &event, 0)) > 0) {
-        if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-            enet_packet_destroy(event.packet);
-        }
-        else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
-            Limelog("Control stream received disconnect event\n");
-            return 0;
-        }
-    }
-    
-    if (err < 0) {
-        Limelog("Control stream connection failed\n");
-        return 0;
-    }
-
     packet = malloc(sizeof(*packet) + paylen);
     if (packet == NULL) {
         return 0;
@@ -405,6 +395,68 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
     }
 
     return 1;
+}
+
+static void controlReceiveThreadFunc(void* context) {
+    int err;
+
+    // This is only used for ENet
+    if (AppVersionQuad[0] < 5) {
+        return;
+    }
+
+    while (!PltIsThreadInterrupted(&controlReceiveThread)) {
+        ENetEvent event;
+
+        // Poll every 100 ms for new packets
+        PltLockMutex(&enetMutex);
+        err = serviceEnetHost(client, &event, 0);
+        PltUnlockMutex(&enetMutex);
+        if (err == 0) {
+            // No events ready
+            PltSleepMs(100);
+            continue;
+        }
+        else if (err < 0) {
+            Limelog("Control stream connection failed: %d\n", err);
+            ListenerCallbacks.connectionTerminated(err);
+            return;
+        }
+
+        if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+            PNVCTL_ENET_PACKET_HEADER ctlHdr = (PNVCTL_ENET_PACKET_HEADER)event.packet->data;
+
+            if (event.packet->dataLength < sizeof(*ctlHdr)) {
+                Limelog("Discarding runt control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(*ctlHdr));
+                enet_packet_destroy(event.packet);
+                continue;
+            }
+
+            if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
+                BYTE_BUFFER bb;
+
+                BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbAdvanceBuffer(&bb, 4);
+
+                unsigned short controllerNumber;
+                unsigned short lowFreqRumble;
+                unsigned short highFreqRumble;
+
+                BbGetShort(&bb, &controllerNumber);
+                BbGetShort(&bb, &lowFreqRumble);
+                BbGetShort(&bb, &highFreqRumble);
+
+                ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
+            }
+
+            enet_packet_destroy(event.packet);
+        }
+        else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
+            Limelog("Control stream received disconnect event\n");
+            ListenerCallbacks.connectionTerminated(-1);
+            return;
+        }
+    }
 }
 
 static void lossStatsThreadFunc(void* context) {
@@ -564,12 +616,15 @@ int stopControlStream(void) {
     
     PltInterruptThread(&lossStatsThread);
     PltInterruptThread(&invalidateRefFramesThread);
+    PltInterruptThread(&controlReceiveThread);
 
     PltJoinThread(&lossStatsThread);
     PltJoinThread(&invalidateRefFramesThread);
+    PltJoinThread(&controlReceiveThread);
 
     PltCloseThread(&lossStatsThread);
     PltCloseThread(&invalidateRefFramesThread);
+    PltCloseThread(&controlReceiveThread);
 
     if (peer != NULL) {
         // We use enet_peer_disconnect_now() so the host knows immediately
@@ -654,6 +709,22 @@ int startControlStream(void) {
         enableNoDelay(ctlSock);
     }
 
+    err = PltCreateThread(controlReceiveThreadFunc, NULL, &controlReceiveThread);
+    if (err != 0) {
+        stopping = 1;
+        if (ctlSock != INVALID_SOCKET) {
+            closeSocket(ctlSock);
+            ctlSock = INVALID_SOCKET;
+        }
+        else {
+            enet_peer_disconnect_now(peer, 0);
+            peer = NULL;
+            enet_host_destroy(client);
+            client = NULL;
+        }
+        return err;
+    }
+
     // Send START A
     if (!sendMessageAndDiscardReply(packetTypes[IDX_START_A],
         payloadLengths[IDX_START_A],
@@ -661,6 +732,18 @@ int startControlStream(void) {
         Limelog("Start A failed: %d\n", (int)LastSocketError());
         err = LastSocketFail();
         stopping = 1;
+
+        if (ctlSock != INVALID_SOCKET) {
+            shutdownTcpSocket(ctlSock);
+        }
+        else {
+            ConnectionInterrupted = 1;
+        }
+
+        PltInterruptThread(&controlReceiveThread);
+        PltJoinThread(&controlReceiveThread);
+        PltCloseThread(&controlReceiveThread);
+
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
             ctlSock = INVALID_SOCKET;
@@ -681,6 +764,18 @@ int startControlStream(void) {
         Limelog("Start B failed: %d\n", (int)LastSocketError());
         err = LastSocketFail();
         stopping = 1;
+
+        if (ctlSock != INVALID_SOCKET) {
+            shutdownTcpSocket(ctlSock);
+        }
+        else {
+            ConnectionInterrupted = 1;
+        }
+
+        PltInterruptThread(&controlReceiveThread);
+        PltJoinThread(&controlReceiveThread);
+        PltCloseThread(&controlReceiveThread);
+
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
             ctlSock = INVALID_SOCKET;
@@ -697,6 +792,18 @@ int startControlStream(void) {
     err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
     if (err != 0) {
         stopping = 1;
+
+        if (ctlSock != INVALID_SOCKET) {
+            shutdownTcpSocket(ctlSock);
+        }
+        else {
+            ConnectionInterrupted = 1;
+        }
+
+        PltInterruptThread(&controlReceiveThread);
+        PltJoinThread(&controlReceiveThread);
+        PltCloseThread(&controlReceiveThread);
+
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
             ctlSock = INVALID_SOCKET;
@@ -724,6 +831,10 @@ int startControlStream(void) {
         PltInterruptThread(&lossStatsThread);
         PltJoinThread(&lossStatsThread);
         PltCloseThread(&lossStatsThread);
+
+        PltInterruptThread(&controlReceiveThread);
+        PltJoinThread(&controlReceiveThread);
+        PltCloseThread(&controlReceiveThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
