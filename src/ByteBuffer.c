@@ -1,8 +1,7 @@
 #include "ByteBuffer.h"
 
 void BbInitializeWrappedBuffer(PBYTE_BUFFER buff, char* data, int offset, int length, int byteOrder) {
-    buff->buffer = data;
-    buff->offset = offset;
+    buff->buffer = data + offset;
     buff->length = length;
     buff->position = 0;
     buff->byteOrder = byteOrder;
@@ -38,6 +37,16 @@ static int byteSwapShort(PBYTE_BUFFER buff, short s) {
     }
 }
 
+int BbAdvanceBuffer(PBYTE_BUFFER buff, int offset) {
+    if (buff->position + offset > buff->length) {
+        return 0;
+    }
+
+    buff->position += offset;
+
+    return 1;
+}
+
 // Get a byte from the byte buffer
 int BbGet(PBYTE_BUFFER buff, char* c) {
     if (buff->position + sizeof(*c) > buff->length) {
@@ -52,7 +61,7 @@ int BbGet(PBYTE_BUFFER buff, char* c) {
 
 // Get a short from the byte buffer
 int BbGetShort(PBYTE_BUFFER buff, short* s) {
-    if (buff->position + sizeof(*s) >= buff->length) {
+    if (buff->position + sizeof(*s) > buff->length) {
         return 0;
     }
 
