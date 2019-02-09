@@ -30,6 +30,7 @@ typedef struct _PACKET_HOLDER {
         NV_CONTROLLER_PACKET controller;
         NV_MULTI_CONTROLLER_PACKET multiController;
         NV_SCROLL_PACKET scroll;
+        NV_HAPTICS_PACKET haptics;
     } packet;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
@@ -343,6 +344,35 @@ static void inputSendThreadProc(void* context) {
     }
 }
 
+// This function tells GFE that we support haptics and it should send rumble events to us
+static int sendEnableHaptics(void) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    // Avoid sending this on earlier server versions, since they may terminate
+    // the connection upon receiving an unexpected packet.
+    if (AppVersionQuad[0] < 7 || (AppVersionQuad[0] == 7 && AppVersionQuad[1] < 1)) {
+        return 0;
+    }
+
+    holder = malloc(sizeof(*holder));
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packetLength = sizeof(NV_HAPTICS_PACKET);
+    holder->packet.haptics.header.packetType = htonl(PACKET_TYPE_HAPTICS);
+    holder->packet.haptics.magicA = H_MAGIC_A;
+    holder->packet.haptics.magicB = H_MAGIC_B;
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        free(holder);
+    }
+
+    return err;
+}
+
 // Begin the input stream
 int startInputStream(void) {
     int err;
@@ -366,6 +396,9 @@ int startInputStream(void) {
         }
         return err;
     }
+
+    // GFE will not send haptics events without this magic packet first
+    sendEnableHaptics();
 
     return err;
 }

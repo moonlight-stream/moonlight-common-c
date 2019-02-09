@@ -6,6 +6,15 @@ typedef struct _NV_INPUT_HEADER {
     int packetType;
 } NV_INPUT_HEADER, PNV_INPUT_HEADER;
 
+#define PACKET_TYPE_HAPTICS 0x06
+#define H_MAGIC_A 0x0000000D
+#define H_MAGIC_B 0x00000001
+typedef struct _NV_HAPTICS_PACKET {
+    NV_INPUT_HEADER header;
+    int magicA;
+    int magicB;
+} NV_HAPTICS_PACKET, *PNV_HAPTICS_PACKET;
+
 #define PACKET_TYPE_KEYBOARD 0x0A
 typedef struct _NV_KEYBOARD_PACKET {
     NV_INPUT_HEADER header;
