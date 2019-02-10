@@ -277,14 +277,21 @@ typedef void(*ConnListenerStageStarting)(int stage);
 // This callback is invoked to indicate that a stage of initialization has completed
 typedef void(*ConnListenerStageComplete)(int stage);
 
-// This callback is invoked to indicate that a stage of initialization has failed
+// This callback is invoked to indicate that a stage of initialization has failed.
+// ConnListenerConnectionTerminated() will not be invoked because the connection was
+// not yet fully established. LiInterruptConnection() and LiStopConnection() may
+// result in this callback being invoked, but it is not guaranteed.
 typedef void(*ConnListenerStageFailed)(int stage, long errorCode);
 
-// This callback is invoked after initialization has finished
+// This callback is invoked after the connection is successfully established
 typedef void(*ConnListenerConnectionStarted)(void);
 
-// This callback is invoked when a connection failure occurs. It will not
-// occur as a result of a call to LiStopConnection()
+// This callback is invoked when a connection is terminated after establishment.
+// The errorCode will be 0 if the termination was reported to be intentional
+// from the server (for example, the user closed the game). If errorCode is
+// non-zero, it means the termination was probably unexpected (loss of network,
+// crash, or similar conditions). This will not be invoked as a result of a call
+// to LiStopConnection() or LiInterruptConnection().
 typedef void(*ConnListenerConnectionTerminated)(long errorCode);
 
 // This callback is invoked to display a dialog-type message to the user
@@ -297,7 +304,11 @@ typedef void(*ConnListenerDisplayTransientMessage)(const char* message);
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 
-// This callback is invoked to rumble a gamepad
+// This callback is invoked to rumble a gamepad. The rumble effect values
+// set in this callback are expected to persist until a future call sets a
+// different haptic effect or turns off the motors by passing 0 for both
+// motors. It is possible to receive rumble events for gamepads that aren't
+// physically present, so your callback should handle this possibility.
 typedef void(*ConnListenerRumble)(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor);
 
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
