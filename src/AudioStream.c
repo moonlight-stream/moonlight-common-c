@@ -105,7 +105,7 @@ static void UdpPingThreadProc(void* context) {
         err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         if (err != sizeof(pingData)) {
             Limelog("Audio Ping: sendto() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
         }
 
@@ -178,7 +178,7 @@ static void ReceiveThreadProc(void* context) {
         packet->size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, useSelect);
         if (packet->size < 0) {
             Limelog("Audio Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             break;
         }
         else if (packet->size == 0) {

@@ -318,7 +318,7 @@ static void inputSendThreadProc(void* context) {
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
             if (err <= 0) {
                 Limelog("Input: send() failed: %d\n", (int) LastSocketError());
-                ListenerCallbacks.connectionTerminated(LastSocketError());
+                ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
             }
         }
@@ -337,7 +337,7 @@ static void inputSendThreadProc(void* context) {
                 (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
-                ListenerCallbacks.connectionTerminated(LastSocketError());
+                ListenerCallbacks.connectionTerminated(err);
                 return;
             }
         }

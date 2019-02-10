@@ -148,6 +148,7 @@ static void ClInternalConnectionTerminated(long errorCode)
         return;
     }
 
+    terminationCallbackErrorCode = errorCode;
     alreadyTerminated = 1;
 
     // Invoke the termination callback on a separate thread

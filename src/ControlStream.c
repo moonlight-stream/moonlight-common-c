@@ -486,7 +486,7 @@ static void lossStatsThreadFunc(void* context) {
             payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
             free(lossStatsPayload);
             Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
         }
 
@@ -520,7 +520,7 @@ static void requestIdrFrame(void) {
         if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
             payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
             Limelog("Request IDR Frame: Transaction failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
         }
     }
@@ -529,7 +529,7 @@ static void requestIdrFrame(void) {
         if (!sendMessageAndDiscardReply(packetTypes[IDX_REQUEST_IDR_FRAME],
             payloadLengths[IDX_REQUEST_IDR_FRAME], preconstructedPayloads[IDX_REQUEST_IDR_FRAME])) {
             Limelog("Request IDR Frame: Transaction failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
         }
     }
@@ -564,7 +564,7 @@ static void requestInvalidateReferenceFrames(void) {
     if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
         payloadLengths[IDX_INVALIDATE_REF_FRAMES], payload)) {
         Limelog("Request Invaldiate Reference Frames: Transaction failed: %d\n", (int)LastSocketError());
-        ListenerCallbacks.connectionTerminated(LastSocketError());
+        ListenerCallbacks.connectionTerminated(LastSocketFail());
         return;
     }
 

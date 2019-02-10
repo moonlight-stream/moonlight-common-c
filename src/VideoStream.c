@@ -51,7 +51,7 @@ static void UdpPingThreadProc(void* context) {
         err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         if (err != sizeof(pingData)) {
             Limelog("Video Ping: send() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
         }
 
@@ -96,7 +96,7 @@ static void ReceiveThreadProc(void* context) {
         err = recvUdpSocket(rtpSocket, buffer, receiveSize, useSelect);
         if (err < 0) {
             Limelog("Video Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketError());
+            ListenerCallbacks.connectionTerminated(LastSocketFail());
             break;
         }
         else if  (err == 0) {
