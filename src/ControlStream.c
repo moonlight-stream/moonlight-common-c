@@ -35,6 +35,7 @@ static int lossCountSinceLastReport;
 static long lastGoodFrame;
 static long lastSeenFrame;
 static int stopping;
+static int disconnectPending;
 
 static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
@@ -188,6 +189,7 @@ int initializeControlStream(void) {
     lastGoodFrame = 0;
     lastSeenFrame = 0;
     lossCountSinceLastReport = 0;
+    disconnectPending = 0;
 
     return 0;
 }
@@ -391,6 +393,27 @@ static int sendMessageAndDiscardReply(short ptype, short paylen, const void* pay
     return 1;
 }
 
+// This intercept function drops disconnect events to allow us to process
+// pending receives first. It works around what appears to be a bug in ENet
+// where pending disconnects can cause loss of unprocessed received data.
+static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
+    if (host->receivedDataLength == sizeof(ENetProtocolHeader) + sizeof(ENetProtocolDisconnect)) {
+        ENetProtocolHeader* protoHeader = (ENetProtocolHeader*)host->receivedData;
+        ENetProtocolDisconnect* disconnect = (ENetProtocolDisconnect*)(protoHeader + 1);
+
+        if ((disconnect->header.command & ENET_PROTOCOL_COMMAND_MASK) == ENET_PROTOCOL_COMMAND_DISCONNECT) {
+            Limelog("ENet disconnect event pending\n");
+            disconnectPending = 1;
+            if (event) {
+                event->type = ENET_EVENT_TYPE_NONE;
+            }
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static void controlReceiveThreadFunc(void* context) {
     int err;
 
@@ -407,6 +430,14 @@ static void controlReceiveThreadFunc(void* context) {
         err = serviceEnetHost(client, &event, 0);
         PltUnlockMutex(&enetMutex);
         if (err == 0) {
+            // Handle a pending disconnect after unsuccessfully polling
+            // for new events to handle.
+            if (disconnectPending) {
+                Limelog("Dispatching pending ENet disconnect\n");
+                ListenerCallbacks.connectionTerminated(-1);
+                return;
+            }
+
             // No events ready
             PltSleepMs(100);
             continue;
@@ -687,6 +718,8 @@ int startControlStream(void) {
         if (client == NULL) {
             return -1;
         }
+
+        client->intercept = ignoreDisconnectIntercept;
 
         // Connect to the host
         peer = enet_host_connect(client, &address, 1, 0);
