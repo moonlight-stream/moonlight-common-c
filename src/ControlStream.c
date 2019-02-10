@@ -297,35 +297,31 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
 static int sendMessageEnet(short ptype, short paylen, const void* payload) {
     PNVCTL_ENET_PACKET_HEADER packet;
     ENetPacket* enetPacket;
-    ENetEvent event;
     int err;
 
     LC_ASSERT(AppVersionQuad[0] >= 5);
 
-    packet = malloc(sizeof(*packet) + paylen);
-    if (packet == NULL) {
+    enetPacket = enet_packet_create(NULL, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
+    if (enetPacket == NULL) {
         return 0;
     }
 
+    packet = (PNVCTL_ENET_PACKET_HEADER)enetPacket->data;
     packet->type = ptype;
     memcpy(&packet[1], payload, paylen);
 
-    enetPacket = enet_packet_create(packet, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
-    if (enetPacket == NULL) {
-        free(packet);
-        return 0;
-    }
-
-    if (enet_peer_send(peer, 0, enetPacket) < 0) {
+    PltLockMutex(&enetMutex);
+    err = enet_peer_send(peer, 0, enetPacket);
+    PltUnlockMutex(&enetMutex);
+    if (err < 0) {
         Limelog("Failed to send ENet control packet\n");
         enet_packet_destroy(enetPacket);
-        free(packet);
         return 0;
     }
     
+    PltLockMutex(&enetMutex);
     enet_host_flush(client);
-
-    free(packet);
+    PltUnlockMutex(&enetMutex);
 
     return 1;
 }
@@ -361,9 +357,7 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
     // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
     // threads at once. We have to synchronize them with a lock.
     if (AppVersionQuad[0] >= 5) {
-        PltLockMutex(&enetMutex);
         ret = sendMessageEnet(ptype, paylen, payload);
-        PltUnlockMutex(&enetMutex);
     }
     else {
         ret = sendMessageTcp(ptype, paylen, payload);
@@ -374,14 +368,9 @@ static int sendMessageAndForget(short ptype, short paylen, const void* payload) 
 
 static int sendMessageAndDiscardReply(short ptype, short paylen, const void* payload) {
     if (AppVersionQuad[0] >= 5) {
-        PltLockMutex(&enetMutex);
-
         if (!sendMessageEnet(ptype, paylen, payload)) {
-            PltUnlockMutex(&enetMutex);
             return 0;
         }
-
-        PltUnlockMutex(&enetMutex);
     }
     else {
         PNVCTL_TCP_PACKET_HEADER reply;
