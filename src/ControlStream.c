@@ -46,6 +46,7 @@ static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 #define IDX_LOSS_STATS 3
 #define IDX_INPUT_DATA 5
 #define IDX_RUMBLE_DATA 6
+#define IDX_TERMINATION 7
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 
@@ -57,6 +58,7 @@ static const short packetTypesGen3[] = {
     0x1417, // Frame Stats (unused)
     -1,     // Input data (unused)
     -1,     // Rumble data (unused)
+    -1,     // Termination (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -66,6 +68,7 @@ static const short packetTypesGen4[] = {
     0x0611, // Frame Stats (unused)
     -1,     // Input data (unused)
     -1,     // Rumble data (unused)
+    -1,     // Termination (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -75,6 +78,7 @@ static const short packetTypesGen5[] = {
     0x0204, // Frame Stats (unused)
     0x0207, // Input data
     -1,     // Rumble data (unused)
+    -1,     // Termination (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -83,7 +87,8 @@ static const short packetTypesGen7[] = {
     0x0201, // Loss Stats
     0x0204, // Frame Stats (unused)
     0x0206, // Input data
-    0x010b, // Rumble data (unused)
+    0x010b, // Rumble data
+    0x0100, // Termination
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -447,6 +452,26 @@ static void controlReceiveThreadFunc(void* context) {
                 BbGetShort(&bb, &highFreqRumble);
 
                 ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
+            }
+            else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
+                BYTE_BUFFER bb;
+
+                BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+
+                unsigned short terminationReason;
+
+                BbGetShort(&bb, &terminationReason);
+
+                Limelog("Server notified termination reason: %04x\n", terminationReason);
+
+                // SERVER_TERMINATED_INTENDED
+                if (terminationReason == 0x0100) {
+                    // Pass error code 0 to notify the client that this was not an error
+                    ListenerCallbacks.connectionTerminated(0);
+                }
+                else {
+                    ListenerCallbacks.connectionTerminated(terminationReason);
+                }
             }
 
             enet_packet_destroy(event.packet);
