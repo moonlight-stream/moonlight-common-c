@@ -422,6 +422,8 @@ static void controlReceiveThreadFunc(void* context) {
         return;
     }
 
+    unsigned short terminationReason = -1;
+
     while (!PltIsThreadInterrupted(&controlReceiveThread)) {
         ENetEvent event;
 
@@ -433,16 +435,44 @@ static void controlReceiveThreadFunc(void* context) {
             // Handle a pending disconnect after unsuccessfully polling
             // for new events to handle.
             if (disconnectPending) {
-                Limelog("Dispatching pending ENet disconnect\n");
-                ListenerCallbacks.connectionTerminated(-1);
-                return;
+                PltLockMutex(&enetMutex);
+                // Wait 100 ms for pending receives after a disconnect and
+                // 1 second for the pending disconnect to be processed after
+                // removing the intercept callback.
+                err = serviceEnetHost(client, &event, client->intercept ? 100 : 1000);
+                if (err == 0) {
+                    if (client->intercept) {
+                        // Now that no pending receive events remain, we can
+                        // remove our intercept hook and allow the server's
+                        // disconnect to be processed as expected. We will wait
+                        // 1 second for this disconnect to be processed before
+                        // we tear down the connection anyway.
+                        client->intercept = NULL;
+                        PltUnlockMutex(&enetMutex);
+                        continue;
+                    }
+                    else {
+                        // The 1 second timeout has expired with no disconnect event
+                        // retransmission after the first notification. We can only
+                        // assume the server died tragically, so go ahead and tear down.
+                        PltUnlockMutex(&enetMutex);
+                        Limelog("Disconnect event timeout expired\n");
+                        ListenerCallbacks.connectionTerminated(-1);
+                        return;
+                    }
+                }
+                else {
+                    PltUnlockMutex(&enetMutex);
+                }
             }
-
-            // No events ready
-            PltSleepMs(100);
-            continue;
+            else {
+                // No events ready
+                PltSleepMs(100);
+                continue;
+            }
         }
-        else if (err < 0) {
+
+        if (err < 0) {
             Limelog("Control stream connection failed: %d\n", err);
             ListenerCallbacks.connectionTerminated(err);
             return;
@@ -478,27 +508,28 @@ static void controlReceiveThreadFunc(void* context) {
 
                 BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
-                unsigned short terminationReason;
-
                 BbGetShort(&bb, &terminationReason);
 
-                Limelog("Server notified termination reason: %04x\n", terminationReason);
+                Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
 
-                // SERVER_TERMINATED_INTENDED
-                if (terminationReason == 0x0100) {
-                    // Pass error code 0 to notify the client that this was not an error
-                    ListenerCallbacks.connectionTerminated(0);
-                }
-                else {
-                    ListenerCallbacks.connectionTerminated(terminationReason);
-                }
+                // We don't actually notify the connection listener until we receive
+                // the disconnect event from the server that confirms the termination.
             }
 
             enet_packet_destroy(event.packet);
         }
         else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
             Limelog("Control stream received disconnect event\n");
-            ListenerCallbacks.connectionTerminated(-1);
+
+            // SERVER_TERMINATED_INTENDED
+            if (terminationReason == 0x0100) {
+                // Pass error code 0 to notify the client that this was not an error
+                ListenerCallbacks.connectionTerminated(0);
+            }
+            else {
+                ListenerCallbacks.connectionTerminated(terminationReason);
+            }
+
             return;
         }
     }
