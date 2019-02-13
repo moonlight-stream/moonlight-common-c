@@ -422,7 +422,7 @@ static void controlReceiveThreadFunc(void* context) {
         return;
     }
 
-    unsigned short terminationReason = -1;
+    long terminationErrorCode = -1;
 
     while (!PltIsThreadInterrupted(&controlReceiveThread)) {
         ENetEvent event;
@@ -508,9 +508,21 @@ static void controlReceiveThreadFunc(void* context) {
 
                 BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
+                unsigned short terminationReason;
+
                 BbGetShort(&bb, &terminationReason);
 
                 Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
+
+                // SERVER_TERMINATED_INTENDED
+                if (terminationReason == 0x0100) {
+                    // Pass error code 0 to notify the client that this was not an error
+                    terminationErrorCode = 0;
+                }
+                else {
+                    // Otherwise pass the reason unmodified
+                    terminationErrorCode = terminationReason;
+                }
 
                 // We don't actually notify the connection listener until we receive
                 // the disconnect event from the server that confirms the termination.
@@ -520,16 +532,7 @@ static void controlReceiveThreadFunc(void* context) {
         }
         else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
             Limelog("Control stream received disconnect event\n");
-
-            // SERVER_TERMINATED_INTENDED
-            if (terminationReason == 0x0100) {
-                // Pass error code 0 to notify the client that this was not an error
-                ListenerCallbacks.connectionTerminated(0);
-            }
-            else {
-                ListenerCallbacks.connectionTerminated(terminationReason);
-            }
-
+            ListenerCallbacks.connectionTerminated(terminationErrorCode);
             return;
         }
     }
