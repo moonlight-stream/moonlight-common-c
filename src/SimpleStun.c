@@ -52,17 +52,23 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         char buf[1024];
     } resp;
 
+    err = initializePlatformSockets();
+    if (err != 0) {
+        Limelog("Failed to initialize sockets: %d\n", err);
+        return err;
+    }
+
     err = resolveHostName(stunServer, AF_INET, 0, &stunAddr, &stunAddrLen);
     if (err != 0) {
         Limelog("Failed to resolve STUN server: %d\n", err);
-        return err;
+        goto Exit;
     }
 
     sock = bindUdpSocket(AF_INET, 2048);
     if (sock == INVALID_SOCKET) {
         err = LastSocketFail();
         Limelog("Failed to connect to STUN server: %d\n", err);
-        return err;
+        goto Exit;
     }
 
     reqMsg.messageType = htons(STUN_MESSAGE_BINDING_REQUEST);
@@ -84,7 +90,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
                 err = LastSocketFail();
                 Limelog("Failed to send STUN binding request: %d\n", err);
                 closeSocket(sock);
-                return err;
+                goto Exit;
             }
         }
 
@@ -102,28 +108,33 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
     if (bytesRead == 0) {
         Limelog("No response from STUN server\n");
-        return -2;
+        err = -2;
+        goto Exit;
     }
     else if (bytesRead == SOCKET_ERROR) {
         err = LastSocketFail();
         Limelog("Failed to read STUN binding response: %d\n", err);
-        return err;
+        goto Exit;
     }
     else if (bytesRead < sizeof(resp.hdr)) {
         Limelog("STUN message truncated: %d\n", bytesRead);
-        return -3;
+        err = -3;
+        goto Exit;
     }
     else if (htonl(resp.hdr.magicCookie) != STUN_MESSAGE_COOKIE) {
         Limelog("Bad STUN cookie value: %x\n", htonl(resp.hdr.magicCookie));
-        return -3;
+        err = -3;
+        goto Exit;
     }
     else if (memcmp(reqMsg.transactionId, resp.hdr.transactionId, sizeof(reqMsg.transactionId))) {
         Limelog("STUN transaction ID mismatch\n");
-        return -3;
+        err = -3;
+        goto Exit;
     }
     else if (htons(resp.hdr.messageType) != STUN_MESSAGE_BINDING_SUCCESS) {
         Limelog("STUN message type mismatch: %x\n", htons(resp.hdr.messageType));
-        return -4;
+        err = -4;
+        goto Exit;
     }
 
     attribute = (PSTUN_ATTRIBUTE_HEADER)(&resp.hdr + 1);
@@ -131,7 +142,8 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     while (bytesRead > sizeof(*attribute)) {
         if (bytesRead < sizeof(*attribute) + htons(attribute->length)) {
             Limelog("STUN attribute out of bounds: %d\n", htons(attribute->length));
-            return -5;
+            err = -5;
+            goto Exit;
         }
         // Mask off the comprehension bit
         else if ((htons(attribute->type) & 0x7FFF) != STUN_ATTRIBUTE_XOR_MAPPED_ADDRESS) {
@@ -144,19 +156,26 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         ipv4Attrib = (PSTUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE)attribute;
         if (htons(ipv4Attrib->hdr.length) != 8) {
             Limelog("STUN address length mismatch: %d\n", htons(ipv4Attrib->hdr.length));
-            return -5;
+            err = -5;
+            goto Exit;
         }
         else if (ipv4Attrib->addressFamily != 1) {
             Limelog("STUN address family mismatch: %x\n", ipv4Attrib->addressFamily);
-            return -5;
+            err = -5;
+            goto Exit;
         }
 
         // The address is XORed with the cookie
         *wanAddr = ipv4Attrib->address ^ resp.hdr.magicCookie;
 
-        return 0;
+        err = 0;
+        goto Exit;
     }
 
     Limelog("No XOR mapped address found in STUN response!\n");
-    return -6;
+    err = -6;
+
+Exit:
+    cleanupPlatformSockets();
+    return err;
 }
