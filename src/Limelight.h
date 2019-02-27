@@ -416,7 +416,15 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function queues a vertical scroll event to the remote server.
+// The number of "clicks" is multiplied by WHEEL_DELTA (120) before
+// being sent to the PC.
 int LiSendScrollEvent(signed char scrollClicks);
+
+// This function queues a vertical scroll event to the remote server.
+// Unlike LiSendScrollEvent(), this function can send wheel events
+// smaller than 120 units for devices that support "high resolution"
+// scrolling (Apple Trackpads, Microsoft Precision Touchpads, etc.).
+int LiSendHighResScrollEvent(short scrollAmount);
 
 // This function returns a time in milliseconds with an implementation-defined epoch.
 // NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and

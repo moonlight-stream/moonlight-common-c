@@ -599,8 +599,8 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
         leftStickX, leftStickY, rightStickX, rightStickY);
 }
 
-// Send a scroll event to the streaming machine
-int LiSendScrollEvent(signed char scrollClicks) {
+// Send a high resolution scroll event to the streaming machine
+int LiSendHighResScrollEvent(short scrollAmount) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -622,7 +622,7 @@ int LiSendScrollEvent(signed char scrollClicks) {
     }
     holder->packet.scroll.zero1 = 0;
     holder->packet.scroll.zero2 = 0;
-    holder->packet.scroll.scrollAmt1 = htons(scrollClicks * 120);
+    holder->packet.scroll.scrollAmt1 = htons(scrollAmount);
     holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
     holder->packet.scroll.zero3 = 0;
 
@@ -632,4 +632,9 @@ int LiSendScrollEvent(signed char scrollClicks) {
     }
 
     return err;
+}
+
+// Send a scroll event to the streaming machine
+int LiSendScrollEvent(signed char scrollClicks) {
+    return LiSendHighResScrollEvent(scrollClicks * 120);
 }
