@@ -76,3 +76,6 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
 void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);
 int isPrivateNetworkAddress(struct sockaddr_storage* address);
+
+int initializePlatformSockets(void);
+void cleanupPlatformSockets(void);

@@ -490,27 +490,27 @@ static void controlReceiveThreadFunc(void* context) {
             if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
                 BbAdvanceBuffer(&bb, 4);
 
                 unsigned short controllerNumber;
                 unsigned short lowFreqRumble;
                 unsigned short highFreqRumble;
 
-                BbGetShort(&bb, &controllerNumber);
-                BbGetShort(&bb, &lowFreqRumble);
-                BbGetShort(&bb, &highFreqRumble);
+                BbGetShort(&bb, (short*)&controllerNumber);
+                BbGetShort(&bb, (short*)&lowFreqRumble);
+                BbGetShort(&bb, (short*)&highFreqRumble);
 
                 ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
             }
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
                 unsigned short terminationReason;
 
-                BbGetShort(&bb, &terminationReason);
+                BbGetShort(&bb, (short*)&terminationReason);
 
                 Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
 
