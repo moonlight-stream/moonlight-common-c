@@ -37,8 +37,16 @@ static long lastSeenFrame;
 static int stopping;
 static int disconnectPending;
 
+static int intervalGoodFrameCount;
+static int intervalTotalFrameCount;
+static uint64_t intervalStartTimeMs;
+static int lastConnectionStatusUpdate;
+
 static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
+
+#define CONN_POOR_LOSS_RATE 40
+#define CONN_OKAY_LOSS_RATE 5
 
 #define IDX_START_A 0
 #define IDX_REQUEST_IDR_FRAME 0
@@ -190,6 +198,10 @@ int initializeControlStream(void) {
     lastSeenFrame = 0;
     lossCountSinceLastReport = 0;
     disconnectPending = 0;
+    intervalGoodFrameCount = 0;
+    intervalTotalFrameCount = 0;
+    intervalStartTimeMs = 0;
+    lastConnectionStatusUpdate = CONN_STATUS_OKAY;
 
     return 0;
 }
@@ -257,9 +269,31 @@ void connectionDetectedFrameLoss(int startFrame, int endFrame) {
 // When we receive a frame, update the number of our current frame
 void connectionReceivedCompleteFrame(int frameIndex) {
     lastGoodFrame = frameIndex;
+    intervalGoodFrameCount++;
 }
 
 void connectionSawFrame(int frameIndex) {
+    uint64_t now = PltGetMillis();
+    if (now - intervalStartTimeMs >= 1000) {
+        if (intervalTotalFrameCount != 0) {
+            // Notify the client of connection status changes based on frame loss rate
+            int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
+            if (frameLossPercent >= CONN_POOR_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_POOR) {
+                ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_POOR);
+                lastConnectionStatusUpdate = CONN_STATUS_POOR;
+            }
+            else if (frameLossPercent <= CONN_OKAY_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_OKAY) {
+                ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_OKAY);
+                lastConnectionStatusUpdate = CONN_STATUS_OKAY;
+            }
+        }
+
+        // Reset interval
+        intervalStartTimeMs = now;
+        intervalGoodFrameCount = intervalTotalFrameCount = 0;
+    }
+
+    intervalTotalFrameCount += frameIndex - lastSeenFrame;
     lastSeenFrame = frameIndex;
 }
 

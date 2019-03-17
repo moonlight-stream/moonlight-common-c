@@ -35,6 +35,7 @@ static void fakeClConnectionStarted(void) {}
 static void fakeClConnectionTerminated(long errorCode) {}
 static void fakeClLogMessage(const char* format, ...) {}
 static void fakeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor) {}
+static void fakeClConnectionStatusUpdate(int connectionStatus) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,
@@ -44,6 +45,7 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .connectionTerminated = fakeClConnectionTerminated,
     .logMessage = fakeClLogMessage,
     .rumble = fakeClRumble,
+    .connectionStatusUpdate = fakeClConnectionStatusUpdate
 };
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
@@ -115,6 +117,9 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         }
         if ((*clCallbacks)->rumble == NULL) {
             (*clCallbacks)->rumble = fakeClRumble;
+        }
+        if ((*clCallbacks)->connectionStatusUpdate == NULL) {
+            (*clCallbacks)->connectionStatusUpdate = fakeClConnectionStatusUpdate;
         }
     }
 }

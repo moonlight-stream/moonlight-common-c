@@ -304,6 +304,13 @@ typedef void(*ConnListenerLogMessage)(const char* format, ...);
 // physically present, so your callback should handle this possibility.
 typedef void(*ConnListenerRumble)(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor);
 
+// This callback is used to notify the client of a connection status change.
+// Consider displaying an overlay for the user to notify them why their stream
+// is not performing as expected.
+#define CONN_STATUS_OKAY    0
+#define CONN_STATUS_POOR    1
+typedef void(*ConnListenerConnectionStatusUpdate)(int connectionStatus);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -314,6 +321,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     void* deprecated2; // was displayTransientMessage()
     ConnListenerLogMessage logMessage;
     ConnListenerRumble rumble;
+    ConnListenerConnectionStatusUpdate connectionStatusUpdate;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
