@@ -294,13 +294,6 @@ typedef void(*ConnListenerConnectionStarted)(void);
 // to LiStopConnection() or LiInterruptConnection().
 typedef void(*ConnListenerConnectionTerminated)(long errorCode);
 
-// This callback is invoked to display a dialog-type message to the user
-typedef void(*ConnListenerDisplayMessage)(const char* message);
-
-// This callback is invoked to display a transient message for the user
-// while streaming
-typedef void(*ConnListenerDisplayTransientMessage)(const char* message);
-
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 
@@ -317,8 +310,8 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageFailed stageFailed;
     ConnListenerConnectionStarted connectionStarted;
     ConnListenerConnectionTerminated connectionTerminated;
-    ConnListenerDisplayMessage displayMessage;
-    ConnListenerDisplayTransientMessage displayTransientMessage;
+    void* deprecated1; // was displayMessage()
+    void* deprecated2; // was displayTransientMessage()
     ConnListenerLogMessage logMessage;
     ConnListenerRumble rumble;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
