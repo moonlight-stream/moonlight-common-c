@@ -45,8 +45,9 @@ static int lastConnectionStatusUpdate;
 static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 
-#define CONN_POOR_LOSS_RATE 40
+#define CONN_POOR_LOSS_RATE 15
 #define CONN_OKAY_LOSS_RATE 5
+#define CONN_STATUS_SAMPLE_PERIOD 3000
 
 #define IDX_START_A 0
 #define IDX_REQUEST_IDR_FRAME 0
@@ -274,7 +275,7 @@ void connectionReceivedCompleteFrame(int frameIndex) {
 
 void connectionSawFrame(int frameIndex) {
     uint64_t now = PltGetMillis();
-    if (now - intervalStartTimeMs >= 1000) {
+    if (now - intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
         if (intervalTotalFrameCount != 0) {
             // Notify the client of connection status changes based on frame loss rate
             int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
