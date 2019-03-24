@@ -20,6 +20,8 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
+static int receivedDataFromPeer;
+
 // We can't request an IDR frame until the depacketizer knows
 // that a packet was lost. This timeout bounds the time that
 // the RTP queue will wait for missing/reordered packets.
@@ -30,6 +32,7 @@ static PLT_THREAD decoderThread;
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
     RtpfInitializeQueue(&rtpQueue); //TODO RTP_QUEUE_DELAY
+    receivedDataFromPeer = 0;
 }
 
 // Clean up the video stream
@@ -55,7 +58,13 @@ static void UdpPingThreadProc(void* context) {
             return;
         }
 
-        PltSleepMs(500);
+        // Send less frequently if we've received data from our peer
+        if (receivedDataFromPeer) {
+            PltSleepMs(5000);
+        }
+        else {
+            PltSleepMs(500);
+        }
     }
 }
 
@@ -103,6 +112,10 @@ static void ReceiveThreadProc(void* context) {
             // Receive timed out; try again
             continue;
         }
+
+        // We've received data, so we can stop sending our ping packets
+        // as quickly, since we're now just keeping the NAT session open.
+        receivedDataFromPeer = 1;
 
         // RTP sequence number must be in host order for the RTP queue
         packet = (PRTP_PACKET)&buffer[0];

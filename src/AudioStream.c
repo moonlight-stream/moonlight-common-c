@@ -15,6 +15,8 @@ static PLT_THREAD decoderThread;
 
 static unsigned short lastSeq;
 
+static int receivedDataFromPeer;
+
 #define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 1400
@@ -68,6 +70,7 @@ void initializeAudioStream(void) {
     }
     RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
+    receivedDataFromPeer = 0;
 }
 
 static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
@@ -100,7 +103,7 @@ static void UdpPingThreadProc(void* context) {
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     saddr.sin6_port = htons(RTP_PORT);
 
-    // Send PING every 500 milliseconds
+    // Send PING every second until we get data back then every 5 seconds after that.
     while (!PltIsThreadInterrupted(&udpPingThread)) {
         err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         if (err != sizeof(pingData)) {
@@ -109,7 +112,13 @@ static void UdpPingThreadProc(void* context) {
             return;
         }
 
-        PltSleepMs(500);
+        // Send less frequently if we've received data from our peer
+        if (receivedDataFromPeer) {
+            PltSleepMs(5000);
+        }
+        else {
+            PltSleepMs(1000);
+        }
     }
 }
 
@@ -200,6 +209,10 @@ static void ReceiveThreadProc(void* context) {
             // Not audio
             continue;
         }
+
+        // We've received data, so we can stop sending our ping packets
+        // as quickly, since we're now just keeping the NAT session open.
+        receivedDataFromPeer = 1;
 
         // GFE accumulates audio samples before we are ready to receive them,
         // so we will drop the first 100 packets to avoid accumulating latency
