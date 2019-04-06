@@ -40,12 +40,14 @@ static int disconnectPending;
 static int intervalGoodFrameCount;
 static int intervalTotalFrameCount;
 static uint64_t intervalStartTimeMs;
+static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
 
 static int idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 
-#define CONN_POOR_LOSS_RATE 15
+#define CONN_IMMEDIATE_POOR_LOSS_RATE 30
+#define CONN_CONSECUTIVE_POOR_LOSS_RATE 15
 #define CONN_OKAY_LOSS_RATE 5
 #define CONN_STATUS_SAMPLE_PERIOD 3000
 
@@ -202,6 +204,7 @@ int initializeControlStream(void) {
     intervalGoodFrameCount = 0;
     intervalTotalFrameCount = 0;
     intervalStartTimeMs = 0;
+    lastIntervalLossPercentage = 0;
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
 
     return 0;
@@ -279,7 +282,11 @@ void connectionSawFrame(int frameIndex) {
         if (intervalTotalFrameCount != 0) {
             // Notify the client of connection status changes based on frame loss rate
             int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
-            if (frameLossPercent >= CONN_POOR_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_POOR) {
+            if (lastConnectionStatusUpdate != CONN_STATUS_POOR &&
+                    (frameLossPercent >= CONN_IMMEDIATE_POOR_LOSS_RATE ||
+                     (frameLossPercent >= CONN_CONSECUTIVE_POOR_LOSS_RATE && lastIntervalLossPercentage >= CONN_CONSECUTIVE_POOR_LOSS_RATE))) {
+                // We require 2 consecutive intervals above CONN_CONSECUTIVE_POOR_LOSS_RATE or a single
+                // interval above CONN_IMMEDIATE_POOR_LOSS_RATE to notify of a poor connection.
                 ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_POOR);
                 lastConnectionStatusUpdate = CONN_STATUS_POOR;
             }
@@ -287,6 +294,8 @@ void connectionSawFrame(int frameIndex) {
                 ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_OKAY);
                 lastConnectionStatusUpdate = CONN_STATUS_OKAY;
             }
+
+            lastIntervalLossPercentage = frameLossPercent;
         }
 
         // Reset interval
