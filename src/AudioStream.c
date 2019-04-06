@@ -114,10 +114,10 @@ static void UdpPingThreadProc(void* context) {
 
         // Send less frequently if we've received data from our peer
         if (receivedDataFromPeer) {
-            PltSleepMs(5000);
+            PltSleepMsInterruptible(&udpPingThread, 5000);
         }
         else {
-            PltSleepMs(1000);
+            PltSleepMsInterruptible(&udpPingThread, 1000);
         }
     }
 }

@@ -63,3 +63,4 @@ void PltRunThreadProc(void);
 #define PLT_WAIT_INTERRUPTED 1
 
 void PltSleepMs(int ms);
+void PltSleepMsInterruptible(PLT_THREAD* thread, int ms);

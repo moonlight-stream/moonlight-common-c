@@ -511,7 +511,7 @@ static void controlReceiveThreadFunc(void* context) {
             }
             else {
                 // No events ready
-                PltSleepMs(100);
+                PltSleepMsInterruptible(&controlReceiveThread, 100);
                 continue;
             }
         }
@@ -617,7 +617,7 @@ static void lossStatsThreadFunc(void* context) {
         lossCountSinceLastReport = 0;
 
         // Wait a bit
-        PltSleepMs(LOSS_REPORT_INTERVAL_MS);
+        PltSleepMsInterruptible(&lossStatsThread, LOSS_REPORT_INTERVAL_MS);
     }
 
     free(lossStatsPayload);

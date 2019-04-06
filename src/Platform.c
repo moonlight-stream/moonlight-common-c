@@ -3,6 +3,10 @@
 
 #include <enet/enet.h>
 
+// The maximum amount of time before observing an interrupt
+// in PltSleepMsInterruptible().
+#define INTERRUPT_PERIOD_MS 50
+
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
 
@@ -53,6 +57,14 @@ void PltSleepMs(int ms) {
     useconds_t usecs = ms * 1000;
     usleep(usecs);
 #endif
+}
+
+void PltSleepMsInterruptible(PLT_THREAD* thread, int ms) {
+    while (ms > 0 && !PltIsThreadInterrupted(thread)) {
+        int msToSleep = ms < INTERRUPT_PERIOD_MS ? ms : INTERRUPT_PERIOD_MS;
+        PltSleepMs(msToSleep);
+        ms -= msToSleep;
+    }
 }
 
 int PltCreateMutex(PLT_MUTEX* mutex) {
