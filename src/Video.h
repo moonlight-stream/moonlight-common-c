@@ -5,6 +5,7 @@
 typedef struct _QUEUED_DECODE_UNIT {
     DECODE_UNIT decodeUnit;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
+    int onStack;
 } QUEUED_DECODE_UNIT, *PQUEUED_DECODE_UNIT;
 
 void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus);

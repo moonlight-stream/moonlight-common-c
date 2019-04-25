@@ -126,8 +126,8 @@ static void ReceiveThreadProc(void* context) {
             // The packet queue now has packets ready
             buffer = NULL;
             while ((queueEntry = RtpfGetQueuedPacket(&rtpQueue)) != NULL) {
+                // queueRtpPacket takes ownership of the packet
                 queueRtpPacket(queueEntry);
-                free(queueEntry->packet);
             }
         }
         else if (queueStatus == RTPF_RET_QUEUED_NOTHING_READY) {
