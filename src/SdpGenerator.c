@@ -11,8 +11,6 @@
 #define CHANNEL_MASK_STEREO 0x3
 #define CHANNEL_MASK_51_SURROUND 0xFC
 
-#define HIGH_BITRATE_THRESHOLD 15000
-
 typedef struct _SDP_OPTION {
     char name[MAX_OPTION_NAME_LEN + 1];
     void* payload;
@@ -362,7 +360,8 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
         if (AppVersionQuad[0] >= 7) {
             // Decide to use HQ audio based on the original video bitrate, not the HEVC-adjusted value
-            if (OriginalVideoBitrate >= HIGH_BITRATE_THRESHOLD && audioChannelCount > 2) {
+            if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD && audioChannelCount > 2 &&
+                    (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
                 // Enable high quality mode for surround sound
                 err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "1");
 

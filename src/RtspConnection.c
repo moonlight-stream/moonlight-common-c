@@ -430,9 +430,20 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
 int performRtspHandshake(void) {
     int ret;
 
+    // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
+    // fake our target address so it doesn't match any of the PC's local interfaces. It seems
+    // that the only way to get it to give you "low quality" stereo audio nowadays is if it
+    // thinks you are remote (target address != any local address).
+    if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
+            (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
+        addrToUrlSafeString(&RemoteAddr, urlAddr);
+    }
+    else {
+        strcpy(urlAddr, "0.0.0.0");
+    }
+
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
-    addrToUrlSafeString(&RemoteAddr, urlAddr);
     sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
     hasSessionId = 0;

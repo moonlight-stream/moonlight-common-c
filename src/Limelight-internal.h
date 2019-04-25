@@ -37,6 +37,10 @@ extern int OriginalVideoBitrate;
 
 #define UDP_RECV_POLL_TIMEOUT_MS 100
 
+// At this value, we will request high quality audio unless CAPABILITY_SLOW_OPUS_DECODER
+// is set on the audio renderer.
+#define HIGH_AUDIO_BITRATE_THRESHOLD 15000
+
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
 int isReferenceFrameInvalidationEnabled(void);
