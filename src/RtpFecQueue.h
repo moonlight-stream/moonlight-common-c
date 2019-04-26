@@ -13,10 +13,6 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
 } RTPFEC_QUEUE_ENTRY, *PRTPFEC_QUEUE_ENTRY;
 
 typedef struct _RTP_FEC_QUEUE {
-    PRTPFEC_QUEUE_ENTRY queueHead;
-    PRTPFEC_QUEUE_ENTRY queueTail;
-    int queueSize;
-
     PRTPFEC_QUEUE_ENTRY bufferHead;
     PRTPFEC_QUEUE_ENTRY bufferTail;
     int bufferSize;
@@ -27,15 +23,15 @@ typedef struct _RTP_FEC_QUEUE {
     int bufferParityPackets;
     int receivedBufferDataPackets;
     int fecPercentage;
+    int nextContiguousSequenceNumber;
 
     int currentFrameNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
 
-#define RTPF_RET_QUEUED_NOTHING_READY 0
-#define RTPF_RET_QUEUED_PACKETS_READY 1
-#define RTPF_RET_REJECTED             2
+#define RTPF_RET_QUEUED    0
+#define RTPF_RET_REJECTED  1
 
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue);
 void RtpfCleanupQueue(PRTP_FEC_QUEUE queue);
 int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry);
-PRTPFEC_QUEUE_ENTRY RtpfGetQueuedPacket(PRTP_FEC_QUEUE queue);
+void RtpfSubmitQueuedPackets(PRTP_FEC_QUEUE queue);

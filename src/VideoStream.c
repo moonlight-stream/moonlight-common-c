@@ -122,15 +122,8 @@ static void ReceiveThreadProc(void* context) {
         packet->sequenceNumber = htons(packet->sequenceNumber);
 
         queueStatus = RtpfAddPacket(&rtpQueue, packet, err, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize]);
-        if (queueStatus == RTPF_RET_QUEUED_PACKETS_READY) {
-            // The packet queue now has packets ready
-            buffer = NULL;
-            while ((queueEntry = RtpfGetQueuedPacket(&rtpQueue)) != NULL) {
-                // queueRtpPacket takes ownership of the packet
-                queueRtpPacket(queueEntry);
-            }
-        }
-        else if (queueStatus == RTPF_RET_QUEUED_NOTHING_READY) {
+
+        if (queueStatus == RTPF_RET_QUEUED) {
             // The queue owns the buffer
             buffer = NULL;
         }
