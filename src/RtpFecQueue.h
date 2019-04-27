@@ -15,6 +15,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
 typedef struct _RTP_FEC_QUEUE {
     PRTPFEC_QUEUE_ENTRY bufferHead;
     PRTPFEC_QUEUE_ENTRY bufferTail;
+    unsigned long long bufferFirstRecvTimeMs;
     int bufferSize;
     int bufferLowestSequenceNumber;
     int bufferHighestSequenceNumber;

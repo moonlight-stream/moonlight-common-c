@@ -669,6 +669,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry) {
     int dataOffset;
 
+    LC_ASSERT(!queueEntry->isParity);
+    LC_ASSERT(queueEntry->receiveTimeMs != 0);
+
     dataOffset = sizeof(*queueEntry->packet);
     if (queueEntry->packet->header & FLAG_EXTENSION) {
         dataOffset += 4; // 2 additional fields

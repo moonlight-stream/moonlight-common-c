@@ -44,7 +44,6 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     newEntry->packet = packet;
     newEntry->length = length;
     newEntry->isParity = isParity;
-    newEntry->receiveTimeMs = PltGetMillis();
     newEntry->prev = NULL;
     newEntry->next = NULL;
 
@@ -266,6 +265,13 @@ static void submitCompletedFrame(PRTP_FEC_QUEUE queue) {
                 removeEntry(queue, entry);
                 entry->prev = entry->next = NULL;
 
+                // To avoid having to sample the system time for each packet, we cheat
+                // and use the first packet's receive time for all packets. This ends up
+                // actually being better for the measurements that the depacketizer does,
+                // since it properly handles out of order packets.
+                LC_ASSERT(queue->bufferFirstRecvTimeMs != 0);
+                entry->receiveTimeMs = queue->bufferFirstRecvTimeMs;
+
                 // Submit this packet for decoding. It will own freeing the entry now.
                 queueRtpPacket(entry);
                 break;
@@ -331,6 +337,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         queue->bufferTail = NULL;
         queue->bufferSize = 0;
         
+        queue->bufferFirstRecvTimeMs = PltGetMillis();
         queue->bufferLowestSequenceNumber = U16(packet->sequenceNumber - fecIndex);
         queue->nextContiguousSequenceNumber = queue->bufferLowestSequenceNumber;
         queue->receivedBufferDataPackets = 0;
