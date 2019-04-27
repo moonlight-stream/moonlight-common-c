@@ -679,6 +679,7 @@ void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry) {
 
     // Reuse the memory reserved for the RTPFEC_QUEUE_ENTRY to store the LENTRY_INTERNAL
     // now that we're in the depacketizer.
+    LC_ASSERT(sizeof(LENTRY_INTERNAL) <= sizeof(RTPFEC_QUEUE_ENTRY));
     PLENTRY_INTERNAL existingEntry = (PLENTRY_INTERNAL)queueEntry;
     existingEntry->allocPtr = queueEntry->packet;
 
