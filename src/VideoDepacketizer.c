@@ -666,26 +666,28 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
 }
 
 // Add an RTP Packet to the queue
-void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry) {
+void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntryPtr) {
     int dataOffset;
+    RTPFEC_QUEUE_ENTRY queueEntry = *queueEntryPtr;
 
-    LC_ASSERT(!queueEntry->isParity);
-    LC_ASSERT(queueEntry->receiveTimeMs != 0);
+    LC_ASSERT(!queueEntry.isParity);
+    LC_ASSERT(queueEntry.receiveTimeMs != 0);
 
-    dataOffset = sizeof(*queueEntry->packet);
-    if (queueEntry->packet->header & FLAG_EXTENSION) {
+    dataOffset = sizeof(*queueEntry.packet);
+    if (queueEntry.packet->header & FLAG_EXTENSION) {
         dataOffset += 4; // 2 additional fields
     }
 
     // Reuse the memory reserved for the RTPFEC_QUEUE_ENTRY to store the LENTRY_INTERNAL
-    // now that we're in the depacketizer.
+    // now that we're in the depacketizer. We saved a copy of the real FEC queue entry
+    // on the stack here so we can safely modify this memory in place.
     LC_ASSERT(sizeof(LENTRY_INTERNAL) <= sizeof(RTPFEC_QUEUE_ENTRY));
-    PLENTRY_INTERNAL existingEntry = (PLENTRY_INTERNAL)queueEntry;
-    existingEntry->allocPtr = queueEntry->packet;
+    PLENTRY_INTERNAL existingEntry = (PLENTRY_INTERNAL)queueEntryPtr;
+    existingEntry->allocPtr = queueEntry.packet;
 
-    processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry->packet) + dataOffset),
-                      queueEntry->length - dataOffset,
-                      queueEntry->receiveTimeMs,
+    processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry.packet) + dataOffset),
+                      queueEntry.length - dataOffset,
+                      queueEntry.receiveTimeMs,
                       &existingEntry);
 
     if (existingEntry != NULL) {
