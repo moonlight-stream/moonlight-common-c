@@ -15,6 +15,7 @@ void cleanupPlatformSockets(void);
 struct thread_context {
     ThreadEntry entry;
     void* context;
+    const char* name;
 #if defined(__vita__)
     PLT_THREAD* thread;
 #endif
@@ -25,6 +26,54 @@ static int activeMutexes = 0;
 static int activeEvents = 0;
 
 #if defined(LC_WINDOWS)
+
+#pragma pack(push, 8)
+typedef struct tagTHREADNAME_INFO
+{
+    DWORD dwType; // Must be 0x1000.
+    LPCSTR szName; // Pointer to name (in user addr space).
+    DWORD dwThreadID; // Thread ID (-1=caller thread).
+    DWORD dwFlags; // Reserved for future use, must be zero.
+} THREADNAME_INFO;
+#pragma pack(pop)
+
+typedef HRESULT (WINAPI *SetThreadDescription_t)(HANDLE, PCWSTR);
+
+void setThreadNameWin32(const char* name) {
+    HMODULE hKernel32;
+    SetThreadDescription_t setThreadDescriptionFunc;
+
+    // This function is only supported on Windows 10 RS1 and later
+    hKernel32 = LoadLibraryA("kernel32.dll");
+    setThreadDescriptionFunc = (SetThreadDescription_t)GetProcAddress(hKernel32, "SetThreadDescription");
+    if (setThreadDescriptionFunc != NULL) {
+        WCHAR nameW[16];
+        size_t chars;
+
+        mbstowcs_s(&chars, nameW, ARRAYSIZE(nameW), name, _TRUNCATE);
+        setThreadDescriptionFunc(GetCurrentThread(), nameW);
+    }
+    FreeLibrary(hKernel32);
+
+#ifdef _MSC_VER
+    // This method works on legacy OSes and older tools not updated to use SetThreadDescription yet,
+    // but it's only safe on MSVC with SEH
+    if (IsDebuggerPresent()) {
+        THREADNAME_INFO info;
+        info.dwType = 0x1000;
+        info.szName = name;
+        info.dwThreadID = (DWORD)-1;
+        info.dwFlags = 0;
+        __try {
+            RaiseException(0x406D1388, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            // Nothing
+        }
+    }
+#endif
+}
+
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     struct thread_context* ctx = (struct thread_context*)lpParameter;
 #elif defined(__vita__)
@@ -33,6 +82,12 @@ int ThreadProc(SceSize args, void *argp) {
 #else
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
+#endif
+
+#if defined(LC_WINDOWS)
+    setThreadNameWin32(ctx->name);
+#elif defined(__linux__)
+    pthread_setname_np(pthread_self(), ctx->name);
 #endif
 
     ctx->entry(ctx->context);
@@ -167,6 +222,7 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
 
     ctx->entry = entry;
     ctx->context = context;
+    ctx->name = name;
     
     thread->cancelled = 0;
 
@@ -197,10 +253,6 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
             free(ctx);
             return err;
         }
-
-#ifdef __linux__
-        pthread_setname_np(thread->thread, name);
-#endif
     }
 #endif
 
