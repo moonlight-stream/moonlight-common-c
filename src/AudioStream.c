@@ -161,7 +161,7 @@ static void ReceiveThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
     int useSelect;
-    int packetsToDrop = 100;
+    int packetsToDrop = 500 / AudioPacketDuration;
 
     packet = NULL;
 
@@ -321,17 +321,17 @@ void stopAudioStream(void) {
 
 int startAudioStream(void* audioContext, int arFlags) {
     int err;
-    POPUS_MULTISTREAM_CONFIGURATION chosenConfig;
+    OPUS_MULTISTREAM_CONFIGURATION chosenConfig;
 
     if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_STEREO) {
-        chosenConfig = &opusStereoConfig;
+        chosenConfig = opusStereoConfig;
     }
     else if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
         if (HighQualitySurroundEnabled) {
-            chosenConfig = &opus51HighSurroundConfig;
+            chosenConfig = opus51HighSurroundConfig;
         }
         else {
-            chosenConfig = &opus51SurroundConfig;
+            chosenConfig = opus51SurroundConfig;
         }
     }
     else {
@@ -339,7 +339,9 @@ int startAudioStream(void* audioContext, int arFlags) {
         return -1;
     }
 
-    err = AudioCallbacks.init(StreamConfig.audioConfiguration, chosenConfig, audioContext, arFlags);
+    chosenConfig.samplesPerFrame = 48 * AudioPacketDuration;
+
+    err = AudioCallbacks.init(StreamConfig.audioConfiguration, &chosenConfig, audioContext, arFlags);
     if (err != 0) {
         return err;
     }

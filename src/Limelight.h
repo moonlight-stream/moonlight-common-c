@@ -228,6 +228,7 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
     int channelCount;
     int streams;
     int coupledStreams;
+    int samplesPerFrame;
     unsigned char mapping[6];
 } OPUS_MULTISTREAM_CONFIGURATION, *POPUS_MULTISTREAM_CONFIGURATION;
 

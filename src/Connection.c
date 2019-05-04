@@ -20,6 +20,7 @@ int NegotiatedVideoFormat;
 volatile int ConnectionInterrupted;
 int HighQualitySurroundEnabled;
 int OriginalVideoBitrate;
+int AudioPacketDuration;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {

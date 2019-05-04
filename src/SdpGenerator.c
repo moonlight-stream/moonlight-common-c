@@ -368,11 +368,30 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                 // Let the audio stream code know that it needs to disable coupled streams when
                 // decoding this audio stream.
                 HighQualitySurroundEnabled = 1;
+
+                // Use 5 ms frames since we don't have a slow decoder
+                AudioPacketDuration = 5;
             }
             else {
                 err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "0");
                 HighQualitySurroundEnabled = 0;
+
+                if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
+                    // Use 5 ms packets by default for lowest latency
+                    AudioPacketDuration = 5;
+                }
+                else {
+                    // Use 20 ms packets for slow decoders to save CPU and bandwidth
+                    AudioPacketDuration = 20;
+                }
             }
+
+            sprintf(payloadStr, "%d", AudioPacketDuration);
+            err |= addAttributeString(&optionHead, "x-nv-aqos.packetDuration", payloadStr);
+        }
+        else {
+            // 5 ms duration for legacy servers
+            AudioPacketDuration = 5;
         }
     }
 

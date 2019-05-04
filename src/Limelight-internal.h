@@ -22,6 +22,7 @@ extern int NegotiatedVideoFormat;
 extern volatile int ConnectionInterrupted;
 extern int HighQualitySurroundEnabled;
 extern int OriginalVideoBitrate;
+extern int AudioPacketDuration;
 
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
