@@ -222,7 +222,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     VideoCallbacks.start();
 
-    err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
+    err = PltCreateThread("VideoRecv", ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         VideoCallbacks.stop();
         closeSocket(rtpSocket);
@@ -231,7 +231,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
     }
 
     if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
+        err = PltCreateThread("VideoDec", DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             VideoCallbacks.stop();
             PltInterruptThread(&receiveThread);
@@ -270,7 +270,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     // Start pinging before reading the first frame so GFE knows where
     // to send UDP data
-    err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
+    err = PltCreateThread("VideoPing", UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         VideoCallbacks.stop();
         stopVideoDepacketizer();

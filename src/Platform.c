@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "PlatformThreads.h"
 #include "Platform.h"
 
@@ -155,7 +157,7 @@ void PltInterruptThread(PLT_THREAD* thread) {
     thread->cancelled = 1;
 }
 
-int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
+int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THREAD* thread) {
     struct thread_context* ctx;
 
     ctx = (struct thread_context*)malloc(sizeof(*ctx));
@@ -181,7 +183,7 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
         thread->alive = 1;
         thread->context = ctx;
         ctx->thread = thread;
-        thread->handle = sceKernelCreateThread("", ThreadProc, 0, 0x40000, 0, 0, NULL);
+        thread->handle = sceKernelCreateThread(name, ThreadProc, 0, 0x40000, 0, 0, NULL);
         if (thread->handle < 0) {
             free(ctx);
             return -1;
@@ -195,6 +197,10 @@ int PltCreateThread(ThreadEntry entry, void* context, PLT_THREAD* thread) {
             free(ctx);
             return err;
         }
+
+#ifdef __linux__
+        pthread_setname_np(thread->thread, name);
+#endif
     }
 #endif
 

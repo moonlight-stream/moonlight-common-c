@@ -834,7 +834,7 @@ int startControlStream(void) {
         enableNoDelay(ctlSock);
     }
 
-    err = PltCreateThread(controlReceiveThreadFunc, NULL, &controlReceiveThread);
+    err = PltCreateThread("ControlRecv", controlReceiveThreadFunc, NULL, &controlReceiveThread);
     if (err != 0) {
         stopping = 1;
         if (ctlSock != INVALID_SOCKET) {
@@ -914,7 +914,7 @@ int startControlStream(void) {
         return err;
     }
 
-    err = PltCreateThread(lossStatsThreadFunc, NULL, &lossStatsThread);
+    err = PltCreateThread("LossStats", lossStatsThreadFunc, NULL, &lossStatsThread);
     if (err != 0) {
         stopping = 1;
 
@@ -942,7 +942,7 @@ int startControlStream(void) {
         return err;
     }
 
-    err = PltCreateThread(invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
+    err = PltCreateThread("InvRefFrames", invalidateRefFramesFunc, NULL, &invalidateRefFramesThread);
     if (err != 0) {
         stopping = 1;
 

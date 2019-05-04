@@ -388,7 +388,7 @@ int startInputStream(void) {
         enableNoDelay(inputSock);
     }
 
-    err = PltCreateThread(inputSendThreadProc, NULL, &inputSendThread);
+    err = PltCreateThread("InputSend", inputSendThreadProc, NULL, &inputSendThread);
     if (err != 0) {
         if (inputSock != INVALID_SOCKET) {
             closeSocket(inputSock);

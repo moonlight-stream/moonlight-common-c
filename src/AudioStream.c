@@ -353,7 +353,7 @@ int startAudioStream(void* audioContext, int arFlags) {
 
     AudioCallbacks.start();
 
-    err = PltCreateThread(ReceiveThreadProc, NULL, &receiveThread);
+    err = PltCreateThread("AudioRecv", ReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         AudioCallbacks.stop();
         closeSocket(rtpSocket);
@@ -362,7 +362,7 @@ int startAudioStream(void* audioContext, int arFlags) {
     }
 
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        err = PltCreateThread(DecoderThreadProc, NULL, &decoderThread);
+        err = PltCreateThread("AudioDec", DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             AudioCallbacks.stop();
             PltInterruptThread(&receiveThread);
@@ -378,7 +378,7 @@ int startAudioStream(void* audioContext, int arFlags) {
     // until everything else is started. Otherwise we could accumulate a
     // bunch of audio packets in the socket receive buffer while our audio
     // backend is starting up and create audio latency.
-    err = PltCreateThread(UdpPingThreadProc, NULL, &udpPingThread);
+    err = PltCreateThread("AudioPing", UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         AudioCallbacks.stop();
         PltInterruptThread(&receiveThread);
