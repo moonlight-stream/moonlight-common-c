@@ -38,9 +38,7 @@ typedef struct _LENTRY_INTERNAL {
 
 // Init
 void initializeVideoDepacketizer(int pktSize) {
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
-    }
+    LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 
     nextFrameNumber = 1;
     startFrameNumber = 0;
@@ -116,17 +114,12 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 }
 
 void stopVideoDepacketizer(void) {
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        LbqSignalQueueShutdown(&decodeUnitQueue);
-    }
+    LbqSignalQueueShutdown(&decodeUnitQueue);
 }
 
 // Cleanup video depacketizer and free malloced memory
 void destroyVideoDepacketizer(void) {
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
-    }
-
+    freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
     cleanupFrameState();
 }
 
@@ -486,9 +479,7 @@ void requestDecoderRefresh(void) {
     waitingForIdrFrame = 1;
     
     // Flush the decode unit queue
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
-    }
+    freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
     
     // Request the receive thread drop its state
     // on the next call. We can't do it here because
@@ -694,4 +685,8 @@ void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntryPtr) {
         // processRtpPayload didn't want this packet, so just free it
         free(existingEntry->allocPtr);
     }
+}
+
+int LiGetPendingVideoFrames(void) {
+    return LbqGetItemCount(&decodeUnitQueue);
 }

@@ -33,3 +33,4 @@ int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead);
 void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead);
+int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead);

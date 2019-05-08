@@ -56,6 +56,10 @@ void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead) {
     PltSetEvent(&queueHead->containsDataEvent);
 }
 
+int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead) {
+    return queueHead->currentSize;
+}
+
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     if (queueHead->shutdown) {
         return LBQ_INTERRUPTED;

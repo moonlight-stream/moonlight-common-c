@@ -65,9 +65,7 @@ typedef struct _QUEUED_AUDIO_PACKET {
 
 // Initialize the audio stream
 void initializeAudioStream(void) {
-    if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
-    }
+    LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
     RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
     receivedDataFromPeer = 0;
@@ -88,9 +86,7 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 
 // Tear down the audio stream once we're done with it
 void destroyAudioStream(void) {
-    if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
-    }
+    freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
     RtpqCleanupQueue(&rtpReorderQueue);
 }
 
@@ -403,4 +399,8 @@ int startAudioStream(void* audioContext, int arFlags) {
     }
 
     return 0;
+}
+
+int LiGetPendingAudioFrames(void) {
+    return LbqGetItemCount(&packetQueue);
 }
