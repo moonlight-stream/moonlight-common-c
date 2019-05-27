@@ -574,17 +574,32 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
-    if (firstPacket){
+    if (firstPacket) {
         if ((AppVersionQuad[0] > 7) ||
             (AppVersionQuad[0] == 7 && AppVersionQuad[1] > 1) ||
-            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 350)) {
-            // >= 7.1.350 should use the 8 byte header again
+            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 415)) {
+            // >= 7.1.415
+            // The first IDR frame now has smaller headers than the rest. We seem to be able to tell
+            // them apart by looking at the first byte. It will be 0x81 for the long header and 0x01
+            // for the short header.
+            // TODO: This algorithm seems to actually work on GFE 3.18 (first byte always 0x01), so
+            // maybe we could unify this codepath in the future.
+            if (currentPos.data[0] == 0x01) {
+                currentPos.offset += 8;
+                currentPos.length -= 8;
+            }
+            else {
+                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                currentPos.offset += 24;
+                currentPos.length -= 24;
+            }
+        }
+        else if (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 350) {
+            // [7.1.350, 7.1.415) should use the 8 byte header again
             currentPos.offset += 8;
             currentPos.length -= 8;
         }
-        else if ((AppVersionQuad[0] > 7) ||
-            (AppVersionQuad[0] == 7 && AppVersionQuad[1] > 1) ||
-            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 320)) {
+        else if (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 320) {
             // [7.1.320, 7.1.350) should use the 12 byte frame header
             currentPos.offset += 12;
             currentPos.length -= 12;
@@ -597,6 +612,12 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
         else {
             // Other versions don't have a frame header at all
         }
+
+        // Assert that the frame start NALU prefix is next
+        LC_ASSERT(currentPos.data[currentPos.offset + 0] == 0);
+        LC_ASSERT(currentPos.data[currentPos.offset + 1] == 0);
+        LC_ASSERT(currentPos.data[currentPos.offset + 2] == 0);
+        LC_ASSERT(currentPos.data[currentPos.offset + 3] == 1);
     }
 
     if (firstPacket && isIdrFrameStart(&currentPos))
