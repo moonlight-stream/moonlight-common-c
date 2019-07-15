@@ -348,29 +348,68 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
 #endif
 }
 
+#ifndef __vita__
+int isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
+    int i;
+    
+    for (i = 0; i < prefixLength; i++) {
+        unsigned char mask = 1 << (i % 8);
+        if ((sin6->sin6_addr.s6_addr[i / 8] & mask) != (subnet[i / 8] & mask)) {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+#endif
+
 int isPrivateNetworkAddress(struct sockaddr_storage* address) {
-    unsigned int addr;
 
     // We only count IPv4 addresses as possibly private for now
-    if (address->ss_family != AF_INET) {
-        return 0;
-    }
+    if (address->ss_family == AF_INET) {
+        unsigned int addr;
 
-    memcpy(&addr, &((struct sockaddr_in*)address)->sin_addr, sizeof(addr));
-    addr = htonl(addr);
+        memcpy(&addr, &((struct sockaddr_in*)address)->sin_addr, sizeof(addr));
+        addr = htonl(addr);
+        
+        // 10.0.0.0/8
+        if ((addr & 0xFF000000) == 0x0A000000) {
+            return 1;
+        }
+        // 172.16.0.0/12
+        else if ((addr & 0xFFF00000) == 0xAC100000) {
+            return 1;
+        }
+        // 192.168.0.0/16
+        else if ((addr & 0xFFFF0000) == 0xC0A80000) {
+            return 1;
+        }
+        // 169.254.0.0/16
+        else if ((addr & 0xFFFF0000) == 0xA9FE0000) {
+            return 1;
+        }
+    }
+#ifndef __vita__
+    else if (address->ss_family == AF_INET6) {
+        struct sockaddr_in6* sin6 = (struct sockaddr_in6*)address;
+        static unsigned char linkLocalPrefix[] = {0xfe, 0x80};
+        static unsigned char siteLocalPrefix[] = {0xfe, 0xc0};
+        static unsigned char uniqueLocalPrefix[] = {0xfc, 0x00};
 
-    // 10.0.0.0/8
-    if ((addr & 0xFF000000) == 0x0A000000) {
-        return 1;
+        // fe80::/10
+        if (isInSubnetV6(sin6, linkLocalPrefix, 10)) {
+            return 1;
+        }
+        // fec0::/10
+        else if (isInSubnetV6(sin6, siteLocalPrefix, 10)) {
+            return 1;
+        }
+        // fc00::/7
+        else if (isInSubnetV6(sin6, uniqueLocalPrefix, 7)) {
+            return 1;
+        }
     }
-    // 172.16.0.0/12
-    else if ((addr & 0xFFF00000) == 0xAC100000) {
-        return 1;
-    }
-    // 192.168.0.0/16
-    else if ((addr & 0xFFFF0000) == 0xC0A80000) {
-        return 1;
-    }
+#endif
 
     return 0;
 }
