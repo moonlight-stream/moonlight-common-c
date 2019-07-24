@@ -501,7 +501,7 @@ static void controlReceiveThreadFunc(void* context) {
                         // assume the server died tragically, so go ahead and tear down.
                         PltUnlockMutex(&enetMutex);
                         Limelog("Disconnect event timeout expired\n");
-                        ListenerCallbacks.connectionTerminated(-1);
+                        ListenerCallbacks.connectionTerminated(terminationErrorCode);
                         return;
                     }
                 }
