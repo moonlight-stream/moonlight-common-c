@@ -566,6 +566,15 @@ int performRtspHandshake(void) {
             NegotiatedVideoFormat = VIDEO_FORMAT_H264;
         }
 
+        // Check if high bitrate surround sound is available before attempting to request it.
+        // TODO: Parse these surround-params so we can get rid of our hardcoded Opus mappings
+        if (strstr(response.payload, "surround-params=660")) {
+            HighQualitySurroundSupported = 1;
+        }
+        else {
+            HighQualitySurroundSupported = 0;
+        }
+
         freeMessage(&response);
     }
 

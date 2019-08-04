@@ -319,11 +319,13 @@ int startAudioStream(void* audioContext, int arFlags) {
     int err;
     OPUS_MULTISTREAM_CONFIGURATION chosenConfig;
 
+    // TODO: Get these from RTSP ANNOUNCE surround-params
     if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_STEREO) {
         chosenConfig = opusStereoConfig;
     }
     else if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
         if (HighQualitySurroundEnabled) {
+            LC_ASSERT(HighQualitySurroundSupported);
             chosenConfig = opus51HighSurroundConfig;
         }
         else {

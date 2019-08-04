@@ -362,7 +362,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     if (AppVersionQuad[0] >= 7) {
         // Decide to use HQ audio based on the original video bitrate, not the HEVC-adjusted value
         if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD && audioChannelCount > 2 &&
-                (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
+                HighQualitySurroundSupported && (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
             // Enable high quality mode for surround sound
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "1");
 

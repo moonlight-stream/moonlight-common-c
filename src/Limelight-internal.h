@@ -20,6 +20,7 @@ extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
 extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
 extern volatile int ConnectionInterrupted;
+extern int HighQualitySurroundSupported;
 extern int HighQualitySurroundEnabled;
 extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
