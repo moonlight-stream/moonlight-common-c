@@ -286,7 +286,6 @@ int enableNoDelay(SOCKET s) {
 
 int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
 {
-#ifndef __vita__
     struct addrinfo hints, *res, *currentAddr;
     int err;
 
@@ -331,21 +330,6 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     Limelog("No working addresses found for host: %s\n", host);
     freeaddrinfo(res);
     return -1;
-#else
-    struct hostent *phost = gethostbyname(host);
-    if (!phost) {
-        Limelog("gethostbyname() failed for host %s\n", host);
-        return -1;
-    }
-    struct sockaddr_in tmp = {0};
-    tmp.sin_len = sizeof(tmp);
-    tmp.sin_family = SCE_NET_AF_INET;
-    memcpy(&tmp.sin_addr, phost->h_addr, phost->h_length);
-
-    memcpy(addr, &tmp, sizeof(tmp));
-    *addrLen = sizeof(tmp);
-    return 0;
-#endif
 }
 
 #ifndef __vita__
