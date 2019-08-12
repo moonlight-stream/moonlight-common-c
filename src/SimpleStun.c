@@ -58,7 +58,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         return err;
     }
 
-    err = resolveHostName(stunServer, AF_INET, 3478, &stunAddr, &stunAddrLen);
+    err = resolveHostName(stunServer, AF_INET, stunPort, &stunAddr, &stunAddrLen);
     if (err != 0) {
         Limelog("Failed to resolve STUN server: %d\n", err);
         goto Exit;
