@@ -22,12 +22,7 @@ typedef int SOCKADDR_LEN;
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#ifndef __vita__
 #include <netinet/tcp.h>
-#else
-#include <psp2/net/net.h>
-#include <enet/enet.h>
-#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -43,14 +38,6 @@ typedef int SOCKADDR_LEN;
 typedef int SOCKET;
 typedef ssize_t SOCK_RET;
 typedef socklen_t SOCKADDR_LEN;
-#endif
-
-#if defined(__vita__)
-#define TCP_NODELAY SCE_NET_TCP_NODELAY
-
-#define sockaddr_in6 sockaddr_in
-#define sin6_addr sin_addr
-#define sin6_port sin_port
 #endif
 
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)
