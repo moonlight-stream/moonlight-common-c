@@ -114,11 +114,7 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     struct sockaddr_storage addr;
     int err;
 
-#ifndef __vita__
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
-#else
-    LC_ASSERT(addrfamily == AF_INET);
-#endif
 
     s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
     if (s == INVALID_SOCKET) {
@@ -332,7 +328,6 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     return -1;
 }
 
-#ifndef __vita__
 int isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
     int i;
     
@@ -345,7 +340,6 @@ int isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLen
     
     return 1;
 }
-#endif
 
 int isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
@@ -373,7 +367,6 @@ int isPrivateNetworkAddress(struct sockaddr_storage* address) {
             return 1;
         }
     }
-#ifndef __vita__
     else if (address->ss_family == AF_INET6) {
         struct sockaddr_in6* sin6 = (struct sockaddr_in6*)address;
         static unsigned char linkLocalPrefix[] = {0xfe, 0x80};
@@ -393,7 +386,6 @@ int isPrivateNetworkAddress(struct sockaddr_storage* address) {
             return 1;
         }
     }
-#endif
 
     return 0;
 }
