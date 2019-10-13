@@ -301,8 +301,9 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     }
     
     for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
-        // Use the test port to ensure this address is working
-        if (tcpTestPort != 0) {
+        // Use the test port to ensure this address is working if there
+        // are multiple addresses for this host name
+        if (tcpTestPort != 0 && res->ai_next != NULL) {
             SOCKET testSocket = connectTcpSocket((struct sockaddr_storage*)currentAddr->ai_addr,
                                                  currentAddr->ai_addrlen,
                                                  tcpTestPort,
