@@ -179,7 +179,6 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
 int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
     int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)qdu);
     if (err == LBQ_SUCCESS) {
-        LC_ASSERT(!(*qdu)->onStack);
         return 1;
     }
     else {
@@ -207,7 +206,8 @@ void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
         free(lastEntry->allocPtr);
     }
 
-    if (!qdu->onStack) {
+    // We will have stack-allocated entries iff we have a direct-submit decoder
+    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
         free(qdu);
     }
 }
@@ -274,9 +274,6 @@ static void reassembleFrame(int frameNumber) {
             nalChainDataLength = 0;
 
             if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-                // Dynamically allocated
-                qdu->onStack = 0;
-
                 if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
                     Limelog("Video decode unit queue overflow\n");
 
@@ -297,9 +294,6 @@ static void reassembleFrame(int frameNumber) {
                 }
             }
             else {
-                // Allocated on stack
-                qdu->onStack = 1;
-
                 int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
 
                 completeQueuedDecodeUnit(qdu, ret);
