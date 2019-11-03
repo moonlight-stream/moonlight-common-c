@@ -818,7 +818,7 @@ int startControlStream(void) {
             peer = NULL;
             enet_host_destroy(client);
             client = NULL;
-            return -1;
+            return ETIMEDOUT;
         }
 
         // Ensure the connect verify ACK is sent immediately

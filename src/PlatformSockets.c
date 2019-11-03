@@ -243,7 +243,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
             // select() timed out
             Limelog("select() timed out after %d seconds\n", timeoutSec);
             closeSocket(s);
-            SetLastSocketError(EWOULDBLOCK);
+            SetLastSocketError(ETIMEDOUT);
             return INVALID_SOCKET;
         }
         else if (FD_ISSET(s, &writefds) || FD_ISSET(s, &exceptfds)) {
