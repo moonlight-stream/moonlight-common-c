@@ -243,11 +243,19 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
     offset = 0;
     for (;;) {
         err = recv(sock, &responseBuffer[offset], RTSP_MAX_RESP_SIZE - offset, 0);
-        if (err <= 0) {
+        if (err < 0) {
+            // Error reading
+            *error = LastSocketError();
+            Limelog("Failed to read RTSP response: %d\n", *error);
+            goto Exit;
+        }
+        else if (err == 0) {
             // Done reading
             break;
         }
-        offset += err;
+        else {
+            offset += err;
+        }
 
         // Warn if the RTSP message is too big
         if (offset == RTSP_MAX_RESP_SIZE) {
