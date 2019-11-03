@@ -50,6 +50,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
+int setSocketNonBlocking(SOCKET s, int val);
 int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect);
 void shutdownTcpSocket(SOCKET s);
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);

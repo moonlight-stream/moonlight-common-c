@@ -177,11 +177,20 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     return s;
 }
 
+int setSocketNonBlocking(SOCKET s, int val) {
+#ifdef FIONBIO
+    return ioctlsocket(s, FIONBIO, &val);
+#else
+    return SOCKET_ERROR;
+#endif
+}
+
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec) {
     SOCKET s;
     struct sockaddr_in6 addr;
     int err;
-#if defined(LC_DARWIN) || defined(FIONBIO)
+    int nonBlocking;
+#ifdef LC_DARWIN
     int val;
 #endif
 
@@ -197,11 +206,8 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
 #endif
     
-#ifdef FIONBIO
     // Enable non-blocking I/O for connect timeout support
-    val = 1;
-    ioctlsocket(s, FIONBIO, &val);
-#endif
+    nonBlocking = setSocketNonBlocking(s, 1) == 0;
 
     // Start connection
     memcpy(&addr, dstaddr, addrlen);
@@ -211,8 +217,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
         err = (int)LastSocketError();
     }
     
-#ifdef FIONBIO
-    {
+    if (nonBlocking) {
         fd_set writefds, exceptfds;
         struct timeval tv;
         
@@ -252,10 +257,8 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
         }
         
         // Disable non-blocking I/O now that the connection is established
-        val = 0;
-        ioctlsocket(s, FIONBIO, &val);
+        setSocketNonBlocking(s, 0);
     }
-#endif
     
     if (err != 0) {
         Limelog("connect() failed: %d\n", err);
