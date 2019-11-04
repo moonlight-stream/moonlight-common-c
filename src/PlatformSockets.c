@@ -178,7 +178,9 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 }
 
 int setSocketNonBlocking(SOCKET s, int val) {
-#ifdef FIONBIO
+#if defined(__vita__)
+    return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
+#elif defined(FIONBIO)
     return ioctlsocket(s, FIONBIO, &val);
 #else
     return SOCKET_ERROR;
