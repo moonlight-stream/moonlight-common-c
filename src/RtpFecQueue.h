@@ -7,6 +7,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
     int length;
     int isParity;
     unsigned long long receiveTimeMs;
+    unsigned int presentationTimeMs;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;

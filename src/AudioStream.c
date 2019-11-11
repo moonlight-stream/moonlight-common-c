@@ -218,8 +218,10 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        // RTP sequence number must be in host order for the RTP queue
+        // Convert fields to host byte-order
         rtp->sequenceNumber = htons(rtp->sequenceNumber);
+        rtp->timestamp = htonl(rtp->timestamp);
+        rtp->ssrc = htonl(rtp->ssrc);
 
         queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET)packet, &packet->q.rentry);
         if (RTPQ_HANDLE_NOW(queueStatus)) {

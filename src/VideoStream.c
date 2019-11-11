@@ -116,9 +116,11 @@ static void ReceiveThreadProc(void* context) {
         // as quickly, since we're now just keeping the NAT session open.
         receivedDataFromPeer = 1;
 
-        // RTP sequence number must be in host order for the RTP queue
+        // Convert fields to host byte-order
         packet = (PRTP_PACKET)&buffer[0];
         packet->sequenceNumber = htons(packet->sequenceNumber);
+        packet->timestamp = htonl(packet->timestamp);
+        packet->ssrc = htonl(packet->ssrc);
 
         queueStatus = RtpfAddPacket(&rtpQueue, packet, err, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize]);
 

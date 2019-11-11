@@ -33,7 +33,8 @@ typedef struct _RTP_PACKET {
     char header;
     char packetType;
     unsigned short sequenceNumber;
-    char reserved[8];
+    unsigned int timestamp;
+    unsigned int ssrc;
 } RTP_PACKET, *PRTP_PACKET;
 
 #pragma pack(pop)

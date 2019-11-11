@@ -47,6 +47,9 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     newEntry->prev = NULL;
     newEntry->next = NULL;
 
+    // 90 KHz video clock
+    newEntry->presentationTimeMs = packet->timestamp / 90;
+
     if (queue->bufferHead == NULL) {
         LC_ASSERT(queue->bufferSize == 0);
         queue->bufferHead = queue->bufferTail = newEntry;
@@ -158,6 +161,8 @@ cleanup_packets:
                 PRTP_PACKET rtpPacket = (PRTP_PACKET) packets[i];
                 rtpPacket->sequenceNumber = U16(i + queue->bufferLowestSequenceNumber);
                 rtpPacket->header = queue->bufferHead->packet->header;
+                rtpPacket->timestamp = queue->bufferHead->packet->timestamp;
+                rtpPacket->ssrc = queue->bufferHead->packet->ssrc;
                 
                 int dataOffset = sizeof(*rtpPacket);
                 if (rtpPacket->header & FLAG_EXTENSION) {

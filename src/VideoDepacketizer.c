@@ -15,6 +15,7 @@ static unsigned int lastPacketInStream;
 static int decodingFrame;
 static int strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
+static unsigned int firstPacketPresentationTime;
 static int dropStatePending;
 static int idrFrameProcessed;
 
@@ -47,6 +48,7 @@ void initializeVideoDepacketizer(int pktSize) {
     lastPacketInStream = UINT32_MAX;
     decodingFrame = 0;
     firstPacketReceiveTime = 0;
+    firstPacketPresentationTime = 0;
     dropStatePending = 0;
     idrFrameProcessed = 0;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
@@ -261,6 +263,7 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.fullLength = nalChainDataLength;
             qdu->decodeUnit.frameNumber = frameNumber;
             qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
+            qdu->decodeUnit.presentationTimeMs = firstPacketPresentationTime;
 
             // IDR frames will have leading CSD buffers
             if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
@@ -497,7 +500,9 @@ static int isFirstPacket(char flags) {
 
 // Process an RTP Payload
 // The caller will free *existingEntry unless we NULL it
-void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long long receiveTimeMs, PLENTRY_INTERNAL* existingEntry) {
+void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
+                       unsigned long long receiveTimeMs, unsigned int presentationTimeMs,
+                       PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
     int frameIndex;
     char flags;
@@ -563,6 +568,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length, unsigned long l
         // We're now decoding a frame
         decodingFrame = 1;
         firstPacketReceiveTime = receiveTimeMs;
+        firstPacketPresentationTime = presentationTimeMs;
     }
 
     lastPacketInStream = streamPacketIndex;
@@ -694,6 +700,7 @@ void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntryPtr) {
     processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry.packet) + dataOffset),
                       queueEntry.length - dataOffset,
                       queueEntry.receiveTimeMs,
+                      queueEntry.presentationTimeMs,
                       &existingEntry);
 
     if (existingEntry != NULL) {
