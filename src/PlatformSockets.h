@@ -49,6 +49,7 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
 int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
+int sendMtuSafe(SOCKET s, char* buffer, int size);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
 int setSocketNonBlocking(SOCKET s, int val);

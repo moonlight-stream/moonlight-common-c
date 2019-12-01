@@ -221,7 +221,6 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
         *error = LastSocketError();
         return ret;
     }
-    enableNoDelay(sock);
     setRecvTimeout(sock, RTSP_TIMEOUT_SEC);
 
     serializedMessage = serializeRtspMessage(request, &messageLen);
@@ -231,8 +230,10 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
         return ret;
     }
 
-    // Send our message
-    err = send(sock, serializedMessage, messageLen, 0);
+    // Send our message split into smaller chunks to avoid MTU issues.
+    // enableNoDelay() must have been called for sendMtuSafe() to work.
+    enableNoDelay(sock);
+    err = sendMtuSafe(sock, serializedMessage, messageLen);
     if (err == SOCKET_ERROR) {
         *error = LastSocketError();
         Limelog("Failed to send RTSP message: %d\n", *error);

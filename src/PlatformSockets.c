@@ -6,6 +6,9 @@
 #define RCV_BUFFER_SIZE_MIN  32767
 #define RCV_BUFFER_SIZE_STEP 16384
 
+#define TCPv4_MSS 536
+#define TCPv6_MSS 1220
+
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
     char addrstr[INET6_ADDRSTRLEN];
@@ -192,9 +195,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     struct sockaddr_in6 addr;
     int err;
     int nonBlocking;
-#ifdef LC_DARWIN
     int val;
-#endif
 
     s = socket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (s == INVALID_SOCKET) {
@@ -207,6 +208,22 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     val = 1;
     setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
 #endif
+
+    // Some broken routers/firewalls (or routes with multiple broken routers) may result in TCP packets
+    // being dropped without without us receiving an ICMP Fragmentation Needed packet. For example,
+    // a router can elect to drop rather than fragment even without DF set. A misconfigured firewall
+    // or router on the path back to us may block the ICMP Fragmentation Needed packet required for
+    // PMTUD to work and thus we end up with a black hole route. Some OSes recover from this better
+    // than others, but we can avoid the issue altogether by capping our MSS to the value mandated
+    // by RFC 879 and RFC 2460.
+    //
+    // Note: This only changes the max packet size we can *receive* from the host PC.
+    // We still must split our own sends into smaller chunks with TCP_NODELAY enabled to
+    // avoid MTU issues on the way out to to the target.
+    val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
+    if (setsockopt(s, IPPROTO_TCP, TCP_MAXSEG, &val, sizeof(val)) < 0) {
+        Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d", val, (int)LastSocketError());
+    }
     
     // Enable non-blocking I/O for connect timeout support
     nonBlocking = setSocketNonBlocking(s, 1) == 0;
@@ -270,6 +287,25 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     }
 
     return s;
+}
+
+// See TCP_MAXSEG note in connectTcpSocket() above for more information.
+// TCP_NODELAY must be enabled on the socket for this function to work!
+int sendMtuSafe(SOCKET s, char* buffer, int size) {
+    int bytesSent = 0;
+
+    while (bytesSent < size) {
+        int bytesToSend = size - bytesSent > TCPv4_MSS ?
+                          TCPv4_MSS : size - bytesSent;
+
+        if (send(s, &buffer[bytesSent], bytesToSend, 0) < 0) {
+            return -1;
+        }
+
+        bytesSent += bytesToSend;
+    }
+
+    return bytesSent;
 }
 
 int enableNoDelay(SOCKET s) {
