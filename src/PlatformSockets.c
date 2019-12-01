@@ -220,10 +220,27 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // Note: This only changes the max packet size we can *receive* from the host PC.
     // We still must split our own sends into smaller chunks with TCP_NODELAY enabled to
     // avoid MTU issues on the way out to to the target.
-    val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
-    if (setsockopt(s, IPPROTO_TCP, TCP_MAXSEG, &val, sizeof(val)) < 0) {
-        Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d", val, (int)LastSocketError());
+#ifdef LC_WINDOWS
+    // Windows doesn't support setting TCP_MAXSEG but IP_PMTUDISC_DONT forces the MSS to the protocol
+    // minimum which is what we want here. Linux doesn't do this (disabling PMTUD just avoids setting DF).
+    if (dstaddr->ss_family == AF_INET) {
+        val = IP_PMTUDISC_DONT;
+        if (setsockopt(s, IPPROTO_IP, IP_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
+            Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+        }
     }
+    else {
+        val = IP_PMTUDISC_DONT;
+        if (setsockopt(s, IPPROTO_IPV6, IPV6_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
+            Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+        }
+    }
+#else
+    val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
+    if (setsockopt(s, IPPROTO_TCP, TCP_MAXSEG, (char*)&val, sizeof(val)) < 0) {
+        Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d\n", val, (int)LastSocketError());
+    }
+#endif
     
     // Enable non-blocking I/O for connect timeout support
     nonBlocking = setSocketNonBlocking(s, 1) == 0;
