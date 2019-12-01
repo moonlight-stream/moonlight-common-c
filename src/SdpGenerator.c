@@ -377,7 +377,9 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "0");
             HighQualitySurroundEnabled = 0;
 
-            if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
+            if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) != 0 ||
+                ((AudioCallbacks.capabilities & CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION) != 0 &&
+                    OriginalVideoBitrate >= LOW_AUDIO_BITRATE_TRESHOLD)) {
                 // Use 5 ms packets by default for lowest latency
                 AudioPacketDuration = 5;
             }

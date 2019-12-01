@@ -176,6 +176,12 @@ typedef struct _DECODE_UNIT {
 // used with video streams above 15 Mbps.
 #define CAPABILITY_SLOW_OPUS_DECODER 0x8
 
+// If set in the audio renderer capabilities field, this indicates that audio packets
+// may contain more or less than 5 ms of audio. This requires that audio renderers read the
+// samplesPerFrame field in OPUS_MULTISTREAM_CONFIGURATION to calculate the correct decoded
+// buffer size rather than just assuming it will always be 240.
+#define CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION 0x10
+
 // If set in the video renderer capabilities field, this macro specifies that the renderer
 // supports slicing to increase decoding performance. The parameter specifies the desired
 // number of slices per frame. This capability is only valid on video renderers.
