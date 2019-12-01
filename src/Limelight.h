@@ -454,8 +454,14 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 int LiGetPendingVideoFrames(void);
 
 // Returns the number of queued audio frames ready for delivery. Only relevant
-// if CAPABILITY_DIRECT_SUBMIT is not set for the audio renderer.
+// if CAPABILITY_DIRECT_SUBMIT is not set for the audio renderer. For most uses,
+// LiGetPendingAudioDuration() is probably a better option than this function.
 int LiGetPendingAudioFrames(void);
+
+// Similar to LiGetPendingAudioFrames() except it returns the pending audio in
+// milliseconds rather than frames, which allows callers to be agnostic of the
+// negotiated audio frame duration.
+int LiGetPendingAudioDuration(void);
 
 #ifdef __cplusplus
 }

@@ -408,3 +408,7 @@ int startAudioStream(void* audioContext, int arFlags) {
 int LiGetPendingAudioFrames(void) {
     return LbqGetItemCount(&packetQueue);
 }
+
+int LiGetPendingAudioDuration(void) {
+    return LiGetPendingAudioFrames() * AudioPacketDuration;
+}
