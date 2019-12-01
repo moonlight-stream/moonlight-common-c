@@ -3,7 +3,7 @@
 
 #include <enet/enet.h>
 
-#define RTSP_MAX_RESP_SIZE 32768
+#define RTSP_MAX_RESP_SIZE 49152
 #define RTSP_TIMEOUT_SEC 10
 
 static int currentSeqNumber;
