@@ -220,7 +220,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // Note: This only changes the max packet size we can *receive* from the host PC.
     // We still must split our own sends into smaller chunks with TCP_NODELAY enabled to
     // avoid MTU issues on the way out to to the target.
-#ifdef LC_WINDOWS
+#if defined(LC_WINDOWS)
     // Windows doesn't support setting TCP_MAXSEG but IP_PMTUDISC_DONT forces the MSS to the protocol
     // minimum which is what we want here. Linux doesn't do this (disabling PMTUD just avoids setting DF).
     if (dstaddr->ss_family == AF_INET) {
@@ -235,7 +235,16 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
             Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
         }
     }
-#else
+#elif defined(TCP_NOOPT)
+    // On BSD-based OSes (including macOS/iOS), TCP_NOOPT seems to be the only way to
+    // restrict MSS to the minimum. It strips all options out of the SYN packet which
+    // forces the remote party to fall back to the minimum MSS. TCP_MAXSEG doesn't seem
+    // to work correctly for outbound connections on macOS/iOS.
+    val = 1;
+    if (setsockopt(s, IPPROTO_TCP, TCP_NOOPT, (char*)&val, sizeof(val)) < 0) {
+        Limelog("setsockopt(TCP_NOOPT, %d) failed: %d\n", val, (int)LastSocketError());
+    }
+#elif defined(TCP_MAXSEG)
     val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
     if (setsockopt(s, IPPROTO_TCP, TCP_MAXSEG, (char*)&val, sizeof(val)) < 0) {
         Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d\n", val, (int)LastSocketError());
