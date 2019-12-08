@@ -1,5 +1,7 @@
 #include "Limelight-internal.h"
 
+#include <openssl/rand.h>
+
 #define STUN_RECV_TIMEOUT_SEC 3
 
 #define STUN_MESSAGE_BINDING_REQUEST 0x0001
@@ -24,12 +26,11 @@ typedef struct _STUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE {
     unsigned int address;
 } STUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE, *PSTUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE;
 
-#define TXID_DWORDS 3
 typedef struct _STUN_MESSAGE {
     unsigned short messageType;
     unsigned short messageLength;
     unsigned int magicCookie;
-    int transactionId[TXID_DWORDS];
+    unsigned char transactionId[12];
 } STUN_MESSAGE, *PSTUN_MESSAGE;
 
 #pragma pack(pop)
@@ -82,9 +83,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     reqMsg.messageType = htons(STUN_MESSAGE_BINDING_REQUEST);
     reqMsg.messageLength = 0;
     reqMsg.magicCookie = htonl(STUN_MESSAGE_COOKIE);
-    for (i = 0; i < TXID_DWORDS; i++) {
-        reqMsg.transactionId[i] = rand();
-    }
+    RAND_bytes(reqMsg.transactionId, sizeof(reqMsg.transactionId));
 
     bytesRead = SOCKET_ERROR;
     for (i = 0; i < STUN_RECV_TIMEOUT_SEC * 1000 / UDP_RECV_POLL_TIMEOUT_MS && bytesRead <= 0; i++) {
