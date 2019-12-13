@@ -252,14 +252,9 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 
-    if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
-        err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "0");
-        err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "0");
-    }
-    else {
-        err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
-        err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
-    }
+    // Enable DSCP marking to hopefully increase QoS priority
+    err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
+    err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
 
     if (AppVersionQuad[0] == 3) {
         err |= addGen3Options(&optionHead, urlSafeAddr);
