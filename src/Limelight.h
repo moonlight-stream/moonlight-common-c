@@ -18,6 +18,16 @@ extern "C" {
 #define STREAM_CFG_REMOTE  1
 #define STREAM_CFG_AUTO    2
 
+// Values for the 'colorSpace' field below.
+// Rec. 2020 is only supported with HEVC video streams.
+#define COLORSPACE_REC_601  0
+#define COLORSPACE_REC_709  1
+#define COLORSPACE_REC_2020 2
+
+// Values for the 'colorRange' field below
+#define COLOR_RANGE_LIMITED  0
+#define COLOR_RANGE_FULL     1
+
 typedef struct _STREAM_CONFIGURATION {
     // Dimensions in pixels of the desired video stream
     int width;
@@ -67,6 +77,14 @@ typedef struct _STREAM_CONFIGURATION {
     // 59.94 Hz would be specified as 5994. This is used by recent versions
     // of GFE for enhanced frame pacing.
     int clientRefreshRateX100;
+
+    // If specified, sets the encoder colorspace to the provided COLORSPACE_*
+    // option (listed above). If not set, the encoder will default to Rec 601.
+    int colorSpace;
+
+    // If specified, sets the encoder color range to the provided COLOR_RANGE_*
+    // option (listed above). If not set, the encoder will default to Limited.
+    int colorRange;
 
     // AES encryption data for the remote input stream. This must be
     // the same as what was passed as rikey and rikeyid

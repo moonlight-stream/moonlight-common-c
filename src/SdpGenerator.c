@@ -393,6 +393,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         AudioPacketDuration = 5;
     }
 
+    if (AppVersionQuad[0] >= 7) {
+        sprintf(payloadStr, "%d", (StreamConfig.colorSpace << 1) | StreamConfig.colorRange);
+        err |= addAttributeString(&optionHead, "x-nv-video[0].encoderCscMode", payloadStr);
+    }
+
     if (err == 0) {
         return optionHead;
     }
