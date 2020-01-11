@@ -210,11 +210,11 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     // Package the new parsed message into the struct
     if (flag == TYPE_REQUEST) {
         createRtspRequest(msg, messageBuffer, FLAG_ALLOCATED_MESSAGE_BUFFER | FLAG_ALLOCATED_OPTION_ITEMS, command, target,
-            protocol, sequenceNum, options, payload, payload ? length - (int)(messageBuffer - payload) : 0);
+            protocol, sequenceNum, options, payload, payload ? length - (int)(payload - messageBuffer) : 0);
     }
     else {
         createRtspResponse(msg, messageBuffer, FLAG_ALLOCATED_MESSAGE_BUFFER | FLAG_ALLOCATED_OPTION_ITEMS, protocol, statusCode,
-            statusStr, sequenceNum, options, payload, payload ? length - (int)(messageBuffer - payload) : 0);
+            statusStr, sequenceNum, options, payload, payload ? length - (int)(payload - messageBuffer) : 0);
     }
     return RTSP_ERROR_SUCCESS;
 
