@@ -500,6 +500,16 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
         return -1;
     }
 
+    // Any keyboard event with the META modifier flag is dropped by all known GFE versions.
+    // This prevents us from sending shortcuts involving the meta key (Win+X, Win+Tab, etc).
+    // The catch is that the meta key event itself would actually work if it didn't set its
+    // own modifier flag, so we'll clear that here. This should be safe even if a new GFE
+    // release comes out that stops dropping events with MODIFIER_META flag.
+    if ((keyCode & 0x00FF) == 0x5B || // VK_LWIN
+        (keyCode & 0x00FF) == 0x5C) { // VK_RWIN
+        modifiers &= ~MODIFIER_META;
+    }
+
     holder->packetLength = sizeof(NV_KEYBOARD_PACKET);
     holder->packet.keyboard.header.packetType = htonl(PACKET_TYPE_KEYBOARD);
     holder->packet.keyboard.keyAction = keyAction;

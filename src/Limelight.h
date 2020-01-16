@@ -418,6 +418,7 @@ int LiSendMouseButtonEvent(char action, int button);
 #define MODIFIER_SHIFT 0x01
 #define MODIFIER_CTRL 0x02
 #define MODIFIER_ALT 0x04
+#define MODIFIER_META 0x08
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 // Button flags
