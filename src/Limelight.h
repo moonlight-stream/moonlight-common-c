@@ -316,7 +316,7 @@ typedef void(*ConnListenerStageComplete)(int stage);
 // ConnListenerConnectionTerminated() will not be invoked because the connection was
 // not yet fully established. LiInterruptConnection() and LiStopConnection() may
 // result in this callback being invoked, but it is not guaranteed.
-typedef void(*ConnListenerStageFailed)(int stage, long errorCode);
+typedef void(*ConnListenerStageFailed)(int stage, int errorCode);
 
 // This callback is invoked after the connection is successfully established
 typedef void(*ConnListenerConnectionStarted)(void);
@@ -327,7 +327,7 @@ typedef void(*ConnListenerConnectionStarted)(void);
 // non-zero, it means the termination was probably unexpected (loss of network,
 // crash, or similar conditions). This will not be invoked as a result of a call
 // to LiStopConnection() or LiInterruptConnection().
-typedef void(*ConnListenerConnectionTerminated)(long errorCode);
+typedef void(*ConnListenerConnectionTerminated)(int errorCode);
 
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);

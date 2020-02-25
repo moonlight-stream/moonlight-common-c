@@ -466,7 +466,7 @@ static void controlReceiveThreadFunc(void* context) {
         return;
     }
 
-    long terminationErrorCode = -1;
+    int terminationErrorCode = -1;
 
     while (!PltIsThreadInterrupted(&controlReceiveThread)) {
         ENetEvent event;

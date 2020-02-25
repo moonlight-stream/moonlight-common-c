@@ -30,9 +30,9 @@ AUDIO_RENDERER_CALLBACKS fakeArCallbacks = {
 
 static void fakeClStageStarting(int stage) {}
 static void fakeClStageComplete(int stage) {}
-static void fakeClStageFailed(int stage, long errorCode) {}
+static void fakeClStageFailed(int stage, int errorCode) {}
 static void fakeClConnectionStarted(void) {}
-static void fakeClConnectionTerminated(long errorCode) {}
+static void fakeClConnectionTerminated(int errorCode) {}
 static void fakeClLogMessage(const char* format, ...) {}
 static void fakeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor) {}
 static void fakeClConnectionStatusUpdate(int connectionStatus) {}
