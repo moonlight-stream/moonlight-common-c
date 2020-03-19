@@ -372,14 +372,16 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "0");
             HighQualitySurroundEnabled = 0;
 
-            if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) != 0 ||
-                ((AudioCallbacks.capabilities & CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION) != 0 &&
-                    OriginalVideoBitrate < LOW_AUDIO_BITRATE_TRESHOLD)) {
-                // Use 20 ms packets for slow decoders and networks to save CPU and bandwidth
+            if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) != 0) {
+                // Use 20 ms packets for slow decoders to save CPU time
                 AudioPacketDuration = 20;
             }
+            else if ((AudioCallbacks.capabilities & CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION) != 0 &&
+                      OriginalVideoBitrate < LOW_AUDIO_BITRATE_TRESHOLD) {
+                // Use 10 ms packets for slow networks to balance latency and bandwidth usage
+                AudioPacketDuration = 10;
+            }
             else {
-
                 // Use 5 ms packets by default for lowest latency
                 AudioPacketDuration = 5;
             }
