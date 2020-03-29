@@ -471,7 +471,7 @@ static void controlReceiveThreadFunc(void* context) {
     while (!PltIsThreadInterrupted(&controlReceiveThread)) {
         ENetEvent event;
 
-        // Poll every 100 ms for new packets
+        // Poll for new packets and process retransmissions
         PltLockMutex(&enetMutex);
         err = serviceEnetHost(client, &event, 0);
         PltUnlockMutex(&enetMutex);
@@ -510,8 +510,12 @@ static void controlReceiveThreadFunc(void* context) {
                 }
             }
             else {
-                // No events ready
-                PltSleepMsInterruptible(&controlReceiveThread, 100);
+                // No events ready - sleep for a short time
+                //
+                // NOTE: This sleep *directly* impacts the lowest possible retransmission
+                // time for packets after a loss event. If we're busy sleeping here, we can't
+                // retransmit a dropped packet, so we keep the sleep time to a minimum.
+                PltSleepMsInterruptible(&controlReceiveThread, 10);
                 continue;
             }
         }
