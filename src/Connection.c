@@ -20,6 +20,8 @@ int NegotiatedVideoFormat;
 volatile int ConnectionInterrupted;
 int HighQualitySurroundSupported;
 int HighQualitySurroundEnabled;
+OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
+OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
 int AudioPacketDuration;
 

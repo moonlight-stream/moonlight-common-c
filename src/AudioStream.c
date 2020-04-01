@@ -26,32 +26,6 @@ static int receivedDataFromPeer;
 // for longer than normal.
 #define RTP_RECV_BUFFER (64 * 1024)
 
-#define SAMPLE_RATE 48000
-
-static OPUS_MULTISTREAM_CONFIGURATION opusStereoConfig = {
-    .sampleRate = SAMPLE_RATE,
-    .channelCount = 2,
-    .streams = 1,
-    .coupledStreams = 1,
-    .mapping = {0, 1}
-};
-
-static OPUS_MULTISTREAM_CONFIGURATION opus51SurroundConfig = {
-    .sampleRate = SAMPLE_RATE,
-    .channelCount = 6,
-    .streams = 4,
-    .coupledStreams = 2,
-    .mapping = {0, 4, 1, 5, 2, 3}
-};
-
-static OPUS_MULTISTREAM_CONFIGURATION opus51HighSurroundConfig = {
-        .sampleRate = SAMPLE_RATE,
-        .channelCount = 6,
-        .streams = 6,
-        .coupledStreams = 0,
-        .mapping = {0, 1, 2, 3, 4, 5}
-};
-
 typedef struct _QUEUED_AUDIO_PACKET {
     // data must remain at the front
     char data[MAX_PACKET_SIZE];
@@ -321,22 +295,16 @@ int startAudioStream(void* audioContext, int arFlags) {
     int err;
     OPUS_MULTISTREAM_CONFIGURATION chosenConfig;
 
-    // TODO: Get these from RTSP ANNOUNCE surround-params
-    if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_STEREO) {
-        chosenConfig = opusStereoConfig;
-    }
-    else if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
-        if (HighQualitySurroundEnabled) {
-            LC_ASSERT(HighQualitySurroundSupported);
-            chosenConfig = opus51HighSurroundConfig;
-        }
-        else {
-            chosenConfig = opus51SurroundConfig;
-        }
+    if (HighQualitySurroundEnabled) {
+        LC_ASSERT(HighQualitySurroundSupported);
+        LC_ASSERT(HighQualityOpusConfig.channelCount != 0);
+        LC_ASSERT(HighQualityOpusConfig.streams != 0);
+        chosenConfig = HighQualityOpusConfig;
     }
     else {
-        Limelog("Invalid audio configuration: %d\n", StreamConfig.audioConfiguration);
-        return -1;
+        LC_ASSERT(NormalQualityOpusConfig.channelCount != 0);
+        LC_ASSERT(NormalQualityOpusConfig.streams != 0);
+        chosenConfig = NormalQualityOpusConfig;
     }
 
     chosenConfig.samplesPerFrame = 48 * AudioPacketDuration;
