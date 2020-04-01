@@ -488,7 +488,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
     HighQualityOpusConfig.sampleRate = NormalQualityOpusConfig.sampleRate = 48000;
 
     // Stereo doesn't have any surround-params elements in the RTSP data
-    if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_STEREO) {
+    if (CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) == 2) {
         NormalQualityOpusConfig.channelCount = 2;
         NormalQualityOpusConfig.streams = 1;
         NormalQualityOpusConfig.coupledStreams = 1;
@@ -501,8 +501,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
         int err;
         int channelCount;
 
-        LC_ASSERT(StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND);
-        channelCount = 6;
+        channelCount = CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration);
 
         // Find the correct audio parameter value
         sprintf(paramsPrefix, "a=fmtp:97 surround-params=%d", channelCount);
@@ -548,7 +547,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
             // It's unknown whether all GFE versions that supported surround sound included these
             // surround sound parameters. In case they didn't, we'll specifically handle 5.1 surround
             // sound using a hardcoded configuration like we used to before this parsing code existed.
-            if (StreamConfig.audioConfiguration == AUDIO_CONFIGURATION_51_SURROUND) {
+            if (channelCount == 6) {
                 NormalQualityOpusConfig.channelCount = 6;
                 NormalQualityOpusConfig.streams = 4;
                 NormalQualityOpusConfig.coupledStreams = 2;

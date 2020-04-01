@@ -52,7 +52,7 @@ typedef struct _STREAM_CONFIGURATION {
     int streamingRemotely;
 
     // Specifies the channel configuration of the audio stream.
-    // See AUDIO_CONFIGURATION_XXX constants below.
+    // See MAKE_AUDIO_CONFIGURATION() below.
     int audioConfiguration;
     
     // Specifies that the client can accept an H.265 video stream
@@ -153,10 +153,23 @@ typedef struct _DECODE_UNIT {
 } DECODE_UNIT, *PDECODE_UNIT;
 
 // Specifies that the audio stream should be encoded in stereo (default)
-#define AUDIO_CONFIGURATION_STEREO 0
+// Deprecated: use MAKE_AUDIO_CONFIGURATION() instead!
+#define AUDIO_CONFIGURATION_STEREO MAKE_AUDIO_CONFIGURATION(2, 0x3)
 
 // Specifies that the audio stream should be in 5.1 surround sound if the PC is able
-#define AUDIO_CONFIGURATION_51_SURROUND 1
+// Deprecated: use MAKE_AUDIO_CONFIGURATION() instead!
+#define AUDIO_CONFIGURATION_51_SURROUND MAKE_AUDIO_CONFIGURATION(6, 0xFC)
+
+// Specifies an audio configuration by channel count and channel mask
+#define MAKE_AUDIO_CONFIGURATION(channelCount, channelMask) \
+    (((channelMask) << 16) | (channelCount << 8) | 0xCA)
+
+// Helper macros for retreiving channel count and channel mask from the audio configuration
+#define CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(x) (((x) >> 8) & 0xFF)
+#define CHANNEL_MASK_FROM_AUDIO_CONFIGURATION(x) (((x) >> 16) & 0xFF)
+
+// The maximum number of channels supported
+#define AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT 6
 
 // Passed to DecoderRendererSetup to indicate that the following video stream will be
 // in H.264 High Profile.
@@ -258,7 +271,7 @@ typedef struct _OPUS_MULTISTREAM_CONFIGURATION {
     int streams;
     int coupledStreams;
     int samplesPerFrame;
-    unsigned char mapping[6];
+    unsigned char mapping[AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT];
 } OPUS_MULTISTREAM_CONFIGURATION, *POPUS_MULTISTREAM_CONFIGURATION;
 
 // This callback initializes the audio renderer. The audio configuration parameter

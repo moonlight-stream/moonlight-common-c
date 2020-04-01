@@ -49,6 +49,9 @@ extern int AudioPacketDuration;
 // renderer sets CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION.
 #define LOW_AUDIO_BITRATE_TRESHOLD 5000
 
+// Internal macro for checking the magic byte of the audio configuration value
+#define MAGIC_BYTE_FROM_AUDIO_CONFIG(x) ((x) & 0xFF)
+
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
 int isReferenceFrameInvalidationEnabled(void);

@@ -178,6 +178,14 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
     
+    // Validate the audio configuration
+    if (MAGIC_BYTE_FROM_AUDIO_CONFIG(StreamConfig.audioConfiguration) != 0xCA ||
+            CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) > AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT) {
+        Limelog("Invalid audio configuration specified\n");
+        err = -1;
+        goto Cleanup;
+    }
+
     // FEC only works in 16 byte chunks, so we must round down
     // the given packet size to the nearest multiple of 16.
     StreamConfig.packetSize -= StreamConfig.packetSize % 16;
