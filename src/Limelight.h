@@ -156,16 +156,20 @@ typedef struct _DECODE_UNIT {
 #define AUDIO_CONFIGURATION_STEREO MAKE_AUDIO_CONFIGURATION(2, 0x3)
 
 // Specifies that the audio stream should be in 5.1 surround sound if the PC is able
-#define AUDIO_CONFIGURATION_51_SURROUND MAKE_AUDIO_CONFIGURATION(6, 0xFC)
+#define AUDIO_CONFIGURATION_51_SURROUND MAKE_AUDIO_CONFIGURATION(6, 0x3F)
+
+// Specifies that the audio stream should be in 7.1 surround sound if the PC is able
+#define AUDIO_CONFIGURATION_71_SURROUND MAKE_AUDIO_CONFIGURATION(8, 0x63F)
 
 // Specifies an audio configuration by channel count and channel mask
+// See https://docs.microsoft.com/en-us/windows-hardware/drivers/audio/channel-mask for channelMask values
 // NOTE: Not all combinations are supported by GFE and/or this library.
 #define MAKE_AUDIO_CONFIGURATION(channelCount, channelMask) \
     (((channelMask) << 16) | (channelCount << 8) | 0xCA)
 
 // Helper macros for retreiving channel count and channel mask from the audio configuration
 #define CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(x) (((x) >> 8) & 0xFF)
-#define CHANNEL_MASK_FROM_AUDIO_CONFIGURATION(x) (((x) >> 16) & 0xFF)
+#define CHANNEL_MASK_FROM_AUDIO_CONFIGURATION(x) (((x) >> 16) & 0xFFFF)
 
 // Helper macro to retreive the surroundAudioInfo parameter value that must be passed in
 // the /launch and /resume HTTPS requests when starting the session.
@@ -173,7 +177,7 @@ typedef struct _DECODE_UNIT {
     (CHANNEL_MASK_FROM_AUDIO_CONFIGURATION(x) << 16 | CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(x))
 
 // The maximum number of channels supported
-#define AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT 6
+#define AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT 8
 
 // Passed to DecoderRendererSetup to indicate that the following video stream will be
 // in H.264 High Profile.
@@ -264,8 +268,10 @@ void LiInitializeVideoCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks);
 // 1 - Front Right
 // 2 - Center
 // 3 - LFE
-// 4 - Surround Left
-// 5 - Surround Right
+// 4 - Back Left
+// 5 - Back Right
+// 6 - Side Left
+// 7 - Side Right
 //
 // If the mapping order does not match the channel order of the audio renderer, you may swap
 // the values in the mismatched indices until the mapping array matches the desired channel order.

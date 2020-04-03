@@ -518,11 +518,18 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
             }
 
             // GFE's normal-quality channel mapping differs from the one our clients use.
-            // They use FL FR C RL RR LFE, but we use FL FR C LFE RL RR. We'll need
+            // They use FL FR C RL RR SL SR LFE, but we use FL FR C LFE RL RR SL SR. We'll need
             // to swap the mappings to match the expected values.
-            if (channelCount == 6) {
-                SWAP_CHANNEL(&NormalQualityOpusConfig, 3, 4);
-                SWAP_CHANNEL(&NormalQualityOpusConfig, 3, 5);
+            if (channelCount == 6 || channelCount == 8) {
+                OPUS_MULTISTREAM_CONFIGURATION originalMapping = NormalQualityOpusConfig;
+
+                // LFE comes after C
+                NormalQualityOpusConfig.mapping[3] = originalMapping.mapping[channelCount - 1];
+
+                // Slide everything else up
+                memcpy(&NormalQualityOpusConfig.mapping[4],
+                       &originalMapping.mapping[3],
+                       channelCount - 4);
             }
 
             // If this configuration is compatible with high quality mode, we may have another
