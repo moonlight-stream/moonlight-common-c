@@ -481,6 +481,7 @@ static int parseOpusConfigFromParamString(char* paramStr, int channelCount, POPU
 
 // Parses the Opus configuration from an RTSP DESCRIBE response
 static int parseOpusConfigurations(PRTSP_MESSAGE response) {
+    HighQualitySurroundSupported = 0;
     memset(&NormalQualityOpusConfig, 0, sizeof(NormalQualityOpusConfig));
     memset(&HighQualityOpusConfig, 0, sizeof(HighQualityOpusConfig));
 
@@ -547,6 +548,10 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
             // It's unknown whether all GFE versions that supported surround sound included these
             // surround sound parameters. In case they didn't, we'll specifically handle 5.1 surround
             // sound using a hardcoded configuration like we used to before this parsing code existed.
+            //
+            // It is not necessary to provide HighQualityOpusConfig here because high quality mode
+            // can only be enabled from seeing the required "surround-params=" value, so there's no
+            // chance it could regress from implementing this parser.
             if (channelCount == 6) {
                 NormalQualityOpusConfig.channelCount = 6;
                 NormalQualityOpusConfig.streams = 4;
@@ -557,16 +562,6 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
                 NormalQualityOpusConfig.mapping[3] = 5;
                 NormalQualityOpusConfig.mapping[4] = 2;
                 NormalQualityOpusConfig.mapping[5] = 3;
-
-                HighQualityOpusConfig.channelCount = 6;
-                HighQualityOpusConfig.streams = 6;
-                HighQualityOpusConfig.coupledStreams = 0;
-                HighQualityOpusConfig.mapping[0] = 0;
-                HighQualityOpusConfig.mapping[1] = 1;
-                HighQualityOpusConfig.mapping[2] = 2;
-                HighQualityOpusConfig.mapping[3] = 3;
-                HighQualityOpusConfig.mapping[4] = 4;
-                HighQualityOpusConfig.mapping[5] = 5;
             }
             else {
                 // We don't have a hardcoded fallback mapping, so we have no choice but to fail.

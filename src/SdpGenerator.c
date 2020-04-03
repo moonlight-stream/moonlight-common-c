@@ -381,6 +381,9 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     else {
         // 5 ms duration for legacy servers
         AudioPacketDuration = 5;
+
+        // High quality audio mode not supported on legacy servers
+        HighQualitySurroundEnabled = 0;
     }
 
     if (AppVersionQuad[0] >= 7) {
