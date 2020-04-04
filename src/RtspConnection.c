@@ -718,6 +718,11 @@ int performRtspHandshake(void) {
         }
         else {
             NegotiatedVideoFormat = VIDEO_FORMAT_H264;
+
+            // Dimensions over 4096 are only supported with HEVC on NVENC
+            if (StreamConfig.width > 4096 || StreamConfig.height > 4096) {
+                Limelog("WARNING: Host PC doesn't support HEVC. Streaming at resolutions above 4K using H.264 will likely fail!\n");
+            }
         }
 
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.

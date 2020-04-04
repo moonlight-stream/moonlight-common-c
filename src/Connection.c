@@ -211,10 +211,20 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     // Height must not be odd or NVENC will fail to initialize
     if (StreamConfig.height & 0x1) {
-        Limelog("Encoder height must not be odd. Rounding %d to %d",
+        Limelog("Encoder height must not be odd. Rounding %d to %d\n",
                 StreamConfig.height,
                 StreamConfig.height & ~0x1);
         StreamConfig.height = StreamConfig.height & ~0x1;
+    }
+
+    // Dimensions over 4096 are only supported with HEVC on NVENC
+    if (!StreamConfig.supportsHevc &&
+            (StreamConfig.width > 4096 || StreamConfig.height > 4096)) {
+        Limelog("WARNING: Streaming at resolutions above 4K using H.264 will likely fail! Trying anyway!\n");
+    }
+    // Dimensions over 8192 aren't supported at all (even on Turing)
+    else if (StreamConfig.width > 8192 || StreamConfig.height > 8192) {
+        Limelog("WARNING: Streaming at resolutions above 8K will likely fail! Trying anyway!\n");
     }
     
     // Extract the appversion from the supplied string
