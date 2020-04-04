@@ -208,6 +208,14 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         err = -1;
         goto Cleanup;
     }
+
+    // Height must not be odd or NVENC will fail to initialize
+    if (StreamConfig.height & 0x1) {
+        Limelog("Encoder height must not be odd. Rounding %d to %d",
+                StreamConfig.height,
+                StreamConfig.height & ~0x1);
+        StreamConfig.height = StreamConfig.height & ~0x1;
+    }
     
     // Extract the appversion from the supplied string
     if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
