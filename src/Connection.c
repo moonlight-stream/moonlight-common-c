@@ -173,6 +173,19 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     void* audioContext, int arFlags) {
     int err;
 
+    // Replace missing callbacks with placeholders
+    fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks);
+    memcpy(&VideoCallbacks, drCallbacks, sizeof(VideoCallbacks));
+    memcpy(&AudioCallbacks, arCallbacks, sizeof(AudioCallbacks));
+
+    // Hook the termination callback so we can avoid issuing a termination callback
+    // after LiStopConnection() is called.
+    //
+    // Initialize ListenerCallbacks before anything that could call Limelog().
+    originalTerminationCallback = clCallbacks->connectionTerminated;
+    memcpy(&ListenerCallbacks, clCallbacks, sizeof(ListenerCallbacks));
+    ListenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
+
     NegotiatedVideoFormat = 0;
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
     OriginalVideoBitrate = streamConfig->bitrate;
@@ -203,17 +216,6 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         err = -1;
         goto Cleanup;
     }
-
-    // Replace missing callbacks with placeholders
-    fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks);
-    memcpy(&VideoCallbacks, drCallbacks, sizeof(VideoCallbacks));
-    memcpy(&AudioCallbacks, arCallbacks, sizeof(AudioCallbacks));
-
-    // Hook the termination callback so we can avoid issuing a termination callback
-    // after LiStopConnection() is called
-    originalTerminationCallback = clCallbacks->connectionTerminated;
-    memcpy(&ListenerCallbacks, clCallbacks, sizeof(ListenerCallbacks));
-    ListenerCallbacks.connectionTerminated = ClInternalConnectionTerminated;
 
     alreadyTerminated = 0;
     ConnectionInterrupted = 0;
