@@ -424,6 +424,18 @@ const char* LiGetStageName(int stage);
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
 
 // This function queues a mouse position update event to be sent to the remote server.
+//
+// Absolute mouse motion doesn't work in many games, so this mode should not be the default
+// for mice when streaming. It may be desirable as the default touchscreen behavior if the
+// touchscreen is not the primary input method.
+//
+// The x and y values are host screen coordinates (not video coordinates!), so the client must take
+// care to scale the initial user input (likely in client window coordinates) before passing it to
+// LiSendMousePositionEvent(). The /launch and /resume HTTPS responses include 'DisplayWidth' and
+// 'DisplayHeight' XML elements which allow the client to scale properly from video coordinates
+// to host screen cordinates.
+//
+// There is no known way to be notified of a resolution change after the stream is launched.
 int LiSendMousePositionEvent(short x, short y);
 
 // This function queues a mouse button event to be sent to the remote server.
