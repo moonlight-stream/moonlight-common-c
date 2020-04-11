@@ -420,8 +420,11 @@ void LiInterruptConnection(void);
 // from the integer passed to the ConnListenerStageXXX callbacks
 const char* LiGetStageName(int stage);
 
-// This function queues a mouse move event to be sent to the remote server.
+// This function queues a relative mouse move event to be sent to the remote server.
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
+
+// This function queues a mouse position update event to be sent to the remote server.
+int LiSendMousePositionEvent(short x, short y);
 
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
