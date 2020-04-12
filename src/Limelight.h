@@ -429,14 +429,13 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY);
 // for mice when streaming. It may be desirable as the default touchscreen behavior if the
 // touchscreen is not the primary input method.
 //
-// The x and y values are host screen coordinates (not video coordinates!), so the client must take
-// care to scale the initial user input (likely in client window coordinates) before passing it to
-// LiSendMousePositionEvent(). The /launch and /resume HTTPS responses include 'DisplayWidth' and
-// 'DisplayHeight' XML elements which allow the client to scale properly from video coordinates
-// to host screen cordinates.
+// The x and y values are transformed to host coordinates as if they are from a plane which
+// is referenceWidth by referenceHeight in size. This allows you to provide coordinates that
+// are relative to an arbitrary plane, such as a window, screen, or scaled video view.
 //
-// There is no known way to be notified of a resolution change after the stream is launched.
-int LiSendMousePositionEvent(short x, short y);
+// For example, if you wanted to directly pass window coordinates as x and y, you would set
+// referenceWidth and referenceHeight to your window width and height.
+int LiSendMousePositionEvent(short x, short y, short referenceWidth, short referenceHeight);
 
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07

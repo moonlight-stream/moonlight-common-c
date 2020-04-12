@@ -25,7 +25,8 @@ typedef struct _PACKET_HOLDER {
     int packetLength;
     union {
         NV_KEYBOARD_PACKET keyboard;
-        NV_MOUSE_MOVE_PACKET mouseMove;
+        NV_REL_MOUSE_MOVE_PACKET mouseMoveRel;
+        NV_ABS_MOUSE_MOVE_PACKET mouseMoveAbs;
         NV_MOUSE_BUTTON_PACKET mouseButton;
         NV_CONTROLLER_PACKET controller;
         NV_MULTI_CONTROLLER_PACKET multiController;
@@ -248,11 +249,11 @@ static void inputSendThreadProc(void* context) {
                 free(controllerBatchHolder);
             }
         }
-        // If it's a mouse move packet, we can also do batching
-        else if (holder->packet.mouseMove.header.packetType == htonl(PACKET_TYPE_MOUSE_MOVE)) {
+        // If it's a relative mouse move packet, we can also do batching
+        else if (holder->packet.mouseMoveRel.header.packetType == htonl(PACKET_TYPE_REL_MOUSE_MOVE)) {
             PPACKET_HOLDER mouseBatchHolder;
-            int totalDeltaX = (short)htons(holder->packet.mouseMove.deltaX);
-            int totalDeltaY = (short)htons(holder->packet.mouseMove.deltaY);
+            int totalDeltaX = (short)htons(holder->packet.mouseMoveRel.deltaX);
+            int totalDeltaY = (short)htons(holder->packet.mouseMoveRel.deltaY);
 
             for (;;) {
                 int partialDeltaX;
@@ -264,12 +265,12 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a mouse move packet, we're done
-                if (mouseBatchHolder->packet.mouseMove.header.packetType != htonl(PACKET_TYPE_MOUSE_MOVE)) {
+                if (mouseBatchHolder->packet.mouseMoveRel.header.packetType != htonl(PACKET_TYPE_REL_MOUSE_MOVE)) {
                     break;
                 }
 
-                partialDeltaX = (short)htons(mouseBatchHolder->packet.mouseMove.deltaX);
-                partialDeltaY = (short)htons(mouseBatchHolder->packet.mouseMove.deltaY);
+                partialDeltaX = (short)htons(mouseBatchHolder->packet.mouseMoveRel.deltaX);
+                partialDeltaY = (short)htons(mouseBatchHolder->packet.mouseMoveRel.deltaY);
 
                 // Check for overflow
                 if (partialDeltaX + totalDeltaX > INT16_MAX ||
@@ -293,8 +294,8 @@ static void inputSendThreadProc(void* context) {
             }
 
             // Update the original packet
-            holder->packet.mouseMove.deltaX = htons((short)totalDeltaX);
-            holder->packet.mouseMove.deltaY = htons((short)totalDeltaY);
+            holder->packet.mouseMoveRel.deltaX = htons((short)totalDeltaX);
+            holder->packet.mouseMoveRel.deltaY = htons((short)totalDeltaY);
         }
 
         // Encrypt the message into the output buffer while leaving room for the length
@@ -438,15 +439,15 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMove.header.packetType = htonl(PACKET_TYPE_MOUSE_MOVE);
-    holder->packet.mouseMove.magic = MOUSE_MOVE_REL_MAGIC;
+    holder->packetLength = sizeof(NV_REL_MOUSE_MOVE_PACKET);
+    holder->packet.mouseMoveRel.header.packetType = htonl(PACKET_TYPE_REL_MOUSE_MOVE);
+    holder->packet.mouseMoveRel.magic = MOUSE_MOVE_REL_MAGIC;
     // On Gen 5 servers, the header code is incremented by one
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.mouseMove.magic++;
+        holder->packet.mouseMoveRel.magic++;
     }
-    holder->packet.mouseMove.deltaX = htons(deltaX);
-    holder->packet.mouseMove.deltaY = htons(deltaY);
+    holder->packet.mouseMoveRel.deltaX = htons(deltaX);
+    holder->packet.mouseMoveRel.deltaY = htons(deltaY);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
@@ -457,7 +458,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 }
 
 // Send a mouse position update to the streaming machine
-int LiSendMousePositionEvent(short x, short y) {
+int LiSendMousePositionEvent(short x, short y, short referenceWidth, short referenceHeight) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -475,11 +476,14 @@ int LiSendMousePositionEvent(short x, short y) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMove.header.packetType = htonl(PACKET_TYPE_MOUSE_MOVE);
-    holder->packet.mouseMove.magic = MOUSE_MOVE_ABS_MAGIC;
-    holder->packet.mouseMove.deltaX = htons(x);
-    holder->packet.mouseMove.deltaY = htons(y);
+    holder->packetLength = sizeof(NV_ABS_MOUSE_MOVE_PACKET);
+    holder->packet.mouseMoveAbs.header.packetType = htonl(PACKET_TYPE_ABS_MOUSE_MOVE);
+    holder->packet.mouseMoveAbs.magic = MOUSE_MOVE_ABS_MAGIC;
+    holder->packet.mouseMoveAbs.x = htons(x);
+    holder->packet.mouseMoveAbs.y = htons(y);
+    holder->packet.mouseMoveAbs.unused = 0;
+    holder->packet.mouseMoveAbs.width = htons(referenceWidth);
+    holder->packet.mouseMoveAbs.height = htons(referenceHeight);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {

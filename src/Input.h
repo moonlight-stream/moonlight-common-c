@@ -25,15 +25,31 @@ typedef struct _NV_KEYBOARD_PACKET {
     short zero2;
 } NV_KEYBOARD_PACKET, *PNV_KEYBOARD_PACKET;
 
-#define PACKET_TYPE_MOUSE_MOVE 0x08
-#define MOUSE_MOVE_ABS_MAGIC 0x05
+#define PACKET_TYPE_REL_MOUSE_MOVE 0x08
 #define MOUSE_MOVE_REL_MAGIC 0x06
-typedef struct _NV_MOUSE_MOVE_PACKET {
+typedef struct _NV_REL_MOUSE_MOVE_PACKET {
     NV_INPUT_HEADER header;
     int magic;
     short deltaX;
     short deltaY;
-} NV_MOUSE_MOVE_PACKET, *PNV_MOUSE_MOVE_PACKET;
+} NV_REL_MOUSE_MOVE_PACKET, *PNV_REL_MOUSE_MOVE_PACKET;
+
+#define PACKET_TYPE_ABS_MOUSE_MOVE 0x0e
+#define MOUSE_MOVE_ABS_MAGIC 0x05
+typedef struct _NV_ABS_MOUSE_MOVE_PACKET {
+    NV_INPUT_HEADER header;
+    int magic;
+
+    short x;
+    short y;
+
+    short unused;
+
+    // Used on the server-side as a reference to scale x and y
+    // to screen coordinates.
+    short width;
+    short height;
+} NV_ABS_MOUSE_MOVE_PACKET, *PNV_ABS_MOUSE_MOVE_PACKET;
 
 #define PACKET_TYPE_MOUSE_BUTTON 0x05
 typedef struct _NV_MOUSE_BUTTON_PACKET {
