@@ -112,9 +112,12 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        // We've received data, so we can stop sending our ping packets
-        // as quickly, since we're now just keeping the NAT session open.
-        receivedDataFromPeer = 1;
+        if (!receivedDataFromPeer) {
+            // We've received data, so we can stop sending our ping packets
+            // as quickly, since we're now just keeping the NAT session open.
+            receivedDataFromPeer = 1;
+            Limelog("Received first video packet\n");
+        }
 
         // Convert fields to host byte-order
         packet = (PRTP_PACKET)&buffer[0];
@@ -162,6 +165,10 @@ int readFirstFrame(void) {
 
 // Terminate the video stream
 void stopVideoStream(void) {
+    if (!receivedDataFromPeer) {
+        Limelog("No video traffic was ever received from the host!\n");
+    }
+
     VideoCallbacks.stop();
 
     // Wake up client code that may be waiting on the decode unit queue

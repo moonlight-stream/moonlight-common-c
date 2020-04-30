@@ -180,9 +180,12 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        // We've received data, so we can stop sending our ping packets
-        // as quickly, since we're now just keeping the NAT session open.
-        receivedDataFromPeer = 1;
+        if (!receivedDataFromPeer) {
+            // We've received data, so we can stop sending our ping packets
+            // as quickly, since we're now just keeping the NAT session open.
+            receivedDataFromPeer = 1;
+            Limelog("Received first audio packet\n");
+        }
 
         // GFE accumulates audio samples before we are ready to receive them,
         // so we will drop the first 100 packets to avoid accumulating latency
@@ -261,6 +264,10 @@ static void DecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
+    if (!receivedDataFromPeer) {
+        Limelog("No audio traffic was ever received from the host!\n");
+    }
+
     AudioCallbacks.stop();
 
     PltInterruptThread(&udpPingThread);
