@@ -7,7 +7,7 @@
 
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
-static char sessionIdString[16];
+static char* sessionIdString;
 static int hasSessionId;
 static int rtspClientVersion;
 static char urlAddr[URLSAFESTRING_LEN];
@@ -35,7 +35,7 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
         return NULL;
     }
 
-    item->option = malloc(strlen(option) + 1);
+    item->option = strdup(option);
     if (item->option == NULL) {
         free(item);
         return NULL;
@@ -43,7 +43,7 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
 
     strcpy(item->option, option);
 
-    item->content = malloc(strlen(content) + 1);
+    item->content = strdup(content);
     if (item->content == NULL) {
         free(item->option);
         free(item);
@@ -771,7 +771,7 @@ int performRtspHandshake(void) {
         sessionId = getOptionContent(response.options, "Session");
 
         if (sessionId == NULL) {
-            Limelog("RTSP SETUP streamid=audio is missing session attribute");
+            Limelog("RTSP SETUP streamid=audio is missing session attribute\n");
             ret = -1;
             goto Exit;
         }
@@ -781,9 +781,13 @@ int performRtspHandshake(void) {
         // resolves any 454 session not found errors on
         // standard RTSP server implementations.
         // (i.e - sessionId = "DEADBEEFCAFE;timeout = 90") 
-        sessionId = strtok(sessionId, ";");
+        sessionIdString = strdup(strtok(sessionId, ";"));
+        if (sessionIdString == NULL) {
+            Limelog("Failed to duplicate session ID string\n");
+            ret = -1;
+            goto Exit;
+        }
 
-        strcpy(sessionIdString, sessionId);
         hasSessionId = 1;
 
         freeMessage(&response);
@@ -905,6 +909,11 @@ Exit:
             enet_host_destroy(client);
             client = NULL;
         }
+    }
+
+    if (sessionIdString != NULL) {
+        free(sessionIdString);
+        sessionIdString = NULL;
     }
 
     return ret;
