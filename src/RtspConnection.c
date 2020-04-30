@@ -3,14 +3,12 @@
 
 #include <enet/enet.h>
 
-#define RTSP_MAX_RESP_SIZE 49152
 #define RTSP_TIMEOUT_SEC 10
 
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
 static char sessionIdString[16];
 static int hasSessionId;
-static char responseBuffer[RTSP_MAX_RESP_SIZE];
 static int rtspClientVersion;
 static char urlAddr[URLSAFESTRING_LEN];
 static int useEnet;
@@ -106,6 +104,11 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     char* payload;
     int payloadLength;
     int ret;
+    char* responseBuffer;
+
+    *error = -1;
+    ret = 0;
+    responseBuffer = NULL;
 
     // We're going to handle the payload separately, so temporarily set the payload to NULL
     payload = request->payload;
@@ -116,21 +119,18 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // Serialize the RTSP message into a message buffer
     serializedMessage = serializeRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {
-        ret = 0;
         goto Exit;
     }
     
     // Create the reliable packet that describes our outgoing message
     packet = enet_packet_create(serializedMessage, messageLen, ENET_PACKET_FLAG_RELIABLE);
     if (packet == NULL) {
-        ret = 0;
         goto Exit;
     }
     
     // Send the message
     if (enet_peer_send(peer, 0, packet) < 0) {
         enet_packet_destroy(packet);
-        ret = 0;
         goto Exit;
     }
     enet_host_flush(client);
@@ -139,14 +139,12 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     if (payload != NULL) {
         packet = enet_packet_create(payload, payloadLength, ENET_PACKET_FLAG_RELIABLE);
         if (packet == NULL) {
-            ret = 0;
             goto Exit;
         }
 
         // Send the payload
         if (enet_peer_send(peer, 0, packet) < 0) {
             enet_packet_destroy(packet);
-            ret = 0;
             goto Exit;
         }
         
@@ -157,13 +155,13 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
         event.type != ENET_EVENT_TYPE_RECEIVE) {
         Limelog("Failed to receive RTSP reply\n");
-        ret = 0;
         goto Exit;
     }
 
-    if (event.packet->dataLength > RTSP_MAX_RESP_SIZE) {
-        Limelog("RTSP message too long\n");
-        ret = 0;
+    responseBuffer = malloc(event.packet->dataLength);
+    if (responseBuffer == NULL) {
+        Limelog("Failed to allocate RTSP response buffer\n");
+        enet_packet_destroy(event.packet);
         goto Exit;
     }
 
@@ -178,13 +176,13 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             Limelog("Failed to receive RTSP reply payload\n");
-            ret = 0;
             goto Exit;
         }
 
-        if (event.packet->dataLength + offset > RTSP_MAX_RESP_SIZE) {
-            Limelog("RTSP message payload too long\n");
-            ret = 0;
+        responseBuffer = extendBuffer(responseBuffer, event.packet->dataLength + offset);
+        if (responseBuffer == NULL) {
+            Limelog("Failed to extend RTSP response buffer\n");
+            enet_packet_destroy(event.packet);
             goto Exit;
         }
 
@@ -200,7 +198,6 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     }
     else {
         Limelog("Failed to parse RTSP response\n");
-        ret = 0;
     }
 
 Exit:
@@ -213,18 +210,27 @@ Exit:
         free(serializedMessage);
     }
 
+    // Free the response buffer
+    if (responseBuffer != NULL) {
+        free(responseBuffer);
+    }
+
     return ret;
 }
 
 // Send RTSP message and get response over TCP
 static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
     SOCK_RET err;
-    int ret = 0;
+    int ret;
     int offset;
     char* serializedMessage = NULL;
     int messageLen;
+    char* responseBuffer;
+    int responseBufferSize;
 
     *error = -1;
+    ret = 0;
+    responseBuffer = NULL;
 
     sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
     if (sock == INVALID_SOCKET) {
@@ -252,8 +258,18 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
 
     // Read the response until the server closes the connection
     offset = 0;
+    responseBufferSize = 0;
     for (;;) {
-        err = recv(sock, &responseBuffer[offset], RTSP_MAX_RESP_SIZE - offset, 0);
+        if (offset >= responseBufferSize) {
+            responseBufferSize = offset + 16384;
+            responseBuffer = extendBuffer(responseBuffer, responseBufferSize);
+            if (responseBuffer == NULL) {
+                Limelog("Failed to allocate RTSP response buffer\n");
+                goto Exit;
+            }
+        }
+
+        err = recv(sock, &responseBuffer[offset], responseBufferSize - offset, 0);
         if (err < 0) {
             // Error reading
             *error = LastSocketError();
@@ -266,12 +282,6 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
         }
         else {
             offset += err;
-        }
-
-        // Warn if the RTSP message is too big
-        if (offset == RTSP_MAX_RESP_SIZE) {
-            Limelog("RTSP message too long\n");
-            goto Exit;
         }
     }
 
@@ -286,6 +296,10 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
 Exit:
     if (serializedMessage != NULL) {
         free(serializedMessage);
+    }
+
+    if (responseBuffer != NULL) {
+        free(responseBuffer);
     }
 
     closeSocket(sock);
