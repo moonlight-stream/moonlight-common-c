@@ -352,6 +352,17 @@ typedef void(*ConnListenerConnectionStarted)(void);
 // to LiStopConnection() or LiInterruptConnection().
 typedef void(*ConnListenerConnectionTerminated)(int errorCode);
 
+// This error code is passed to ConnListenerConnectionTerminated() when the stream
+// is being gracefully terminated by the host. It usually means the app on the host
+// PC has exited.
+#define ML_ERROR_GRACEFUL_TERMINATION 0
+
+// This error is passed to ConnListenerConnectionTerminated() if no video data
+// was ever received for this connection after waiting several seconds. It likely
+// indicates a problem with traffic on UDP 47998 due to missing or incorrect
+// firewall or port forwarding rules.
+#define ML_ERROR_NO_VIDEO_TRAFFIC -100
+
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 
