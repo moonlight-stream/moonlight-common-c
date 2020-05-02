@@ -115,6 +115,7 @@ static void ReceiveThreadProc(void* context) {
                 // assume something is broken and terminate the connection.
                 waitingForVideoMs += UDP_RECV_POLL_TIMEOUT_MS;
                 if (waitingForVideoMs >= FIRST_FRAME_TIMEOUT_SEC * 1000) {
+                    Limelog("Terminating connection due to lack of video traffic\n");
                     ListenerCallbacks.connectionTerminated(ML_ERROR_NO_VIDEO_TRAFFIC);
                     break;
                 }
@@ -128,7 +129,7 @@ static void ReceiveThreadProc(void* context) {
             // We've received data, so we can stop sending our ping packets
             // as quickly, since we're now just keeping the NAT session open.
             receivedDataFromPeer = 1;
-            Limelog("Received first video packet\n");
+            Limelog("Received first video packet after %d ms\n", waitingForVideoMs);
         }
 
         // Convert fields to host byte-order

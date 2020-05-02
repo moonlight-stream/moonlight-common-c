@@ -132,6 +132,7 @@ static void ReceiveThreadProc(void* context) {
     int queueStatus;
     int useSelect;
     int packetsToDrop = 500 / AudioPacketDuration;
+    int waitingForAudioMs;
 
     packet = NULL;
 
@@ -144,6 +145,7 @@ static void ReceiveThreadProc(void* context) {
         useSelect = 0;
     }
 
+    waitingForAudioMs = 0;
     while (!PltIsThreadInterrupted(&receiveThread)) {
         if (packet == NULL) {
             packet = (PQUEUED_AUDIO_PACKET)malloc(sizeof(*packet));
@@ -162,6 +164,10 @@ static void ReceiveThreadProc(void* context) {
         }
         else if (packet->size == 0) {
             // Receive timed out; try again
+            
+            if (!receivedDataFromPeer) {
+                waitingForAudioMs += UDP_RECV_POLL_TIMEOUT_MS;
+            }
 
             // If we hit this path, there are no queued audio packets on the host PC,
             // so we don't need to drop anything.
@@ -184,7 +190,7 @@ static void ReceiveThreadProc(void* context) {
             // We've received data, so we can stop sending our ping packets
             // as quickly, since we're now just keeping the NAT session open.
             receivedDataFromPeer = 1;
-            Limelog("Received first audio packet\n");
+            Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
         }
 
         // GFE accumulates audio samples before we are ready to receive them,
