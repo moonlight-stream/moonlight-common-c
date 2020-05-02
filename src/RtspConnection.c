@@ -20,13 +20,6 @@ static ENetPeer* peer;
 #define CHAR_TO_INT(x) ((x) - '0')
 #define CHAR_IS_DIGIT(x) ((x) >= '0' && (x) <= '9')
 
-#define SWAP_CHANNEL(config, i, j) \
-{ \
-    unsigned char tmp = (config)->mapping[i]; \
-    (config)->mapping[i] = (config)->mapping[j]; \
-    (config)->mapping[j] = tmp; \
-}
-
 // Create RTSP Option
 static POPTION_ITEM createOptionItem(char* option, char* content)
 {
@@ -41,16 +34,12 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
         return NULL;
     }
 
-    strcpy(item->option, option);
-
     item->content = strdup(content);
     if (item->content == NULL) {
         free(item->option);
         free(item);
         return NULL;
     }
-
-    strcpy(item->content, content);
 
     item->next = NULL;
     item->flags = FLAG_ALLOCATED_OPTION_FIELDS;
