@@ -2,6 +2,10 @@
 #include "RtpFecQueue.h"
 #include "rs.h"
 
+// Uncomment to enable FEC validation mode with a synthetic drop
+// and recovered packet checks vs the original input.
+//#define FEC_VALIDATION_MODE
+
 void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
     reed_solomon_init();
     memset(queue, 0, sizeof(*queue));
@@ -88,12 +92,24 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
     int ret;
     
+#ifdef FEC_VALIDATION_MODE
+    // We'll need an extra packet to run in FEC validation mode, because we will
+    // be "dropping" one below and recovering it using parity. However, some frames
+    // are so large that FEC is disabled entirely, so don't wait for parity on those.
+    if (queue->bufferSize < queue->bufferDataPackets + (queue->fecPercentage ? 1 : 0)) {
+#else
     if (queue->bufferSize < queue->bufferDataPackets) {
+#endif
         // Not enough data to recover yet
         return -1;
     }
     
+#ifdef FEC_VALIDATION_MODE
+    // If FEC is disabled for this frame, we must bail early here.
+    if (queue->fecPercentage == 0 && queue->receivedBufferDataPackets == queue->bufferDataPackets) {
+#else
     if (queue->receivedBufferDataPackets == queue->bufferDataPackets) {
+#endif
         // We've received a full frame with no need for FEC.
         return 0;
     }
@@ -121,9 +137,28 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
     int packetBufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
 
+#ifdef FEC_VALIDATION_MODE
+    // Choose a packet to drop
+    int dropIndex = rand() % queue->bufferDataPackets;
+    PRTP_PACKET droppedRtpPacket = NULL;
+    int droppedRtpPacketLength = 0;
+#endif
+
     PRTPFEC_QUEUE_ENTRY entry = queue->bufferHead;
     while (entry != NULL) {
         int index = U16(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
+
+#ifdef FEC_VALIDATION_MODE
+        if (index == dropIndex) {
+            // If this was the drop choice, remember the original contents
+            // and "drop" it.
+            droppedRtpPacket = entry->packet;
+            droppedRtpPacketLength = entry->length;
+            entry = entry->next;
+            continue;
+        }
+#endif
+
         packets[index] = (unsigned char*) entry->packet;
         marks[index] = 0;
         
@@ -171,6 +206,56 @@ cleanup_packets:
 
                 PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)rtpPacket) + dataOffset);
                 nvPacket->frameIndex = queue->currentFrameNumber;
+
+#ifdef FEC_VALIDATION_MODE
+                if (i == dropIndex && droppedRtpPacket != NULL) {
+                    // Check the packet contents if this was our known drop
+                    PNV_VIDEO_PACKET droppedNvPacket = (PNV_VIDEO_PACKET)(((char*)droppedRtpPacket) + dataOffset);
+                    int droppedDataLength = droppedRtpPacketLength - dataOffset - sizeof(*nvPacket);
+                    int recoveredDataLength = StreamConfig.packetSize - sizeof(*nvPacket);
+                    int j;
+                    int recoveryErrors = 0;
+
+                    LC_ASSERT(droppedDataLength <= recoveredDataLength);
+                    LC_ASSERT(droppedDataLength == recoveredDataLength || (nvPacket->flags & FLAG_EOF));
+
+                    // Check all NV_VIDEO_PACKET fields except fecInfo which differs in the recovered packet
+                    LC_ASSERT(nvPacket->flags == droppedNvPacket->flags);
+                    LC_ASSERT(nvPacket->frameIndex == droppedNvPacket->frameIndex);
+                    LC_ASSERT(nvPacket->streamPacketIndex == droppedNvPacket->streamPacketIndex);
+                    LC_ASSERT(memcmp(nvPacket->reserved, droppedNvPacket->reserved, sizeof(nvPacket->reserved)) == 0);
+
+                    // Check the data itself - use memcmp() and only loop if an error is detected
+                    if (memcmp(nvPacket + 1, droppedNvPacket + 1, droppedDataLength)) {
+                        unsigned char* actualData = (unsigned char*)(nvPacket + 1);
+                        unsigned char* expectedData = (unsigned char*)(droppedNvPacket + 1);
+                        for (j = 0; j < droppedDataLength; j++) {
+                            if (actualData[j] != expectedData[j]) {
+                                Limelog("Recovery error at %d: expected 0x%02x, actual 0x%02x\n",
+                                        j, expectedData[j], actualData[j]);
+                                recoveryErrors++;
+                            }
+                        }
+                    }
+
+                    // If this packet is at the end of the frame, the remaining data should be zeros.
+                    for (j = droppedDataLength; j < recoveredDataLength; j++) {
+                        unsigned char* actualData = (unsigned char*)(nvPacket + 1);
+                        if (actualData[j] != 0) {
+                            Limelog("Recovery error at %d: expected 0x00, actual 0x%02x\n",
+                                    j, actualData[j]);
+                            recoveryErrors++;
+                        }
+                    }
+
+                    LC_ASSERT(recoveryErrors == 0);
+
+                    // This drop was fake, so we don't want to actually submit it to the depacketizer.
+                    // It will get confused because it's already seen this packet before.
+                    free(packets[i]);
+                    continue;
+                }
+#endif
 
                 // Do some rudamentary checks to see that the recovered packet is sane.
                 // In some cases (4K 30 FPS 80 Mbps), we seem to get some odd failures
