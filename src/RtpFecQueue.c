@@ -108,13 +108,21 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     }
     
 #ifdef FEC_VALIDATION_MODE
-    // If FEC is disabled for this frame, we must bail early here.
-    if (queue->fecPercentage == 0 && queue->receivedBufferDataPackets == queue->bufferDataPackets) {
+    // If FEC is disabled or unsupported for this frame, we must bail early here.
+    if ((queue->fecPercentage == 0 || AppVersionQuad[0] < 5) &&
+            queue->receivedBufferDataPackets == queue->bufferDataPackets) {
 #else
     if (queue->receivedBufferDataPackets == queue->bufferDataPackets) {
 #endif
         // We've received a full frame with no need for FEC.
         return 0;
+    }
+
+    if (AppVersionQuad[0] < 5) {
+        // Our FEC recovery code doesn't work properly until Gen 5
+        Limelog("FEC recovery not supported on Gen %d servers\n",
+                AppVersionQuad[0]);
+        return -1;
     }
 
     reed_solomon* rs = NULL;
@@ -392,6 +400,9 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         // Reject packets behind our current buffer window
         return RTPF_RET_REJECTED;
     }
+
+    // FLAG_EXTENSION is required for all supported versions of GFE.
+    LC_ASSERT(packet->header & FLAG_EXTENSION);
 
     int dataOffset = sizeof(*packet);
     if (packet->header & FLAG_EXTENSION) {
