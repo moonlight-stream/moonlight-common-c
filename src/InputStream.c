@@ -466,11 +466,6 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
         return -2;
     }
 
-    // TODO: Figure out the exact version where this was added
-    if (AppVersionQuad[0] < 7) {
-        return -3;
-    }
-
     holder = malloc(sizeof(*holder));
     if (holder == NULL) {
         return -1;

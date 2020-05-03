@@ -435,6 +435,8 @@ const char* LiGetStageName(int stage);
 int LiSendMouseMoveEvent(short deltaX, short deltaY);
 
 // This function queues a mouse position update event to be sent to the remote server.
+// This functionality is only reliably supported on GFE 3.20 or later. Earlier versions
+// may not position the mouse correctly.
 //
 // Absolute mouse motion doesn't work in many games, so this mode should not be the default
 // for mice when streaming. It may be desirable as the default touchscreen behavior if the
