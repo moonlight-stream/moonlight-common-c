@@ -297,6 +297,31 @@ static void inputSendThreadProc(void* context) {
             holder->packet.mouseMoveRel.deltaX = htons((short)totalDeltaX);
             holder->packet.mouseMoveRel.deltaY = htons((short)totalDeltaY);
         }
+        // If it's an absolute mouse move packet, we should only send the latest
+        else if (holder->packet.mouseMoveAbs.header.packetType == htonl(PACKET_TYPE_ABS_MOUSE_MOVE)) {
+            for (;;) {
+                PPACKET_HOLDER mouseBatchHolder;
+
+                // Peek at the next packet
+                if (LbqPeekQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // If it's not a mouse position packet, we're done
+                if (mouseBatchHolder->packet.mouseMoveAbs.header.packetType != htonl(PACKET_TYPE_ABS_MOUSE_MOVE)) {
+                    break;
+                }
+
+                // Remove the mouse position packet
+                if (LbqPollQueueElement(&packetQueue, (void**)&mouseBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // Replace the current packet with the new one
+                free(holder);
+                holder = mouseBatchHolder;
+            }
+        }
 
         // Encrypt the message into the output buffer while leaving room for the length
         encryptedSize = sizeof(encryptedBuffer) - 4;
