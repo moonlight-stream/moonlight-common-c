@@ -126,8 +126,8 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     }
 
     reed_solomon* rs = NULL;
-    unsigned char** packets = malloc(totalPackets * sizeof(unsigned char*));
-    unsigned char* marks = malloc(totalPackets * sizeof(unsigned char));
+    unsigned char** packets = calloc(totalPackets, sizeof(unsigned char*));
+    unsigned char* marks = calloc(totalPackets, sizeof(unsigned char));
     if (packets == NULL || marks == NULL) {
         ret = -2;
         goto cleanup;
