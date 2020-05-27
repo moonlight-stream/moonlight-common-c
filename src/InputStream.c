@@ -459,6 +459,10 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         return -2;
     }
 
+    if (deltaX == 0 && deltaY == 0) {
+        return 0;
+    }
+
     holder = malloc(sizeof(*holder));
     if (holder == NULL) {
         return -1;
@@ -673,6 +677,10 @@ int LiSendHighResScrollEvent(short scrollAmount) {
 
     if (!initialized) {
         return -2;
+    }
+
+    if (scrollAmount == 0) {
+        return 0;
     }
 
     holder = malloc(sizeof(*holder));
