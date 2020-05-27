@@ -506,8 +506,14 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
     holder->packet.mouseMoveAbs.x = htons(x);
     holder->packet.mouseMoveAbs.y = htons(y);
     holder->packet.mouseMoveAbs.unused = 0;
-    holder->packet.mouseMoveAbs.width = htons(referenceWidth);
-    holder->packet.mouseMoveAbs.height = htons(referenceHeight);
+
+    // There appears to be a rounding error in GFE's scaling calculation which prevents
+    // the cursor from reaching the far edge of the screen when streaming at smaller
+    // resolutions with a higher desktop resolution (like streaming 720p with a desktop
+    // resolution of 1080p, or streaming 720p/1080p with a desktop resolution of 4K).
+    // Subtracting one from the reference dimensions seems to work around this issue.
+    holder->packet.mouseMoveAbs.width = htons(referenceWidth - 1);
+    holder->packet.mouseMoveAbs.height = htons(referenceHeight - 1);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
