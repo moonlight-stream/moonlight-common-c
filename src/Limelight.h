@@ -536,6 +536,50 @@ int LiGetPendingAudioFrames(void);
 // negotiated audio frame duration.
 int LiGetPendingAudioDuration(void);
 
+// Port index flags for use with LiGetPortFromPortFlagIndex() and LiGetProtocolFromPortFlagIndex()
+#define ML_PORT_INDEX_TCP_47984 0
+#define ML_PORT_INDEX_TCP_47989 1
+#define ML_PORT_INDEX_TCP_48010 2
+#define ML_PORT_INDEX_UDP_47998 8
+#define ML_PORT_INDEX_UDP_47999 9
+#define ML_PORT_INDEX_UDP_48000 10
+#define ML_PORT_INDEX_UDP_48010 11
+
+// Port flags for use with LiTestClientConnectivity()
+#define ML_PORT_FLAG_ALL       0xFFFFFFFF
+#define ML_PORT_FLAG_TCP_47984 0x0001
+#define ML_PORT_FLAG_TCP_47989 0x0002
+#define ML_PORT_FLAG_TCP_48010 0x0004
+#define ML_PORT_FLAG_UDP_47998 0x0100
+#define ML_PORT_FLAG_UDP_47999 0x0200
+#define ML_PORT_FLAG_UDP_48000 0x0400
+#define ML_PORT_FLAG_UDP_48010 0x0800
+
+// Returns the port flags that correspond to ports involved in a failing connection stage.
+// This may be used to specifically test the ports that could have caused the connection failure.
+// If no ports are likely involved with a given stage failure, this function returns 0.
+unsigned int LiGetPortFlagsFromStage(int stage);
+
+// Returns the IPPROTO_* value for the specified port index 
+int LiGetProtocolFromPortFlagIndex(int portFlagIndex);
+
+// Returns the port number for the specified port index
+unsigned short LiGetPortFromPortFlagIndex(int portFlagIndex);
+
+// This function may be used to test if the local network is blocking Moonlight's ports. It requires
+// a test server running on an Internet-reachable host. To perform a test, pass in the DNS hostname
+// of the test server, a reference TCP port to ensure the test host is reachable at all (something
+// very unlikely to blocked, like 80 or 443), and a set of ML_PORT_FLAG_* values corresponding to
+// the ports you'd like to test. On return, it returns ML_TEST_RESULT_INCONCLUSIVE on catastrophic error,
+// or the set of port flags that failed to validate. If all ports validate successfully, it returns 0.
+//
+// It's encouraged to not use the port flags explicitly (because GameStream ports may change in the future),
+// but to instead use ML_PORT_FLAG_ALL or LiGetPortFlagsFromStage() on connection failure.
+//
+// The test server is available at https://github.com/cgutman/gfe-loopback
+#define ML_TEST_RESULT_INCONCLUSIVE 0xFFFFFFFF
+unsigned int LiTestClientConnectivity(const char* testServer, unsigned short referencePort, unsigned int testPortFlags);
+
 #ifdef __cplusplus
 }
 #endif
