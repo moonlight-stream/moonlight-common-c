@@ -146,7 +146,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                     err = connect(sockets[i], current->ai_addr, current->ai_addrlen);
                     if (err < 0) {
                         err = (int)LastSocketError();
-                        if (err != EWOULDBLOCK && err != EAGAIN) {
+                        if (err != EWOULDBLOCK && err != EAGAIN && err != EINPROGRESS) {
                             Limelog("Failed to start async connect to TCP %u: %d\n", LiGetPortFromPortFlagIndex(i), err);
 
                             // Mask off this bit so we don't try to include it in pollSockets() below
