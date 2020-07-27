@@ -65,20 +65,77 @@ void setRecvTimeout(SOCKET s, int timeoutSec) {
     }
 }
 
-int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
-    fd_set readfds;
-    int err;
+int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
+#ifdef LC_WINDOWS
+    // We could have used WSAPoll() but it has some nasty bugs
+    // https://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
+    //
+    // We'll emulate WSAPoll() with select(). Fortunately, Microsoft's definition
+    // of fd_set does not have the same stack corruption hazards that UNIX does.
+    fd_set readFds, writeFds, exceptFds;
+    int i, err;
     struct timeval tv;
+
+    FD_ZERO(&readFds);
+    FD_ZERO(&writeFds);
+    FD_ZERO(&exceptFds);
+
+    for (i = 0; i < pollFdsCount; i++) {
+        // Clear revents on input like poll() does
+        pollFds[i].revents = 0;
+
+        if (pollFds[i].events & POLLIN) {
+            FD_SET(pollFds[i].fd, &readFds);
+        }
+        if (pollFds[i].events & POLLOUT) {
+            FD_SET(pollFds[i].fd, &writeFds);
+
+            // Windows signals failed connections as an exception,
+            // while Linux signals them as writeable.
+            FD_SET(pollFds[i].fd, &exceptFds);
+        }
+    }
+
+    tv.tv_sec = timeoutMs / 1000;
+    tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+    // nfds is unused on Windows
+    err = select(0, &readFds, &writeFds, &exceptFds, timeoutMs >= 0 ? &tv : NULL);
+    if (err <= 0) {
+        // Error or timeout
+        return err;
+    }
+
+    for (i = 0; i < pollFdsCount; i++) {
+        if (FD_ISSET(pollFds[i].fd, &readFds)) {
+            pollFds[i].revents |= POLLRDNORM;
+        }
+
+        if (FD_ISSET(pollFds[i].fd, &writeFds)) {
+            pollFds[i].revents |= POLLWRNORM;
+        }
+
+        if (FD_ISSET(pollFds[i].fd, &exceptFds)) {
+            pollFds[i].revents |= POLLERR;
+        }
+    }
+
+    return err;
+#else
+    return poll(pollFds, pollFdsCount, timeoutMs);
+#endif
+}
+
+int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
+    int err;
     
     if (useSelect) {
-        FD_ZERO(&readfds);
-        FD_SET(s, &readfds);
+        struct pollfd pfd;
 
         // Wait up to 100 ms for the socket to be readable
-        tv.tv_sec = 0;
-        tv.tv_usec = UDP_RECV_POLL_TIMEOUT_MS * 1000;
-
-        err = select((int)(s) + 1, &readfds, NULL, NULL, &tv);
+        pfd.fd = s;
+        pfd.events = POLLIN;
+        err = pollSockets(&pfd, 1, UDP_RECV_POLL_TIMEOUT_MS);
         if (err <= 0) {
             // Return if an error or timeout occurs
             return err;
@@ -263,39 +320,32 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     }
     
     if (nonBlocking) {
-        fd_set writefds, exceptfds;
-        struct timeval tv;
-        
-        FD_ZERO(&writefds);
-        FD_ZERO(&exceptfds);
-        FD_SET(s, &writefds);
-        FD_SET(s, &exceptfds);
-        
-        tv.tv_sec = timeoutSec;
-        tv.tv_usec = 0;
-        
+        struct pollfd pfd;
+
         // Wait for the connection to complete or the timeout to elapse
-        err = select(s + 1, NULL, &writefds, &exceptfds, &tv);
+        pfd.fd = s;
+        pfd.events = POLLOUT;
+        err = pollSockets(&pfd, 1, timeoutSec * 1000);
         if (err < 0) {
-            // select() failed
+            // pollSockets() failed
             err = LastSocketError();
-            Limelog("select() failed: %d\n", err);
+            Limelog("pollSockets() failed: %d\n", err);
             closeSocket(s);
             SetLastSocketError(err);
             return INVALID_SOCKET;
         }
         else if (err == 0) {
-            // select() timed out
-            Limelog("select() timed out after %d seconds\n", timeoutSec);
+            // pollSockets() timed out
+            Limelog("Connection timed out after %d seconds (TCP port %u)\n", timeoutSec, port);
             closeSocket(s);
             SetLastSocketError(ETIMEDOUT);
             return INVALID_SOCKET;
         }
-        else if (FD_ISSET(s, &writefds) || FD_ISSET(s, &exceptfds)) {
+        else {
             // The socket was signalled
             SOCKADDR_LEN len = sizeof(err);
             getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
-            if (err != 0 || FD_ISSET(s, &exceptfds)) {
+            if (err != 0 || (pfd.revents & POLLERR)) {
                 // Get the error code
                 err = (err != 0) ? err : LastSocketFail();
             }
