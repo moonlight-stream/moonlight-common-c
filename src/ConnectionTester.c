@@ -27,6 +27,20 @@ unsigned int LiGetPortFlagsFromStage(int stage)
     }
 }
 
+unsigned int LiGetPortFlagsFromTerminationErrorCode(int errorCode)
+{
+    switch (errorCode)
+    {
+        case ML_ERROR_NO_VIDEO_TRAFFIC:
+            // Video is UDP 47998, but we'll also test UDP 48000 because
+            // we don't have an equivalent audio traffic error.
+            return ML_PORT_FLAG_UDP_47998 | ML_PORT_FLAG_UDP_48000;
+
+        default:
+            return 0;
+    }
+}
+
 int LiGetProtocolFromPortFlagIndex(int portFlagIndex)
 {
     // The lower byte is reserved for TCP

@@ -555,10 +555,13 @@ int LiGetPendingAudioDuration(void);
 #define ML_PORT_FLAG_UDP_48000 0x0400
 #define ML_PORT_FLAG_UDP_48010 0x0800
 
-// Returns the port flags that correspond to ports involved in a failing connection stage.
-// This may be used to specifically test the ports that could have caused the connection failure.
-// If no ports are likely involved with a given stage failure, this function returns 0.
+// Returns the port flags that correspond to ports involved in a failing connection stage, or
+// connection termination error.
+//
+// These may be used to specifically test the ports that could have caused the connection failure.
+// If no ports are likely involved with a given failure, this function returns 0.
 unsigned int LiGetPortFlagsFromStage(int stage);
+unsigned int LiGetPortFlagsFromTerminationErrorCode(int errorCode);
 
 // Returns the IPPROTO_* value for the specified port index 
 int LiGetProtocolFromPortFlagIndex(int portFlagIndex);
