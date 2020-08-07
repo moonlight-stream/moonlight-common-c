@@ -49,7 +49,6 @@ int initializeInputStream(void) {
     
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
-    initialized = 1;
     return 0;
 }
 
@@ -72,8 +71,6 @@ void destroyInputStream(void) {
 
         entry = nextEntry;
     }
-
-    initialized = 0;
 }
 
 static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
@@ -423,6 +420,9 @@ int startInputStream(void) {
         return err;
     }
 
+    // Allow input packets to be queued now
+    initialized = 1;
+
     // GFE will not send haptics events without this magic packet first
     sendEnableHaptics();
 
@@ -431,6 +431,9 @@ int startInputStream(void) {
 
 // Stops the input stream
 int stopInputStream(void) {
+    // No more packets should be queued now
+    initialized = 0;
+
     // Signal the input send thread
     LbqSignalQueueShutdown(&packetQueue);
     PltInterruptThread(&inputSendThread);
