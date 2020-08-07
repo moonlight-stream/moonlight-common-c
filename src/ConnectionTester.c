@@ -99,7 +99,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
     }
 
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_flags = AI_ADDRCONFIG;
 
     err = getaddrinfo(testServer, NULL, &hints, &serverAddrs);
@@ -127,7 +127,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 
         for (i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
             if (testPortFlags & (1 << i)) {
-                sockets[i] = socket(hints.ai_family,
+                sockets[i] = socket(current->ai_family,
                                     LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
                                     LiGetProtocolFromPortFlagIndex(i));
                 if (sockets[i] == INVALID_SOCKET) {
