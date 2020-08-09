@@ -89,6 +89,11 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
     testPortFlags &= VALID_PORT_FLAG_MASK;
     failingPortFlags = testPortFlags;
 
+    // If no ports were specified, just return 0
+    if (testPortFlags == 0) {
+        return 0;
+    }
+
     // Initialize sockets array to -1
     memset(sockets, 0xFF, sizeof(sockets));
 
