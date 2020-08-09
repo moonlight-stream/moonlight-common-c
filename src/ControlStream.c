@@ -26,6 +26,7 @@ static SOCKET ctlSock = INVALID_SOCKET;
 static ENetHost* client;
 static ENetPeer* peer;
 static PLT_MUTEX enetMutex;
+static int usePeriodicPing;
 
 static PLT_THREAD lossStatsThread;
 static PLT_THREAD invalidateRefFramesThread;
@@ -167,6 +168,7 @@ static short* payloadLengths;
 static char**preconstructedPayloads;
 
 #define LOSS_REPORT_INTERVAL_MS 50
+#define PERIODIC_PING_INTERVAL_MS 250
 
 // Initializes the control stream
 int initializeControlStream(void) {
@@ -206,6 +208,9 @@ int initializeControlStream(void) {
     intervalStartTimeMs = 0;
     lastIntervalLossPercentage = 0;
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
+    usePeriodicPing = (AppVersionQuad[0] > 7) ||
+            (AppVersionQuad[0] == 7 && AppVersionQuad[1] > 1) ||
+            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 415);
 
     return 0;
 }
@@ -592,44 +597,66 @@ static void controlReceiveThreadFunc(void* context) {
 }
 
 static void lossStatsThreadFunc(void* context) {
-    char*lossStatsPayload;
     BYTE_BUFFER byteBuffer;
 
-    lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
-    if (lossStatsPayload == NULL) {
-        Limelog("Loss Stats: malloc() failed\n");
-        ListenerCallbacks.connectionTerminated(-1);
-        return;
+    if (usePeriodicPing) {
+        char periodicPingPayload[8];
+
+        BbInitializeWrappedBuffer(&byteBuffer, periodicPingPayload, 0, sizeof(periodicPingPayload), BYTE_ORDER_LITTLE);
+        BbPutShort(&byteBuffer, 4); // Length of payload
+        BbPutInt(&byteBuffer, 0); // Timestamp?
+
+        while (!PltIsThreadInterrupted(&lossStatsThread)) {
+            // Send the message (and don't expect a response)
+            if (!sendMessageAndForget(0x0200, sizeof(periodicPingPayload), periodicPingPayload)) {
+                Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
+                ListenerCallbacks.connectionTerminated(LastSocketFail());
+                return;
+            }
+
+            // Wait a bit
+            PltSleepMsInterruptible(&lossStatsThread, PERIODIC_PING_INTERVAL_MS);
+        }
     }
+    else {
+        char* lossStatsPayload;
 
-    while (!PltIsThreadInterrupted(&lossStatsThread)) {
-        // Construct the payload
-        BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
-        BbPutInt(&byteBuffer, lossCountSinceLastReport);
-        BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
-        BbPutInt(&byteBuffer, 1000);
-        BbPutLong(&byteBuffer, lastGoodFrame);
-        BbPutInt(&byteBuffer, 0);
-        BbPutInt(&byteBuffer, 0);
-        BbPutInt(&byteBuffer, 0x14);
-
-        // Send the message (and don't expect a response)
-        if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
-            payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
-            free(lossStatsPayload);
-            Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketFail());
+        lossStatsPayload = malloc(payloadLengths[IDX_LOSS_STATS]);
+        if (lossStatsPayload == NULL) {
+            Limelog("Loss Stats: malloc() failed\n");
+            ListenerCallbacks.connectionTerminated(-1);
             return;
         }
 
-        // Clear the transient state
-        lossCountSinceLastReport = 0;
+        while (!PltIsThreadInterrupted(&lossStatsThread)) {
+            // Construct the payload
+            BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
+            BbPutInt(&byteBuffer, lossCountSinceLastReport);
+            BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
+            BbPutInt(&byteBuffer, 1000);
+            BbPutLong(&byteBuffer, lastGoodFrame);
+            BbPutInt(&byteBuffer, 0);
+            BbPutInt(&byteBuffer, 0);
+            BbPutInt(&byteBuffer, 0x14);
 
-        // Wait a bit
-        PltSleepMsInterruptible(&lossStatsThread, LOSS_REPORT_INTERVAL_MS);
+            // Send the message (and don't expect a response)
+            if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
+                payloadLengths[IDX_LOSS_STATS], lossStatsPayload)) {
+                free(lossStatsPayload);
+                Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
+                ListenerCallbacks.connectionTerminated(LastSocketFail());
+                return;
+            }
+
+            // Clear the transient state
+            lossCountSinceLastReport = 0;
+
+            // Wait a bit
+            PltSleepMsInterruptible(&lossStatsThread, LOSS_REPORT_INTERVAL_MS);
+        }
+
+        free(lossStatsPayload);
     }
-
-    free(lossStatsPayload);
 }
 
 static void requestIdrFrame(void) {
