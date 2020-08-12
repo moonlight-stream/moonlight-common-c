@@ -386,10 +386,14 @@ int initializePlatform(void) {
         return err;
     }
 
+    enterLowLatencyMode();
+
 	return 0;
 }
 
 void cleanupPlatform(void) {
+    exitLowLatencyMode();
+
     cleanupPlatformSockets();
     
     enet_deinitialize();

@@ -9,6 +9,10 @@
 #define TCPv4_MSS 536
 #define TCPv6_MSS 1220
 
+#if defined(LC_WINDOWS)
+static HANDLE WlanHandle;
+#endif
+
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
     char addrstr[INET6_ADDRSTRLEN];
@@ -506,6 +510,66 @@ int isPrivateNetworkAddress(struct sockaddr_storage* address) {
     }
 
     return 0;
+}
+
+// Enable platform-specific low latency options (best-effort)
+void enterLowLatencyMode(void) {
+#if defined(LC_WINDOWS)
+    DWORD negotiatedVersion;
+    PWLAN_INTERFACE_INFO_LIST wlanInterfaceList;
+    DWORD i;
+
+    // Reduce timer period to increase wait precision
+    timeBeginPeriod(1);
+
+    // Use the Vista+ WLAN API version
+    LC_ASSERT(WlanHandle == NULL);
+    if (WlanOpenHandle(WLAN_API_MAKE_VERSION(2, 0), NULL, &negotiatedVersion, &WlanHandle) != ERROR_SUCCESS) {
+        return;
+    }
+
+    if (WlanEnumInterfaces(WlanHandle, NULL, &wlanInterfaceList) != ERROR_SUCCESS) {
+        WlanCloseHandle(WlanHandle, NULL);
+        WlanHandle = NULL;
+        return;
+    }
+
+    for (i = 0; i < wlanInterfaceList->dwNumberOfItems; i++) {
+        if (wlanInterfaceList->InterfaceInfo[i].isState == wlan_interface_state_connected) {
+            DWORD error;
+            BOOL value;
+
+            // Enable media streaming mode for 802.11 wireless interfaces to reduce latency and
+            // unneccessary background scanning operations that cause packet loss and jitter.
+            //
+            // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/oid-wdi-set-connection-quality
+            // https://docs.microsoft.com/en-us/previous-versions/windows/hardware/wireless/native-802-11-media-streaming
+            value = TRUE;
+            error = WlanSetInterface(WlanHandle, &wlanInterfaceList->InterfaceInfo[i].InterfaceGuid,
+                                     wlan_intf_opcode_media_streaming_mode, sizeof(value), &value, NULL);
+            if (error == ERROR_SUCCESS) {
+                Limelog("WLAN interface %d is now in low latency mode\n", i);
+            }
+        }
+    }
+
+    WlanFreeMemory(wlanInterfaceList);
+#else
+#endif
+}
+
+void exitLowLatencyMode(void) {
+#if defined(LC_WINDOWS)
+    // Closing our WLAN client handle will undo our optimizations
+    if (WlanHandle != NULL) {
+        WlanCloseHandle(WlanHandle, NULL);
+        WlanHandle = NULL;
+    }
+
+    // Restore original timer period
+    timeEndPeriod(1);
+#else
+#endif
 }
 
 int initializePlatformSockets(void) {

@@ -6,6 +6,8 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <wlanapi.h>
+#include <timeapi.h>
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 
@@ -62,6 +64,9 @@ void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);
 int isPrivateNetworkAddress(struct sockaddr_storage* address);
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs);
+
+void enterLowLatencyMode(void);
+void exitLowLatencyMode(void);
 
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
