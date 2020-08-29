@@ -53,6 +53,8 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         char buf[1024];
     } resp;
 
+    sock = INVALID_SOCKET;
+
     err = initializePlatformSockets();
     if (err != 0) {
         Limelog("Failed to initialize sockets: %d\n", err);
@@ -110,8 +112,6 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
             bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), 1);
         }
     }
-
-    closeSocket(sock);
 
     if (bytesRead == 0) {
         Limelog("No response from STUN server\n");
@@ -183,6 +183,10 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     err = -6;
 
 Exit:
+    if (sock != INVALID_SOCKET) {
+        closeSocket(sock);
+    }
+
     if (stunAddrs != NULL) {
         freeaddrinfo(stunAddrs);
     }
