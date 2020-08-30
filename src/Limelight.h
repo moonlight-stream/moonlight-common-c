@@ -363,6 +363,11 @@ typedef void(*ConnListenerConnectionTerminated)(int errorCode);
 // firewall or port forwarding rules.
 #define ML_ERROR_NO_VIDEO_TRAFFIC -100
 
+// This error is passed to ConnListenerConnectionTerminated() if a fully formed
+// frame could not be received after waiting several seconds. It likely indicates
+// an extremely unstable connection or a bitrate that is far too high.
+#define ML_ERROR_NO_VIDEO_FRAME -101
+
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 

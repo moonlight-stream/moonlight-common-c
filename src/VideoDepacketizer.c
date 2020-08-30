@@ -297,9 +297,8 @@ static void reassembleFrame(int frameNumber) {
                 }
             }
             else {
-                int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
-
-                completeQueuedDecodeUnit(qdu, ret);
+                // Submit the frame to the decoder
+                submitFrame(qdu);
             }
 
             // Notify the control connection

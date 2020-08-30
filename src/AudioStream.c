@@ -181,8 +181,6 @@ static void ReceiveThreadProc(void* context) {
         }
 
         if (!receivedDataFromPeer) {
-            // We've received data, so we can stop sending our ping packets
-            // as quickly, since we're now just keeping the NAT session open.
             receivedDataFromPeer = 1;
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
         }
