@@ -180,9 +180,8 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
 
-    s = socket(addrfamily, SOCK_DGRAM, IPPROTO_UDP);
+    s = createSocket(addrfamily, SOCK_DGRAM, IPPROTO_UDP, 0);
     if (s == INVALID_SOCKET) {
-        Limelog("socket() failed: %d\n", (int)LastSocketError());
         return INVALID_SOCKET;
     }
 
@@ -251,24 +250,41 @@ int setSocketNonBlocking(SOCKET s, int val) {
 #endif
 }
 
-SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec) {
+SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBlocking) {
     SOCKET s;
-    struct sockaddr_in6 addr;
-    int err;
-    int nonBlocking;
     int val;
 
-    s = socket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP);
+    s = socket(addressFamily, socketType, protocol);
     if (s == INVALID_SOCKET) {
         Limelog("socket() failed: %d\n", (int)LastSocketError());
         return INVALID_SOCKET;
     }
-    
+
 #ifdef LC_DARWIN
     // Disable SIGPIPE on iOS
     val = 1;
     setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
 #endif
+
+    if (nonBlocking) {
+        setSocketNonBlocking(s, 1);
+    }
+
+    return s;
+}
+
+SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec) {
+    SOCKET s;
+    struct sockaddr_in6 addr;
+    struct pollfd pfd;
+    int err;
+    int val;
+
+    // Create a non-blocking TCP socket
+    s = createSocket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP, 1);
+    if (s == INVALID_SOCKET) {
+        return INVALID_SOCKET;
+    }
 
     // Some broken routers/firewalls (or routes with multiple broken routers) may result in TCP packets
     // being dropped without without us receiving an ICMP Fragmentation Needed packet. For example,
@@ -311,9 +327,6 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
         Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d\n", val, (int)LastSocketError());
     }
 #endif
-    
-    // Enable non-blocking I/O for connect timeout support
-    nonBlocking = setSocketNonBlocking(s, 1) == 0;
 
     // Start connection
     memcpy(&addr, dstaddr, addrlen);
@@ -321,44 +334,44 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     err = connect(s, (struct sockaddr*) &addr, addrlen);
     if (err < 0) {
         err = (int)LastSocketError();
+        if (err != EWOULDBLOCK && err != EAGAIN && err != EINPROGRESS) {
+            goto Exit;
+        }
     }
     
-    if (nonBlocking) {
-        struct pollfd pfd;
+    // Wait for the connection to complete or the timeout to elapse
+    pfd.fd = s;
+    pfd.events = POLLOUT;
+    err = pollSockets(&pfd, 1, timeoutSec * 1000);
+    if (err < 0) {
+        // pollSockets() failed
+        err = LastSocketError();
+        Limelog("pollSockets() failed: %d\n", err);
+        closeSocket(s);
+        SetLastSocketError(err);
+        return INVALID_SOCKET;
+    }
+    else if (err == 0) {
+        // pollSockets() timed out
+        Limelog("Connection timed out after %d seconds (TCP port %u)\n", timeoutSec, port);
+        closeSocket(s);
+        SetLastSocketError(ETIMEDOUT);
+        return INVALID_SOCKET;
+    }
+    else {
+        // The socket was signalled
+        SOCKADDR_LEN len = sizeof(err);
+        getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
+        if (err != 0 || (pfd.revents & POLLERR)) {
+            // Get the error code
+            err = (err != 0) ? err : LastSocketFail();
+        }
+    }
 
-        // Wait for the connection to complete or the timeout to elapse
-        pfd.fd = s;
-        pfd.events = POLLOUT;
-        err = pollSockets(&pfd, 1, timeoutSec * 1000);
-        if (err < 0) {
-            // pollSockets() failed
-            err = LastSocketError();
-            Limelog("pollSockets() failed: %d\n", err);
-            closeSocket(s);
-            SetLastSocketError(err);
-            return INVALID_SOCKET;
-        }
-        else if (err == 0) {
-            // pollSockets() timed out
-            Limelog("Connection timed out after %d seconds (TCP port %u)\n", timeoutSec, port);
-            closeSocket(s);
-            SetLastSocketError(ETIMEDOUT);
-            return INVALID_SOCKET;
-        }
-        else {
-            // The socket was signalled
-            SOCKADDR_LEN len = sizeof(err);
-            getsockopt(s, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
-            if (err != 0 || (pfd.revents & POLLERR)) {
-                // Get the error code
-                err = (err != 0) ? err : LastSocketFail();
-            }
-        }
-        
-        // Disable non-blocking I/O now that the connection is established
-        setSocketNonBlocking(s, 0);
-    }
+    // Disable non-blocking I/O now that the connection is established
+    setSocketNonBlocking(s, 0);
     
+Exit:
     if (err != 0) {
         Limelog("connect() failed: %d\n", err);
         closeSocket(s);

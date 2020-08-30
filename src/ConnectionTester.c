@@ -109,9 +109,10 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 
     for (i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
         if (testPortFlags & (1 << i)) {
-            sockets[i] = socket(address.ss_family,
-                                LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
-                                LiGetProtocolFromPortFlagIndex(i));
+            sockets[i] = createSocket(address.ss_family,
+                                      LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
+                                      LiGetProtocolFromPortFlagIndex(i),
+                                      1);
             if (sockets[i] == INVALID_SOCKET) {
                 err = LastSocketFail();
                 Limelog("Failed to create socket: %d\n", err);
@@ -119,25 +120,8 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                 goto Exit;
             }
 
-            #ifdef LC_DARWIN
-            {
-                // Disable SIGPIPE on iOS
-                int val = 1;
-                setsockopt(sockets[i], SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
-            }
-            #endif
-
             ((struct sockaddr_in6*)&address)->sin6_port = htons(LiGetPortFromPortFlagIndex(i));
             if (LiGetProtocolFromPortFlagIndex(i) == IPPROTO_TCP) {
-                // Enable non-blocking I/O for connect timeout support
-                if (setSocketNonBlocking(sockets[i] , 1) != 0) {
-                    // If non-blocking sockets are not available, TCP tests are not supported
-                    err = LastSocketFail();
-                    Limelog("Failed to enable non-blocking I/O: %d\n", err);
-                    failingPortFlags = ML_TEST_RESULT_INCONCLUSIVE;
-                    goto Exit;
-                }
-
                 // Initiate an asynchronous connection
                 err = connect(sockets[i], (struct sockaddr*)&address, address_length);
                 if (err < 0) {
