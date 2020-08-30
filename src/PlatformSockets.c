@@ -252,7 +252,6 @@ int setSocketNonBlocking(SOCKET s, int val) {
 
 SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBlocking) {
     SOCKET s;
-    int val;
 
     s = socket(addressFamily, socketType, protocol);
     if (s == INVALID_SOCKET) {
@@ -261,9 +260,11 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBloc
     }
 
 #ifdef LC_DARWIN
-    // Disable SIGPIPE on iOS
-    val = 1;
-    setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    {
+        // Disable SIGPIPE on iOS
+        int val = 1;
+        setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    }
 #endif
 
     if (nonBlocking) {
