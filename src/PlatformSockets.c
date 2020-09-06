@@ -133,36 +133,46 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
     int err;
     
-    if (useSelect) {
-        struct pollfd pfd;
+    do {
+        if (useSelect) {
+            struct pollfd pfd;
 
-        // Wait up to 100 ms for the socket to be readable
-        pfd.fd = s;
-        pfd.events = POLLIN;
-        err = pollSockets(&pfd, 1, UDP_RECV_POLL_TIMEOUT_MS);
-        if (err <= 0) {
-            // Return if an error or timeout occurs
-            return err;
+            // Wait up to 100 ms for the socket to be readable
+            pfd.fd = s;
+            pfd.events = POLLIN;
+            err = pollSockets(&pfd, 1, UDP_RECV_POLL_TIMEOUT_MS);
+            if (err <= 0) {
+                // Return if an error or timeout occurs
+                return err;
+            }
+
+            // This won't block since the socket is readable
+            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+        }
+        else {
+            // The caller has already configured a timeout on this
+            // socket via SO_RCVTIMEO, so we can avoid a syscall
+            // for each packet.
+            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+            if (err < 0 &&
+                    (LastSocketError() == EWOULDBLOCK ||
+                     LastSocketError() == EINTR ||
+                     LastSocketError() == EAGAIN)) {
+                // Return 0 for timeout
+                return 0;
+            }
         }
 
-        // This won't block since the socket is readable
-        return (int)recv(s, buffer, size, 0);
-    }
-    else {
-        // The caller has already configured a timeout on this
-        // socket via SO_RCVTIMEO, so we can avoid a syscall
-        // for each packet.
-        err = (int)recv(s, buffer, size, 0);
-        if (err < 0 &&
-                (LastSocketError() == EWOULDBLOCK ||
-                 LastSocketError() == EINTR ||
-                 LastSocketError() == EAGAIN)) {
-            // Return 0 for timeout
-            return 0;
-        }
+    // We may receive an error due to a previous ICMP Port Unreachable error received
+    // by this socket. We want to ignore those and continue reading. If the remote party
+    // is really dead, ENet or TCP connection failures will trigger connection teardown.
+#if defined(LC_WINDOWS)
+    } while (err < 0 && LastSocketError() == WSAECONNRESET);
+#else
+    } while (err < 0 && LastSocketError() == ECONNREFUSED);
+#endif
 
-        return err;
-    }
+    return err;
 }
 
 void closeSocket(SOCKET s) {
