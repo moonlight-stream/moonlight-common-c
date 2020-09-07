@@ -102,7 +102,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
         return ML_TEST_RESULT_INCONCLUSIVE;
     }
 
-    err = resolveHostName(testServer, AF_UNSPEC, referencePort, &address, &address_length);
+    err = resolveHostName(testServer, AF_UNSPEC, TCP_PORT_FLAG_ALWAYS_TEST | referencePort, &address, &address_length);
     if (err != 0) {
         return ML_TEST_RESULT_INCONCLUSIVE;
     }

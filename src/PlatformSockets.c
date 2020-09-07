@@ -446,11 +446,13 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     }
     
     for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
-        // Use the test port to ensure this address is working
-        if (tcpTestPort != 0) {
+        // Use the test port to ensure this address is working if:
+        // a) We have multiple addresses
+        // b) The caller asked us to test even with a single address
+        if (tcpTestPort != 0 && (res->ai_next != NULL || (tcpTestPort & TCP_PORT_FLAG_ALWAYS_TEST))) {
             SOCKET testSocket = connectTcpSocket((struct sockaddr_storage*)currentAddr->ai_addr,
                                                  currentAddr->ai_addrlen,
-                                                 tcpTestPort,
+                                                 tcpTestPort & TCP_PORT_MASK,
                                                  TEST_PORT_TIMEOUT_SEC);
             if (testSocket == INVALID_SOCKET) {
                 // Try the next address
