@@ -10,7 +10,15 @@
 #define TCPv6_MSS 1220
 
 #if defined(LC_WINDOWS)
+static HMODULE WlanApiLibraryHandle;
 static HANDLE WlanHandle;
+
+DWORD (WINAPI *pfnWlanOpenHandle)(DWORD dwClientVersion, PVOID pReserved, PDWORD pdwNegotiatedVersion, PHANDLE phClientHandle);
+DWORD (WINAPI *pfnWlanCloseHandle)(HANDLE hClientHandle, PVOID pReserved);
+DWORD (WINAPI *pfnWlanEnumInterfaces)(HANDLE hClientHandle, PVOID pReserved, PWLAN_INTERFACE_INFO_LIST *ppInterfaceList);
+VOID (WINAPI *pfnWlanFreeMemory)(PVOID pMemory);
+DWORD (WINAPI *pfnWlanSetInterface)(HANDLE hClientHandle, CONST GUID *pInterfaceGuid, WLAN_INTF_OPCODE OpCode, DWORD dwDataSize, CONST PVOID pData, PVOID pReserved);
+
 #endif
 
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
@@ -547,14 +555,43 @@ void enterLowLatencyMode(void) {
     // Reduce timer period to increase wait precision
     timeBeginPeriod(1);
 
-    // Use the Vista+ WLAN API version
-    LC_ASSERT(WlanHandle == NULL);
-    if (WlanOpenHandle(WLAN_API_MAKE_VERSION(2, 0), NULL, &negotiatedVersion, &WlanHandle) != ERROR_SUCCESS) {
+    // Load wlanapi.dll dynamically because it will not always be present on Windows Server SKUs.
+    WlanApiLibraryHandle = LoadLibraryA("wlanapi.dll");
+    if (WlanApiLibraryHandle == NULL) {
+        Limelog("WLANAPI is not supported on this OS\n");
         return;
     }
 
-    if (WlanEnumInterfaces(WlanHandle, NULL, &wlanInterfaceList) != ERROR_SUCCESS) {
-        WlanCloseHandle(WlanHandle, NULL);
+    pfnWlanOpenHandle = GetProcAddress(WlanApiLibraryHandle, "WlanOpenHandle");
+    pfnWlanCloseHandle = GetProcAddress(WlanApiLibraryHandle, "WlanCloseHandle");
+    pfnWlanFreeMemory = GetProcAddress(WlanApiLibraryHandle, "WlanFreeMemory");
+    pfnWlanEnumInterfaces = GetProcAddress(WlanApiLibraryHandle, "WlanEnumInterfaces");
+    pfnWlanSetInterface = GetProcAddress(WlanApiLibraryHandle, "WlanSetInterface");
+
+    if (pfnWlanOpenHandle == NULL || pfnWlanCloseHandle == NULL ||
+            pfnWlanFreeMemory == NULL || pfnWlanEnumInterfaces == NULL || pfnWlanSetInterface == NULL) {
+        LC_ASSERT(pfnWlanOpenHandle != NULL);
+        LC_ASSERT(pfnWlanCloseHandle != NULL);
+        LC_ASSERT(pfnWlanFreeMemory != NULL);
+        LC_ASSERT(pfnWlanEnumInterfaces != NULL);
+        LC_ASSERT(pfnWlanSetInterface != NULL);
+
+        // This should never happen since that would mean Microsoft removed a public API, but
+        // we'll check and fail gracefully just in case.
+        FreeLibrary(WlanApiLibraryHandle);
+        WlanApiLibraryHandle = NULL;
+        return;
+    }
+
+    // Use the Vista+ WLAN API version
+    LC_ASSERT(WlanHandle == NULL);
+    if (pfnWlanOpenHandle(WLAN_API_MAKE_VERSION(2, 0), NULL, &negotiatedVersion, &WlanHandle) != ERROR_SUCCESS) {
+        WlanHandle = NULL;
+        return;
+    }
+
+    if (pfnWlanEnumInterfaces(WlanHandle, NULL, &wlanInterfaceList) != ERROR_SUCCESS) {
+        pfnWlanCloseHandle(WlanHandle, NULL);
         WlanHandle = NULL;
         return;
     }
@@ -570,15 +607,15 @@ void enterLowLatencyMode(void) {
             // https://docs.microsoft.com/en-us/windows-hardware/drivers/network/oid-wdi-set-connection-quality
             // https://docs.microsoft.com/en-us/previous-versions/windows/hardware/wireless/native-802-11-media-streaming
             value = TRUE;
-            error = WlanSetInterface(WlanHandle, &wlanInterfaceList->InterfaceInfo[i].InterfaceGuid,
-                                     wlan_intf_opcode_media_streaming_mode, sizeof(value), &value, NULL);
+            error = pfnWlanSetInterface(WlanHandle, &wlanInterfaceList->InterfaceInfo[i].InterfaceGuid,
+                                        wlan_intf_opcode_media_streaming_mode, sizeof(value), &value, NULL);
             if (error == ERROR_SUCCESS) {
                 Limelog("WLAN interface %d is now in low latency mode\n", i);
             }
         }
     }
 
-    WlanFreeMemory(wlanInterfaceList);
+    pfnWlanFreeMemory(wlanInterfaceList);
 #else
 #endif
 }
@@ -587,8 +624,20 @@ void exitLowLatencyMode(void) {
 #if defined(LC_WINDOWS)
     // Closing our WLAN client handle will undo our optimizations
     if (WlanHandle != NULL) {
-        WlanCloseHandle(WlanHandle, NULL);
+        pfnWlanCloseHandle(WlanHandle, NULL);
         WlanHandle = NULL;
+    }
+
+    // Release the library reference to wlanapi.dll
+    if (WlanApiLibraryHandle != NULL) {
+        pfnWlanOpenHandle = NULL;
+        pfnWlanCloseHandle = NULL;
+        pfnWlanFreeMemory = NULL;
+        pfnWlanEnumInterfaces = NULL;
+        pfnWlanSetInterface = NULL;
+
+        FreeLibrary(WlanApiLibraryHandle);
+        WlanApiLibraryHandle = NULL;
     }
 
     // Restore original timer period
