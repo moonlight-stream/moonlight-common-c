@@ -104,7 +104,8 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 
     err = resolveHostName(testServer, AF_UNSPEC, TCP_PORT_FLAG_ALWAYS_TEST | referencePort, &address, &address_length);
     if (err != 0) {
-        return ML_TEST_RESULT_INCONCLUSIVE;
+        failingPortFlags = ML_TEST_RESULT_INCONCLUSIVE;
+        goto Exit;
     }
 
     for (i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
