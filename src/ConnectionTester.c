@@ -12,6 +12,8 @@
 
 #define PORT_FLAGS_MAX_COUNT 32
 
+#define MTU_TEST_SIZE 1040
+
 unsigned int LiGetPortFlagsFromStage(int stage)
 {
     switch (stage)
@@ -136,7 +138,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                 }
             }
             else {
-                const char buf[] = {'C', 'T', 'E', 'S', 'T'};
+                const char buf[MTU_TEST_SIZE] = "moonlight-ctest";
                 int j;
 
                 // Send a few packets since UDP is unreliable
@@ -217,7 +219,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                 LC_ASSERT(portIndex != PORT_FLAGS_MAX_COUNT);
 
                 if (LiGetProtocolFromPortFlagIndex(portIndex) == IPPROTO_UDP) {
-                    char buf[32];
+                    char buf[MTU_TEST_SIZE];
 
                     // A UDP socket was signalled. This could be because we got
                     // a packet from the test server, or it could be because we
