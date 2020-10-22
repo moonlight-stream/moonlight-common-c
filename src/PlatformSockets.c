@@ -78,20 +78,21 @@ void setRecvTimeout(SOCKET s, int timeoutSec) {
 }
 
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
-#ifdef LC_WINDOWS
+#if defined(LC_WINDOWS) || defined(__vita__)
     // We could have used WSAPoll() but it has some nasty bugs
     // https://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
     //
     // We'll emulate WSAPoll() with select(). Fortunately, Microsoft's definition
     // of fd_set does not have the same stack corruption hazards that UNIX does.
     fd_set readFds, writeFds, exceptFds;
-    int i, err;
+    int i, err, nfds;
     struct timeval tv;
 
     FD_ZERO(&readFds);
     FD_ZERO(&writeFds);
     FD_ZERO(&exceptFds);
 
+    nfds = 0;
     for (i = 0; i < pollFdsCount; i++) {
         // Clear revents on input like poll() does
         pollFds[i].revents = 0;
@@ -102,17 +103,25 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
         if (pollFds[i].events & POLLOUT) {
             FD_SET(pollFds[i].fd, &writeFds);
 
+#ifdef LC_WINDOWS
             // Windows signals failed connections as an exception,
             // while Linux signals them as writeable.
             FD_SET(pollFds[i].fd, &exceptFds);
+#endif
         }
+
+#ifndef LC_WINDOWS
+        // nfds is unused on Windows
+        if (pollFds[i].fd >= nfds) {
+            nfds = pollFds[i].fd + 1;
+        }
+#endif
     }
 
     tv.tv_sec = timeoutMs / 1000;
     tv.tv_usec = (timeoutMs % 1000) * 1000;
 
-    // nfds is unused on Windows
-    err = select(0, &readFds, &writeFds, &exceptFds, timeoutMs >= 0 ? &tv : NULL);
+    err = select(nfds, &readFds, &writeFds, &exceptFds, timeoutMs >= 0 ? &tv : NULL);
     if (err <= 0) {
         // Error or timeout
         return err;
