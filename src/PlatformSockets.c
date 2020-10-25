@@ -6,7 +6,11 @@
 #define RCV_BUFFER_SIZE_MIN  32767
 #define RCV_BUFFER_SIZE_STEP 16384
 
+#if defined(__vita__)
+#define TCPv4_MSS 512
+#else
 #define TCPv4_MSS 536
+#endif
 #define TCPv6_MSS 1220
 
 #if defined(LC_WINDOWS)
