@@ -246,9 +246,20 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     
     err |= addAttributeString(&optionHead, "x-nv-vqos[0].videoQualityScoreUpdateTime", "5000");
 
-    // Enable DSCP marking to hopefully increase QoS priority
-    err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
-    err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
+    // If the remote host is local (RFC 1918) or IPv6 (where it's hard to tell based on the address
+    // alone), enable QoS tagging for our traffic. Windows qWave will disable it if the host is
+    // off-link, *however* Windows may get it wrong in cases where the host is directly connected
+    // to the Internet without a NAT. In this case, it may send DSCP marked traffic off-link and
+    // it could lead to black holes due to misconfigured ISP hardware or CPE. For this reason,
+    // we only enable it in cases where it looks like it will work.
+    if (StreamConfig.streamingRemotely == STREAM_CFG_LOCAL || RemoteAddr.ss_family == AF_INET6) {
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "5");
+        err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "4");
+    }
+    else {
+        err |= addAttributeString(&optionHead, "x-nv-vqos[0].qosTrafficType", "0");
+        err |= addAttributeString(&optionHead, "x-nv-aqos.qosTrafficType", "0");
+    }
 
     if (AppVersionQuad[0] == 3) {
         err |= addGen3Options(&optionHead, urlSafeAddr);
