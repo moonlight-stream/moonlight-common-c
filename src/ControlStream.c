@@ -544,13 +544,13 @@ static void controlReceiveThreadFunc(void* context) {
                 BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
                 BbAdvanceBuffer(&bb, 4);
 
-                unsigned short controllerNumber;
-                unsigned short lowFreqRumble;
-                unsigned short highFreqRumble;
+                uint16_t controllerNumber;
+                uint16_t lowFreqRumble;
+                uint16_t highFreqRumble;
 
-                BbGetShort(&bb, (short*)&controllerNumber);
-                BbGetShort(&bb, (short*)&lowFreqRumble);
-                BbGetShort(&bb, (short*)&highFreqRumble);
+                BbGet16(&bb, &controllerNumber);
+                BbGet16(&bb, &lowFreqRumble);
+                BbGet16(&bb, &highFreqRumble);
 
                 ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
             }
@@ -559,10 +559,10 @@ static void controlReceiveThreadFunc(void* context) {
 
                 BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
-                unsigned short terminationReason;
+                uint16_t terminationReason;
                 int terminationErrorCode;
 
-                BbGetShort(&bb, (short*)&terminationReason);
+                BbGet16(&bb, &terminationReason);
 
                 Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
 
@@ -603,8 +603,8 @@ static void lossStatsThreadFunc(void* context) {
         char periodicPingPayload[8];
 
         BbInitializeWrappedBuffer(&byteBuffer, periodicPingPayload, 0, sizeof(periodicPingPayload), BYTE_ORDER_LITTLE);
-        BbPutShort(&byteBuffer, 4); // Length of payload
-        BbPutInt(&byteBuffer, 0); // Timestamp?
+        BbPut16(&byteBuffer, 4); // Length of payload
+        BbPut32(&byteBuffer, 0); // Timestamp?
 
         while (!PltIsThreadInterrupted(&lossStatsThread)) {
             // Send the message (and don't expect a response)
@@ -631,13 +631,13 @@ static void lossStatsThreadFunc(void* context) {
         while (!PltIsThreadInterrupted(&lossStatsThread)) {
             // Construct the payload
             BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
-            BbPutInt(&byteBuffer, lossCountSinceLastReport);
-            BbPutInt(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
-            BbPutInt(&byteBuffer, 1000);
-            BbPutLong(&byteBuffer, lastGoodFrame);
-            BbPutInt(&byteBuffer, 0);
-            BbPutInt(&byteBuffer, 0);
-            BbPutInt(&byteBuffer, 0x14);
+            BbPut32(&byteBuffer, lossCountSinceLastReport);
+            BbPut32(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
+            BbPut32(&byteBuffer, 1000);
+            BbPut64(&byteBuffer, lastGoodFrame);
+            BbPut32(&byteBuffer, 0);
+            BbPut32(&byteBuffer, 0);
+            BbPut32(&byteBuffer, 0x14);
 
             // Send the message (and don't expect a response)
             if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
