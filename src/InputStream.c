@@ -8,9 +8,9 @@
 
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
-static int initialized;
+static bool initialized;
 static EVP_CIPHER_CTX* cipherContext;
-static int cipherInitialized;
+static bool cipherInitialized;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
@@ -45,7 +45,7 @@ int initializeInputStream(void) {
     memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
     
     // Initialized on first packet
-    cipherInitialized = 0;
+    cipherInitialized = false;
     
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
@@ -58,7 +58,7 @@ void destroyInputStream(void) {
     
     if (cipherInitialized) {
         EVP_CIPHER_CTX_free(cipherContext);
-        cipherInitialized = 0;
+        cipherInitialized = false;
     }
 
     entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
@@ -95,7 +95,7 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
             if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
                 return -1;
             }
-            cipherInitialized = 1;
+            cipherInitialized = true;
         }
 
         // Gen 7 servers use 128-bit AES GCM
@@ -153,7 +153,7 @@ static int encryptData(const unsigned char* plaintext, int plaintextLen,
                 ret = -1;
                 goto cbc_cleanup;
             }
-            cipherInitialized = 1;
+            cipherInitialized = true;
 
             // Prior to Gen 7, 128-bit AES CBC is used for encryption
             if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_cbc(), NULL,
@@ -421,7 +421,7 @@ int startInputStream(void) {
     }
 
     // Allow input packets to be queued now
-    initialized = 1;
+    initialized = true;
 
     // GFE will not send haptics events without this magic packet first
     sendEnableHaptics();
@@ -432,7 +432,7 @@ int startInputStream(void) {
 // Stops the input stream
 int stopInputStream(void) {
     // No more packets should be queued now
-    initialized = 0;
+    initialized = false;
 
     // Signal the input send thread
     LbqSignalQueueShutdown(&packetQueue);

@@ -147,7 +147,7 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 #endif
 }
 
-int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect) {
+int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
     int err;
     
     do {
@@ -207,7 +207,7 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
 
-    s = createSocket(addrfamily, SOCK_DGRAM, IPPROTO_UDP, 0);
+    s = createSocket(addrfamily, SOCK_DGRAM, IPPROTO_UDP, false);
     if (s == INVALID_SOCKET) {
         return INVALID_SOCKET;
     }
@@ -267,7 +267,8 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     return s;
 }
 
-int setSocketNonBlocking(SOCKET s, int val) {
+int setSocketNonBlocking(SOCKET s, bool enabled) {
+    int val = enabled ? 1 : 0;
 #if defined(__vita__)
     return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
 #elif defined(FIONBIO)
@@ -277,7 +278,7 @@ int setSocketNonBlocking(SOCKET s, int val) {
 #endif
 }
 
-SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBlocking) {
+SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking) {
     SOCKET s;
 
     s = socket(addressFamily, socketType, protocol);
@@ -295,7 +296,7 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBloc
 #endif
 
     if (nonBlocking) {
-        setSocketNonBlocking(s, 1);
+        setSocketNonBlocking(s, true);
     }
 
     return s;
@@ -309,7 +310,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     int val;
 
     // Create a non-blocking TCP socket
-    s = createSocket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP, 1);
+    s = createSocket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP, true);
     if (s == INVALID_SOCKET) {
         return INVALID_SOCKET;
     }
@@ -397,7 +398,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     }
 
     // Disable non-blocking I/O now that the connection is established
-    setSocketNonBlocking(s, 0);
+    setSocketNonBlocking(s, false);
     
 Exit:
     if (err != 0) {
@@ -492,20 +493,20 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     return -1;
 }
 
-int isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
+bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
     int i;
     
     for (i = 0; i < prefixLength; i++) {
         unsigned char mask = 1 << (i % 8);
         if ((sin6->sin6_addr.s6_addr[i / 8] & mask) != (subnet[i / 8] & mask)) {
-            return 0;
+            return false;
         }
     }
     
-    return 1;
+    return true;
 }
 
-int isPrivateNetworkAddress(struct sockaddr_storage* address) {
+bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
     // We only count IPv4 addresses as possibly private for now
     if (address->ss_family == AF_INET) {
@@ -516,19 +517,19 @@ int isPrivateNetworkAddress(struct sockaddr_storage* address) {
         
         // 10.0.0.0/8
         if ((addr & 0xFF000000) == 0x0A000000) {
-            return 1;
+            return true;
         }
         // 172.16.0.0/12
         else if ((addr & 0xFFF00000) == 0xAC100000) {
-            return 1;
+            return true;
         }
         // 192.168.0.0/16
         else if ((addr & 0xFFFF0000) == 0xC0A80000) {
-            return 1;
+            return true;
         }
         // 169.254.0.0/16
         else if ((addr & 0xFFFF0000) == 0xA9FE0000) {
-            return 1;
+            return true;
         }
     }
     else if (address->ss_family == AF_INET6) {
@@ -539,19 +540,19 @@ int isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
         // fe80::/10
         if (isInSubnetV6(sin6, linkLocalPrefix, 10)) {
-            return 1;
+            return true;
         }
         // fec0::/10
         else if (isInSubnetV6(sin6, siteLocalPrefix, 10)) {
-            return 1;
+            return true;
         }
         // fc00::/7
         else if (isInSubnetV6(sin6, uniqueLocalPrefix, 7)) {
-            return 1;
+            return true;
         }
     }
 
-    return 0;
+    return false;
 }
 
 // Enable platform-specific low latency options (best-effort)

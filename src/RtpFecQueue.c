@@ -25,7 +25,7 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet, int length, int isParity) {
+static bool queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, bool head, PRTP_PACKET packet, int length, bool isParity) {
     PRTPFEC_QUEUE_ENTRY entry;
     
     LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextContiguousSequenceNumber));
@@ -41,7 +41,7 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
         entry = queue->bufferHead;
         while (entry != NULL) {
             if (entry->packet->sequenceNumber == packet->sequenceNumber) {
-                return 0;
+                return false;
             }
 
             entry = entry->next;
@@ -79,7 +79,7 @@ static int queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, int h
     }
     queue->bufferSize++;
 
-    return 1;
+    return true;
 }
 
 #define PACKET_RECOVERY_FAILURE()                     \
@@ -295,7 +295,7 @@ cleanup_packets:
                 // it may be a legitimate part of the H.264 bytestream.
 
                 LC_ASSERT(isBefore16(rtpPacket->sequenceNumber, queue->bufferFirstParitySequenceNumber));
-                queuePacket(queue, queueEntry, 0, rtpPacket, StreamConfig.packetSize + dataOffset, 0);
+                queuePacket(queue, queueEntry, false, rtpPacket, StreamConfig.packetSize + dataOffset, false);
             } else if (packets[i] != NULL) {
                 free(packets[i]);
             }
@@ -464,7 +464,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
     LC_ASSERT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
 
     LC_ASSERT((nvPacket->flags & FLAG_EOF) || length - dataOffset == StreamConfig.packetSize);
-    if (!queuePacket(queue, packetEntry, 0, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
+    if (!queuePacket(queue, packetEntry, false, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
         return RTPF_RET_REJECTED;
     }
     else {

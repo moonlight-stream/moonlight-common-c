@@ -104,12 +104,12 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
                 // Wait UDP_RECV_POLL_TIMEOUT_MS before moving on to the next server to
                 // avoid having to spam the other STUN servers if we find a working one.
-                bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), 1);
+                bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
             }
         }
         else {
             // This waits in UDP_RECV_POLL_TIMEOUT_MS increments
-            bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), 1);
+            bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
         }
     }
 

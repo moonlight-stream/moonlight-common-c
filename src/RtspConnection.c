@@ -8,10 +8,10 @@
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
 static char* sessionIdString;
-static int hasSessionId;
+static bool hasSessionId;
 static int rtspClientVersion;
 static char urlAddr[URLSAFESTRING_LEN];
-static int useEnet;
+static bool useEnet;
 
 static SOCKET sock = INVALID_SOCKET;
 static ENetHost* client;
@@ -48,21 +48,21 @@ static POPTION_ITEM createOptionItem(char* option, char* content)
 }
 
 // Add an option to the RTSP Message
-static int addOption(PRTSP_MESSAGE msg, char* option, char* content)
+static bool addOption(PRTSP_MESSAGE msg, char* option, char* content)
 {
     POPTION_ITEM item = createOptionItem(option, content);
     if (item == NULL) {
-        return 0;
+        return false;
     }
 
     insertOption(&msg->options, item);
     msg->flags |= FLAG_ALLOCATED_OPTION_ITEMS;
 
-    return 1;
+    return true;
 }
 
 // Create an RTSP Request
-static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
+static bool initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
 {
     char sequenceNumberStr[16];
     char clientVersionStr[16];
@@ -77,14 +77,14 @@ static int initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target)
         !addOption(msg, "X-GS-ClientVersion", clientVersionStr) ||
         (!useEnet && !addOption(msg, "Host", urlAddr))) {
         freeMessage(msg);
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 // Send RTSP message and get response over ENet
-static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
+static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
     ENetEvent event;
     char* serializedMessage;
     int messageLen;
@@ -92,11 +92,11 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     ENetPacket* packet;
     char* payload;
     int payloadLength;
-    int ret;
+    bool ret;
     char* responseBuffer;
 
     *error = -1;
-    ret = 0;
+    ret = false;
     responseBuffer = NULL;
 
     // We're going to handle the payload separately, so temporarily set the payload to NULL
@@ -183,7 +183,7 @@ static int transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         
     if (parseRtspMessage(response, responseBuffer, offset) == RTSP_ERROR_SUCCESS) {
         // Successfully parsed response
-        ret = 1;
+        ret = true;
     }
     else {
         Limelog("Failed to parse RTSP response\n");
@@ -208,9 +208,9 @@ Exit:
 }
 
 // Send RTSP message and get response over TCP
-static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
+static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
     SOCK_RET err;
-    int ret;
+    bool ret;
     int offset;
     char* serializedMessage = NULL;
     int messageLen;
@@ -218,7 +218,7 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
     int responseBufferSize;
 
     *error = -1;
-    ret = 0;
+    ret = false;
     responseBuffer = NULL;
 
     sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
@@ -276,7 +276,7 @@ static int transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response,
 
     if (parseRtspMessage(response, responseBuffer, offset) == RTSP_ERROR_SUCCESS) {
         // Successfully parsed response
-        ret = 1;
+        ret = true;
     }
     else {
         Limelog("Failed to parse RTSP response\n");
@@ -296,7 +296,7 @@ Exit:
     return ret;
 }
 
-static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int expectingPayload, int* error) {
+static bool transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
     if (useEnet) {
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
@@ -306,15 +306,15 @@ static int transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, in
 }
 
 // Send RTSP OPTIONS request
-static int requestOptions(PRTSP_MESSAGE response, int* error) {
+static bool requestOptions(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
-    int ret;
+    bool ret;
 
     *error = -1;
 
     ret = initializeRtspRequest(&request, "OPTIONS", rtspTargetUrl);
-    if (ret != 0) {
-        ret = transactRtspMessage(&request, response, 0, error);
+    if (ret) {
+        ret = transactRtspMessage(&request, response, false, error);
         freeMessage(&request);
     }
 
@@ -322,22 +322,22 @@ static int requestOptions(PRTSP_MESSAGE response, int* error) {
 }
 
 // Send RTSP DESCRIBE request
-static int requestDescribe(PRTSP_MESSAGE response, int* error) {
+static bool requestDescribe(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
-    int ret;
+    bool ret;
 
     *error = -1;
 
     ret = initializeRtspRequest(&request, "DESCRIBE", rtspTargetUrl);
-    if (ret != 0) {
+    if (ret) {
         if (addOption(&request, "Accept",
             "application/sdp") &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
-            ret = transactRtspMessage(&request, response, 1, error);
+            ret = transactRtspMessage(&request, response, true, error);
         }
         else {
-            ret = 0;
+            ret = false;
         }
         freeMessage(&request);
     }
@@ -346,18 +346,18 @@ static int requestDescribe(PRTSP_MESSAGE response, int* error) {
 }
 
 // Send RTSP SETUP request
-static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
+static bool setupStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
-    int ret;
+    bool ret;
     char* transportValue;
 
     *error = -1;
 
     ret = initializeRtspRequest(&request, "SETUP", target);
-    if (ret != 0) {
+    if (ret) {
         if (hasSessionId) {
             if (!addOption(&request, "Session", sessionIdString)) {
-                ret = 0;
+                ret = false;
                 goto FreeMessage;
             }
         }
@@ -375,10 +375,10 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
         if (addOption(&request, "Transport", transportValue) &&
             addOption(&request, "If-Modified-Since",
                 "Thu, 01 Jan 1970 00:00:00 GMT")) {
-            ret = transactRtspMessage(&request, response, 0, error);
+            ret = transactRtspMessage(&request, response, false, error);
         }
         else {
-            ret = 0;
+            ret = false;
         }
 
     FreeMessage:
@@ -389,19 +389,19 @@ static int setupStream(PRTSP_MESSAGE response, char* target, int* error) {
 }
 
 // Send RTSP PLAY request
-static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
+static bool playStream(PRTSP_MESSAGE response, char* target, int* error) {
     RTSP_MESSAGE request;
-    int ret;
+    bool ret;
 
     *error = -1;
 
     ret = initializeRtspRequest(&request, "PLAY", target);
     if (ret != 0) {
         if (addOption(&request, "Session", sessionIdString)) {
-            ret = transactRtspMessage(&request, response, 0, error);
+            ret = transactRtspMessage(&request, response, false, error);
         }
         else {
-            ret = 0;
+            ret = false;
         }
         freeMessage(&request);
     }
@@ -410,17 +410,17 @@ static int playStream(PRTSP_MESSAGE response, char* target, int* error) {
 }
 
 // Send RTSP ANNOUNCE message
-static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
+static bool sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
     RTSP_MESSAGE request;
-    int ret;
+    bool ret;
     int payloadLength;
     char payloadLengthStr[16];
 
     *error = -1;
 
     ret = initializeRtspRequest(&request, "ANNOUNCE", "streamid=video");
-    if (ret != 0) {
-        ret = 0;
+    if (ret) {
+        ret = false;
 
         if (!addOption(&request, "Session", sessionIdString) ||
             !addOption(&request, "Content-type", "application/sdp")) {
@@ -439,7 +439,7 @@ static int sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
             goto FreeMessage;
         }
 
-        ret = transactRtspMessage(&request, response, 0, error);
+        ret = transactRtspMessage(&request, response, false, error);
 
     FreeMessage:
         freeMessage(&request);
@@ -484,7 +484,7 @@ static int parseOpusConfigFromParamString(char* paramStr, int channelCount, POPU
 
 // Parses the Opus configuration from an RTSP DESCRIBE response
 static int parseOpusConfigurations(PRTSP_MESSAGE response) {
-    HighQualitySurroundSupported = 0;
+    HighQualitySurroundSupported = false;
     memset(&NormalQualityOpusConfig, 0, sizeof(NormalQualityOpusConfig));
     memset(&HighQualityOpusConfig, 0, sizeof(HighQualityOpusConfig));
 
@@ -549,7 +549,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
                 }
 
                 // We can request high quality audio
-                HighQualitySurroundSupported = 1;
+                HighQualitySurroundSupported = true;
             }
         }
         else {
@@ -603,7 +603,7 @@ int performRtspHandshake(void) {
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
     sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
-    hasSessionId = 0;
+    hasSessionId = false;
 
     switch (AppVersionQuad[0]) {
         case 3:
@@ -777,7 +777,7 @@ int performRtspHandshake(void) {
             goto Exit;
         }
 
-        hasSessionId = 1;
+        hasSessionId = true;
 
         freeMessage(&response);
     }

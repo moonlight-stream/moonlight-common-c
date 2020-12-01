@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define TYPE_REQUEST 0
 #define TYPE_RESPONSE 1

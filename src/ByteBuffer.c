@@ -37,32 +37,32 @@ static int byteSwapShort(PBYTE_BUFFER buff, short s) {
     }
 }
 
-int BbAdvanceBuffer(PBYTE_BUFFER buff, int offset) {
+bool BbAdvanceBuffer(PBYTE_BUFFER buff, int offset) {
     if (buff->position + offset > buff->length) {
-        return 0;
+        return false;
     }
 
     buff->position += offset;
 
-    return 1;
+    return true;
 }
 
 // Get a byte from the byte buffer
-int BbGet(PBYTE_BUFFER buff, char* c) {
+bool BbGet(PBYTE_BUFFER buff, char* c) {
     if (buff->position + sizeof(*c) > buff->length) {
-        return 0;
+        return false;
     }
 
     memcpy(c, &buff->buffer[buff->position], sizeof(*c));
     buff->position += sizeof(*c);
 
-    return 1;
+    return true;
 }
 
 // Get a short from the byte buffer
-int BbGetShort(PBYTE_BUFFER buff, short* s) {
+bool BbGetShort(PBYTE_BUFFER buff, short* s) {
     if (buff->position + sizeof(*s) > buff->length) {
-        return 0;
+        return false;
     }
 
     memcpy(s, &buff->buffer[buff->position], sizeof(*s));
@@ -70,13 +70,13 @@ int BbGetShort(PBYTE_BUFFER buff, short* s) {
 
     *s = byteSwapShort(buff, *s);
 
-    return 1;
+    return true;
 }
 
 // Get an int from the byte buffer
-int BbGetInt(PBYTE_BUFFER buff, int* i) {
+bool BbGetInt(PBYTE_BUFFER buff, int* i) {
     if (buff->position + sizeof(*i) > buff->length) {
-        return 0;
+        return false;
     }
 
     memcpy(i, &buff->buffer[buff->position], sizeof(*i));
@@ -84,13 +84,13 @@ int BbGetInt(PBYTE_BUFFER buff, int* i) {
 
     *i = byteSwapInt(buff, *i);
 
-    return 1;
+    return true;
 }
 
 // Get a long from the byte buffer
-int BbGetLong(PBYTE_BUFFER buff, long long* l) {
+bool BbGetLong(PBYTE_BUFFER buff, long long* l) {
     if (buff->position + sizeof(*l) > buff->length) {
-        return 0;
+        return false;
     }
 
     memcpy(l, &buff->buffer[buff->position], sizeof(*l));
@@ -98,13 +98,13 @@ int BbGetLong(PBYTE_BUFFER buff, long long* l) {
 
     *l = byteSwapLongLong(buff, *l);
 
-    return 1;
+    return true;
 }
 
 // Put an int into the byte buffer
-int BbPutInt(PBYTE_BUFFER buff, int i) {
+bool BbPutInt(PBYTE_BUFFER buff, int i) {
     if (buff->position + sizeof(i) > buff->length) {
-        return 0;
+        return false;
     }
 
     i = byteSwapInt(buff, i);
@@ -112,13 +112,13 @@ int BbPutInt(PBYTE_BUFFER buff, int i) {
     memcpy(&buff->buffer[buff->position], &i, sizeof(i));
     buff->position += sizeof(i);
 
-    return 1;
+    return true;
 }
 
 // Put a long into the byte buffer
-int BbPutLong(PBYTE_BUFFER buff, long long l) {
+bool BbPutLong(PBYTE_BUFFER buff, long long l) {
     if (buff->position + sizeof(l) > buff->length) {
-        return 0;
+        return false;
     }
 
     l = byteSwapLongLong(buff, l);
@@ -126,13 +126,13 @@ int BbPutLong(PBYTE_BUFFER buff, long long l) {
     memcpy(&buff->buffer[buff->position], &l, sizeof(l));
     buff->position += sizeof(l);
 
-    return 1;
+    return true;
 }
 
 // Put a short into the byte buffer
-int BbPutShort(PBYTE_BUFFER buff, short s) {
+bool BbPutShort(PBYTE_BUFFER buff, short s) {
     if (buff->position + sizeof(s) > buff->length) {
-        return 0;
+        return false;
     }
 
     s = byteSwapShort(buff, s);
@@ -140,17 +140,17 @@ int BbPutShort(PBYTE_BUFFER buff, short s) {
     memcpy(&buff->buffer[buff->position], &s, sizeof(s));
     buff->position += sizeof(s);
 
-    return 1;
+    return true;
 }
 
 // Put a byte into the buffer
-int BbPut(PBYTE_BUFFER buff, char c) {
+bool BbPut(PBYTE_BUFFER buff, char c) {
     if (buff->position + sizeof(c) > buff->length) {
-        return 0;
+        return false;
     }
 
     memcpy(&buff->buffer[buff->position], &c, sizeof(c));
     buff->position += sizeof(c);
 
-    return 1;
+    return true;
 }

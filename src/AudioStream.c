@@ -15,7 +15,7 @@ static PLT_THREAD decoderThread;
 
 static unsigned short lastSeq;
 
-static int receivedDataFromPeer;
+static bool receivedDataFromPeer;
 
 #define RTP_PORT 48000
 
@@ -42,7 +42,7 @@ void initializeAudioStream(void) {
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
     RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
-    receivedDataFromPeer = 0;
+    receivedDataFromPeer = false;
 }
 
 static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
@@ -86,7 +86,7 @@ static void UdpPingThreadProc(void* context) {
     }
 }
 
-static int queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
+static bool queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
     int err;
 
     err = LbqOfferQueueItem(&packetQueue, *packet, &(*packet)->q.lentry);
@@ -99,10 +99,10 @@ static int queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
         freePacketList(LbqFlushQueueItems(&packetQueue));
     }
     else if (err == LBQ_INTERRUPTED) {
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
@@ -124,7 +124,7 @@ static void ReceiveThreadProc(void* context) {
     PRTP_PACKET rtp;
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
-    int useSelect;
+    bool useSelect;
     int packetsToDrop = 500 / AudioPacketDuration;
     int waitingForAudioMs;
 
@@ -132,11 +132,11 @@ static void ReceiveThreadProc(void* context) {
 
     if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
         // SO_RCVTIMEO failed, so use select() to wait
-        useSelect = 1;
+        useSelect = true;
     }
     else {
         // SO_RCVTIMEO timeout set for recv()
-        useSelect = 0;
+        useSelect = false;
     }
 
     waitingForAudioMs = 0;
@@ -181,7 +181,7 @@ static void ReceiveThreadProc(void* context) {
         }
 
         if (!receivedDataFromPeer) {
-            receivedDataFromPeer = 1;
+            receivedDataFromPeer = true;
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
         }
 

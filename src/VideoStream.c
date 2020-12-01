@@ -20,9 +20,9 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
-static int receivedDataFromPeer;
+static bool receivedDataFromPeer;
 static uint64_t firstDataTimeMs;
-static int receivedFullFrame;
+static bool receivedFullFrame;
 
 // We can't request an IDR frame until the depacketizer knows
 // that a packet was lost. This timeout bounds the time that
@@ -34,9 +34,9 @@ static int receivedFullFrame;
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
     RtpfInitializeQueue(&rtpQueue); //TODO RTP_QUEUE_DELAY
-    receivedDataFromPeer = 0;
+    receivedDataFromPeer = false;
     firstDataTimeMs = 0;
-    receivedFullFrame = 0;
+    receivedFullFrame = false;
 }
 
 // Clean up the video stream
@@ -72,7 +72,7 @@ static void ReceiveThreadProc(void* context) {
     int bufferSize, receiveSize;
     char* buffer;
     int queueStatus;
-    int useSelect;
+    bool useSelect;
     int waitingForVideoMs;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
@@ -81,11 +81,11 @@ static void ReceiveThreadProc(void* context) {
 
     if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
         // SO_RCVTIMEO failed, so use select() to wait
-        useSelect = 1;
+        useSelect = true;
     }
     else {
         // SO_RCVTIMEO timeout set for recv()
-        useSelect = 0;
+        useSelect = false;
     }
 
     waitingForVideoMs = 0;
@@ -124,7 +124,7 @@ static void ReceiveThreadProc(void* context) {
         }
 
         if (!receivedDataFromPeer) {
-            receivedDataFromPeer = 1;
+            receivedDataFromPeer = true;
             Limelog("Received first video packet after %d ms\n", waitingForVideoMs);
 
             firstDataTimeMs = PltGetMillis();
@@ -165,7 +165,7 @@ void submitFrame(PQUEUED_DECODE_UNIT qdu) {
     completeQueuedDecodeUnit(qdu, ret);
 
     // Remember that we got a full frame successfully
-    receivedFullFrame = 1;
+    receivedFullFrame = true;
 }
 
 // Decoder thread proc

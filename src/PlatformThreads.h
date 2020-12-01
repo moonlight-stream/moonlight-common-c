@@ -10,31 +10,31 @@ typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
 typedef struct _PLT_THREAD {
     HANDLE handle;
-    int cancelled;
+    bool cancelled;
 } PLT_THREAD;
 #elif defined(__vita__)
 typedef int PLT_MUTEX;
 typedef struct _PLT_EVENT {
     int mutex;
     int cond;
-    int signalled;
+    bool signalled;
 } PLT_EVENT;
 typedef struct _PLT_THREAD {
     int handle;
     int cancelled;
     void *context;
-    int alive;
+    bool alive;
 } PLT_THREAD;
 #elif defined (LC_POSIX)
 typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
-    int signalled;
+    bool signalled;
 } PLT_EVENT;
 typedef struct _PLT_THREAD {
     pthread_t thread;
-    int cancelled;
+    bool cancelled;
 } PLT_THREAD;
 #else
 #error Unsupported platform
@@ -48,7 +48,7 @@ void PltUnlockMutex(PLT_MUTEX* mutex);
 int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THREAD* thread);
 void PltCloseThread(PLT_THREAD* thread);
 void PltInterruptThread(PLT_THREAD* thread);
-int PltIsThreadInterrupted(PLT_THREAD* thread);
+bool PltIsThreadInterrupted(PLT_THREAD* thread);
 void PltJoinThread(PLT_THREAD* thread);
 
 int PltCreateEvent(PLT_EVENT* event);

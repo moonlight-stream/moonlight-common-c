@@ -1,13 +1,8 @@
 #include "Rtsp.h"
 
 // Check if String s begins with the given prefix
-static int startsWith(const char* s, const char* prefix) {
-    if (strncmp(s, prefix, strlen(prefix)) == 0) {
-        return 1;
-    }
-    else {
-        return 0;
-    }
+static bool startsWith(const char* s, const char* prefix) {
+    return strncmp(s, prefix, strlen(prefix)) == 0;
 }
 
 // Gets the length of the message
@@ -65,7 +60,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     char* command;
     char* sequence;
     char flag;
-    char messageEnded = 0;
+    bool messageEnded = false;
 
     char* payload = NULL;
     char* opt = NULL;
@@ -175,13 +170,13 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
                 // See if we've hit the end of the message. The first \r is missing because it's been tokenized
                 if (startsWith(endCheck, "\n") && endCheck[1] == '\0') {
                     // RTSP over ENet doesn't always have the second CRLF for some reason
-                    messageEnded = 1;
+                    messageEnded = true;
 
                     break;
                 }
                 else if (startsWith(endCheck, "\n\r\n")) {
                     // We've encountered the end of the message - mark it thus
-                    messageEnded = 1;
+                    messageEnded = true;
 
                     // The payload is the remainder of messageBuffer. If none, then payload = null
                     if (endCheck[3] != '\0')

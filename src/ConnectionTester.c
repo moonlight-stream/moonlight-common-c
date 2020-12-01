@@ -72,7 +72,7 @@ unsigned short LiGetPortFromPortFlagIndex(int portFlagIndex)
             return 48010;
 
         default:
-            LC_ASSERT(0);
+            LC_ASSERT(false);
             return 0;
     }
 }
@@ -115,7 +115,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
             sockets[i] = createSocket(address.ss_family,
                                       LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
                                       LiGetProtocolFromPortFlagIndex(i),
-                                      1);
+                                      true);
             if (sockets[i] == INVALID_SOCKET) {
                 err = LastSocketFail();
                 Limelog("Failed to create socket: %d\n", err);

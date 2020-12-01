@@ -71,7 +71,7 @@ void* extendBuffer(void* ptr, size_t newSize) {
     return newBuf;
 }
 
-int isReferenceFrameInvalidationEnabled(void) {
+bool isReferenceFrameInvalidationEnabled(void) {
     LC_ASSERT(NegotiatedVideoFormat != 0);
     return ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
            ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC));

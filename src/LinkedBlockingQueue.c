@@ -52,7 +52,7 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
 }
 
 void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead) {
-    queueHead->shutdown = 1;
+    queueHead->shutdown = true;
     PltSetEvent(&queueHead->containsDataEvent);
 }
 

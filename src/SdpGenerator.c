@@ -365,14 +365,14 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
             // Let the audio stream code know that it needs to disable coupled streams when
             // decoding this audio stream.
-            HighQualitySurroundEnabled = 1;
+            HighQualitySurroundEnabled = true;
 
             // Use 5 ms frames since we don't have a slow decoder
             AudioPacketDuration = 5;
         }
         else {
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "0");
-            HighQualitySurroundEnabled = 0;
+            HighQualitySurroundEnabled = false;
 
             if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) != 0) {
                 // Use 20 ms packets for slow decoders to save CPU time
@@ -397,7 +397,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         AudioPacketDuration = 5;
 
         // High quality audio mode not supported on legacy servers
-        HighQualitySurroundEnabled = 0;
+        HighQualitySurroundEnabled = false;
     }
 
     if (AppVersionQuad[0] >= 7) {

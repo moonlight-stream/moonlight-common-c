@@ -5,7 +5,7 @@
 typedef struct _RTPFEC_QUEUE_ENTRY {
     PRTP_PACKET packet;
     int length;
-    int isParity;
+    bool isParity;
     unsigned long long receiveTimeMs;
     unsigned int presentationTimeMs;
 

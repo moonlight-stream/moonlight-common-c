@@ -9,15 +9,15 @@ static int nalChainDataLength;
 
 static unsigned int nextFrameNumber;
 static unsigned int startFrameNumber;
-static int waitingForNextSuccessfulFrame;
-static int waitingForIdrFrame;
+static bool waitingForNextSuccessfulFrame;
+static bool waitingForIdrFrame;
 static unsigned int lastPacketInStream;
-static int decodingFrame;
-static int strictIdrFrameWait;
+static bool decodingFrame;
+static bool strictIdrFrameWait;
 static unsigned long long firstPacketReceiveTime;
 static unsigned int firstPacketPresentationTime;
-static int dropStatePending;
-static int idrFrameProcessed;
+static bool dropStatePending;
+static bool idrFrameProcessed;
 
 #define DR_CLEANUP -1000
 
@@ -43,14 +43,14 @@ void initializeVideoDepacketizer(int pktSize) {
 
     nextFrameNumber = 1;
     startFrameNumber = 0;
-    waitingForNextSuccessfulFrame = 0;
-    waitingForIdrFrame = 1;
+    waitingForNextSuccessfulFrame = false;
+    waitingForIdrFrame = true;
     lastPacketInStream = UINT32_MAX;
-    decodingFrame = 0;
+    decodingFrame = false;
     firstPacketReceiveTime = 0;
     firstPacketPresentationTime = 0;
-    dropStatePending = 0;
-    idrFrameProcessed = 0;
+    dropStatePending = false;
+    idrFrameProcessed = false;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
 }
 
@@ -75,12 +75,12 @@ static void dropFrameState(void) {
     LC_ASSERT(!decodingFrame);
 
     // We're dropping frame state now
-    dropStatePending = 0;
+    dropStatePending = false;
 
     // We'll need an IDR frame now if we're in strict mode
     // or if we've never seen one before
     if (strictIdrFrameWait || !idrFrameProcessed) {
-        waitingForIdrFrame = 1;
+        waitingForIdrFrame = true;
     }
 
     // Count the number of consecutive frames dropped
@@ -94,7 +94,7 @@ static void dropFrameState(void) {
         consecutiveFrameDrops = 0;
 
         // Request an IDR frame
-        waitingForIdrFrame = 1;
+        waitingForIdrFrame = true;
         requestIdrOnDemand();
     }
 
@@ -125,25 +125,21 @@ void destroyVideoDepacketizer(void) {
     cleanupFrameState();
 }
 
-// Returns 1 if candidate is a frame start and 0 otherwise
-static int isSeqFrameStart(PBUFFER_DESC candidate) {
+static bool isSeqFrameStart(PBUFFER_DESC candidate) {
     return (candidate->length == 4 && candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
-// Returns 1 if candidate is an Annex B start and 0 otherwise
-static int isSeqAnnexBStart(PBUFFER_DESC candidate) {
+static bool isSeqAnnexBStart(PBUFFER_DESC candidate) {
     return (candidate->data[candidate->offset + candidate->length - 1] == 1);
 }
 
-// Returns 1 if candidate is padding and 0 otherwise
-static int isSeqPadding(PBUFFER_DESC candidate) {
+static bool isSeqPadding(PBUFFER_DESC candidate) {
     return (candidate->data[candidate->offset + candidate->length - 1] == 0);
 }
 
-// Returns 1 on success, 0 otherwise
-static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
+static bool getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
     if (current->length < 3) {
-        return 0;
+        return false;
     }
 
     if (current->data[current->offset] == 0 &&
@@ -155,14 +151,14 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
                 candidate->data = current->data;
                 candidate->offset = current->offset;
                 candidate->length = 4;
-                return 1;
+                return true;
             }
             else {
                 // Padding
                 candidate->data = current->data;
                 candidate->offset = current->offset;
                 candidate->length = 3;
-                return 1;
+                return true;
             }
         }
         else if (current->data[current->offset + 2] == 1) {
@@ -170,22 +166,17 @@ static int getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
             candidate->data = current->data;
             candidate->offset = current->offset;
             candidate->length = 3;
-            return 1;
+            return true;
         }
     }
 
-    return 0;
+    return false;
 }
 
 // Get the first decode unit available
-int getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
+bool getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
     int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)qdu);
-    if (err == LBQ_SUCCESS) {
-        return 1;
-    }
-    else {
-        return 0;
-    }
+    return (err == LBQ_SUCCESS);
 }
 
 // Cleanup a decode unit by freeing the buffer chain and the holder
@@ -199,7 +190,7 @@ void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
     else if (drStatus == DR_OK && qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
         // Remember that the IDR frame was processed. We can now use
         // reference frame invalidation.
-        idrFrameProcessed = 1;
+        idrFrameProcessed = true;
     }
 
     while (qdu->decodeUnit.bufferList != NULL) {
@@ -214,8 +205,7 @@ void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
     }
 }
 
-// Returns 1 if the special sequence describes an I-frame
-static int isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
+static bool isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
     switch (specialSeq->data[specialSeq->offset + specialSeq->length]) {
         case 0x20:
         case 0x22:
@@ -224,19 +214,18 @@ static int isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
         case 0x28:
         case 0x2A:
             // H265
-            return 1;
+            return true;
             
         case 0x65:
             // H264
-            return 1;
+            return true;
             
         default:
-            return 0;
+            return false;
     }
 }
 
-// Returns 1 if this buffer describes an IDR frame
-static int isIdrFrameStart(PBUFFER_DESC buffer) {
+static bool isIdrFrameStart(PBUFFER_DESC buffer) {
     BUFFER_DESC specialSeq;
     return getSpecialSeq(buffer, &specialSeq) &&
         isSeqFrameStart(&specialSeq) &&
@@ -399,7 +388,7 @@ static void queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
 // Process an RTP Payload using the slow path that handles multiple NALUs per packet
 static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC specialSeq;
-    int decodingVideo = 0;
+    bool decodingVideo = false;
 
     // We should not have any NALUs when processing the first packet in an IDR frame
     LC_ASSERT(nalChainHead == NULL);
@@ -407,27 +396,27 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
 
     while (currentPos->length != 0) {
         int start = currentPos->offset;
-        int containsPicData = 0;
+        bool containsPicData = false;
 
         if (getSpecialSeq(currentPos, &specialSeq)) {
             if (isSeqAnnexBStart(&specialSeq)) {
                 // Now we're decoding video
-                decodingVideo = 1;
+                decodingVideo = true;
 
                 if (isSeqFrameStart(&specialSeq)) {
                     // Now we're working on a frame
-                    decodingFrame = 1;
+                    decodingFrame = true;
 
                     if (isSeqReferenceFrameStart(&specialSeq)) {
                         // No longer waiting for an IDR frame
-                        waitingForIdrFrame = 0;
+                        waitingForIdrFrame = false;
                         
                         // Cancel any pending IDR frame request
-                        waitingForNextSuccessfulFrame = 0;
+                        waitingForNextSuccessfulFrame = false;
 
                         // Use the cached LENTRY for this NALU since it will be
                         // the bulk of the data in this packet.
-                        containsPicData = 1;
+                        containsPicData = true;
                     }
                 }
 
@@ -437,7 +426,7 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
             }
             else {
                 // Not decoding video
-                decodingVideo = 0;
+                decodingVideo = false;
 
                 // Just skip this byte
                 currentPos->length--;
@@ -472,7 +461,7 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
 // an IDR frame
 void requestDecoderRefresh(void) {
     // Wait for the next IDR frame
-    waitingForIdrFrame = 1;
+    waitingForIdrFrame = true;
     
     // Flush the decode unit queue
     freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
@@ -481,7 +470,7 @@ void requestDecoderRefresh(void) {
     // on the next call. We can't do it here because
     // it may be trying to queue DUs and we'll nuke
     // the state out from under it.
-    dropStatePending = 1;
+    dropStatePending = true;
     
     // Request the IDR frame
     requestIdrOnDemand();
@@ -535,9 +524,9 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     if (isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)) ||
             (!firstPacket && streamPacketIndex != U24(lastPacketInStream + 1))) {
         Limelog("Depacketizer detected corrupt frame: %d", frameIndex);
-        decodingFrame = 0;
+        decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
-        waitingForNextSuccessfulFrame = 1;
+        waitingForNextSuccessfulFrame = true;
         dropFrameState();
         return;
     }
@@ -557,7 +546,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             nextFrameNumber = frameIndex;
 
             // Wait until next complete frame
-            waitingForNextSuccessfulFrame = 1;
+            waitingForNextSuccessfulFrame = true;
             dropFrameState();
         }
         else {
@@ -565,7 +554,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         // We're now decoding a frame
-        decodingFrame = 1;
+        decodingFrame = true;
         firstPacketReceiveTime = receiveTimeMs;
         firstPacketPresentationTime = presentationTimeMs;
     }
@@ -631,7 +620,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     if (flags & FLAG_EOF) {
         // Move on to the next frame
-        decodingFrame = 0;
+        decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
 
         // If waiting for next successful frame and we got here
@@ -639,7 +628,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         if (waitingForNextSuccessfulFrame) {
             // This is the next successful frame after a loss event
             connectionDetectedFrameLoss(startFrameNumber, frameIndex - 1);
-            waitingForNextSuccessfulFrame = 0;
+            waitingForNextSuccessfulFrame = false;
         }
 
         // If we need an IDR frame first, then drop this frame
@@ -662,7 +651,7 @@ void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 // otherwise we'll lose this IDR frame without another in flight
                 // and have to wait until we hit our consecutive drop limit to
                 // request a new one (potentially several seconds).
-                dropStatePending = 0;
+                dropStatePending = false;
             }
             else {
                 dropFrameState();

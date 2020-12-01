@@ -68,18 +68,18 @@ typedef socklen_t SOCKADDR_LEN;
 #define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
-SOCKET createSocket(int addressFamily, int socketType, int protocol, int nonBlocking);
+SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 int sendMtuSafe(SOCKET s, char* buffer, int size);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
-int setSocketNonBlocking(SOCKET s, int val);
-int recvUdpSocket(SOCKET s, char* buffer, int size, int useSelect);
+int setSocketNonBlocking(SOCKET s, bool enabled);
+int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect);
 void shutdownTcpSocket(SOCKET s);
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
 void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);
-int isPrivateNetworkAddress(struct sockaddr_storage* address);
+bool isPrivateNetworkAddress(struct sockaddr_storage* address);
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs);
 
 #define TCP_PORT_MASK 0xFFFF

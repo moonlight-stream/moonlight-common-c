@@ -18,7 +18,7 @@ void RtpqCleanupQueue(PRTP_REORDER_QUEUE queue) {
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int head, PRTP_PACKET packet) {
+static bool queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, bool head, PRTP_PACKET packet) {
     PRTP_QUEUE_ENTRY entry;
 
     LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextRtpSequenceNumber));
@@ -27,7 +27,7 @@ static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int 
     entry = queue->queueHead;
     while (entry != NULL) {
         if (entry->packet->sequenceNumber == packet->sequenceNumber) {
-            return 0;
+            return false;
         }
 
         entry = entry->next;
@@ -64,7 +64,7 @@ static int queuePacket(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY newEntry, int 
     }
     queue->queueSize++;
 
-    return 1;
+    return true;
 }
 
 static void updateOldestQueued(PRTP_REORDER_QUEUE queue) {
@@ -126,7 +126,7 @@ static void removeEntry(PRTP_REORDER_QUEUE queue, PRTP_QUEUE_ENTRY entry) {
 }
 
 static PRTP_QUEUE_ENTRY enforceQueueConstraints(PRTP_REORDER_QUEUE queue) {
-    int dequeuePacket = 0;
+    bool dequeuePacket = false;
 
     // Empty queue is fine
     if (queue->queueHead == NULL) {
@@ -136,7 +136,7 @@ static PRTP_QUEUE_ENTRY enforceQueueConstraints(PRTP_REORDER_QUEUE queue) {
     // Check that the queue's time constraint is satisfied
     if (PltGetMillis() - queue->oldestQueuedTimeMs > queue->maxQueueTimeMs) {
         Limelog("Returning RTP packet queued for too long\n");
-        dequeuePacket = 1;
+        dequeuePacket = true;
     }
 
     // Check that the queue's size constraint is satisfied. We subtract one
@@ -144,7 +144,7 @@ static PRTP_QUEUE_ENTRY enforceQueueConstraints(PRTP_REORDER_QUEUE queue) {
     // the current packet is enqueued.
     if (!dequeuePacket && queue->queueSize == queue->maxSize - 1) {
         Limelog("Returning RTP packet after queue overgrowth\n");
-        dequeuePacket = 1;
+        dequeuePacket = true;
     }
 
     if (dequeuePacket) {
@@ -172,7 +172,7 @@ int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY
         }
         else {
             // Queue is empty currently so we'll put this packet on there
-            if (!queuePacket(queue, packetEntry, 0, packet)) {
+            if (!queuePacket(queue, packetEntry, false, packet)) {
                 return 0;
             }
             else {
@@ -204,7 +204,7 @@ int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY
         // Queue has data inside, so we need to see where this packet fits
         if (packet->sequenceNumber == queue->nextRtpSequenceNumber) {
             // It fits in a hole where we need a packet, now we have some ready
-            if (!queuePacket(queue, packetEntry, 0, packet)) {
+            if (!queuePacket(queue, packetEntry, false, packet)) {
                 return 0;
             }
             else {
@@ -212,7 +212,7 @@ int RtpqAddPacket(PRTP_REORDER_QUEUE queue, PRTP_PACKET packet, PRTP_QUEUE_ENTRY
             }
         }
         else {
-            if (!queuePacket(queue, packetEntry, 0, packet)) {
+            if (!queuePacket(queue, packetEntry, false, packet)) {
                 return 0;
             }
             else {

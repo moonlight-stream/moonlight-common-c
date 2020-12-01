@@ -3,7 +3,7 @@
 
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;
-static int alreadyTerminated;
+static bool alreadyTerminated;
 static PLT_THREAD terminationCallbackThread;
 static int terminationCallbackErrorCode;
 
@@ -17,9 +17,9 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
-volatile int ConnectionInterrupted;
-int HighQualitySurroundSupported;
-int HighQualitySurroundEnabled;
+volatile bool ConnectionInterrupted;
+bool HighQualitySurroundSupported;
+bool HighQualitySurroundEnabled;
 OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
 OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
@@ -50,13 +50,13 @@ const char* LiGetStageName(int stage) {
 // so it is not safe to start another connection before LiStartConnection() returns.
 void LiInterruptConnection(void) {
     // Signal anyone waiting on the global interrupted flag
-    ConnectionInterrupted = 1;
+    ConnectionInterrupted = true;
 }
 
 // Stop the connection by undoing the step at the current stage and those before it
 void LiStopConnection(void) {
     // Disable termination callbacks now
-    alreadyTerminated = 1;
+    alreadyTerminated = true;
 
     // Set the interrupted flag
     LiInterruptConnection();
@@ -153,7 +153,7 @@ static void ClInternalConnectionTerminated(int errorCode)
     }
 
     terminationCallbackErrorCode = errorCode;
-    alreadyTerminated = 1;
+    alreadyTerminated = true;
 
     // Invoke the termination callback on a separate thread
     err = PltCreateThread("AsyncTerm", terminationCallbackThreadFunc, NULL, &terminationCallbackThread);
@@ -235,8 +235,8 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         goto Cleanup;
     }
 
-    alreadyTerminated = 0;
-    ConnectionInterrupted = 0;
+    alreadyTerminated = false;
+    ConnectionInterrupted = false;
 
     Limelog("Initializing platform...");
     ListenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
