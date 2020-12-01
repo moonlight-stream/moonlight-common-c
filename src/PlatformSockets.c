@@ -30,14 +30,14 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
         inet_ntop(addr->ss_family, &sin6->sin6_addr, addrstr, sizeof(addrstr));
 
         // IPv6 addresses need to be enclosed in brackets for URLs
-        sprintf(string, "[%s]", addrstr);
+        sprintf_s(string, URLSAFESTRING_LEN, "[%s]", addrstr);
     }
     else {
         struct sockaddr_in* sin = (struct sockaddr_in*)addr;
         inet_ntop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
 
         // IPv4 addresses are returned without changes
-        sprintf(string, "%s", addrstr);
+        sprintf_s(string, URLSAFESTRING_LEN, "%s", addrstr);
     }
 }
 

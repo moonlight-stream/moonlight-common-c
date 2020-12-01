@@ -37,7 +37,7 @@ int extractVersionQuadFromString(const char* string, int* quad) {
     char* nextNumber;
     int i;
     
-    strcpy(versionString, string);
+    strcpy_s(versionString, ARRAYSIZE(versionString), string);
     nextNumber = versionString;
     
     for (i = 0; i < 4; i++) {

@@ -39,14 +39,14 @@ static int getSerializedAttributeListSize(PSDP_OPTION head) {
 }
 
 // Populate the serialized attribute list into a string
-static int fillSerializedAttributeList(char* buffer, PSDP_OPTION head) {
+static int fillSerializedAttributeList(char* buffer, int bufferLength, PSDP_OPTION head) {
     PSDP_OPTION currentEntry = head;
     int offset = 0;
     while (currentEntry != NULL) {
-        offset += sprintf(&buffer[offset], "a=%s:", currentEntry->name);
+        offset += sprintf_s(&buffer[offset], bufferLength - offset, "a=%s:", currentEntry->name);
         memcpy(&buffer[offset], currentEntry->payload, currentEntry->payloadLen);
         offset += currentEntry->payloadLen;
-        offset += sprintf(&buffer[offset], " \r\n");
+        offset += sprintf_s(&buffer[offset], bufferLength - offset, " \r\n");
 
         currentEntry = currentEntry->next;
     }
@@ -64,7 +64,7 @@ static int addAttributeBinary(PSDP_OPTION* head, char* name, const void* payload
 
     option->next = NULL;
     option->payloadLen = payloadLen;
-    strcpy(option->name, name);
+    strcpy_s(option->name, ARRAYSIZE(option->name), name);
     option->payload = (void*)(option + 1);
     memcpy(option->payload, payload, payloadLen);
 
@@ -133,7 +133,7 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
 
-    sprintf(payloadStr, "rtsp://%s:48010", addrStr);
+    sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "rtsp://%s:48010", addrStr);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
 
     return err;
@@ -175,15 +175,15 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     optionHead = NULL;
     err = 0;
 
-    sprintf(payloadStr, "%d", StreamConfig.width);
+    sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", StreamConfig.width);
     err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportWd", payloadStr);
-    sprintf(payloadStr, "%d", StreamConfig.height);
+    sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", StreamConfig.height);
     err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportHt", payloadStr);
 
-    sprintf(payloadStr, "%d", StreamConfig.fps);
+    sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", StreamConfig.fps);
     err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
 
-    sprintf(payloadStr, "%d", StreamConfig.packetSize);
+    sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", StreamConfig.packetSize);
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
     err |= addAttributeString(&optionHead, "x-nv-video[0].rateControlMode", "4");
@@ -222,7 +222,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
     // to the requested value.
     if (AppVersionQuad[0] >= 5) {
-        sprintf(payloadStr, "%d", bitrate);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", bitrate);
 
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialPeakBitrateKbps", payloadStr);
@@ -236,7 +236,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
         }
 
-        sprintf(payloadStr, "%d", bitrate);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", bitrate);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
     }
@@ -286,7 +286,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             // If not using slicing, we request 1 slice per frame
             slicesPerFrame = 1;
         }
-        sprintf(payloadStr, "%d", slicesPerFrame);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", slicesPerFrame);
         err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
 
         if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
@@ -340,13 +340,13 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                 err |= addAttributeString(&optionHead, "x-nv-video[0].maxNumReferenceFrames", "1");
             }
 
-            sprintf(payloadStr, "%d", StreamConfig.clientRefreshRateX100);
+            sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", StreamConfig.clientRefreshRateX100);
             err |= addAttributeString(&optionHead, "x-nv-video[0].clientRefreshRateX100", payloadStr);
         }
 
-        sprintf(payloadStr, "%d", audioChannelCount);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", audioChannelCount);
         err |= addAttributeString(&optionHead, "x-nv-audio.surround.numChannels", payloadStr);
-        sprintf(payloadStr, "%d", audioChannelMask);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", audioChannelMask);
         err |= addAttributeString(&optionHead, "x-nv-audio.surround.channelMask", payloadStr);
         if (audioChannelCount > 2) {
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.enable", "1");
@@ -389,7 +389,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             }
         }
 
-        sprintf(payloadStr, "%d", AudioPacketDuration);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", AudioPacketDuration);
         err |= addAttributeString(&optionHead, "x-nv-aqos.packetDuration", payloadStr);
     }
     else {
@@ -401,7 +401,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     }
 
     if (AppVersionQuad[0] >= 7) {
-        sprintf(payloadStr, "%d", (StreamConfig.colorSpace << 1) | StreamConfig.colorRange);
+        sprintf_s(payloadStr, ARRAYSIZE(payloadStr), "%d", (StreamConfig.colorSpace << 1) | StreamConfig.colorRange);
         err |= addAttributeString(&optionHead, "x-nv-video[0].encoderCscMode", payloadStr);
     }
 
@@ -415,7 +415,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
 // Populate the SDP header with required information
 static int fillSdpHeader(char* buffer, int rtspClientVersion, char*urlSafeAddr) {
-    return sprintf(buffer,
+    return sprintf_s(buffer, MAX_SDP_HEADER_LEN,
         "v=0\r\n"
         "o=android 0 %d IN %s %s\r\n"
         "s=NVIDIA Streaming Client\r\n",
@@ -426,7 +426,7 @@ static int fillSdpHeader(char* buffer, int rtspClientVersion, char*urlSafeAddr) 
 
 // Populate the SDP tail with required information
 static int fillSdpTail(char* buffer) {
-    return sprintf(buffer,
+    return sprintf_s(buffer, MAX_SDP_TAIL_LEN,
         "t=0 0\r\n"
         "m=video %d  \r\n",
         AppVersionQuad[0] < 4 ? 47996 : 47998);
@@ -435,6 +435,7 @@ static int fillSdpTail(char* buffer) {
 // Get the SDP attributes for the stream config
 char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     PSDP_OPTION attributeList;
+    int attributeListSize;
     int offset;
     char* payload;
     char urlSafeAddr[URLSAFESTRING_LEN];
@@ -446,15 +447,18 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
         return NULL;
     }
 
-    payload = malloc(MAX_SDP_HEADER_LEN + MAX_SDP_TAIL_LEN +
-        getSerializedAttributeListSize(attributeList));
+    attributeListSize = getSerializedAttributeListSize(attributeList);
+    payload = malloc(MAX_SDP_HEADER_LEN + MAX_SDP_TAIL_LEN + attributeListSize);
     if (payload == NULL) {
         freeAttributeList(attributeList);
         return NULL;
     }
 
     offset = fillSdpHeader(payload, rtspClientVersion, urlSafeAddr);
-    offset += fillSerializedAttributeList(&payload[offset], attributeList);
+
+    // Add 1 for the null terminator (which will immediately be overwritten by fillSdpTail())
+    offset += fillSerializedAttributeList(&payload[offset], attributeListSize + 1, attributeList);
+
     offset += fillSdpTail(&payload[offset]);
 
     freeAttributeList(attributeList);

@@ -1,3 +1,4 @@
+#include "Limelight-internal.h"
 #include "Rtsp.h"
 
 // Check if String s begins with the given prefix
@@ -26,7 +27,7 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
     // Add length of response-specific strings
     else {
         char statusCodeStr[16];
-        sprintf(statusCodeStr, "%d", msg->message.response.statusCode);
+        sprintf_s(statusCodeStr, ARRAYSIZE(statusCodeStr), "%d", msg->message.response.statusCode);
         count += strlen(statusCodeStr);
         count += strlen(msg->message.response.statusString);
         // two spaces and \r\n
@@ -53,6 +54,7 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
 // Given an RTSP message string rtspMessage, parse it into an RTSP_MESSAGE struct msg
 int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     char* token;
+    char* tokenizerContext;
     char* protocol;
     char* endCheck;
     char* target;
@@ -88,7 +90,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     messageBuffer[length] = 0;
 
     // Get the first token of the message
-    token = strtok(messageBuffer, delim);
+    token = strtok_s(messageBuffer, delim, &tokenizerContext);
     if (token == NULL) {
         exitCode = RTSP_ERROR_MALFORMED;
         goto ExitFailure;
@@ -101,7 +103,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         protocol = token;
 
         // Get the status code
-        token = strtok(NULL, delim);
+        token = strtok_s(NULL, delim, &tokenizerContext);
         statusCode = atoi(token);
         if (token == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
@@ -109,7 +111,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         }
 
         // Get the status string
-        statusStr = strtok(NULL, end);
+        statusStr = strtok_s(NULL, end, &tokenizerContext);
         if (statusStr == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
@@ -124,12 +126,12 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     else {
         flag = TYPE_REQUEST;
         command = token;
-        target = strtok(NULL, delim);
+        target = strtok_s(NULL, delim, &tokenizerContext);
         if (target == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
-        protocol = strtok(NULL, delim);
+        protocol = strtok_s(NULL, delim, &tokenizerContext);
         if (protocol == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
@@ -144,7 +146,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     // Parse remaining options
     while (token != NULL)
     {
-        token = strtok(NULL, typeFlag == TOKEN_OPTION ? optDelim : end);
+        token = strtok_s(NULL, typeFlag == TOKEN_OPTION ? optDelim : end, &tokenizerContext);
         if (token != NULL) {
             if (typeFlag == TOKEN_OPTION) {
                 opt = token;
@@ -322,37 +324,37 @@ char* serializeRtspMessage(PRTSP_MESSAGE msg, int* serializedLength) {
 
     if (msg->type == TYPE_REQUEST) {
         // command [space]
-        strcpy(serializedMessage, msg->message.request.command);
-        strcat(serializedMessage, " ");
+        strcpy_s(serializedMessage, size, msg->message.request.command);
+        strcat_s(serializedMessage, size, " ");
         // target [space]
-        strcat(serializedMessage, msg->message.request.target);
-        strcat(serializedMessage, " ");
+        strcat_s(serializedMessage, size, msg->message.request.target);
+        strcat_s(serializedMessage, size, " ");
         // protocol \r\n
-        strcat(serializedMessage, msg->protocol);
-        strcat(serializedMessage, "\r\n");
+        strcat_s(serializedMessage, size, msg->protocol);
+        strcat_s(serializedMessage, size, "\r\n");
     }
     else {
         // protocol [space]
-        strcpy(serializedMessage, msg->protocol);
-        strcat(serializedMessage, " ");
+        strcpy_s(serializedMessage, size, msg->protocol);
+        strcat_s(serializedMessage, size, " ");
         // status code [space]
-        sprintf(statusCodeStr, "%d", msg->message.response.statusCode);
-        strcat(serializedMessage, statusCodeStr);
-        strcat(serializedMessage, " ");
+        sprintf_s(statusCodeStr, ARRAYSIZE(statusCodeStr), "%d", msg->message.response.statusCode);
+        strcat_s(serializedMessage, size, statusCodeStr);
+        strcat_s(serializedMessage, size, " ");
         // status str\r\n
-        strcat(serializedMessage, msg->message.response.statusString);
-        strcat(serializedMessage, "\r\n");
+        strcat_s(serializedMessage, size, msg->message.response.statusString);
+        strcat_s(serializedMessage, size, "\r\n");
     }
     // option content\r\n
     while (current != NULL) {
-        strcat(serializedMessage, current->option);
-        strcat(serializedMessage, ": ");
-        strcat(serializedMessage, current->content);
-        strcat(serializedMessage, "\r\n");
+        strcat_s(serializedMessage, size, current->option);
+        strcat_s(serializedMessage, size, ": ");
+        strcat_s(serializedMessage, size, current->content);
+        strcat_s(serializedMessage, size, "\r\n");
         current = current->next;
     }
     // Final \r\n
-    strcat(serializedMessage, "\r\n");
+    strcat_s(serializedMessage, size, "\r\n");
 
     // payload
     if (msg->payload != NULL) {

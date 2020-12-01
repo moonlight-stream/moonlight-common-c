@@ -1,5 +1,8 @@
 #pragma once
 
+// Don't warn for POSIX functions like strdup
+#define _CRT_NONSTDC_NO_DEPRECATE
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>

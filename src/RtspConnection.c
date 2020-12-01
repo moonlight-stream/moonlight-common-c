@@ -71,8 +71,8 @@ static bool initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target
     createRtspRequest(msg, NULL, 0, command, target, "RTSP/1.0",
         0, NULL, NULL, 0);
 
-    sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
-    sprintf(clientVersionStr, "%d", rtspClientVersion);
+    sprintf_s(sequenceNumberStr, ARRAYSIZE(sequenceNumberStr), "%d", currentSeqNumber++);
+    sprintf_s(clientVersionStr, ARRAYSIZE(clientVersionStr), "%d", rtspClientVersion);
     if (!addOption(msg, "CSeq", sequenceNumberStr) ||
         !addOption(msg, "X-GS-ClientVersion", clientVersionStr) ||
         (!useEnet && !addOption(msg, "Host", urlAddr))) {
@@ -434,7 +434,7 @@ static bool sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
         request.flags |= FLAG_ALLOCATED_PAYLOAD;
         request.payloadLength = payloadLength;
 
-        sprintf(payloadLengthStr, "%d", payloadLength);
+        sprintf_s(payloadLengthStr, ARRAYSIZE(payloadLengthStr), "%d", payloadLength);
         if (!addOption(&request, "Content-length", payloadLengthStr)) {
             goto FreeMessage;
         }
@@ -508,7 +508,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
         channelCount = CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration);
 
         // Find the correct audio parameter value
-        sprintf(paramsPrefix, "a=fmtp:97 surround-params=%d", channelCount);
+        sprintf_s(paramsPrefix, ARRAYSIZE(paramsPrefix), "a=fmtp:97 surround-params=%d", channelCount);
         paramStart = strstr(response->payload, paramsPrefix);
         if (paramStart) {
             // Skip the prefix
@@ -596,12 +596,12 @@ int performRtspHandshake(void) {
         addrToUrlSafeString(&RemoteAddr, urlAddr);
     }
     else {
-        strcpy(urlAddr, "0.0.0.0");
+        strcpy_s(urlAddr, ARRAYSIZE(urlAddr), "0.0.0.0");
     }
 
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
-    sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
+    sprintf_s(rtspTargetUrl, ARRAYSIZE(rtspTargetUrl), "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
     hasSessionId = false;
 
@@ -740,6 +740,7 @@ int performRtspHandshake(void) {
     {
         RTSP_MESSAGE response;
         char* sessionId;
+        char* tokenizerContext;
         int error = -1;
 
         if (!setupStream(&response,
@@ -770,7 +771,7 @@ int performRtspHandshake(void) {
         // resolves any 454 session not found errors on
         // standard RTSP server implementations.
         // (i.e - sessionId = "DEADBEEFCAFE;timeout = 90") 
-        sessionIdString = strdup(strtok(sessionId, ";"));
+        sessionIdString = strdup(strtok_s(sessionId, ";", &tokenizerContext));
         if (sessionIdString == NULL) {
             Limelog("Failed to duplicate session ID string\n");
             ret = -1;
