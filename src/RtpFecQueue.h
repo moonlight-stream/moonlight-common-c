@@ -6,7 +6,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
     PRTP_PACKET packet;
     int length;
     bool isParity;
-    unsigned long long receiveTimeMs;
+    uint64_t receiveTimeMs;
     unsigned int presentationTimeMs;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
@@ -16,7 +16,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
 typedef struct _RTP_FEC_QUEUE {
     PRTPFEC_QUEUE_ENTRY bufferHead;
     PRTPFEC_QUEUE_ENTRY bufferTail;
-    unsigned long long bufferFirstRecvTimeMs;
+    uint64_t bufferFirstRecvTimeMs;
     int bufferSize;
     int bufferLowestSequenceNumber;
     int bufferHighestSequenceNumber;

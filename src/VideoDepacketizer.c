@@ -14,7 +14,7 @@ static bool waitingForIdrFrame;
 static unsigned int lastPacketInStream;
 static bool decodingFrame;
 static bool strictIdrFrameWait;
-static unsigned long long firstPacketReceiveTime;
+static uint64_t firstPacketReceiveTime;
 static unsigned int firstPacketPresentationTime;
 static bool dropStatePending;
 static bool idrFrameProcessed;
@@ -488,8 +488,8 @@ static int isFirstPacket(char flags) {
 
 // Process an RTP Payload
 // The caller will free *existingEntry unless we NULL it
-void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
-                       unsigned long long receiveTimeMs, unsigned int presentationTimeMs,
+static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
+                       uint64_t receiveTimeMs, unsigned int presentationTimeMs,
                        PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
     int frameIndex;

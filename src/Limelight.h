@@ -139,7 +139,7 @@ typedef struct _DECODE_UNIT {
     // Receive time of first buffer. This value uses an implementation-defined epoch.
     // To compute actual latency values, use LiGetMillis() to get a timestamp that
     // shares the same epoch as this value.
-    unsigned long long receiveTimeMs;
+    uint64_t receiveTimeMs;
 
     // Presentation time in milliseconds with the epoch at the first captured frame.
     // This can be used to aid frame pacing or to drop old frames that were queued too

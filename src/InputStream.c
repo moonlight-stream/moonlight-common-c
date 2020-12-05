@@ -332,7 +332,7 @@ static void inputSendThreadProc(void* context) {
         }
 
         // Prepend the length to the message
-        encryptedLengthPrefix = htonl((unsigned long)encryptedSize);
+        encryptedLengthPrefix = htonl((uint32_t)encryptedSize);
         memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, 4);
 
         if (AppVersionQuad[0] < 5) {

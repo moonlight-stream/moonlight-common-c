@@ -33,8 +33,8 @@ static PLT_THREAD invalidateRefFramesThread;
 static PLT_THREAD controlReceiveThread;
 static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport;
-static long lastGoodFrame;
-static long lastSeenFrame;
+static int lastGoodFrame;
+static int lastSeenFrame;
 static bool stopping;
 static bool disconnectPending;
 
@@ -660,7 +660,7 @@ static void lossStatsThreadFunc(void* context) {
 }
 
 static void requestIdrFrame(void) {
-    long long payload[3];
+    int64_t payload[3];
 
     if (AppVersionQuad[0] >= 5) {
         // Form the payload
@@ -697,7 +697,7 @@ static void requestIdrFrame(void) {
 }
 
 static void requestInvalidateReferenceFrames(void) {
-    long long payload[3];
+    int64_t payload[3];
     PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
 
     LC_ASSERT(isReferenceFrameInvalidationEnabled());
