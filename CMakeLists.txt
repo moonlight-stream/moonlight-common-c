@@ -15,7 +15,7 @@ if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS=1 -D_CRT_NONSTDC_NO_DEPRECATE=1)
   link_libraries(ws2_32.lib qwave.lib winmm.lib)
 else()
-  add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+  add_compile_options(-Wall -Wextra -Wno-unused-parameter -Werror)
 endif()
 
 string(TOUPPER "x${CMAKE_BUILD_TYPE}" BUILD_TYPE)
