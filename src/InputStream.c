@@ -187,7 +187,7 @@ static void inputSendThreadProc(void* context) {
     SOCK_RET err;
     PPACKET_HOLDER holder;
     char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
-    int encryptedSize;
+    uint32_t encryptedSize;
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         int encryptedLengthPrefix;
@@ -323,7 +323,7 @@ static void inputSendThreadProc(void* context) {
         // Encrypt the message into the output buffer while leaving room for the length
         encryptedSize = sizeof(encryptedBuffer) - 4;
         err = encryptData((const unsigned char*)&holder->packet, holder->packetLength,
-            (unsigned char*)&encryptedBuffer[4], &encryptedSize);
+            (unsigned char*)&encryptedBuffer[4], (int*)&encryptedSize);
         free(holder);
         if (err != 0) {
             Limelog("Input: Encryption failed: %d\n", (int)err);
@@ -332,7 +332,7 @@ static void inputSendThreadProc(void* context) {
         }
 
         // Prepend the length to the message
-        encryptedLengthPrefix = htonl((uint32_t)encryptedSize);
+        encryptedLengthPrefix = htonl(encryptedSize);
         memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, 4);
 
         if (AppVersionQuad[0] < 5) {

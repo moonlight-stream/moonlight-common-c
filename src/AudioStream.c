@@ -169,7 +169,7 @@ static void ReceiveThreadProc(void* context) {
             continue;
         }
 
-        if (packet->size < sizeof(RTP_PACKET)) {
+        if (packet->size < (int)sizeof(RTP_PACKET)) {
             // Runt packet
             continue;
         }

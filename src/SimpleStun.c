@@ -123,7 +123,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         Limelog("Failed to read STUN binding response: %d\n", err);
         goto Exit;
     }
-    else if (bytesRead < sizeof(resp.hdr)) {
+    else if (bytesRead < (int)sizeof(resp.hdr)) {
         Limelog("STUN message truncated: %d\n", bytesRead);
         err = -3;
         goto Exit;
@@ -146,8 +146,8 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
     attribute = (PSTUN_ATTRIBUTE_HEADER)(&resp.hdr + 1);
     bytesRead -= sizeof(resp.hdr);
-    while (bytesRead > sizeof(*attribute)) {
-        if (bytesRead < sizeof(*attribute) + htons(attribute->length)) {
+    while (bytesRead > (int)sizeof(*attribute)) {
+        if (bytesRead < (int)(sizeof(*attribute) + htons(attribute->length))) {
             Limelog("STUN attribute out of bounds: %d\n", htons(attribute->length));
             err = -5;
             goto Exit;

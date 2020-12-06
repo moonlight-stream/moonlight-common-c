@@ -16,7 +16,7 @@ typedef struct _RTP_QUEUE_ENTRY {
 
 typedef struct _RTP_REORDER_QUEUE {
     int maxSize;
-    int maxQueueTimeMs;
+    uint32_t maxQueueTimeMs;
 
     PRTP_QUEUE_ENTRY queueHead;
     PRTP_QUEUE_ENTRY queueTail;

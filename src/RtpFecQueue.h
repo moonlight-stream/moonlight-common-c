@@ -27,7 +27,7 @@ typedef struct _RTP_FEC_QUEUE {
     int fecPercentage;
     int nextContiguousSequenceNumber;
 
-    int currentFrameNumber;
+    unsigned int currentFrameNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
 
 #define RTPF_RET_QUEUED    0

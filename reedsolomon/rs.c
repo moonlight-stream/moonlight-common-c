@@ -499,7 +499,7 @@ static int reed_solomon_decode(reed_solomon* rs, unsigned char **data_blocks, in
     unsigned char* subShards[DATA_SHARDS_MAX];
     unsigned char* outputs[DATA_SHARDS_MAX];
     gf* m = rs->m;
-    int i, j, c, swap, subMatrixRow, dataShards, nos, nshards;
+    int i, j, c, swap, subMatrixRow, dataShards;
 
     /* the erased_blocks should always sorted
      * if sorted, nr_fec_blocks times to check it
@@ -523,11 +523,9 @@ static int reed_solomon_decode(reed_solomon* rs, unsigned char **data_blocks, in
 
     j = 0;
     subMatrixRow = 0;
-    nos = 0;
-    nshards = 0;
     dataShards = rs->data_shards;
     for (i = 0; i < dataShards; i++) {
-        if (j < nr_fec_blocks && i == erased_blocks[j])
+        if (j < nr_fec_blocks && i == (int)erased_blocks[j])
             j++;
         else {
             /* this row is ok */
