@@ -7,7 +7,7 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
     int length;
     bool isParity;
     uint64_t receiveTimeMs;
-    unsigned int presentationTimeMs;
+    uint32_t presentationTimeMs;
 
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;
@@ -17,17 +17,17 @@ typedef struct _RTP_FEC_QUEUE {
     PRTPFEC_QUEUE_ENTRY bufferHead;
     PRTPFEC_QUEUE_ENTRY bufferTail;
     uint64_t bufferFirstRecvTimeMs;
-    int bufferSize;
-    int bufferLowestSequenceNumber;
-    int bufferHighestSequenceNumber;
-    int bufferFirstParitySequenceNumber;
-    int bufferDataPackets;
-    int bufferParityPackets;
-    int receivedBufferDataPackets;
-    int fecPercentage;
-    int nextContiguousSequenceNumber;
+    uint32_t bufferSize;
+    uint32_t bufferLowestSequenceNumber;
+    uint32_t bufferHighestSequenceNumber;
+    uint32_t bufferFirstParitySequenceNumber;
+    uint32_t bufferDataPackets;
+    uint32_t bufferParityPackets;
+    uint32_t receivedBufferDataPackets;
+    uint32_t fecPercentage;
+    uint32_t nextContiguousSequenceNumber;
 
-    unsigned int currentFrameNumber;
+    uint32_t currentFrameNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
 
 #define RTPF_RET_QUEUED    0

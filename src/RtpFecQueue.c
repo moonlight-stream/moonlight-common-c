@@ -92,7 +92,7 @@ static bool queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, bool
 
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_FEC_QUEUE queue) {
-    int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
+    unsigned int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
     int ret;
     
 #ifdef FEC_VALIDATION_MODE
@@ -150,14 +150,14 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
 
 #ifdef FEC_VALIDATION_MODE
     // Choose a packet to drop
-    int dropIndex = rand() % queue->bufferDataPackets;
+    unsigned int dropIndex = rand() % queue->bufferDataPackets;
     PRTP_PACKET droppedRtpPacket = NULL;
     int droppedRtpPacketLength = 0;
 #endif
 
     PRTPFEC_QUEUE_ENTRY entry = queue->bufferHead;
     while (entry != NULL) {
-        int index = U16(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
+        unsigned int index = U16(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
 
 #ifdef FEC_VALIDATION_MODE
         if (index == dropIndex) {
@@ -181,7 +181,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
         entry = entry->next;
     }
 
-    int i;
+    unsigned int i;
     for (i = 0; i < totalPackets; i++) {
         if (marks[i]) {
             packets[i] = malloc(packetBufferSize);
