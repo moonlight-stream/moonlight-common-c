@@ -395,7 +395,7 @@ static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
     err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
     free(packet);
 
-    if (err != sizeof(*packet) + paylen) {
+    if (err != (SOCK_RET)(sizeof(*packet) + paylen)) {
         return false;
     }
 

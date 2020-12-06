@@ -3,7 +3,7 @@
 #pragma pack(push, 1)
 
 typedef struct _NV_INPUT_HEADER {
-    int packetType;
+    uint32_t packetType;
 } NV_INPUT_HEADER, PNV_INPUT_HEADER;
 
 #define PACKET_TYPE_HAPTICS 0x06

@@ -492,7 +492,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                        uint64_t receiveTimeMs, unsigned int presentationTimeMs,
                        PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
-    int frameIndex;
+    unsigned int frameIndex;
     char flags;
     unsigned int firstPacket;
     unsigned int streamPacketIndex;
