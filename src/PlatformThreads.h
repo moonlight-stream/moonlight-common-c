@@ -10,18 +10,18 @@ typedef HANDLE PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
 typedef struct _PLT_THREAD {
     HANDLE handle;
-    bool cancelled;
+    atomic_bool cancelled;
 } PLT_THREAD;
 #elif defined(__vita__)
 typedef int PLT_MUTEX;
 typedef struct _PLT_EVENT {
     int mutex;
     int cond;
-    bool signalled;
+    atomic_bool signalled;
 } PLT_EVENT;
 typedef struct _PLT_THREAD {
     int handle;
-    int cancelled;
+    atomic_bool cancelled;
     void *context;
     bool alive;
 } PLT_THREAD;
@@ -30,11 +30,11 @@ typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
-    bool signalled;
+    atomic_bool signalled;
 } PLT_EVENT;
 typedef struct _PLT_THREAD {
     pthread_t thread;
-    bool cancelled;
+    atomic_bool cancelled;
 } PLT_THREAD;
 #else
 #error Unsupported platform

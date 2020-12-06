@@ -22,7 +22,7 @@ static PLT_THREAD decoderThread;
 
 static bool receivedDataFromPeer;
 static uint64_t firstDataTimeMs;
-static bool receivedFullFrame;
+static atomic_bool receivedFullFrame;
 
 // We can't request an IDR frame until the depacketizer knows
 // that a packet was lost. This timeout bounds the time that

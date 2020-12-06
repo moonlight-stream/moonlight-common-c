@@ -18,8 +18,8 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     PLT_MUTEX mutex;
     PLT_EVENT containsDataEvent;
     int sizeBound;
-    int currentSize;
-    bool shutdown;
+    atomic_int currentSize;
+    atomic_bool shutdown;
     int lifetimeSize;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;

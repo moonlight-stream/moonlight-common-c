@@ -8,7 +8,7 @@
 
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
-static bool initialized;
+static atomic_bool initialized;
 static EVP_CIPHER_CTX* cipherContext;
 static bool cipherInitialized;
 

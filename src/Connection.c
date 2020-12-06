@@ -3,7 +3,7 @@
 
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;
-static bool alreadyTerminated;
+static atomic_bool alreadyTerminated;
 static PLT_THREAD terminationCallbackThread;
 static int terminationCallbackErrorCode;
 
@@ -17,7 +17,7 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
-volatile bool ConnectionInterrupted;
+atomic_bool ConnectionInterrupted;
 bool HighQualitySurroundSupported;
 bool HighQualitySurroundEnabled;
 OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;

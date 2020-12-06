@@ -106,7 +106,7 @@ int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
         return LBQ_INTERRUPTED;
     }
     
-    if (queueHead->head == NULL) {
+    if (queueHead->currentSize == 0) {
         return LBQ_NO_ELEMENT;
     }
 
@@ -131,7 +131,7 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
         return LBQ_INTERRUPTED;
     }
 
-    if (queueHead->head == NULL) {
+    if (queueHead->currentSize == 0) {
         return LBQ_NO_ELEMENT;
     }
 

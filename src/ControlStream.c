@@ -33,9 +33,9 @@ static PLT_THREAD invalidateRefFramesThread;
 static PLT_THREAD controlReceiveThread;
 static PLT_EVENT invalidateRefFramesEvent;
 static int lossCountSinceLastReport;
-static int lastGoodFrame;
-static int lastSeenFrame;
-static bool stopping;
+static atomic_int lastGoodFrame;
+static atomic_int lastSeenFrame;
+static atomic_bool stopping;
 static bool disconnectPending;
 
 static int intervalGoodFrameCount;
@@ -44,7 +44,7 @@ static uint64_t intervalStartTimeMs;
 static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
 
-static bool idrFrameRequired;
+static atomic_bool idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 
 #define CONN_IMMEDIATE_POOR_LOSS_RATE 30
