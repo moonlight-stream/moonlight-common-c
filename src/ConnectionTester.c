@@ -111,7 +111,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
     }
 
     for (i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
-        if (testPortFlags & (1 << i)) {
+        if (testPortFlags & (1U << i)) {
             sockets[i] = createSocket(address.ss_family,
                                       LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? SOCK_DGRAM : SOCK_STREAM,
                                       LiGetProtocolFromPortFlagIndex(i),
@@ -133,7 +133,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                         Limelog("Failed to start async connect to TCP %u: %d\n", LiGetPortFromPortFlagIndex(i), err);
 
                         // Mask off this bit so we don't try to include it in pollSockets() below
-                        testPortFlags &= ~(1 << i);
+                        testPortFlags &= ~(1U << i);
                     }
                 }
             }
@@ -149,7 +149,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                         Limelog("Failed to send test packet to UDP %u: %d\n", LiGetPortFromPortFlagIndex(i), err);
 
                         // Mask off this bit so we don't try to include it in pollSockets() below
-                        testPortFlags &= ~(1 << i);
+                        testPortFlags &= ~(1U << i);
 
                         break;
                     }
@@ -170,7 +170,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 
         // Fill out our FD sets
         for (i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
-            if (testPortFlags & (1 << i)) {
+            if (testPortFlags & (1U << i)) {
                 pfds[nfds].fd = sockets[i];
 
                 if (LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP) {
@@ -211,7 +211,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                 // This socket was signalled. Figure out what port it was.
                 for (portIndex = 0; portIndex < PORT_FLAGS_MAX_COUNT; portIndex++) {
                     if (sockets[portIndex] == pfds[i].fd) {
-                        LC_ASSERT(testPortFlags & (1 << portIndex));
+                        LC_ASSERT(testPortFlags & (1U << portIndex));
                         break;
                     }
                 }
@@ -225,13 +225,13 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                     // a packet from the test server, or it could be because we
                     // received an ICMP error which will be given to us from
                     // recvfrom().
-                    testPortFlags &= ~(1 << portIndex);
+                    testPortFlags &= ~(1U << portIndex);
 
                     // Check if the socket can be successfully read now
                     err = recvfrom(sockets[portIndex], buf, sizeof(buf), 0, NULL, NULL);
                     if (err >= 0) {
                         // The UDP test was a success.
-                        failingPortFlags &= ~(1 << portIndex);
+                        failingPortFlags &= ~(1U << portIndex);
 
                         Limelog("UDP port %u test successful\n", LiGetPortFromPortFlagIndex(portIndex));
                     }
@@ -250,10 +250,10 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                     }
 
                     // The TCP test has completed for this port
-                    testPortFlags &= ~(1 << portIndex);
+                    testPortFlags &= ~(1U << portIndex);
                     if (err == 0) {
                         // The TCP test was a success
-                        failingPortFlags &= ~(1 << portIndex);
+                        failingPortFlags &= ~(1U << portIndex);
 
                         Limelog("TCP port %u test successful\n", LiGetPortFromPortFlagIndex(portIndex));
                     }
