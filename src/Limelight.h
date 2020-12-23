@@ -575,6 +575,11 @@ int LiGetProtocolFromPortFlagIndex(int portFlagIndex);
 // Returns the port number for the specified port index
 unsigned short LiGetPortFromPortFlagIndex(int portFlagIndex);
 
+// Populates the output buffer with a stringified list of the port flags set in the input argument.
+// The second and subsequent entries will be prepended by 'separator' (if provided).
+// If the output buffer is too small, the output will be truncated to fit the provided buffer.
+void LiStringifyPortFlags(unsigned int portFlags, const char* separator, char* outputBuffer, int outputBufferLength);
+
 // This function may be used to test if the local network is blocking Moonlight's ports. It requires
 // a test server running on an Internet-reachable host. To perform a test, pass in the DNS hostname
 // of the test server, a reference TCP port to ensure the test host is reachable at all (something

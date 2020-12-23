@@ -77,6 +77,33 @@ unsigned short LiGetPortFromPortFlagIndex(int portFlagIndex)
     }
 }
 
+void LiStringifyPortFlags(unsigned int portFlags, const char* separator, char* outputBuffer, int outputBufferLength)
+{
+    // Initialize the output buffer to an empty string
+    outputBuffer[0] = 0;
+
+    // If there is no separator specified, use an empty string
+    if (separator == NULL) {
+        separator = "";
+    }
+
+    int offset = 0;
+    for (int i = 0; i < PORT_FLAGS_MAX_COUNT; i++) {
+        if (portFlags & (1U << i)) {
+            const char* protoStr = LiGetProtocolFromPortFlagIndex(i) == IPPROTO_UDP ? "UDP" : "TCP";
+            offset += snprintf(&outputBuffer[offset], outputBufferLength - offset, "%s%s %u",
+                               offset != 0 ? separator : "",
+                               protoStr,
+                               LiGetPortFromPortFlagIndex(i));
+            if (outputBufferLength - offset <= 0) {
+                // snprintf() will return the desired length if the buffer is too small,
+                // so it is possible for this calculation to be negative.
+                break;
+            }
+        }
+    }
+}
+
 unsigned int LiTestClientConnectivity(const char* testServer, unsigned short referencePort, unsigned int testPortFlags)
 {
     unsigned int failingPortFlags;
