@@ -433,7 +433,11 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         }
         
         queue->currentFrameNumber = nvPacket->frameIndex;
-        
+
+        // Tell the control stream logic about this frame, even if we don't end up
+        // being able to reconstruct a full frame from it.
+        connectionSawFrame(queue->currentFrameNumber);
+
         // Discard any unsubmitted buffers from the previous frame
         while (queue->bufferHead != NULL) {
             PRTPFEC_QUEUE_ENTRY entry = queue->bufferHead;

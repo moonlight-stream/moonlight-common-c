@@ -282,6 +282,8 @@ void connectionReceivedCompleteFrame(int frameIndex) {
 }
 
 void connectionSawFrame(int frameIndex) {
+    LC_ASSERT(!isBefore16(frameIndex, lastSeenFrame));
+
     uint64_t now = PltGetMillis();
     if (now - intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
         if (intervalTotalFrameCount != 0) {

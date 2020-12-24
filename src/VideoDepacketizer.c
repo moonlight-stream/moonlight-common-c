@@ -530,9 +530,6 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         dropFrameState();
         return;
     }
-
-    // Notify the listener of the latest frame we've seen from the PC
-    connectionSawFrame(frameIndex);
     
     // Verify that we didn't receive an incomplete frame
     LC_ASSERT(firstPacket ^ decodingFrame);
