@@ -570,8 +570,15 @@ static void controlReceiveThreadFunc(void* context) {
 
                 // SERVER_TERMINATED_INTENDED
                 if (terminationReason == 0x0100) {
-                    // Pass error code 0 to notify the client that this was not an error
-                    terminationErrorCode = ML_ERROR_GRACEFUL_TERMINATION;
+                    if (lastSeenFrame != 0) {
+                        // Pass error code 0 to notify the client that this was not an error
+                        terminationErrorCode = ML_ERROR_GRACEFUL_TERMINATION;
+                    }
+                    else {
+                        // We never saw a frame, so this is probably an error that caused
+                        // NvStreamer to terminate prior to sending any frames.
+                        terminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
+                    }
                 }
                 else {
                     // Otherwise pass the reason unmodified
