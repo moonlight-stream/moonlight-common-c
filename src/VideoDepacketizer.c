@@ -253,6 +253,7 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.frameNumber = frameNumber;
             qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
             qdu->decodeUnit.presentationTimeMs = firstPacketPresentationTime;
+            qdu->decodeUnit.enqueueTimeMs = LiGetMillis();
 
             // IDR frames will have leading CSD buffers
             if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {

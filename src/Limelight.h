@@ -136,10 +136,16 @@ typedef struct _DECODE_UNIT {
     // Frame type
     int frameType;
 
-    // Receive time of first buffer. This value uses an implementation-defined epoch.
-    // To compute actual latency values, use LiGetMillis() to get a timestamp that
-    // shares the same epoch as this value.
+    // Receive time of first buffer. This value uses an implementation-defined epoch,
+    // but the same epoch as enqueueTimeMs and LiGetMillis().
     uint64_t receiveTimeMs;
+
+    // Time the frame was fully assembled and queued for the video decoder to process.
+    // This is also approximately the same time as the final packet was received, so
+    // enqueueTimeMs - receiveTimeMs is the time taken to receive the frame. At the
+    // time the decode unit is passed to submitDecodeUnit(), the total queue delay
+    // can be calculated by LiGetMillis() - enqueueTimeMs.
+    uint64_t enqueueTimeMs;
 
     // Presentation time in milliseconds with the epoch at the first captured frame.
     // This can be used to aid frame pacing or to drop old frames that were queued too
