@@ -268,10 +268,11 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 }
 
 int setSocketNonBlocking(SOCKET s, bool enabled) {
-    int val = enabled ? 1 : 0;
 #if defined(__vita__)
+    int val = enabled ? 1 : 0;
     return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
 #elif defined(FIONBIO)
+    int val = enabled ? 1 : 0;
     return ioctlsocket(s, FIONBIO, &val);
 #else
     return SOCKET_ERROR;
