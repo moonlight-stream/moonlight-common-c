@@ -230,7 +230,8 @@ static bool isIdrFrameStart(PBUFFER_DESC buffer) {
     return getSpecialSeq(buffer, &specialSeq) &&
         isSeqFrameStart(&specialSeq) &&
         (specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67 || // H264 SPS
-         specialSeq.data[specialSeq.offset + specialSeq.length] == 0x40); // H265 VPS
+         specialSeq.data[specialSeq.offset + specialSeq.length] == 0x40 || // H265 VPS
+         specialSeq.data[specialSeq.offset + specialSeq.length + 7] == 0x40); // HEVC encoded by AMF
 }
 
 // Reassemble the frame with the given frame number
