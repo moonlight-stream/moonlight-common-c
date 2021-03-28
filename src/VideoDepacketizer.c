@@ -225,6 +225,35 @@ static bool isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
     }
 }
 
+static bool isAccessUnitDelimiter(PBUFFER_DESC buffer) {
+    BUFFER_DESC specialSeq;
+    return getSpecialSeq(buffer, &specialSeq) &&
+            specialSeq.data[specialSeq.offset + specialSeq.length] == 0x46; // HEVC AUD
+}
+
+// Advance the buffer descriptor to the start of the next NAL
+static void skipToNextNal(PBUFFER_DESC buffer) {
+    BUFFER_DESC specialSeq;
+
+    // If we're starting on a NAL boundary, skip to the next one
+    if (getSpecialSeq(buffer, &specialSeq) && isSeqAnnexBStart(&specialSeq)) {
+        buffer->offset += specialSeq.length;
+        buffer->length -= specialSeq.length;
+    }
+
+    // Loop until we find an Annex B start sequence (3 or 4 byte)
+    while (!getSpecialSeq(buffer, &specialSeq) || !isSeqAnnexBStart(&specialSeq)) {
+        if (buffer->length == 0) {
+            // If we skipped all the data, something has gone horribly wrong
+            LC_ASSERT(buffer->length > 0);
+            return;
+        }
+
+        buffer->offset++;
+        buffer->length--;
+    }
+}
+
 static bool isIdrFrameStart(PBUFFER_DESC buffer) {
     BUFFER_DESC specialSeq;
     return getSpecialSeq(buffer, &specialSeq) &&
@@ -604,6 +633,13 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         LC_ASSERT(currentPos.data[currentPos.offset + 1] == 0);
         LC_ASSERT(currentPos.data[currentPos.offset + 2] == 0);
         LC_ASSERT(currentPos.data[currentPos.offset + 3] == 1);
+
+        // If an AUD NAL is prepended to this frame data, remove it.
+        // Other parts of this code are not prepared to deal with a
+        // NAL of that type, so stripping it is the easiest option.
+        if (isAccessUnitDelimiter(&currentPos)) {
+            skipToNextNal(&currentPos);
+        }
     }
 
     if (firstPacket && isIdrFrameStart(&currentPos))
