@@ -37,6 +37,17 @@ typedef struct _LENTRY_INTERNAL {
     void* allocPtr;
 } LENTRY_INTERNAL, *PLENTRY_INTERNAL;
 
+#define H264_NAL_TYPE(x) ((x) & 0x1F)
+#define HEVC_NAL_TYPE(x) (((x) & 0x7E) >> 1)
+
+#define H264_NAL_TYPE_SPS 7
+#define H264_NAL_TYPE_PPS 8
+#define H264_NAL_TYPE_AUD 9
+#define HEVC_NAL_TYPE_VPS 32
+#define HEVC_NAL_TYPE_SPS 33
+#define HEVC_NAL_TYPE_PPS 34
+#define HEVC_NAL_TYPE_AUD 35
+
 // Init
 void initializeVideoDepacketizer(int pktSize) {
     LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
@@ -206,29 +217,46 @@ void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
 }
 
 static bool isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
-    switch (specialSeq->data[specialSeq->offset + specialSeq->length]) {
-        case 0x20:
-        case 0x22:
-        case 0x24:
-        case 0x26:
-        case 0x28:
-        case 0x2A:
-            // H265
-            return true;
-            
-        case 0x65:
-            // H264
-            return true;
-            
-        default:
-            return false;
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(specialSeq->data[specialSeq->offset + specialSeq->length]) == 5;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        switch (HEVC_NAL_TYPE(specialSeq->data[specialSeq->offset + specialSeq->length])) {
+            case 16:
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+            case 21:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
     }
 }
 
 static bool isAccessUnitDelimiter(PBUFFER_DESC buffer) {
     BUFFER_DESC specialSeq;
-    return getSpecialSeq(buffer, &specialSeq) &&
-            specialSeq.data[specialSeq.offset + specialSeq.length] == 0x46; // HEVC AUD
+
+    if (!getSpecialSeq(buffer, &specialSeq)) {
+        return false;
+    }
+
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_AUD;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_AUD;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
 }
 
 // Advance the buffer descriptor to the start of the next NAL
@@ -256,10 +284,21 @@ static void skipToNextNal(PBUFFER_DESC buffer) {
 
 static bool isIdrFrameStart(PBUFFER_DESC buffer) {
     BUFFER_DESC specialSeq;
-    return getSpecialSeq(buffer, &specialSeq) &&
-        isSeqFrameStart(&specialSeq) &&
-        (specialSeq.data[specialSeq.offset + specialSeq.length] == 0x67 || // H264 SPS
-         specialSeq.data[specialSeq.offset + specialSeq.length] == 0x40); // H265 VPS
+
+    if (!getSpecialSeq(buffer, &specialSeq) || !isSeqFrameStart(&specialSeq)) {
+        return false;
+    }
+
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_SPS;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_VPS;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
 }
 
 // Reassemble the frame with the given frame number
@@ -329,13 +368,6 @@ static void reassembleFrame(int frameNumber) {
     }
 }
 
-
-#define AVC_NAL_TYPE_SPS 0x67
-#define AVC_NAL_TYPE_PPS 0x68
-#define HEVC_NAL_TYPE_VPS 0x40
-#define HEVC_NAL_TYPE_SPS 0x42
-#define HEVC_NAL_TYPE_PPS 0x44
-
 static int getBufferFlags(char* data, int length) {
     BUFFER_DESC buffer;
     BUFFER_DESC candidate;
@@ -348,20 +380,36 @@ static int getBufferFlags(char* data, int length) {
         return BUFFER_TYPE_PICDATA;
     }
 
-    switch (candidate.data[candidate.offset + candidate.length]) {
-        case AVC_NAL_TYPE_SPS:
-        case HEVC_NAL_TYPE_SPS:
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        switch (H264_NAL_TYPE(candidate.data[candidate.offset + candidate.length])) {
+        case H264_NAL_TYPE_SPS:
             return BUFFER_TYPE_SPS;
 
-        case AVC_NAL_TYPE_PPS:
-        case HEVC_NAL_TYPE_PPS:
+        case H264_NAL_TYPE_PPS:
             return BUFFER_TYPE_PPS;
-
-        case HEVC_NAL_TYPE_VPS:
-            return BUFFER_TYPE_VPS;
 
         default:
             return BUFFER_TYPE_PICDATA;
+        }
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        switch (HEVC_NAL_TYPE(candidate.data[candidate.offset + candidate.length])) {
+            case HEVC_NAL_TYPE_SPS:
+                return BUFFER_TYPE_SPS;
+
+            case HEVC_NAL_TYPE_PPS:
+                return BUFFER_TYPE_PPS;
+
+            case HEVC_NAL_TYPE_VPS:
+                return BUFFER_TYPE_VPS;
+
+            default:
+                return BUFFER_TYPE_PICDATA;
+        }
+    }
+    else {
+        LC_ASSERT(false);
+        return BUFFER_TYPE_PICDATA;
     }
 }
 
