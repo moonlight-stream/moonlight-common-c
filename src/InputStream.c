@@ -326,6 +326,7 @@ static void inputSendThreadProc(void* context) {
         // the encryption.
         if (encryptedControlStream) {
             err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, holder->packetLength);
+            free(holder);
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(err);
