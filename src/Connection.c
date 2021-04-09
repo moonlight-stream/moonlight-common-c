@@ -291,12 +291,11 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     Limelog("Initializing audio stream...");
     ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_INIT);
-    if (initializeAudioStream() != 0) {
-        if (err != 0) {
-            Limelog("failed: %d\n", err);
-            ListenerCallbacks.stageFailed(STAGE_AUDIO_STREAM_INIT, err);
-            goto Cleanup;
-        }
+    err = initializeAudioStream();
+    if (err != 0) {
+        Limelog("failed: %d\n", err);
+        ListenerCallbacks.stageFailed(STAGE_AUDIO_STREAM_INIT, err);
+        goto Cleanup;
     }
     stage++;
     LC_ASSERT(stage == STAGE_AUDIO_STREAM_INIT);
