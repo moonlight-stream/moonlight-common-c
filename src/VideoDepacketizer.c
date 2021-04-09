@@ -638,9 +638,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     // If this is the first packet, skip the frame header (if one exists)
     if (firstPacket) {
-        if ((AppVersionQuad[0] > 7) ||
-            (AppVersionQuad[0] == 7 && AppVersionQuad[1] > 1) ||
-            (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 415)) {
+        if (APP_VERSION_AT_LEAST(7, 1, 415)) {
             // >= 7.1.415
             // The first IDR frame now has smaller headers than the rest. We seem to be able to tell
             // them apart by looking at the first byte. It will be 0x81 for the long header and 0x01
@@ -657,17 +655,17 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 currentPos.length -= 24;
             }
         }
-        else if (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 350) {
+        else if (APP_VERSION_AT_LEAST(7, 1, 350)) {
             // [7.1.350, 7.1.415) should use the 8 byte header again
             currentPos.offset += 8;
             currentPos.length -= 8;
         }
-        else if (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] >= 320) {
+        else if (APP_VERSION_AT_LEAST(7, 1, 320)) {
             // [7.1.320, 7.1.350) should use the 12 byte frame header
             currentPos.offset += 12;
             currentPos.length -= 12;
         }
-        else if (AppVersionQuad[0] >= 5) {
+        else if (APP_VERSION_AT_LEAST(5, 0, 0)) {
             // [5.x, 7.1.320) should use the 8 byte header
             currentPos.offset += 8;
             currentPos.length -= 8;

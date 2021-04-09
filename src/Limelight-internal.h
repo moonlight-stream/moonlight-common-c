@@ -39,6 +39,11 @@ extern int AudioPacketDuration;
 #define isBefore24(x, y) (U24((x) - (y)) > (UINT24_MAX/2))
 #define isBefore32(x, y) (U32((x) - (y)) > (UINT32_MAX/2))
 
+#define APP_VERSION_AT_LEAST(a, b, c, d)                                                    \
+    ((AppVersionQuad[0] > (a)) ||                                                           \
+     (AppVersionQuad[0] == (a) && AppVersionQuad[1] > (b)) ||                               \
+     (AppVersionQuad[0] == (a) && AppVersionQuad[1] == (b) && AppVersionQuad[2] >= (c)))
+
 #define UDP_RECV_POLL_TIMEOUT_MS 100
 
 // At this value or above, we will request high quality audio unless CAPABILITY_SLOW_OPUS_DECODER
