@@ -377,9 +377,13 @@ typedef void(*ConnListenerConnectionTerminated)(int errorCode);
 
 // This error is passed to ConnListenerConnectionTerminated() if the stream ends
 // very soon after starting due to a graceful termination from the host. Usually
-// this seems to happen if DRM protected content is on-screen, or another issue
-// that prevents the encoder from being able to capture video successfully.
+// this seems to happen if DRM protected content is on-screen (pre-GFE 3.22), or
+// another issue that prevents the encoder from being able to capture video successfully.
 #define ML_ERROR_UNEXPECTED_EARLY_TERMINATION -102
+
+// This error is passed to ConnListenerConnectionTerminated() if the stream ends
+// due to a protected content error from the host. This value is supported on GFE 3.22+.
+#define ML_ERROR_PROTECTED_CONTENT -103
 
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);

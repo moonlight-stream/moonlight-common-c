@@ -817,7 +817,7 @@ static void controlReceiveThreadFunc(void* context) {
 
                     Limelog("Server notified termination reason: 0x%08x\n", terminationErrorCode);
 
-                    // Handle NVST_DISCONN_SERVER_TERMINATED_CLOSED specially
+                    // NVST_DISCONN_SERVER_TERMINATED_CLOSED is the expected graceful termination error
                     if (terminationErrorCode == 0x80030023) {
                         if (lastSeenFrame != 0) {
                             // Pass error code 0 to notify the client that this was not an error
@@ -828,6 +828,10 @@ static void controlReceiveThreadFunc(void* context) {
                             // NvStreamer to terminate prior to sending any frames.
                             terminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
                         }
+                    }
+                    // NVST_DISCONN_SERVER_VFP_PROTECTED_CONTENT means it failed due to protected content on screen
+                    else if (terminationErrorCode == 0x800e9302) {
+                        terminationErrorCode = ML_ERROR_PROTECTED_CONTENT;
                     }
                 }
                 else {
