@@ -127,6 +127,16 @@ static const short packetTypesGen7[] = {
     0x010b, // Rumble data
     0x0100, // Termination
 };
+static const short packetTypesGen7Enc[] = {
+    0x0305, // Start A
+    0x0307, // Start B
+    0x0301, // Invalidate reference frames
+    0x0201, // Loss Stats
+    0x0204, // Frame Stats (unused)
+    0x0206, // Input data
+    0x010b, // Rumble data
+    0x0109, // Termination (extended)
+};
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
 static const int startBGen3[] = { 0, 0, 0, 0xa };
@@ -201,6 +211,8 @@ int initializeControlStream(void) {
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
     PltCreateMutex(&enetMutex);
 
+    encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
+
     if (AppVersionQuad[0] == 3) {
         packetTypes = (short*)packetTypesGen3;
         payloadLengths = (short*)payloadLengthsGen3;
@@ -217,7 +229,12 @@ int initializeControlStream(void) {
         preconstructedPayloads = (char**)preconstructedPayloadsGen5;
     }
     else {
-        packetTypes = (short*)packetTypesGen7;
+        if (encryptedControlStream) {
+            packetTypes = (short*)packetTypesGen7Enc;
+        }
+        else {
+            packetTypes = (short*)packetTypesGen7;
+        }
         payloadLengths = (short*)payloadLengthsGen7;
         preconstructedPayloads = (char**)preconstructedPayloadsGen7;
     }
@@ -234,7 +251,6 @@ int initializeControlStream(void) {
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
-    encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
     cipherContext = EVP_CIPHER_CTX_new();
 
     return 0;
@@ -791,38 +807,63 @@ static void controlReceiveThreadFunc(void* context) {
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
-                uint16_t terminationReason;
-                int terminationErrorCode;
+                uint32_t terminationErrorCode;
 
-                BbGet16(&bb, &terminationReason);
+                if (packetLength >= 6) {
+                    // This is the extended termination message which contains a full HRESULT
+                    BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_BIG);
+                    BbGet32(&bb, &terminationErrorCode);
 
-                Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
+                    Limelog("Server notified termination reason: 0x%08x\n", terminationErrorCode);
 
-                // SERVER_TERMINATED_INTENDED
-                if (terminationReason == 0x0100) {
-                    if (lastSeenFrame != 0) {
-                        // Pass error code 0 to notify the client that this was not an error
-                        terminationErrorCode = ML_ERROR_GRACEFUL_TERMINATION;
-                    }
-                    else {
-                        // We never saw a frame, so this is probably an error that caused
-                        // NvStreamer to terminate prior to sending any frames.
-                        terminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
+                    // Handle NVST_DISCONN_SERVER_TERMINATED_CLOSED specially
+                    if (terminationErrorCode == 0x80030023) {
+                        if (lastSeenFrame != 0) {
+                            // Pass error code 0 to notify the client that this was not an error
+                            terminationErrorCode = ML_ERROR_GRACEFUL_TERMINATION;
+                        }
+                        else {
+                            // We never saw a frame, so this is probably an error that caused
+                            // NvStreamer to terminate prior to sending any frames.
+                            terminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
+                        }
                     }
                 }
                 else {
-                    // Otherwise pass the reason unmodified
-                    terminationErrorCode = terminationReason;
+                    uint16_t terminationReason;
+
+                    // This is the short termination message
+                    BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                    BbGet16(&bb, &terminationReason);
+
+                    Limelog("Server notified termination reason: 0x%04x\n", terminationReason);
+
+                    // SERVER_TERMINATED_INTENDED
+                    if (terminationReason == 0x0100) {
+                        if (lastSeenFrame != 0) {
+                            // Pass error code 0 to notify the client that this was not an error
+                            terminationErrorCode = ML_ERROR_GRACEFUL_TERMINATION;
+                        }
+                        else {
+                            // We never saw a frame, so this is probably an error that caused
+                            // NvStreamer to terminate prior to sending any frames.
+                            terminationErrorCode = ML_ERROR_UNEXPECTED_EARLY_TERMINATION;
+                        }
+                    }
+                    else {
+                        // Otherwise pass the reason unmodified
+                        terminationErrorCode = terminationReason;
+                    }
                 }
+
 
                 // We used to wait for a ENET_EVENT_TYPE_DISCONNECT event, but since
                 // GFE 3.20.3.63 we don't get one for 10 seconds after we first get
                 // this termination message. The termination message should be reliable
                 // enough to end the stream now, rather than waiting for an explicit
                 // disconnect.
-                ListenerCallbacks.connectionTerminated(terminationErrorCode);
+                ListenerCallbacks.connectionTerminated((int)terminationErrorCode);
                 free(ctlHdr);
                 return;
             }
