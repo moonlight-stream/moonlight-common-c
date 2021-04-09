@@ -422,7 +422,7 @@ gcm_cleanup:
 }
 
 // Caller must free() *packet on success!!!
-static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet) {
+static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
     bool ret = false;
     int len;
     unsigned char iv[16];
@@ -482,6 +482,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
     // Now we do an in-place V2 to V1 header conversion, so our existing parsing code doesn't have to change.
     // All we need to do is eliminate the new length field in V2 by shifting everything by 2 bytes.
     memmove(((unsigned char*)*packet) + 2, ((unsigned char*)*packet) + 4, plaintextLength - 4);
+    *packetLength = plaintextLength - 2;
 
     ret = true;
 
@@ -722,6 +723,7 @@ static void controlReceiveThreadFunc(void* context) {
 
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
             PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr;
+            int packetLength;
 
             if (event.packet->dataLength < sizeof(*ctlHdr)) {
                 Limelog("Discarding runt control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(*ctlHdr));
@@ -744,7 +746,7 @@ static void controlReceiveThreadFunc(void* context) {
                     // We (ab)use this lock to protect the cryptoContext too
                     PltLockMutex(&enetMutex);
                     ctlHdr = NULL;
-                    if (!decryptControlMessageToV1((PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data, &ctlHdr)) {
+                    if (!decryptControlMessageToV1((PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data, &ctlHdr, &packetLength)) {
                         PltUnlockMutex(&enetMutex);
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
@@ -755,20 +757,25 @@ static void controlReceiveThreadFunc(void* context) {
                 else {
                     // What do we do here???
                     LC_ASSERT(false);
+                    packetLength = event.packet->dataLength;
                 }
             }
             else {
                 // Take ownership of the packet data directly for the non-encrypted case
                 ctlHdr = (PNVCTL_ENET_PACKET_HEADER_V1)event.packet->data;
+                packetLength = event.packet->dataLength;
                 event.packet->data = NULL;
             }
 
-            // All below codepaths must free ctlHdr and event.packet!!!
+            // We're done with the packet struct
+            enet_packet_destroy(event.packet);
+
+            // All below codepaths must free ctlHdr!!!
 
             if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
                 BbAdvanceBuffer(&bb, 4);
 
                 uint16_t controllerNumber;
@@ -784,7 +791,7 @@ static void controlReceiveThreadFunc(void* context) {
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
                 uint16_t terminationReason;
                 int terminationErrorCode;
@@ -817,12 +824,10 @@ static void controlReceiveThreadFunc(void* context) {
                 // disconnect.
                 ListenerCallbacks.connectionTerminated(terminationErrorCode);
                 free(ctlHdr);
-                enet_packet_destroy(event.packet);
                 return;
             }
 
             free(ctlHdr);
-            enet_packet_destroy(event.packet);
         }
         else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
             Limelog("Control stream received unexpected disconnect event\n");
