@@ -12,7 +12,7 @@ static bool hasSessionId;
 static int rtspClientVersion;
 static char urlAddr[URLSAFESTRING_LEN];
 static bool useEnet;
-static const char* controlStreamId;
+static char* controlStreamId;
 
 static SOCKET sock = INVALID_SOCKET;
 static ENetHost* client;
