@@ -39,7 +39,7 @@ extern int AudioPacketDuration;
 #define isBefore24(x, y) (U24((x) - (y)) > (UINT24_MAX/2))
 #define isBefore32(x, y) (U32((x) - (y)) > (UINT32_MAX/2))
 
-#define APP_VERSION_AT_LEAST(a, b, c, d)                                                    \
+#define APP_VERSION_AT_LEAST(a, b, c)                                                       \
     ((AppVersionQuad[0] > (a)) ||                                                           \
      (AppVersionQuad[0] == (a) && AppVersionQuad[1] > (b)) ||                               \
      (AppVersionQuad[0] == (a) && AppVersionQuad[1] == (b) && AppVersionQuad[2] >= (c)))
