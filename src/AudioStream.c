@@ -78,6 +78,7 @@ int initializeAudioStream(void) {
     int err = PltCreateThread("AudioPing", UdpPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         closeSocket(rtpSocket);
+        rtpSocket = INVALID_SOCKET;
         return err;
     }
 

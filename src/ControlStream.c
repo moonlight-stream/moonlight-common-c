@@ -489,7 +489,8 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         goto gcm_cleanup;
     }
 
-    // GCM encryption won't ever fill ciphertext here but we have to call it anyway
+    // GCM will never have additional plaintext here, but we need to call it to
+    // ensure that the GCM authentication tag is correct for this data.
     if (EVP_DecryptFinal_ex(cipherContext, (unsigned char*)*packet, &len) != 1) {
         goto gcm_cleanup;
     }
@@ -860,7 +861,6 @@ static void controlReceiveThreadFunc(void* context) {
                         terminationErrorCode = terminationReason;
                     }
                 }
-
 
                 // We used to wait for a ENET_EVENT_TYPE_DISCONNECT event, but since
                 // GFE 3.20.3.63 we don't get one for 10 seconds after we first get
