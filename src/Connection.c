@@ -30,10 +30,10 @@ static const char* stageNames[STAGE_MAX] = {
     "none",
     "platform initialization",
     "name resolution",
+    "audio stream initialization",
     "RTSP handshake",
     "control stream initialization",
     "video stream initialization",
-    "audio stream initialization",
     "input stream initialization",
     "control stream establishment",
     "video stream establishment",
@@ -91,12 +91,6 @@ void LiStopConnection(void) {
         stage--;
         Limelog("done\n");
     }
-    if (stage == STAGE_AUDIO_STREAM_INIT) {
-        Limelog("Cleaning up audio stream...");
-        destroyAudioStream();
-        stage--;
-        Limelog("done\n");
-    }
     if (stage == STAGE_VIDEO_STREAM_INIT) {
         Limelog("Cleaning up video stream...");
         destroyVideoStream();
@@ -112,6 +106,12 @@ void LiStopConnection(void) {
     if (stage == STAGE_RTSP_HANDSHAKE) {
         // Nothing to do
         stage--;
+    }
+    if (stage == STAGE_AUDIO_STREAM_INIT) {
+        Limelog("Cleaning up audio stream...");
+        destroyAudioStream();
+        stage--;
+        Limelog("done\n");
     }
     if (stage == STAGE_NAME_RESOLUTION) {
         // Nothing to do
@@ -289,6 +289,20 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         }
     }
 
+    Limelog("Initializing audio stream...");
+    ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_INIT);
+    if (initializeAudioStream() != 0) {
+        if (err != 0) {
+            Limelog("failed: %d\n", err);
+            ListenerCallbacks.stageFailed(STAGE_AUDIO_STREAM_INIT, err);
+            goto Cleanup;
+        }
+    }
+    stage++;
+    LC_ASSERT(stage == STAGE_AUDIO_STREAM_INIT);
+    ListenerCallbacks.stageComplete(STAGE_AUDIO_STREAM_INIT);
+    Limelog("done\n");
+
     Limelog("Starting RTSP handshake...");
     ListenerCallbacks.stageStarting(STAGE_RTSP_HANDSHAKE);
     err = performRtspHandshake();
@@ -321,14 +335,6 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     stage++;
     LC_ASSERT(stage == STAGE_VIDEO_STREAM_INIT);
     ListenerCallbacks.stageComplete(STAGE_VIDEO_STREAM_INIT);
-    Limelog("done\n");
-
-    Limelog("Initializing audio stream...");
-    ListenerCallbacks.stageStarting(STAGE_AUDIO_STREAM_INIT);
-    initializeAudioStream();
-    stage++;
-    LC_ASSERT(stage == STAGE_AUDIO_STREAM_INIT);
-    ListenerCallbacks.stageComplete(STAGE_AUDIO_STREAM_INIT);
     Limelog("done\n");
 
     Limelog("Initializing input stream...");

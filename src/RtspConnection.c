@@ -855,7 +855,7 @@ int performRtspHandshake(void) {
         int error = -1;
 
         if (!playStream(&response, "/", &error)) {
-            Limelog("RTSP PLAY streamid=video request failed: %d\n", error);
+            Limelog("RTSP PLAY request failed: %d\n", error);
             ret = error;
             goto Exit;
         }
