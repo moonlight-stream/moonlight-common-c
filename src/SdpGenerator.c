@@ -142,9 +142,19 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
 static int addGen5Options(PSDP_OPTION* head) {
     int err = 0;
 
-    // We want to use the new ENet connections for control and input
-    err |= addAttributeString(head, "x-nv-general.useReliableUdp", "1");
-    err |= addAttributeString(head, "x-nv-ri.useControlChannel", "1");
+    if (APP_VERSION_AT_LEAST(7, 1, 431)) {
+        // 0x20 enables audio encryption (which we don't support yet)
+        // 0x80 enables remote input encryption (which we do want)
+        err |= addAttributeString(head, "x-nv-general.featureFlags", "135");
+
+        // Ask for the unencrypted control protocol for now
+        err |= addAttributeString(head, "x-nv-general.useReliableUdp", "9");
+    }
+    else {
+        // We want to use the new ENet connections for control and input
+        err |= addAttributeString(head, "x-nv-general.useReliableUdp", "1");
+        err |= addAttributeString(head, "x-nv-ri.useControlChannel", "1");
+    }
     
     // Disable dynamic resolution switching
     err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
