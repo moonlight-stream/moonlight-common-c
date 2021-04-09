@@ -147,8 +147,9 @@ static int addGen5Options(PSDP_OPTION* head) {
         // 0x80 enables remote input encryption (which we do want)
         err |= addAttributeString(head, "x-nv-general.featureFlags", "135");
 
-        // Ask for the unencrypted control protocol for now
-        err |= addAttributeString(head, "x-nv-general.useReliableUdp", "9");
+        // Ask for the encrypted control protocol to ensure remote input will be encrypted.
+        // This used to be done via separate RI encryption, but now it is all or nothing.
+        err |= addAttributeString(head, "x-nv-general.useReliableUdp", "13");
     }
     else {
         // We want to use the new ENet connections for control and input

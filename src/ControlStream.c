@@ -6,15 +6,31 @@
 
 #include <enet/enet.h>
 
+#include <openssl/evp.h>
+
 // NV control stream packet header for TCP
 typedef struct _NVCTL_TCP_PACKET_HEADER {
     unsigned short type;
     unsigned short payloadLength;
 } NVCTL_TCP_PACKET_HEADER, *PNVCTL_TCP_PACKET_HEADER;
 
-typedef struct _NVCTL_ENET_PACKET_HEADER {
+typedef struct _NVCTL_ENET_PACKET_HEADER_V1 {
     unsigned short type;
-} NVCTL_ENET_PACKET_HEADER, *PNVCTL_ENET_PACKET_HEADER;
+} NVCTL_ENET_PACKET_HEADER_V1, *PNVCTL_ENET_PACKET_HEADER_V1;
+
+typedef struct _NVCTL_ENET_PACKET_HEADER_V2 {
+    unsigned short type;
+    unsigned short payloadLength;
+} NVCTL_ENET_PACKET_HEADER_V2, *PNVCTL_ENET_PACKET_HEADER_V2;
+
+#define AES_GCM_TAG_LENGTH 16
+typedef struct _NVCTL_ENCRYPTED_PACKET_HEADER {
+    unsigned short encryptedHeaderType; // Always LE 0x0001
+    unsigned short length; // sizeof(seq) + 16 byte tag + secondary header and data
+    unsigned int seq; // Monotonically increasing sequence number (used as IV for AES-GCM)
+
+    // encrypted NVCTL_ENET_PACKET_HEADER_V2 and payload data follow
+} NVCTL_ENCRYPTED_PACKET_HEADER, *PNVCTL_ENCRYPTED_PACKET_HEADER;
 
 typedef struct _QUEUED_FRAME_INVALIDATION_TUPLE {
     int startFrame;
@@ -37,15 +53,23 @@ static int lastGoodFrame;
 static int lastSeenFrame;
 static bool stopping;
 static bool disconnectPending;
+static bool encryptedControlStream;
 
 static int intervalGoodFrameCount;
 static int intervalTotalFrameCount;
 static uint64_t intervalStartTimeMs;
 static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
+static int currentEnetSequenceNumber;
 
 static bool idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
+
+static EVP_CIPHER_CTX* cipherContext;
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
+#endif
 
 #define CONN_IMMEDIATE_POOR_LOSS_RATE 30
 #define CONN_CONSECUTIVE_POOR_LOSS_RATE 15
@@ -208,7 +232,10 @@ int initializeControlStream(void) {
     intervalStartTimeMs = 0;
     lastIntervalLossPercentage = 0;
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
+    currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
+    encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
+    cipherContext = EVP_CIPHER_CTX_new();
 
     return 0;
 }
@@ -226,6 +253,7 @@ void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 // Cleans up control stream
 void destroyControlStream(void) {
     LC_ASSERT(stopping);
+    EVP_CIPHER_CTX_free(cipherContext);
     PltCloseEvent(&invalidateRefFramesEvent);
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
     PltDeleteMutex(&enetMutex);
@@ -345,21 +373,184 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
     return fullPacket;
 }
 
+static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
+    bool ret = false;
+    int len;
+    unsigned char iv[16];
+
+    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+    memset(iv, 0, sizeof(iv));
+    iv[0] = (unsigned char)encPacket->seq;
+
+    if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
+        goto gcm_cleanup;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
+        goto gcm_cleanup;
+    }
+
+    if (EVP_EncryptInit_ex(cipherContext, NULL, NULL,
+                           (const unsigned char*)StreamConfig.remoteInputAesKey, iv) != 1) {
+        goto gcm_cleanup;
+    }
+
+    // Encrypt into the space after the encrypted header and GCM tag
+    int encryptedSize = sizeof(*packet) + packet->payloadLength;
+    if (EVP_EncryptUpdate(cipherContext, ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH,
+                          &encryptedSize, (const unsigned char*)packet, encryptedSize) != 1) {
+        goto gcm_cleanup;
+    }
+
+    // GCM encryption won't ever fill ciphertext here but we have to call it anyway
+    if (EVP_EncryptFinal_ex(cipherContext, ((unsigned char*)(encPacket + 1)), &len) != 1) {
+        goto gcm_cleanup;
+    }
+    LC_ASSERT(len == 0);
+
+    // Read the tag into the space after the encrypted header
+    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_GET_TAG, 16, (unsigned char*)(encPacket + 1)) != 1) {
+        ret = -1;
+        goto gcm_cleanup;
+    }
+
+    ret = true;
+
+gcm_cleanup:
+    EVP_CIPHER_CTX_reset(cipherContext);
+    return ret;
+}
+
+// Caller must free() *packet on success!!!
+static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet) {
+    bool ret = false;
+    int len;
+    unsigned char iv[16];
+
+    *packet = NULL;
+
+    // It must be an encrypted packet to begin with
+    LC_ASSERT(encPacket->encryptedHeaderType == 0x0001);
+
+    // Check length first so we don't underflow
+    if (encPacket->length < sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(NVCTL_ENET_PACKET_HEADER_V2)) {
+        Limelog("Received runt packet (%d). Unable to decrypt.\n", encPacket->length);
+        return false;
+    }
+
+    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+    memset(iv, 0, sizeof(iv));
+    iv[0] = (unsigned char)encPacket->seq;
+
+    if (EVP_DecryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
+        goto gcm_cleanup;
+    }
+
+    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
+        goto gcm_cleanup;
+    }
+
+    if (EVP_DecryptInit_ex(cipherContext, NULL, NULL,
+                           (const unsigned char*)StreamConfig.remoteInputAesKey, iv) != 1) {
+        goto gcm_cleanup;
+    }
+
+    int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
+    *packet = malloc(plaintextLength);
+    if (*packet == NULL) {
+        goto gcm_cleanup;
+    }
+
+    // Decrypt into the packet we allocated
+    if (EVP_DecryptUpdate(cipherContext, (unsigned char*)*packet, &plaintextLength,
+                          ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength) != 1) {
+        goto gcm_cleanup;
+    }
+
+    // Set the GCM tag before calling EVP_DecryptFinal_ex()
+    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_TAG, 16, (unsigned char*)(encPacket + 1)) != 1) {
+        ret = -1;
+        goto gcm_cleanup;
+    }
+
+    // GCM encryption won't ever fill ciphertext here but we have to call it anyway
+    if (EVP_DecryptFinal_ex(cipherContext, (unsigned char*)*packet, &len) != 1) {
+        goto gcm_cleanup;
+    }
+    LC_ASSERT(len == 0);
+
+    // Now we do an in-place V2 to V1 header conversion, so our existing parsing code doesn't have to change.
+    // All we need to do is eliminate the new length field in V2 by shifting everything by 2 bytes.
+    memmove(((unsigned char*)*packet) + 2, ((unsigned char*)*packet) + 4, plaintextLength - 4);
+
+    ret = true;
+
+gcm_cleanup:
+    EVP_CIPHER_CTX_reset(cipherContext);
+
+    if (!ret && *packet) {
+        free(*packet);
+        *packet = NULL;
+    }
+
+    return ret;
+}
+
 static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
-    PNVCTL_ENET_PACKET_HEADER packet;
     ENetPacket* enetPacket;
     int err;
 
     LC_ASSERT(AppVersionQuad[0] >= 5);
 
-    enetPacket = enet_packet_create(NULL, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
-    if (enetPacket == NULL) {
-        return false;
-    }
+    if (encryptedControlStream) {
+        PNVCTL_ENCRYPTED_PACKET_HEADER encPacket;
+        PNVCTL_ENET_PACKET_HEADER_V2 packet;
+        char tempBuffer[256];
 
-    packet = (PNVCTL_ENET_PACKET_HEADER)enetPacket->data;
-    packet->type = ptype;
-    memcpy(&packet[1], payload, paylen);
+        enetPacket = enet_packet_create(NULL,
+                                        sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
+                                        ENET_PACKET_FLAG_RELIABLE);
+        if (enetPacket == NULL) {
+            return false;
+        }
+
+        // We (ab)use the enetMutex to protect currentEnetSequenceNumber and the cipherContext
+        // used inside encryptControlMessage().
+        PltLockMutex(&enetMutex);
+
+        encPacket = (PNVCTL_ENCRYPTED_PACKET_HEADER)enetPacket->data;
+        encPacket->encryptedHeaderType = 0x0001;
+        encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
+        encPacket->seq = currentEnetSequenceNumber++;
+
+        // Construct the plaintext data for encryption
+        LC_ASSERT(sizeof(*packet) + paylen < sizeof(tempBuffer));
+        packet = (PNVCTL_ENET_PACKET_HEADER_V2)tempBuffer;
+        packet->type = ptype;
+        packet->payloadLength = paylen;
+        memcpy(&packet[1], payload, paylen);
+
+        // Encrypt the data into the final packet
+        if (!encryptControlMessage(encPacket, packet)) {
+            Limelog("Failed to encrypt control stream message\n");
+            enet_packet_destroy(enetPacket);
+            PltUnlockMutex(&enetMutex);
+            return false;
+        }
+
+        PltUnlockMutex(&enetMutex);
+    }
+    else {
+        PNVCTL_ENET_PACKET_HEADER_V1 packet;
+        enetPacket = enet_packet_create(NULL, sizeof(*packet) + paylen, ENET_PACKET_FLAG_RELIABLE);
+        if (enetPacket == NULL) {
+            return false;
+        }
+
+        packet = (PNVCTL_ENET_PACKET_HEADER_V1)enetPacket->data;
+        packet->type = ptype;
+        memcpy(&packet[1], payload, paylen);
+    }
 
     PltLockMutex(&enetMutex);
     err = enet_peer_send(peer, 0, enetPacket);
@@ -530,7 +721,7 @@ static void controlReceiveThreadFunc(void* context) {
         }
 
         if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-            PNVCTL_ENET_PACKET_HEADER ctlHdr = (PNVCTL_ENET_PACKET_HEADER)event.packet->data;
+            PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr;
 
             if (event.packet->dataLength < sizeof(*ctlHdr)) {
                 Limelog("Discarding runt control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(*ctlHdr));
@@ -538,10 +729,46 @@ static void controlReceiveThreadFunc(void* context) {
                 continue;
             }
 
+            ctlHdr = (PNVCTL_ENET_PACKET_HEADER_V1)event.packet->data;
+
+            if (encryptedControlStream) {
+                // V2 headers can be interpreted as V1 headers for the purpose of examining type,
+                // so this check is safe.
+                if (ctlHdr->type == 0x0001) {
+                    if (event.packet->dataLength < sizeof(NVCTL_ENCRYPTED_PACKET_HEADER)) {
+                        Limelog("Discarding runt encrypted control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(NVCTL_ENCRYPTED_PACKET_HEADER));
+                        enet_packet_destroy(event.packet);
+                        continue;
+                    }
+
+                    // We (ab)use this lock to protect the cryptoContext too
+                    PltLockMutex(&enetMutex);
+                    ctlHdr = NULL;
+                    if (!decryptControlMessageToV1((PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data, &ctlHdr)) {
+                        PltUnlockMutex(&enetMutex);
+                        Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
+                        enet_packet_destroy(event.packet);
+                        continue;
+                    }
+                    PltUnlockMutex(&enetMutex);
+                }
+                else {
+                    // What do we do here???
+                    LC_ASSERT(false);
+                }
+            }
+            else {
+                // Take ownership of the packet data directly for the non-encrypted case
+                ctlHdr = (PNVCTL_ENET_PACKET_HEADER_V1)event.packet->data;
+                event.packet->data = NULL;
+            }
+
+            // All below codepaths must free ctlHdr and event.packet!!!
+
             if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
                 BbAdvanceBuffer(&bb, 4);
 
                 uint16_t controllerNumber;
@@ -557,7 +784,7 @@ static void controlReceiveThreadFunc(void* context) {
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
 
-                BbInitializeWrappedBuffer(&bb, (char*)event.packet->data, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), event.packet->dataLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
                 uint16_t terminationReason;
                 int terminationErrorCode;
@@ -589,10 +816,12 @@ static void controlReceiveThreadFunc(void* context) {
                 // enough to end the stream now, rather than waiting for an explicit
                 // disconnect.
                 ListenerCallbacks.connectionTerminated(terminationErrorCode);
+                free(ctlHdr);
                 enet_packet_destroy(event.packet);
                 return;
             }
 
+            free(ctlHdr);
             enet_packet_destroy(event.packet);
         }
         else if (event.type == ENET_EVENT_TYPE_DISCONNECT) {

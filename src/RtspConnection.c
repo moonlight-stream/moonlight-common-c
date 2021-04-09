@@ -606,7 +606,7 @@ int performRtspHandshake(void) {
     sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
     currentSeqNumber = 1;
     hasSessionId = false;
-    controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/9/0" : "streamid=control/1/0";
+    controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
 
     switch (AppVersionQuad[0]) {
         case 3:
