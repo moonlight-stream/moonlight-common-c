@@ -125,7 +125,7 @@ static void ReceiveThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
     bool useSelect;
-    int packetsToDrop = 500 / AudioPacketDuration;
+    int packetsToDrop = 1000 / AudioPacketDuration;
     int waitingForAudioMs;
 
     packet = NULL;
@@ -185,8 +185,8 @@ static void ReceiveThreadProc(void* context) {
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
         }
 
-        // GFE accumulates audio samples before we are ready to receive them,
-        // so we will drop the first 100 packets to avoid accumulating latency
+        // GFE accumulates audio samples before we are ready to receive them, so
+        // we will drop the first 1 second of packets to avoid accumulating latency
         // by sending audio frames to the player faster than they can be played.
         if (packetsToDrop > 0) {
             packetsToDrop--;
