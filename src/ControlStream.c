@@ -6,8 +6,6 @@
 
 #include <enet/enet.h>
 
-#include <openssl/evp.h>
-
 // NV control stream packet header for TCP
 typedef struct _NVCTL_TCP_PACKET_HEADER {
     unsigned short type;
@@ -65,11 +63,8 @@ static int currentEnetSequenceNumber;
 static bool idrFrameRequired;
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 
-static EVP_CIPHER_CTX* cipherContext;
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
-#endif
+static PPLT_CRYPTO_CONTEXT encryptionCtx;
+static PPLT_CRYPTO_CONTEXT decryptionCtx;
 
 #define CONN_IMMEDIATE_POOR_LOSS_RATE 30
 #define CONN_CONSECUTIVE_POOR_LOSS_RATE 15
@@ -251,7 +246,8 @@ int initializeControlStream(void) {
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
-    cipherContext = EVP_CIPHER_CTX_new();
+    encryptionCtx = PltCreateCryptoContext();
+    decryptionCtx = PltCreateCryptoContext();
 
     return 0;
 }
@@ -269,7 +265,8 @@ void freeFrameInvalidationList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 // Cleans up control stream
 void destroyControlStream(void) {
     LC_ASSERT(stopping);
-    EVP_CIPHER_CTX_free(cipherContext);
+    PltDestroyCryptoContext(encryptionCtx);
+    PltDestroyCryptoContext(decryptionCtx);
     PltCloseEvent(&invalidateRefFramesEvent);
     freeFrameInvalidationList(LbqDestroyLinkedBlockingQueue(&invalidReferenceFrameTuples));
     PltDeleteMutex(&enetMutex);
@@ -390,57 +387,23 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
 }
 
 static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
-    bool ret = false;
-    int len;
     unsigned char iv[16];
+    int encryptedSize = sizeof(*packet) + packet->payloadLength;
 
     // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
     memset(iv, 0, sizeof(iv));
     iv[0] = (unsigned char)encPacket->seq;
 
-    if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
-        goto gcm_cleanup;
-    }
-
-    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
-        goto gcm_cleanup;
-    }
-
-    if (EVP_EncryptInit_ex(cipherContext, NULL, NULL,
-                           (const unsigned char*)StreamConfig.remoteInputAesKey, iv) != 1) {
-        goto gcm_cleanup;
-    }
-
-    // Encrypt into the space after the encrypted header and GCM tag
-    int encryptedSize = sizeof(*packet) + packet->payloadLength;
-    if (EVP_EncryptUpdate(cipherContext, ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH,
-                          &encryptedSize, (const unsigned char*)packet, encryptedSize) != 1) {
-        goto gcm_cleanup;
-    }
-
-    // GCM encryption won't ever fill ciphertext here but we have to call it anyway
-    if (EVP_EncryptFinal_ex(cipherContext, ((unsigned char*)(encPacket + 1)), &len) != 1) {
-        goto gcm_cleanup;
-    }
-    LC_ASSERT(len == 0);
-
-    // Read the tag into the space after the encrypted header
-    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_GET_TAG, 16, (unsigned char*)(encPacket + 1)) != 1) {
-        ret = -1;
-        goto gcm_cleanup;
-    }
-
-    ret = true;
-
-gcm_cleanup:
-    EVP_CIPHER_CTX_reset(cipherContext);
-    return ret;
+    return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM,
+                             (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                             iv, sizeof(iv),
+                             (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // Write tag into the space after the encrypted header
+                             (unsigned char*)packet, encryptedSize,
+                             ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, &encryptedSize); // Write ciphertext after the GCM tag
 }
 
 // Caller must free() *packet on success!!!
 static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
-    bool ret = false;
-    int len;
     unsigned char iv[16];
 
     *packet = NULL;
@@ -458,60 +421,28 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
     memset(iv, 0, sizeof(iv));
     iv[0] = (unsigned char)encPacket->seq;
 
-    if (EVP_DecryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
-        goto gcm_cleanup;
-    }
-
-    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
-        goto gcm_cleanup;
-    }
-
-    if (EVP_DecryptInit_ex(cipherContext, NULL, NULL,
-                           (const unsigned char*)StreamConfig.remoteInputAesKey, iv) != 1) {
-        goto gcm_cleanup;
-    }
-
     int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
     *packet = malloc(plaintextLength);
     if (*packet == NULL) {
-        goto gcm_cleanup;
+        return false;
     }
 
-    // Decrypt into the packet we allocated
-    if (EVP_DecryptUpdate(cipherContext, (unsigned char*)*packet, &plaintextLength,
-                          ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength) != 1) {
-        goto gcm_cleanup;
+    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM,
+                           (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                           iv, sizeof(iv),
+                           (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header
+                           ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength, // The ciphertext is after the tag
+                           (unsigned char*)*packet, &plaintextLength)) {
+        free(*packet);
+        return false;
     }
-
-    // Set the GCM tag before calling EVP_DecryptFinal_ex()
-    if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_TAG, 16, (unsigned char*)(encPacket + 1)) != 1) {
-        ret = -1;
-        goto gcm_cleanup;
-    }
-
-    // GCM will never have additional plaintext here, but we need to call it to
-    // ensure that the GCM authentication tag is correct for this data.
-    if (EVP_DecryptFinal_ex(cipherContext, (unsigned char*)*packet, &len) != 1) {
-        goto gcm_cleanup;
-    }
-    LC_ASSERT(len == 0);
 
     // Now we do an in-place V2 to V1 header conversion, so our existing parsing code doesn't have to change.
     // All we need to do is eliminate the new length field in V2 by shifting everything by 2 bytes.
     memmove(((unsigned char*)*packet) + 2, ((unsigned char*)*packet) + 4, plaintextLength - 4);
     *packetLength = plaintextLength - 2;
 
-    ret = true;
-
-gcm_cleanup:
-    EVP_CIPHER_CTX_reset(cipherContext);
-
-    if (!ret && *packet) {
-        free(*packet);
-        *packet = NULL;
-    }
-
-    return ret;
+    return true;
 }
 
 static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
@@ -760,16 +691,12 @@ static void controlReceiveThreadFunc(void* context) {
                         continue;
                     }
 
-                    // We (ab)use this lock to protect the cryptoContext too
-                    PltLockMutex(&enetMutex);
                     ctlHdr = NULL;
                     if (!decryptControlMessageToV1((PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data, &ctlHdr, &packetLength)) {
-                        PltUnlockMutex(&enetMutex);
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
                         continue;
                     }
-                    PltUnlockMutex(&enetMutex);
                 }
                 else {
                     // What do we do here???

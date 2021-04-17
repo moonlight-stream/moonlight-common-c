@@ -4,21 +4,16 @@
 #include "LinkedBlockingQueue.h"
 #include "Input.h"
 
-#include <openssl/evp.h>
-
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
 static bool initialized;
-static EVP_CIPHER_CTX* cipherContext;
-static bool cipherInitialized;
+static PPLT_CRYPTO_CONTEXT cryptoContext;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
 static PLT_THREAD inputSendThread;
 
 #define MAX_INPUT_PACKET_SIZE 128
 #define INPUT_STREAM_TIMEOUT_SEC 10
-
-#define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) + 15) / 16) * 16)
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -36,19 +31,13 @@ typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
-#endif
-
 // Initializes the input stream
 int initializeInputStream(void) {
     memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
     
-    // Initialized on first packet
-    cipherInitialized = false;
-    
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
 
+    cryptoContext = PltCreateCryptoContext();
     return 0;
 }
 
@@ -56,10 +45,7 @@ int initializeInputStream(void) {
 void destroyInputStream(void) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry, nextEntry;
     
-    if (cipherInitialized) {
-        EVP_CIPHER_CTX_free(cipherContext);
-        cipherInitialized = false;
-    }
+    PltDestroyCryptoContext(cryptoContext);
 
     entry = LbqDestroyLinkedBlockingQueue(&packetQueue);
 
@@ -73,113 +59,38 @@ void destroyInputStream(void) {
     }
 }
 
-static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
-    int i;
-    int paddedLength = ROUND_TO_PKCS7_PADDED_LEN(plaintextLen);
-    unsigned char paddingByte = (unsigned char)(16 - (plaintextLen % 16));
-    
-    for (i = plaintextLen; i < paddedLength; i++) {
-        plaintext[i] = paddingByte;
-    }
-    
-    return paddedLength;
-}
-
-static int encryptData(const unsigned char* plaintext, int plaintextLen,
+static int encryptData(unsigned char* plaintext, int plaintextLen,
                        unsigned char* ciphertext, int* ciphertextLen) {
-    int ret;
-    int len;
-    
+    // Starting in Gen 7, AES GCM is used for encryption
     if (AppVersionQuad[0] >= 7) {
-        if (!cipherInitialized) {
-            if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
-                return -1;
-            }
-            cipherInitialized = true;
+        if (!PltEncryptMessage(cryptoContext, ALGORITHM_AES_GCM,
+                               (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                               currentAesIv, sizeof(currentAesIv),
+                               ciphertext, 16,
+                               plaintext, plaintextLen,
+                               &ciphertext[16], ciphertextLen)) {
+            return -1;
         }
 
-        // Gen 7 servers use 128-bit AES GCM
-        if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        
-        // Gen 7 servers uses 16 byte IVs
-        if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        
-        // Initialize again but now provide our key and current IV
-        if (EVP_EncryptInit_ex(cipherContext, NULL, NULL,
-                               (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        
-        // Encrypt into the caller's buffer, leaving room for the auth tag to be prepended
-        if (EVP_EncryptUpdate(cipherContext, &ciphertext[16], ciphertextLen, plaintext, plaintextLen) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        
-        // GCM encryption won't ever fill ciphertext here but we have to call it anyway
-        if (EVP_EncryptFinal_ex(cipherContext, ciphertext, &len) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        LC_ASSERT(len == 0);
-        
-        // Read the tag into the caller's buffer
-        if (EVP_CIPHER_CTX_ctrl(cipherContext, EVP_CTRL_GCM_GET_TAG, 16, ciphertext) != 1) {
-            ret = -1;
-            goto gcm_cleanup;
-        }
-        
         // Increment the ciphertextLen to account for the tag
         *ciphertextLen += 16;
-        
-        ret = 0;
-        
-    gcm_cleanup:
-        EVP_CIPHER_CTX_reset(cipherContext);
+        return 0;
     }
     else {
+        // PKCS7 padding may need to be added in-place, so we must copy this into a buffer
+        // that can safely be modified.
         unsigned char paddedData[MAX_INPUT_PACKET_SIZE];
-        int paddedLength;
-        
-        if (!cipherInitialized) {
-            if ((cipherContext = EVP_CIPHER_CTX_new()) == NULL) {
-                ret = -1;
-                goto cbc_cleanup;
-            }
-            cipherInitialized = true;
 
-            // Prior to Gen 7, 128-bit AES CBC is used for encryption
-            if (EVP_EncryptInit_ex(cipherContext, EVP_aes_128_cbc(), NULL,
-                                   (const unsigned char*)StreamConfig.remoteInputAesKey, currentAesIv) != 1) {
-                ret = -1;
-                goto cbc_cleanup;
-            }
-        }
-        
-        // Pad the data to the required block length
         memcpy(paddedData, plaintext, plaintextLen);
-        paddedLength = addPkcs7PaddingInPlace(paddedData, plaintextLen);
-        
-        if (EVP_EncryptUpdate(cipherContext, ciphertext, ciphertextLen, paddedData, paddedLength) != 1) {
-            ret = -1;
-            goto cbc_cleanup;
-        }
-        
-        ret = 0;
 
-    cbc_cleanup:
-        // Nothing to do
-        ;
+        // Prior to Gen 7, 128-bit AES CBC is used for encryption
+        return PltEncryptMessage(cryptoContext, ALGORITHM_AES_CBC,
+                                 (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                                 currentAesIv, sizeof(currentAesIv),
+                                 NULL, 0,
+                                 paddedData, plaintextLen,
+                                 ciphertext, ciphertextLen) ? 0 : -1;
     }
-    
-    return ret;
 }
 
 // Input thread proc

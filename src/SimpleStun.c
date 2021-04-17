@@ -1,7 +1,5 @@
 #include "Limelight-internal.h"
 
-#include <openssl/rand.h>
-
 #define STUN_RECV_TIMEOUT_SEC 3
 
 #define STUN_MESSAGE_BINDING_REQUEST 0x0001
@@ -85,7 +83,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     reqMsg.messageType = htons(STUN_MESSAGE_BINDING_REQUEST);
     reqMsg.messageLength = 0;
     reqMsg.magicCookie = htonl(STUN_MESSAGE_COOKIE);
-    RAND_bytes(reqMsg.transactionId, sizeof(reqMsg.transactionId));
+    PltGenerateRandomData(reqMsg.transactionId, sizeof(reqMsg.transactionId));
 
     bytesRead = SOCKET_ERROR;
     for (i = 0; i < STUN_RECV_TIMEOUT_SEC * 1000 / UDP_RECV_POLL_TIMEOUT_MS && bytesRead <= 0; i++) {

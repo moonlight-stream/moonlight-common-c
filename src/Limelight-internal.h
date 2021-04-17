@@ -4,6 +4,7 @@
 #include "Platform.h"
 #include "PlatformSockets.h"
 #include "PlatformThreads.h"
+#include "PlatformCrypto.h"
 #include "Video.h"
 #include "RtpFecQueue.h"
 
