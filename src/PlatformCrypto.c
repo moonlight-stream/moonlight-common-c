@@ -34,13 +34,11 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
 
     switch (algorithm) {
     case ALGORITHM_AES_CBC:
-        LC_ASSERT(keyLength == 16);
         LC_ASSERT(tag == NULL);
         LC_ASSERT(tagLength == 0);
         cipherMode = MBEDTLS_MODE_CBC;
         break;
     case ALGORITHM_AES_GCM:
-        LC_ASSERT(keyLength == 16);
         LC_ASSERT(tag != NULL);
         LC_ASSERT(tagLength > 0);
         cipherMode = MBEDTLS_MODE_GCM;
@@ -164,13 +162,11 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
 
     switch (algorithm) {
     case ALGORITHM_AES_CBC:
-        LC_ASSERT(keyLength == 16);
         LC_ASSERT(tag == NULL);
         LC_ASSERT(tagLength == 0);
         cipherMode = MBEDTLS_MODE_CBC;
         break;
     case ALGORITHM_AES_GCM:
-        LC_ASSERT(keyLength == 16);
         LC_ASSERT(tag != NULL);
         LC_ASSERT(tagLength > 0);
         cipherMode = MBEDTLS_MODE_GCM;
@@ -314,6 +310,7 @@ void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) {
 
 void PltGenerateRandomData(unsigned char* data, int length) {
 #ifdef USE_MBEDTLS
+    // FIXME: This is not thread safe...
     if (!RandomStateInitialized) {
         mbedtls_entropy_init(&EntropyContext);
         mbedtls_ctr_drbg_init(&CtrDrbgContext);

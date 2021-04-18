@@ -21,7 +21,7 @@ typedef struct _PLT_CRYPTO_CONTEXT {
 
 #define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) + 15) / 16) * 16)
 
-PPLT_CRYPTO_CONTEXT PltCreateCryptoContext();
+PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void);
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx);
 
 #define ALGORITHM_AES_CBC 1
