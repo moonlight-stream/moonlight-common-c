@@ -86,10 +86,22 @@ typedef ssize_t SOCK_RET;
 typedef socklen_t SOCKADDR_LEN;
 #endif
 
+#ifdef AF_INET
+typedef struct sockaddr_in6 LC_SOCKADDR;
+#define SET_PORT(addr, port) ((addr)->sin6_port = htons(port))
+#else
+typedef struct sockaddr_in LC_SOCKADDR;
+#define SET_PORT(addr, port) ((addr)->sin_port = htons(port))
+#endif
+
 #define LastSocketFail() ((LastSocketError() != 0) ? LastSocketError() : -1)
 
+#ifdef AF_INET
 // IPv6 addresses have 2 extra characters for URL escaping
 #define URLSAFESTRING_LEN (INET6_ADDRSTRLEN+2)
+#else
+#define URLSAFESTRING_LEN INET_ADDRSTRLEN
+#endif
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
 SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);

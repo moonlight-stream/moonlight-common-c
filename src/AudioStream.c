@@ -40,11 +40,11 @@ typedef struct _QUEUED_AUDIO_PACKET {
 static void UdpPingThreadProc(void* context) {
     // Ping in ASCII
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
-    struct sockaddr_in6 saddr;
+    LC_SOCKADDR saddr;
     SOCK_RET err;
 
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
-    saddr.sin6_port = htons(RTP_PORT);
+    SET_PORT(&saddr, RTP_PORT);
 
     // Send PING every second until we get data back then every 5 seconds after that.
     while (!PltIsThreadInterrupted(&udpPingThread)) {

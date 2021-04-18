@@ -151,7 +151,7 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
                 goto Exit;
             }
 
-            ((struct sockaddr_in6*)&address)->sin6_port = htons(LiGetPortFromPortFlagIndex(i));
+            SET_PORT((LC_SOCKADDR*)&address, LiGetPortFromPortFlagIndex(i));
             if (LiGetProtocolFromPortFlagIndex(i) == IPPROTO_TCP) {
                 // Initiate an asynchronous connection
                 err = connect(sockets[i], (struct sockaddr*)&address, address_length);

@@ -23,8 +23,9 @@ DWORD (WINAPI *pfnWlanSetInterface)(HANDLE hClientHandle, CONST GUID *pInterface
 
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
 {
-    char addrstr[INET6_ADDRSTRLEN];
+    char addrstr[URLSAFESTRING_LEN];
 
+#ifdef AF_INET6
     if (addr->ss_family == AF_INET6) {
         struct sockaddr_in6* sin6 = (struct sockaddr_in6*)addr;
         inet_ntop(addr->ss_family, &sin6->sin6_addr, addrstr, sizeof(addrstr));
@@ -32,7 +33,9 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
         // IPv6 addresses need to be enclosed in brackets for URLs
         sprintf(string, "[%s]", addrstr);
     }
-    else {
+    else
+#endif
+    {
         struct sockaddr_in* sin = (struct sockaddr_in*)addr;
         inet_ntop(addr->ss_family, &sin->sin_addr, addrstr, sizeof(addrstr));
 
@@ -204,8 +207,15 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
     SOCKET s;
     struct sockaddr_storage addr;
     int err;
+    SOCKADDR_LEN addrLen;
 
+#ifdef AF_INET6
     LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
+    addrLen = (addrfamily == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
+#else
+    LC_ASSERT(addrfamily == AF_INET);
+    addrLen = sizeof(struct sockaddr_in);
+#endif
 
     s = createSocket(addrfamily, SOCK_DGRAM, IPPROTO_UDP, false);
     if (s == INVALID_SOCKET) {
@@ -214,10 +224,7 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
 
     memset(&addr, 0, sizeof(addr));
     addr.ss_family = addrfamily;
-    if (bind(s, (struct sockaddr*) &addr,
-        addrfamily == AF_INET ?
-        sizeof(struct sockaddr_in) :
-        sizeof(struct sockaddr_in6)) == SOCKET_ERROR) {
+    if (bind(s, (struct sockaddr*) &addr, addrLen) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("bind() failed: %d\n", err);
         closeSocket(s);
@@ -305,7 +312,7 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlo
 
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec) {
     SOCKET s;
-    struct sockaddr_in6 addr;
+    LC_SOCKADDR addr;
     struct pollfd pfd;
     int err;
     int val;
@@ -360,7 +367,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
 
     // Start connection
     memcpy(&addr, dstaddr, addrlen);
-    addr.sin6_port = htons(port);
+    SET_PORT(&addr, port);
     err = connect(s, (struct sockaddr*) &addr, addrlen);
     if (err < 0) {
         err = (int)LastSocketError();
@@ -494,6 +501,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     return -1;
 }
 
+#ifdef AF_INET6
 bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
     int i;
     
@@ -506,6 +514,7 @@ bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLe
     
     return true;
 }
+#endif
 
 bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
@@ -533,6 +542,7 @@ bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
             return true;
         }
     }
+#ifdef AF_INET6
     else if (address->ss_family == AF_INET6) {
         struct sockaddr_in6* sin6 = (struct sockaddr_in6*)address;
         static unsigned char linkLocalPrefix[] = {0xfe, 0x80};
@@ -552,6 +562,7 @@ bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
             return true;
         }
     }
+#endif
 
     return false;
 }
