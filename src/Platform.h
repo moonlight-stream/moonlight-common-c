@@ -61,6 +61,41 @@
 #define LC_ASSERT(x) assert(x)
 #endif
 
+#ifdef _MSC_VER
+#pragma intrinsic(_byteswap_ushort)
+#define BSWAP16(x) _byteswap_ushort(x)
+#pragma intrinsic(_byteswap_ulong)
+#define BSWAP32(x) _byteswap_ulong(x)
+#pragma intrinsic(_byteswap_uint64)
+#define BSWAP64(x) _byteswap_uint64(x)
+#elif (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8)
+#define BSWAP16(x) __builtin_bswap16(x)
+#define BSWAP32(x) __builtin_bswap32(x)
+#define BSWAP64(x) __builtin_bswap64(x)
+#elif defined(__has_builtin) && __has_builtin(__builtin_bswap16)
+#define BSWAP16(x) __builtin_bswap16(x)
+#define BSWAP32(x) __builtin_bswap32(x)
+#define BSWAP64(x) __builtin_bswap64(x)
+#else
+#error Please define your platform's byteswap macros!
+#endif
+
+#if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || defined(__BIG_ENDIAN__)
+#define LE16(x) BSWAP16(x)
+#define LE32(x) BSWAP32(x)
+#define LE64(x) BSWAP64(x)
+#define BE16(x) (x)
+#define BE32(x) (x)
+#define BE64(x) (x)
+#else
+#define LE16(x) (x)
+#define LE32(x) (x)
+#define LE64(x) (x)
+#define BE16(x) BSWAP16(x)
+#define BE32(x) BSWAP32(x)
+#define BE64(x) BSWAP64(x)
+#endif
+
 int initializePlatform(void);
 void cleanupPlatform(void);
 

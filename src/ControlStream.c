@@ -369,6 +369,9 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
         return NULL;
     }
 
+    staticHeader.type = LE16(staticHeader.type);
+    staticHeader.payloadLength = LE16(staticHeader.payloadLength);
+
     fullPacket = (PNVCTL_TCP_PACKET_HEADER)malloc(staticHeader.payloadLength + sizeof(staticHeader));
     if (fullPacket == NULL) {
         return NULL;
@@ -389,6 +392,13 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
 static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
     unsigned char iv[16];
     int encryptedSize = sizeof(*packet) + packet->payloadLength;
+
+    encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
+    encPacket->length = LE16(encPacket->length);
+    encPacket->seq = LE32(encPacket->seq);
+
+    packet->type = LE16(packet->type);
+    packet->payloadLength = LE16(packet->payloadLength);
 
     // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
     memset(iv, 0, sizeof(iv));
@@ -479,7 +489,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
         packet->payloadLength = paylen;
         memcpy(&packet[1], payload, paylen);
 
-        // Encrypt the data into the final packet
+        // Encrypt the data into the final packet (and byteswap for BE machines)
         if (!encryptControlMessage(encPacket, packet)) {
             Limelog("Failed to encrypt control stream message\n");
             enet_packet_destroy(enetPacket);
@@ -497,7 +507,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
         }
 
         packet = (PNVCTL_ENET_PACKET_HEADER_V1)enetPacket->data;
-        packet->type = ptype;
+        packet->type = LE16(ptype);
         memcpy(&packet[1], payload, paylen);
     }
 
@@ -528,8 +538,8 @@ static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
         return false;
     }
 
-    packet->type = ptype;
-    packet->payloadLength = paylen;
+    packet->type = LE16(ptype);
+    packet->payloadLength = LE16(paylen);
     memcpy(&packet[1], payload, paylen);
 
     err = send(ctlSock, (char*) packet, sizeof(*packet) + paylen, 0);
@@ -680,23 +690,34 @@ static void controlReceiveThreadFunc(void* context) {
             }
 
             ctlHdr = (PNVCTL_ENET_PACKET_HEADER_V1)event.packet->data;
+            ctlHdr->type = LE16(ctlHdr->type);
 
             if (encryptedControlStream) {
                 // V2 headers can be interpreted as V1 headers for the purpose of examining type,
                 // so this check is safe.
                 if (ctlHdr->type == 0x0001) {
+                    PNVCTL_ENCRYPTED_PACKET_HEADER encHdr;
+
                     if (event.packet->dataLength < sizeof(NVCTL_ENCRYPTED_PACKET_HEADER)) {
                         Limelog("Discarding runt encrypted control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(NVCTL_ENCRYPTED_PACKET_HEADER));
                         enet_packet_destroy(event.packet);
                         continue;
                     }
 
+                    // encryptedHeaderType is already byteswapped by aliasing through ctlHdr above
+                    encHdr = (PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data;
+                    encHdr->length = LE16(encHdr->length);
+                    encHdr->seq = LE32(encHdr->seq);
+
                     ctlHdr = NULL;
-                    if (!decryptControlMessageToV1((PNVCTL_ENCRYPTED_PACKET_HEADER)event.packet->data, &ctlHdr, &packetLength)) {
+                    if (!decryptControlMessageToV1(encHdr, &ctlHdr, &packetLength)) {
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
                         continue;
                     }
+
+                    // We need to byteswap the unsealed header too
+                    ctlHdr->type = LE16(ctlHdr->type);
                 }
                 else {
                     // What do we do here???
@@ -706,7 +727,6 @@ static void controlReceiveThreadFunc(void* context) {
             }
             else {
                 // Take ownership of the packet data directly for the non-encrypted case
-                ctlHdr = (PNVCTL_ENET_PACKET_HEADER_V1)event.packet->data;
                 packetLength = event.packet->dataLength;
                 event.packet->data = NULL;
             }
@@ -879,11 +899,11 @@ static void requestIdrFrame(void) {
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
-            payload[1] = lastSeenFrame;
+            payload[1] = LE64(lastSeenFrame);
         }
         else {
-            payload[0] = lastSeenFrame - 0x20;
-            payload[1] = lastSeenFrame;
+            payload[0] = LE64(lastSeenFrame - 0x20);
+            payload[1] = LE64(lastSeenFrame);
         }
 
         payload[2] = 0;
@@ -912,6 +932,8 @@ static void requestIdrFrame(void) {
 static void requestInvalidateReferenceFrames(void) {
     int64_t payload[3];
     PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
+    int startFrame;
+    int endFrame;
 
     LC_ASSERT(isReferenceFrameInvalidationEnabled());
 
@@ -921,16 +943,19 @@ static void requestInvalidateReferenceFrames(void) {
 
     LC_ASSERT(qfit->startFrame <= qfit->endFrame);
 
-    payload[0] = qfit->startFrame;
-    payload[1] = qfit->endFrame;
-    payload[2] = 0;
+    startFrame = qfit->startFrame;
+    endFrame = qfit->endFrame;
 
     // Aggregate all lost frames into one range
     do {
-        LC_ASSERT(qfit->endFrame >= payload[1]);
-        payload[1] = qfit->endFrame;
+        LC_ASSERT(qfit->endFrame >= endFrame);
+        endFrame = qfit->endFrame;
         free(qfit);
     } while (getNextFrameInvalidationTuple(&qfit));
+
+    payload[0] = LE64(startFrame);
+    payload[1] = LE64(endFrame);
+    payload[2] = 0;
 
     // Send the reference frame invalidation request and read the response
     if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
@@ -940,7 +965,7 @@ static void requestInvalidateReferenceFrames(void) {
         return;
     }
 
-    Limelog("Invalidate reference frame request sent (%d to %d)\n", (int)payload[0], (int)payload[1]);
+    Limelog("Invalidate reference frame request sent (%d to %d)\n", startFrame, endFrame);
 }
 
 static void invalidateRefFramesFunc(void* context) {

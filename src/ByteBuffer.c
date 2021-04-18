@@ -10,30 +10,30 @@ void BbInitializeWrappedBuffer(PBYTE_BUFFER buff, char* data, int offset, int le
 // Get the long long in the correct byte order
 static uint64_t byteSwap64(PBYTE_BUFFER buff, uint64_t l) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
-        return HTONLL(l);
+        return BE64(l);
     }
     else {
-        return l;
+        return LE64(l);
     }
 }
 
 // Get the int in the correct byte order
 static uint32_t byteSwap32(PBYTE_BUFFER buff, uint32_t i) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
-        return htonl(i);
+        return BE32(i);
     }
     else {
-        return i;
+        return LE32(i);
     }
 }
 
 // Get the short in the correct byte order
 static uint16_t byteSwap16(PBYTE_BUFFER buff, uint16_t s) {
     if (buff->byteOrder == BYTE_ORDER_BIG) {
-        return htons(s);
+        return BE16(s);
     }
     else {
-        return s;
+        return LE16(s);
     }
 }
 

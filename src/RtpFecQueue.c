@@ -413,6 +413,10 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
     }
 
     PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)packet) + dataOffset);
+
+    nvPacket->streamPacketIndex = LE32(nvPacket->streamPacketIndex);
+    nvPacket->frameIndex = LE32(nvPacket->frameIndex);
+    nvPacket->fecInfo = LE32(nvPacket->fecInfo);
     
     if (isBefore16(nvPacket->frameIndex, queue->currentFrameNumber)) {
         // Reject frames behind our current frame number

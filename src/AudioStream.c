@@ -221,9 +221,9 @@ static void ReceiveThreadProc(void* context) {
         }
 
         // Convert fields to host byte-order
-        rtp->sequenceNumber = htons(rtp->sequenceNumber);
-        rtp->timestamp = htonl(rtp->timestamp);
-        rtp->ssrc = htonl(rtp->ssrc);
+        rtp->sequenceNumber = BE16(rtp->sequenceNumber);
+        rtp->timestamp = BE32(rtp->timestamp);
+        rtp->ssrc = BE32(rtp->ssrc);
 
         queueStatus = RtpqAddPacket(&rtpReorderQueue, (PRTP_PACKET)packet, &packet->q.rentry);
         if (RTPQ_HANDLE_NOW(queueStatus)) {
