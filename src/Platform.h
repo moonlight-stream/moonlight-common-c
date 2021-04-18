@@ -80,7 +80,7 @@
 #error Please define your platform byteswap macros!
 #endif
 
-#if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || defined(__BIG_ENDIAN__)
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || defined(__BIG_ENDIAN__)
 #define LE16(x) BSWAP16(x)
 #define LE32(x) BSWAP32(x)
 #define LE64(x) BSWAP64(x)
