@@ -2,9 +2,15 @@
 cmake_minimum_required(VERSION 3.1)
 project(moonlight-common-c LANGUAGES C)
 
+option(USE_MBEDTLS "Use MbedTLS instead of OpenSSL" OFF)
+
 SET(CMAKE_C_STANDARD 11)
 
-find_package(OpenSSL 1.0.2 REQUIRED)
+if(USE_MBEDTLS)
+  add_definitions(-DUSE_MBEDTLS)
+else()
+  find_package(OpenSSL 1.0.2 REQUIRED)
+endif()
 
 aux_source_directory(src SRC_LIST)
 aux_source_directory(enet SRC_LIST)

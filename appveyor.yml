@@ -15,9 +15,20 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: gcc
       CXX: g++
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      CC: clang
+      CXX: clang++
+      CMAKE_ARGS: -DUSE_MBEDTLS=ON
+      PREBUILD_CMD: sudo apt install libmbedtls-dev
+    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+      CC: gcc
+      CXX: g++
+      CMAKE_ARGS: -DUSE_MBEDTLS=ON
+      PREBUILD_CMD: sudo apt install libmbedtls-dev
 
 before_build:
   - 'git submodule update --init --recursive'
+  - 'eval "$PREBUILD_CMD"'
 
 build_script:
   - 'mkdir build_debug'
