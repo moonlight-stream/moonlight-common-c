@@ -77,7 +77,7 @@
 #define BSWAP32(x) __builtin_bswap32(x)
 #define BSWAP64(x) __builtin_bswap64(x)
 #else
-#error Please define your platform's byteswap macros!
+#error Please define your platform byteswap macros!
 #endif
 
 #if (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || defined(__BIG_ENDIAN__)

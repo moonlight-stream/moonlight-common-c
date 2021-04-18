@@ -11,6 +11,10 @@ bool RandomStateInitialized = false;
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
+#endif
+
 static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
     int paddedLength = ROUND_TO_PKCS7_PADDED_LEN(plaintextLen);
     unsigned char paddingByte = (unsigned char)(16 - (plaintextLen % 16));
