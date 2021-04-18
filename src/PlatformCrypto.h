@@ -2,12 +2,21 @@
 
 #include <stdbool.h>
 
+#ifdef USE_MBEDTLS
+#include <mbedtls/cipher.h>
+#else
 // Hide the real OpenSSL definition from other code
 typedef struct evp_cipher_ctx_st EVP_CIPHER_CTX;
+#endif
 
 typedef struct _PLT_CRYPTO_CONTEXT {
+#ifdef USE_MBEDTLS
+    bool initialized;
+    mbedtls_cipher_context_t ctx;
+#else
     bool initialized; // Used for CBC only
     EVP_CIPHER_CTX* ctx;
+#endif
 } PLT_CRYPTO_CONTEXT, *PPLT_CRYPTO_CONTEXT;
 
 #define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) + 15) / 16) * 16)

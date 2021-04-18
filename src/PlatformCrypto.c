@@ -1,5 +1,13 @@
 #include "Limelight-internal.h"
 
+#ifdef USE_MBEDTLS
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
+
+mbedtls_entropy_context EntropyContext;
+mbedtls_ctr_drbg_context CtrDrbgContext;
+bool RandomStateInitialized = false;
+#else
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
@@ -11,6 +19,7 @@ static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
 
     return paddedLength;
 }
+#endif
 
 // For CBC modes, inputData buffer must be allocated with length rounded up to next multiple of 16 and inputData buffer may be modified!
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
@@ -19,6 +28,56 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength) {
+#ifdef USE_MBEDTLS
+    mbedtls_cipher_mode_t cipherMode;
+    size_t outLength;
+
+    switch (algorithm) {
+    case ALGORITHM_AES_CBC:
+        LC_ASSERT(keyLength == 16);
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+        cipherMode = MBEDTLS_MODE_CBC;
+        break;
+    case ALGORITHM_AES_GCM:
+        LC_ASSERT(keyLength == 16);
+        LC_ASSERT(tag != NULL);
+        LC_ASSERT(tagLength > 0);
+        cipherMode = MBEDTLS_MODE_GCM;
+        break;
+    default:
+        LC_ASSERT(false);
+        return false;
+    }
+
+    if (!ctx->initialized) {
+        if (mbedtls_cipher_setup(&ctx->ctx, mbedtls_cipher_info_from_values(MBEDTLS_CIPHER_ID_AES, keyLength * 8, cipherMode)) != 0) {
+            return false;
+        }
+
+        if (mbedtls_cipher_setkey(&ctx->ctx, key, keyLength * 8, MBEDTLS_ENCRYPT) != 0) {
+            return false;
+        }
+
+        ctx->initialized = true;
+    }
+
+    outLength = *outputDataLength;
+
+    if (tag != NULL) {
+        if (mbedtls_cipher_auth_encrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
+            return false;
+        }
+    }
+    else {
+        if (mbedtls_cipher_crypt(&ctx->ctx, iv, ivLength, inputData, inputDataLength, outputData, &outLength) != 0) {
+            return false;
+        }
+    }
+
+    *outputDataLength = outLength;
+    return true;
+#else
     bool ret = false;
     const EVP_CIPHER* cipher;
 
@@ -90,6 +149,7 @@ cleanup:
         EVP_CIPHER_CTX_reset(ctx->ctx);
     }
     return ret;
+#endif
 }
 
 bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
@@ -98,6 +158,56 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength) {
+#ifdef USE_MBEDTLS
+    mbedtls_cipher_mode_t cipherMode;
+    size_t outLength;
+
+    switch (algorithm) {
+    case ALGORITHM_AES_CBC:
+        LC_ASSERT(keyLength == 16);
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+        cipherMode = MBEDTLS_MODE_CBC;
+        break;
+    case ALGORITHM_AES_GCM:
+        LC_ASSERT(keyLength == 16);
+        LC_ASSERT(tag != NULL);
+        LC_ASSERT(tagLength > 0);
+        cipherMode = MBEDTLS_MODE_GCM;
+        break;
+    default:
+        LC_ASSERT(false);
+        return false;
+    }
+
+    if (!ctx->initialized) {
+        if (mbedtls_cipher_setup(&ctx->ctx, mbedtls_cipher_info_from_values(MBEDTLS_CIPHER_ID_AES, keyLength * 8, cipherMode)) != 0) {
+            return false;
+        }
+
+        if (mbedtls_cipher_setkey(&ctx->ctx, key, keyLength * 8, MBEDTLS_DECRYPT) != 0) {
+            return false;
+        }
+
+        ctx->initialized = true;
+    }
+
+    outLength = *outputDataLength;
+
+    if (tag != NULL) {
+        if (mbedtls_cipher_auth_decrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
+            return false;
+        }
+    }
+    else {
+        if (mbedtls_cipher_crypt(&ctx->ctx, iv, ivLength, inputData, inputDataLength, outputData, &outLength) != 0) {
+            return false;
+        }
+    }
+
+    *outputDataLength = outLength;
+    return true;
+#else
     bool ret = false;
     const EVP_CIPHER* cipher;
 
@@ -169,6 +279,7 @@ cleanup:
         EVP_CIPHER_CTX_reset(ctx->ctx);
     }
     return ret;
+#endif
 }
 
 PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) {
@@ -178,20 +289,46 @@ PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) {
     }
 
     ctx->initialized = false;
+
+#ifdef USE_MBEDTLS
+    mbedtls_cipher_init(&ctx->ctx);
+#else
     ctx->ctx = EVP_CIPHER_CTX_new();
     if (!ctx->ctx) {
         free(ctx);
         return NULL;
     }
+#endif
 
     return ctx;
 }
 
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) {
+#ifdef USE_MBEDTLS
+    mbedtls_cipher_free(&ctx->ctx);
+#else
     EVP_CIPHER_CTX_free(ctx->ctx);
+#endif
     free(ctx);
 }
 
 void PltGenerateRandomData(unsigned char* data, int length) {
+#ifdef USE_MBEDTLS
+    if (!RandomStateInitialized) {
+        mbedtls_entropy_init(&EntropyContext);
+        mbedtls_ctr_drbg_init(&CtrDrbgContext);
+        if (mbedtls_ctr_drbg_seed(&CtrDrbgContext, mbedtls_entropy_func, &EntropyContext, NULL, 0) != 0) {
+            // Nothing we can really do here...
+            Limelog("Seeding MbedTLS random number generator failed!\n");
+            LC_ASSERT(false);
+            return;
+        }
+
+        RandomStateInitialized = true;
+    }
+
+    mbedtls_ctr_drbg_random(&CtrDrbgContext, data, length);
+#else
     RAND_bytes(data, length);
+#endif
 }

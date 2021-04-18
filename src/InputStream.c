@@ -247,7 +247,7 @@ static void inputSendThreadProc(void* context) {
         else {
             // Encrypt the message into the output buffer while leaving room for the length
             encryptedSize = sizeof(encryptedBuffer) - 4;
-            err = encryptData((const unsigned char*)&holder->packet, holder->packetLength,
+            err = encryptData((unsigned char*)&holder->packet, holder->packetLength,
                 (unsigned char*)&encryptedBuffer[4], (int*)&encryptedSize);
             free(holder);
             if (err != 0) {
