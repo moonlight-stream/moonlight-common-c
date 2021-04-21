@@ -123,7 +123,7 @@ static const short packetTypesGen7[] = {
     0x0100, // Termination
 };
 static const short packetTypesGen7Enc[] = {
-    0x0305, // Start A
+    0x0302, // Request IDR frame
     0x0307, // Start B
     0x0301, // Invalidate reference frames
     0x0201, // Loss Stats
@@ -141,6 +141,8 @@ static const char startBGen4[] = { 0 };
 
 static const char startAGen5[] = { 0, 0 };
 static const char startBGen5[] = { 0 };
+
+static const char requestIdrFrameGen7Enc[] = { 0, 0 };
 
 static const short payloadLengthsGen3[] = {
     sizeof(requestIdrFrameGen3), // Request IDR frame
@@ -174,6 +176,14 @@ static const short payloadLengthsGen7[] = {
     80, // Frame Stats
     -1, // Input data
 };
+static const short payloadLengthsGen7Enc[] = {
+    sizeof(requestIdrFrameGen7Enc), // Request IDR frame
+    sizeof(startBGen5), // Start B
+    24, // Invalidate reference frames
+    32, // Loss Stats
+    80, // Frame Stats
+    -1, // Input data
+};
 
 static const char* preconstructedPayloadsGen3[] = {
     requestIdrFrameGen3,
@@ -191,10 +201,15 @@ static const char* preconstructedPayloadsGen7[] = {
     startAGen5,
     startBGen5
 };
+static const char* preconstructedPayloadsGen7Enc[] = {
+    requestIdrFrameGen7Enc,
+    startBGen5
+};
 
 static short* packetTypes;
 static short* payloadLengths;
 static char**preconstructedPayloads;
+static bool supportsIdrFrameRequest;
 
 #define LOSS_REPORT_INTERVAL_MS 50
 #define PERIODIC_PING_INTERVAL_MS 250
@@ -212,26 +227,33 @@ int initializeControlStream(void) {
         packetTypes = (short*)packetTypesGen3;
         payloadLengths = (short*)payloadLengthsGen3;
         preconstructedPayloads = (char**)preconstructedPayloadsGen3;
+        supportsIdrFrameRequest = true;
     }
     else if (AppVersionQuad[0] == 4) {
         packetTypes = (short*)packetTypesGen4;
         payloadLengths = (short*)payloadLengthsGen4;
         preconstructedPayloads = (char**)preconstructedPayloadsGen4;
+        supportsIdrFrameRequest = true;
     }
     else if (AppVersionQuad[0] == 5) {
         packetTypes = (short*)packetTypesGen5;
         payloadLengths = (short*)payloadLengthsGen5;
         preconstructedPayloads = (char**)preconstructedPayloadsGen5;
+        supportsIdrFrameRequest = false;
     }
     else {
         if (encryptedControlStream) {
             packetTypes = (short*)packetTypesGen7Enc;
+            payloadLengths = (short*)payloadLengthsGen7Enc;
+            preconstructedPayloads = (char**)preconstructedPayloadsGen7Enc;
+            supportsIdrFrameRequest = true;
         }
         else {
             packetTypes = (short*)packetTypesGen7;
+            payloadLengths = (short*)payloadLengthsGen7;
+            preconstructedPayloads = (char**)preconstructedPayloadsGen7;
+            supportsIdrFrameRequest = false;
         }
-        payloadLengths = (short*)payloadLengthsGen7;
-        preconstructedPayloads = (char**)preconstructedPayloadsGen7;
     }
 
     idrFrameRequired = false;
@@ -893,9 +915,12 @@ static void lossStatsThreadFunc(void* context) {
 }
 
 static void requestIdrFrame(void) {
-    int64_t payload[3];
+    // If this server does not have a known IDR frame request
+    // message, we'll accomplish the same thing by creating a
+    // reference frame invalidation request.
+    if (!supportsIdrFrameRequest) {
+        int64_t payload[3];
 
-    if (AppVersionQuad[0] >= 5) {
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
