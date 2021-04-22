@@ -412,7 +412,7 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
 }
 
 static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
-    unsigned char iv[16];
+    unsigned char iv[16] = { 0 };
     int encryptedSize = sizeof(*packet) + packet->payloadLength;
 
     encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
@@ -423,7 +423,6 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     packet->payloadLength = LE16(packet->payloadLength);
 
     // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-    memset(iv, 0, sizeof(iv));
     iv[0] = (unsigned char)encPacket->seq;
 
     return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
@@ -436,7 +435,7 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
 
 // Caller must free() *packet on success!!!
 static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
-    unsigned char iv[16];
+    unsigned char iv[16] = { 0 };
 
     *packet = NULL;
 
@@ -450,7 +449,6 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
     }
 
     // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-    memset(iv, 0, sizeof(iv));
     iv[0] = (unsigned char)encPacket->seq;
 
     int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
