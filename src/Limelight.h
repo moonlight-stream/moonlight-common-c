@@ -58,7 +58,7 @@ typedef struct _STREAM_CONFIGURATION {
     
     // Specifies that the client can accept an H.265 video stream
     // if the server is able to provide one.
-    int supportsHevc;
+    bool supportsHevc;
 
     // Specifies that the client is requesting an HDR H.265 video stream.
     //
@@ -66,7 +66,7 @@ typedef struct _STREAM_CONFIGURATION {
     // 1) The client decoder supports HEVC Main10 profile (supportsHevc must be set too)
     // 2) The server has support for HDR as indicated by ServerCodecModeSupport in /serverinfo
     // 3) The app supports HDR as indicated by IsHdrSupported in /applist
-    int enableHdr;
+    bool enableHdr;
 
     // Specifies the percentage that the specified bitrate will be adjusted
     // when an HEVC stream will be delivered. This allows clients to opt to
