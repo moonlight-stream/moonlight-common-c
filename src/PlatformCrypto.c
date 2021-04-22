@@ -103,31 +103,16 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     *outputDataLength = outLength;
     return true;
 #else
-    const EVP_CIPHER* cipher;
-
-    switch (algorithm) {
-    case ALGORITHM_AES_CBC:
-        LC_ASSERT(keyLength == 16);
-        LC_ASSERT(tag == NULL);
-        LC_ASSERT(tagLength == 0);
-        cipher = EVP_aes_128_cbc();
-        break;
-    case ALGORITHM_AES_GCM:
-        LC_ASSERT(keyLength == 16);
-        LC_ASSERT(tag != NULL);
-        LC_ASSERT(tagLength > 0);
-        cipher = EVP_aes_128_gcm();
-        break;
-    default:
-        LC_ASSERT(false);
-        return false;
-    }
+    LC_ASSERT(keyLength == 16);
 
     if (algorithm == ALGORITHM_AES_GCM) {
+        LC_ASSERT(tag != NULL);
+        LC_ASSERT(tagLength > 0);
+
         if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
             // Perform a full initialization. This codepath also allows
             // us to change the IV length if required.
-            if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
+            if (EVP_EncryptInit_ex(ctx->ctx, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
                 return false;
             }
 
@@ -149,10 +134,13 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
             }
         }
     }
-    else {
+    else if (algorithm == ALGORITHM_AES_CBC) {
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+
         if (!ctx->initialized) {
             // Perform a full initialization
-            if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
+            if (EVP_EncryptInit_ex(ctx->ctx, EVP_aes_128_cbc(), NULL, key, iv) != 1) {
                 return false;
             }
 
@@ -169,6 +157,10 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
         if (flags & CIPHER_FLAG_PAD_TO_BLOCK_SIZE) {
             inputDataLength = addPkcs7PaddingInPlace(inputData, inputDataLength);
         }
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
     }
 
     if (EVP_EncryptUpdate(ctx->ctx, outputData, outputDataLength, inputData, inputDataLength) != 1) {
@@ -279,31 +271,16 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     *outputDataLength = outLength;
     return true;
 #else
-    const EVP_CIPHER* cipher;
-
-    switch (algorithm) {
-    case ALGORITHM_AES_CBC:
-        LC_ASSERT(keyLength == 16);
-        LC_ASSERT(tag == NULL);
-        LC_ASSERT(tagLength == 0);
-        cipher = EVP_aes_128_cbc();
-        break;
-    case ALGORITHM_AES_GCM:
-        LC_ASSERT(keyLength == 16);
-        LC_ASSERT(tag != NULL);
-        LC_ASSERT(tagLength > 0);
-        cipher = EVP_aes_128_gcm();
-        break;
-    default:
-        LC_ASSERT(false);
-        return false;
-    }
+    LC_ASSERT(keyLength == 16);
 
     if (algorithm == ALGORITHM_AES_GCM) {
+        LC_ASSERT(tag != NULL);
+        LC_ASSERT(tagLength > 0);
+
         if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
             // Perform a full initialization. This codepath also allows
             // us to change the IV length if required.
-            if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
+            if (EVP_DecryptInit_ex(ctx->ctx, EVP_aes_128_gcm(), NULL, NULL, NULL) != 1) {
                 return false;
             }
 
@@ -325,10 +302,13 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
             }
         }
     }
-    else {
+    else if (algorithm == ALGORITHM_AES_CBC) {
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+
         if (!ctx->initialized) {
             // Perform a full initialization
-            if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
+            if (EVP_DecryptInit_ex(ctx->ctx, EVP_aes_128_cbc(), NULL, key, iv) != 1) {
                 return false;
             }
 
@@ -341,6 +321,10 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                 return false;
             }
         }
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
     }
 
     if (EVP_DecryptUpdate(ctx->ctx, outputData, outputDataLength, inputData, inputDataLength) != 1) {
