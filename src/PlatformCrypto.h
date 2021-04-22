@@ -27,8 +27,9 @@ void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx);
 #define ALGORITHM_AES_CBC 1
 #define ALGORITHM_AES_GCM 2
 
-#define CIPHER_FLAG_RESET_IV 0x01
-#define CIPHER_FLAG_FINISH   0x02
+#define CIPHER_FLAG_RESET_IV          0x01
+#define CIPHER_FLAG_FINISH            0x02
+#define CIPHER_FLAG_PAD_TO_BLOCK_SIZE 0x04
 
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,

@@ -150,7 +150,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
     if (AudioEncryptionEnabled) {
         // We must have room for the AES padding which may be written to the buffer
-        unsigned char decryptedOpusData[MAX_PACKET_SIZE+16];
+        unsigned char decryptedOpusData[ROUND_TO_PKCS7_PADDED_LEN(MAX_PACKET_SIZE)];
         unsigned char iv[16] = { 0 };
         int dataLength = packet->size - sizeof(*rtp);
 

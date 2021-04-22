@@ -79,12 +79,13 @@ static int encryptData(unsigned char* plaintext, int plaintextLen,
     else {
         // PKCS7 padding may need to be added in-place, so we must copy this into a buffer
         // that can safely be modified.
-        unsigned char paddedData[MAX_INPUT_PACKET_SIZE];
+        unsigned char paddedData[ROUND_TO_PKCS7_PADDED_LEN(MAX_INPUT_PACKET_SIZE)];
 
         memcpy(paddedData, plaintext, plaintextLen);
 
-        // Prior to Gen 7, 128-bit AES CBC is used for encryption
-        return PltEncryptMessage(cryptoContext, ALGORITHM_AES_CBC, 0,
+        // Prior to Gen 7, 128-bit AES CBC is used for encryption with each message padded
+        // to the block size to ensure messages are not delayed within the cipher.
+        return PltEncryptMessage(cryptoContext, ALGORITHM_AES_CBC, CIPHER_FLAG_PAD_TO_BLOCK_SIZE,
                                  (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                  currentAesIv, sizeof(currentAesIv),
                                  NULL, 0,
