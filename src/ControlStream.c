@@ -426,7 +426,7 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     memset(iv, 0, sizeof(iv));
     iv[0] = (unsigned char)encPacket->seq;
 
-    return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM,
+    return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
                              (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                              iv, sizeof(iv),
                              (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // Write tag into the space after the encrypted header
@@ -459,7 +459,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         return false;
     }
 
-    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM,
+    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
                            (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                            iv, sizeof(iv),
                            (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header

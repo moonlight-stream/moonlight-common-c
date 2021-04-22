@@ -27,14 +27,17 @@ void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx);
 #define ALGORITHM_AES_CBC 1
 #define ALGORITHM_AES_GCM 2
 
-bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
+#define CIPHER_FLAG_RESET_IV 0x01
+#define CIPHER_FLAG_FINISH   0x02
+
+bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength);
 
-bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm,
+bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
                        unsigned char* tag, int tagLength,

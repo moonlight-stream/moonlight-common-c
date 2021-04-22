@@ -63,7 +63,7 @@ static int encryptData(unsigned char* plaintext, int plaintextLen,
                        unsigned char* ciphertext, int* ciphertextLen) {
     // Starting in Gen 7, AES GCM is used for encryption
     if (AppVersionQuad[0] >= 7) {
-        if (!PltEncryptMessage(cryptoContext, ALGORITHM_AES_GCM,
+        if (!PltEncryptMessage(cryptoContext, ALGORITHM_AES_GCM, 0,
                                (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                currentAesIv, sizeof(currentAesIv),
                                ciphertext, 16,
@@ -84,7 +84,7 @@ static int encryptData(unsigned char* plaintext, int plaintextLen,
         memcpy(paddedData, plaintext, plaintextLen);
 
         // Prior to Gen 7, 128-bit AES CBC is used for encryption
-        return PltEncryptMessage(cryptoContext, ALGORITHM_AES_CBC,
+        return PltEncryptMessage(cryptoContext, ALGORITHM_AES_CBC, 0,
                                  (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                  currentAesIv, sizeof(currentAesIv),
                                  NULL, 0,
