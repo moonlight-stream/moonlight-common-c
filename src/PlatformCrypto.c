@@ -11,10 +11,6 @@ bool RandomStateInitialized = false;
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define EVP_CIPHER_CTX_reset(x) EVP_CIPHER_CTX_cleanup(x); EVP_CIPHER_CTX_init(x)
-#endif
-
 static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
     int paddedLength = ROUND_TO_PKCS7_PADDED_LEN(plaintextLen);
     unsigned char paddingByte = (unsigned char)(16 - (plaintextLen % 16));
@@ -103,8 +99,6 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
 
     if (algorithm == ALGORITHM_AES_GCM) {
-        EVP_CIPHER_CTX_reset(ctx->ctx);
-
         if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
             return false;
         }
@@ -119,8 +113,6 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
     else {
         if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
-            EVP_CIPHER_CTX_reset(ctx->ctx);
-
             if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
                 return false;
             }
@@ -240,8 +232,6 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
 
     if (algorithm == ALGORITHM_AES_GCM) {
-        EVP_CIPHER_CTX_reset(ctx->ctx);
-
         if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
             return false;
         }
@@ -256,8 +246,6 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
     else {
         if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
-            EVP_CIPHER_CTX_reset(ctx->ctx);
-
             if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
                 return false;
             }
