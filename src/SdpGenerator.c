@@ -139,13 +139,31 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     return err;
 }
 
+#define NVFF_BASE             0x07
+#define NVFF_AUDIO_ENCRYPTION 0x20
+#define NVFF_RI_ENCRYPTION    0x80
+
 static int addGen5Options(PSDP_OPTION* head) {
     int err = 0;
+    char payloadStr[32];
+
+    // This must be initialized to false already
+    LC_ASSERT(!AudioEncryptionEnabled);
 
     if (APP_VERSION_AT_LEAST(7, 1, 431)) {
-        // 0x20 enables audio encryption (which we don't support yet)
-        // 0x80 enables remote input encryption (which we do want)
-        err |= addAttributeString(head, "x-nv-general.featureFlags", "135");
+        unsigned int featureFlags;
+
+        // RI encryption is always enabled
+        featureFlags = NVFF_BASE | NVFF_RI_ENCRYPTION;
+
+        // Enable audio encryption if the client opted in
+        if (StreamConfig.encryptionFlags & ENCFLG_AUDIO) {
+            featureFlags |= NVFF_AUDIO_ENCRYPTION;
+            AudioEncryptionEnabled = true;
+        }
+
+        sprintf(payloadStr, "%u", featureFlags);
+        err |= addAttributeString(head, "x-nv-general.featureFlags", payloadStr);
 
         // Ask for the encrypted control protocol to ensure remote input will be encrypted.
         // This used to be done via separate RI encryption, but now it is all or nothing.

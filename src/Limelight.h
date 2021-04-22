@@ -29,6 +29,11 @@ extern "C" {
 #define COLOR_RANGE_LIMITED  0
 #define COLOR_RANGE_FULL     1
 
+// Values for 'encryptionFlags' field below
+#define ENCFLG_NONE  0x00000000
+#define ENCFLG_AUDIO 0x00000001
+#define ENCFLG_ALL   0xFFFFFFFF
+
 typedef struct _STREAM_CONFIGURATION {
     // Dimensions in pixels of the desired video stream
     int width;
@@ -86,6 +91,14 @@ typedef struct _STREAM_CONFIGURATION {
     // If specified, sets the encoder color range to the provided COLOR_RANGE_*
     // option (listed above). If not set, the encoder will default to Limited.
     int colorRange;
+
+    // Specifies the data streams where encryption may be enabled if supported
+    // by the host PC. Ideally, you would pass ENCFLG_ALL to encrypt everything
+    // that we support encrypting. However, lower performance hardware may not
+    // be able to support encrypting heavy stuff like video or audio data, so
+    // that encryption may be disabled here. Remote input encryption is always
+    // enabled.
+    int encryptionFlags;
 
     // AES encryption data for the remote input stream. This must be
     // the same as what was passed as rikey and rikeyid

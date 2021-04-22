@@ -24,6 +24,7 @@ OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
 OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
 int AudioPacketDuration;
+bool AudioEncryptionEnabled;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {

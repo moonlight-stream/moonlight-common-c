@@ -13,6 +13,8 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
+static PPLT_CRYPTO_CONTEXT audioDecryptionCtx;
+
 static unsigned short lastSeq;
 
 static bool receivedDataFromPeer;
@@ -65,6 +67,7 @@ int initializeAudioStream(void) {
     RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
     receivedDataFromPeer = false;
+    audioDecryptionCtx = PltCreateCryptoContext();
 
     // For GFE 3.22 compatibility, we must start the audio ping thread before the RTSP handshake.
     // It will not reply to our RTSP PLAY request until the audio ping has been received.
@@ -109,6 +112,7 @@ void destroyAudioStream(void) {
         rtpSocket = INVALID_SOCKET;
     }
 
+    PltDestroyCryptoContext(audioDecryptionCtx);
     freePacketList(LbqDestroyLinkedBlockingQueue(&packetQueue));
     RtpqCleanupQueue(&rtpReorderQueue);
 }
@@ -144,7 +148,36 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
     lastSeq = rtp->sequenceNumber;
 
-    AudioCallbacks.decodeAndPlaySample((char*)(rtp + 1), packet->size - sizeof(*rtp));
+    if (AudioEncryptionEnabled) {
+        // We must have room for the AES padding which may be written to the buffer
+        unsigned char decryptedOpusData[MAX_PACKET_SIZE+16];
+        unsigned char iv[16] = {};
+        int dataLength = packet->size - sizeof(*rtp);
+
+        LC_ASSERT(dataLength <= MAX_PACKET_SIZE);
+
+        // The IV is the avkeyid (equivalent to the rikeyid) +
+        // the RTP sequence number, in big endian.
+        uint32_t ivSeq = BE32(*(uint32_t*)StreamConfig.remoteInputAesIv);
+        ivSeq += rtp->sequenceNumber;
+        ivSeq = BE32(ivSeq);
+
+        memcpy(iv, &ivSeq, sizeof(ivSeq));
+
+        if (!PltDecryptMessage(audioDecryptionCtx, ALGORITHM_AES_CBC, CIPHER_FLAG_RESET_IV | CIPHER_FLAG_FINISH,
+                               (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                               iv, sizeof(iv),
+                               NULL, 0,
+                               (unsigned char*)(rtp + 1), dataLength,
+                               decryptedOpusData, &dataLength)) {
+            return;
+        }
+
+        AudioCallbacks.decodeAndPlaySample((char*)decryptedOpusData, dataLength);
+    }
+    else {
+        AudioCallbacks.decodeAndPlaySample((char*)(rtp + 1), packet->size - sizeof(*rtp));
+    }
 }
 
 static void ReceiveThreadProc(void* context) {

@@ -607,6 +607,7 @@ int performRtspHandshake(void) {
     currentSeqNumber = 1;
     hasSessionId = false;
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
+    AudioEncryptionEnabled = false;
 
     switch (AppVersionQuad[0]) {
         case 3:
