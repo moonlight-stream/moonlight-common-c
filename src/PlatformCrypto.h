@@ -14,7 +14,7 @@ typedef struct _PLT_CRYPTO_CONTEXT {
     bool initialized;
     mbedtls_cipher_context_t ctx;
 #else
-    bool initialized; // Used for CBC only
+    bool initialized;
     EVP_CIPHER_CTX* ctx;
 #endif
 } PLT_CRYPTO_CONTEXT, *PPLT_CRYPTO_CONTEXT;

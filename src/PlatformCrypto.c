@@ -24,6 +24,9 @@ static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
 // When CIPHER_FLAG_PAD_TO_BLOCK_SIZE is used, inputData buffer must be allocated such that
 // the buffer length is at least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) and inputData
 // buffer may be modified!
+// For GCM, the IV can change from message to message without CIPHER_FLAG_RESET_IV.
+// CIPHER_FLAG_RESET_IV is only required for GCM when the IV length changes.
+// Changing the key between encrypt/decrypt calls on a single context is not supported.
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
@@ -121,25 +124,46 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
 
     if (algorithm == ALGORITHM_AES_GCM) {
-        if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
-            return false;
-        }
+        if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
+            // Perform a full initialization. This codepath also allows
+            // us to change the IV length if required.
+            if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
+                return false;
+            }
 
-        if (EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN, ivLength, NULL) != 1) {
-            return false;
-        }
+            if (EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN, ivLength, NULL) != 1) {
+                return false;
+            }
 
-        if (EVP_EncryptInit_ex(ctx->ctx, NULL, NULL, key, iv) != 1) {
-            return false;
+            if (EVP_EncryptInit_ex(ctx->ctx, NULL, NULL, key, iv) != 1) {
+                return false;
+            }
+
+            ctx->initialized = true;
+        }
+        else {
+            // Calling with cipher == NULL results in a parameter change
+            // without requiring a reallocation of the internal cipher ctx.
+            if (EVP_EncryptInit_ex(ctx->ctx, NULL, NULL, NULL, iv) != 1) {
+                return false;
+            }
         }
     }
     else {
-        if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
+        if (!ctx->initialized) {
+            // Perform a full initialization
             if (EVP_EncryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
                 return false;
             }
 
             ctx->initialized = true;
+        }
+        else if (flags & CIPHER_FLAG_RESET_IV) {
+            // Calling with cipher == NULL results in a parameter change
+            // without requiring a reallocation of the internal cipher ctx.
+            if (EVP_EncryptInit_ex(ctx->ctx, NULL, NULL, NULL, iv) != 1) {
+                return false;
+            }
         }
 
         if (flags & CIPHER_FLAG_PAD_TO_BLOCK_SIZE) {
@@ -180,6 +204,9 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 
 // When CBC is used, outputData buffer must be allocated such that the buffer length is
 // at least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) to allow room for PKCS7 padding.
+// For GCM, the IV can change from message to message without CIPHER_FLAG_RESET_IV.
+// CIPHER_FLAG_RESET_IV is only required for GCM when the IV length changes.
+// Changing the key between encrypt/decrypt calls on a single context is not supported.
 bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
@@ -273,25 +300,46 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     }
 
     if (algorithm == ALGORITHM_AES_GCM) {
-        if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
-            return false;
-        }
+        if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
+            // Perform a full initialization. This codepath also allows
+            // us to change the IV length if required.
+            if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, NULL, NULL) != 1) {
+                return false;
+            }
 
-        if (EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN, ivLength, NULL) != 1) {
-            return false;
-        }
+            if (EVP_CIPHER_CTX_ctrl(ctx->ctx, EVP_CTRL_GCM_SET_IVLEN, ivLength, NULL) != 1) {
+                return false;
+            }
 
-        if (EVP_DecryptInit_ex(ctx->ctx, NULL, NULL, key, iv) != 1) {
-            return false;
+            if (EVP_DecryptInit_ex(ctx->ctx, NULL, NULL, key, iv) != 1) {
+                return false;
+            }
+
+            ctx->initialized = true;
+        }
+        else {
+            // Calling with cipher == NULL results in a parameter change
+            // without requiring a reallocation of the internal cipher ctx.
+            if (EVP_DecryptInit_ex(ctx->ctx, NULL, NULL, NULL, iv) != 1) {
+                return false;
+            }
         }
     }
     else {
-        if (!ctx->initialized || (flags & CIPHER_FLAG_RESET_IV)) {
+        if (!ctx->initialized) {
+            // Perform a full initialization
             if (EVP_DecryptInit_ex(ctx->ctx, cipher, NULL, key, iv) != 1) {
                 return false;
             }
 
             ctx->initialized = true;
+        }
+        else if (flags & CIPHER_FLAG_RESET_IV) {
+            // Calling with cipher == NULL results in a parameter change
+            // without requiring a reallocation of the internal cipher ctx.
+            if (EVP_DecryptInit_ex(ctx->ctx, NULL, NULL, NULL, iv) != 1) {
+                return false;
+            }
         }
     }
 
