@@ -6,7 +6,7 @@
 typedef void(*ThreadEntry)(void* context);
 
 #if defined(LC_WINDOWS)
-typedef HANDLE PLT_MUTEX;
+typedef SRWLOCK PLT_MUTEX;
 typedef HANDLE PLT_EVENT;
 typedef struct _PLT_THREAD {
     HANDLE handle;

@@ -124,10 +124,7 @@ void PltSleepMsInterruptible(PLT_THREAD* thread, int ms) {
 
 int PltCreateMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
-    *mutex = CreateMutexEx(NULL, NULL, 0, MUTEX_ALL_ACCESS);
-    if (!*mutex) {
-        return -1;
-    }
+    InitializeSRWLock(mutex);
 #elif defined(__vita__)
     *mutex = sceKernelCreateMutex("", 0, 0, NULL);
     if (*mutex < 0) {
@@ -146,7 +143,7 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
 void PltDeleteMutex(PLT_MUTEX* mutex) {
     activeMutexes--;
 #if defined(LC_WINDOWS)
-    CloseHandle(*mutex);
+    // No-op to destroy a SRWLOCK
 #elif defined(__vita__)
     sceKernelDeleteMutex(*mutex);
 #else
@@ -156,11 +153,7 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
 
 void PltLockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
-    int err;
-    err = WaitForSingleObjectEx(*mutex, INFINITE, FALSE);
-    if (err != WAIT_OBJECT_0) {
-        LC_ASSERT(false);
-    }
+    AcquireSRWLockExclusive(mutex);
 #elif defined(__vita__)
     sceKernelLockMutex(*mutex, 1, NULL);
 #else
@@ -170,7 +163,7 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 
 void PltUnlockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
-    ReleaseMutex(*mutex);
+    ReleaseSRWLockExclusive(mutex);
 #elif defined(__vita__)
     sceKernelUnlockMutex(*mutex, 1);
 #else
