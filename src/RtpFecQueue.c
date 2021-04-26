@@ -423,7 +423,7 @@ int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_
         return RTPF_RET_REJECTED;
     }
 
-    int fecIndex = (nvPacket->fecInfo & 0x3FF000) >> 12;
+    uint32_t fecIndex = (nvPacket->fecInfo & 0x3FF000) >> 12;
     
     // Reinitialize the queue if it's empty after a frame delivery or
     // if we can't finish a frame before receiving the next one.

@@ -555,7 +555,7 @@ void requestDecoderRefresh(void) {
 }
 
 // Return 1 if packet is the first one in the frame
-static int isFirstPacket(char flags) {
+static int isFirstPacket(uint8_t flags) {
     // Clear the picture data flag
     flags &= ~FLAG_CONTAINS_PIC_DATA;
 
@@ -570,10 +570,10 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                        uint64_t receiveTimeMs, unsigned int presentationTimeMs,
                        PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
-    unsigned int frameIndex;
-    char flags;
-    unsigned int firstPacket;
-    unsigned int streamPacketIndex;
+    uint32_t frameIndex;
+    uint8_t flags;
+    uint32_t firstPacket;
+    uint32_t streamPacketIndex;
 
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
