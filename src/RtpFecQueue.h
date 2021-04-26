@@ -13,11 +13,16 @@ typedef struct _RTPFEC_QUEUE_ENTRY {
     struct _RTPFEC_QUEUE_ENTRY* prev;
 } RTPFEC_QUEUE_ENTRY, *PRTPFEC_QUEUE_ENTRY;
 
+typedef struct _RTPFEC_QUEUE_LIST {
+    PRTPFEC_QUEUE_ENTRY head;
+    PRTPFEC_QUEUE_ENTRY tail;
+    uint32_t count;
+} RTPFEC_QUEUE_LIST, *PRTPFEC_QUEUE_LIST;
+
 typedef struct _RTP_FEC_QUEUE {
-    PRTPFEC_QUEUE_ENTRY bufferHead;
-    PRTPFEC_QUEUE_ENTRY bufferTail;
+    RTPFEC_QUEUE_LIST pendingFecBlockList;
+
     uint64_t bufferFirstRecvTimeMs;
-    uint32_t bufferSize;
     uint32_t bufferLowestSequenceNumber;
     uint32_t bufferHighestSequenceNumber;
     uint32_t bufferFirstParitySequenceNumber;
