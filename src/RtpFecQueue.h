@@ -21,6 +21,7 @@ typedef struct _RTPFEC_QUEUE_LIST {
 
 typedef struct _RTP_FEC_QUEUE {
     RTPFEC_QUEUE_LIST pendingFecBlockList;
+    RTPFEC_QUEUE_LIST completedFecBlockList;
 
     uint64_t bufferFirstRecvTimeMs;
     uint32_t bufferLowestSequenceNumber;
