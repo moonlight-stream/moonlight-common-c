@@ -620,7 +620,16 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     if (firstPacket) {
         // Make sure this is the next consecutive frame
         if (isBefore32(nextFrameNumber, frameIndex)) {
-            Limelog("Network dropped an entire frame\n");
+            if (nextFrameNumber + 1 == frameIndex) {
+                Limelog("Network dropped 1 frame (frame %d)\n", frameIndex - 1);
+            }
+            else {
+                Limelog("Network dropped %d frames (frames %d to %d)\n",
+                        frameIndex - nextFrameNumber,
+                        nextFrameNumber,
+                        frameIndex - 1);
+            }
+
             nextFrameNumber = frameIndex;
 
             // Wait until next complete frame
