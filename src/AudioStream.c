@@ -18,7 +18,7 @@ static PPLT_CRYPTO_CONTEXT audioDecryptionCtx;
 static unsigned short lastSeq;
 
 static bool receivedDataFromPeer;
-static uint64_t pingStartTime;
+static uint64_t firstReceiveTime;
 
 #define RTP_PORT 48000
 
@@ -49,13 +49,20 @@ static void UdpPingThreadProc(void* context) {
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     SET_PORT(&saddr, RTP_PORT);
 
-    // Send PING every second until we get data back then every 5 seconds after that.
+    // Send PING every 500 milliseconds
     while (!PltIsThreadInterrupted(&udpPingThread)) {
         err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         if (err != sizeof(pingData)) {
             Limelog("Audio Ping: sendto() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketFail());
             return;
+        }
+
+        if (firstReceiveTime == 0 && isSocketReadable(rtpSocket)) {
+            // Remember the time when we got our first incoming audio packet.
+            // We will need to adjust for the delay between this event and
+            // when the real receive thread is ready to avoid falling behind.
+            firstReceiveTime = PltGetMillis();
         }
 
         PltSleepMsInterruptible(&udpPingThread, 500);
@@ -68,6 +75,7 @@ int initializeAudioStream(void) {
     RtpqInitializeQueue(&rtpReorderQueue, RTPQ_DEFAULT_MAX_SIZE, RTPQ_DEFAULT_QUEUE_TIME);
     lastSeq = 0;
     receivedDataFromPeer = false;
+    firstReceiveTime = 0;
     audioDecryptionCtx = PltCreateCryptoContext();
 
     // For GFE 3.22 compatibility, we must start the audio ping thread before the RTSP handshake.
@@ -76,15 +84,6 @@ int initializeAudioStream(void) {
     if (rtpSocket == INVALID_SOCKET) {
         return LastSocketFail();
     }
-
-    // Track the time we started pinging. Audio samples will begin arriving
-    // shortly after the first ping reaches the host. However, we won't be
-    // ready to start playback until later on. As a result, we'll drop samples
-    // equivalent to the amount of time before the receive thread is ready
-    // to accept traffic in real-time.
-    // FIXME: This could also take into account the size of the recv buffer,
-    // since long RTSP handshakes could cause that to fill to capacity.
-    pingStartTime = PltGetMillis();
 
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
@@ -195,16 +194,11 @@ static void ReceiveThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
     bool useSelect;
-    int initialResyncDelay = PltGetMillis() - pingStartTime;
-    int packetsToDrop;
+    uint32_t packetsToDrop;
     int waitingForAudioMs;
 
-    // Cap delay at 3 seconds to account for recv buffer cap
-    initialResyncDelay = initialResyncDelay > 3000 ? 3000 : initialResyncDelay;
-    packetsToDrop = initialResyncDelay / AudioPacketDuration;
-    Limelog("Initial audio resync period: %d milliseconds\n", initialResyncDelay);
-
     packet = NULL;
+    packetsToDrop = 0;
 
     if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
         // SO_RCVTIMEO failed, so use select() to wait
@@ -259,11 +253,15 @@ static void ReceiveThreadProc(void* context) {
         if (!receivedDataFromPeer) {
             receivedDataFromPeer = true;
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
+
+            if (firstReceiveTime != 0) {
+                packetsToDrop = (PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
+                Limelog("Initial audio resync period: %d milliseconds\n", packetsToDrop * AudioPacketDuration);
+            }
         }
 
         // GFE accumulates audio samples before we are ready to receive them, so
-        // we will drop the first 1 second of packets to avoid accumulating latency
-        // by sending audio frames to the player faster than they can be played.
+        // we will drop the ones that arrived before the receive thread was ready.
         if (packetsToDrop > 0) {
             packetsToDrop--;
             continue;

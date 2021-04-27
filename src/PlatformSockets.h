@@ -117,6 +117,7 @@ void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);
 bool isPrivateNetworkAddress(struct sockaddr_storage* address);
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs);
+bool isSocketReadable(SOCKET s);
 
 #define TCP_PORT_MASK 0xFFFF
 #define TCP_PORT_FLAG_ALWAYS_TEST 0x10000

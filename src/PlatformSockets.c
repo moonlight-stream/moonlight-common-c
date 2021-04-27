@@ -150,6 +150,20 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 #endif
 }
 
+bool isSocketReadable(SOCKET s) {
+    struct pollfd pfd;
+    int err;
+
+    pfd.fd = s;
+    pfd.events = POLLIN;
+    err = pollSockets(&pfd, 1, 0);
+    if (err <= 0) {
+        return false;
+    }
+
+    return true;
+}
+
 int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
     int err;
     
