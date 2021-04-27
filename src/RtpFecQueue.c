@@ -32,6 +32,9 @@ void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
 }
 
 static void insertEntryIntoList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY entry) {
+    LC_ASSERT(entry->prev == NULL);
+    LC_ASSERT(entry->next == NULL);
+
     if (list->head == NULL) {
         LC_ASSERT(list->count == 0);
         LC_ASSERT(list->tail == NULL);
@@ -51,6 +54,7 @@ static void insertEntryIntoList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY ent
 
 static void removeEntryFromList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY entry) {
     LC_ASSERT(entry != NULL);
+    LC_ASSERT(list->count != 0);
     LC_ASSERT(list->head != NULL);
     LC_ASSERT(list->tail != NULL);
 
@@ -62,13 +66,16 @@ static void removeEntryFromList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY ent
     }
 
     if (entry->prev != NULL) {
+        LC_ASSERT(entry->prev->next == entry);
         entry->prev->next = entry->next;
-        entry->prev = NULL;
     }
     if (entry->next != NULL) {
+        LC_ASSERT(entry->next->prev == entry);
         entry->next->prev = entry->prev;
-        entry->next = NULL;
     }
+
+    entry->next = NULL;
+    entry->prev = NULL;
 
     list->count--;
 }
