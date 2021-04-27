@@ -555,13 +555,12 @@ void requestDecoderRefresh(void) {
 }
 
 // Return 1 if packet is the first one in the frame
-static int isFirstPacket(uint8_t flags) {
+static int isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
     // Clear the picture data flag
     flags &= ~FLAG_CONTAINS_PIC_DATA;
 
     // Check if it's just the start or both start and end of a frame
-    return (flags == (FLAG_SOF | FLAG_EOF) ||
-        flags == FLAG_SOF);
+    return (flags == (FLAG_SOF | FLAG_EOF) || flags == FLAG_SOF) && fecBlockNumber == 0;
 }
 
 // Process an RTP Payload
@@ -574,6 +573,8 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     uint8_t flags;
     uint32_t firstPacket;
     uint32_t streamPacketIndex;
+    uint8_t fecCurrentBlockNumber;
+    uint8_t fecLastBlockNumber;
 
     // Mask the top 8 bits from the SPI
     videoPacket->streamPacketIndex >>= 8;
@@ -583,9 +584,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     currentPos.offset = 0;
     currentPos.length = length - sizeof(*videoPacket);
 
+    fecCurrentBlockNumber = (videoPacket->multiFecBlocks >> 4) & 0x3;
+    fecLastBlockNumber = (videoPacket->multiFecBlocks >> 6) & 0x3;
     frameIndex = videoPacket->frameIndex;
     flags = videoPacket->flags;
-    firstPacket = isFirstPacket(flags);
+    firstPacket = isFirstPacket(flags, fecCurrentBlockNumber);
 
     LC_ASSERT((flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
 
@@ -600,7 +603,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     // It almost always detects them before they get to us, but in case it doesn't
     // the streamPacketIndex not matching correctly should find nearly all of the rest.
     if (isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)) ||
-            (!firstPacket && streamPacketIndex != U24(lastPacketInStream + 1))) {
+            (!(flags & FLAG_SOF) && streamPacketIndex != U24(lastPacketInStream + 1))) {
         Limelog("Depacketizer detected corrupt frame: %d", frameIndex);
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
@@ -698,7 +701,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
     }
 
-    if (flags & FLAG_EOF) {
+    if ((flags & FLAG_EOF) && fecCurrentBlockNumber == fecLastBlockNumber) {
         // Move on to the next frame
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;

@@ -34,6 +34,10 @@ typedef struct _RTP_FEC_QUEUE {
     uint32_t nextContiguousSequenceNumber;
 
     uint32_t currentFrameNumber;
+
+    bool multiFecCapable;
+    uint8_t multiFecCurrentBlockNumber;
+    uint8_t multiFecLastBlockNumber;
 } RTP_FEC_QUEUE, *PRTP_FEC_QUEUE;
 
 #define RTPF_RET_QUEUED    0

@@ -168,18 +168,6 @@ static int addGen5Options(PSDP_OPTION* head) {
         // Ask for the encrypted control protocol to ensure remote input will be encrypted.
         // This used to be done via separate RI encryption, but now it is all or nothing.
         err |= addAttributeString(head, "x-nv-general.useReliableUdp", "13");
-
-        if (StreamConfig.bitrate >= 30000 || StreamConfig.width * StreamConfig.height >= 3840 * 2160) {
-            // HACK: GFE 3.22 will split frames into 2 FEC blocks (sharing a frame number)
-            // if the number of packets exceeds ~120. We can't correctly handle those, so
-            // we'll turn off FEC at bitrates above 30 Mbps as an interim hack.
-            err |= addAttributeString(head, "x-nv-vqos[0].fec.repairPercent", "0");
-            err |= addAttributeString(head, "x-nv-vqos[0].fec.numSrcPackets", "511");
-        }
-        else {
-            err |= addAttributeString(head, "x-nv-vqos[0].fec.repairPercent", "20");
-            err |= addAttributeString(head, "x-nv-vqos[0].fec.numSrcPackets", "125");
-        }
     }
     else {
         // We want to use the new ENet connections for control and input
