@@ -18,6 +18,7 @@ static PPLT_CRYPTO_CONTEXT audioDecryptionCtx;
 static unsigned short lastSeq;
 
 static bool receivedDataFromPeer;
+static uint64_t pingStartTime;
 
 #define RTP_PORT 48000
 
@@ -75,6 +76,15 @@ int initializeAudioStream(void) {
     if (rtpSocket == INVALID_SOCKET) {
         return LastSocketFail();
     }
+
+    // Track the time we started pinging. Audio samples will begin arriving
+    // shortly after the first ping reaches the host. However, we won't be
+    // ready to start playback until later on. As a result, we'll drop samples
+    // equivalent to the amount of time before the receive thread is ready
+    // to accept traffic in real-time.
+    // FIXME: This could also take into account the size of the recv buffer,
+    // since long RTSP handshakes could cause that to fill to capacity.
+    pingStartTime = PltGetMillis();
 
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
@@ -185,8 +195,14 @@ static void ReceiveThreadProc(void* context) {
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
     bool useSelect;
-    int packetsToDrop = 1000 / AudioPacketDuration;
+    int initialResyncDelay = PltGetMillis() - pingStartTime;
+    int packetsToDrop;
     int waitingForAudioMs;
+
+    // Cap delay at 3 seconds to account for recv buffer cap
+    initialResyncDelay = initialResyncDelay > 3000 ? 3000 : initialResyncDelay;
+    packetsToDrop = initialResyncDelay / AudioPacketDuration;
+    Limelog("Initial audio resync period: %d milliseconds\n", initialResyncDelay);
 
     packet = NULL;
 
