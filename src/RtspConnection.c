@@ -298,6 +298,11 @@ Exit:
 }
 
 static bool transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
+    if (ConnectionInterrupted) {
+        *error = -1;
+        return false;
+    }
+
     if (useEnet) {
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
