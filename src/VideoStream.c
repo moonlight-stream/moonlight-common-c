@@ -49,18 +49,16 @@ void destroyVideoStream(void) {
 static void UdpPingThreadProc(void* context) {
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
-    SOCK_RET err;
 
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     SET_PORT(&saddr, RTP_PORT);
 
     while (!PltIsThreadInterrupted(&udpPingThread)) {
-        err = sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
-        if (err != sizeof(pingData)) {
-            Limelog("Video Ping: send() failed: %d\n", (int)LastSocketError());
-            ListenerCallbacks.connectionTerminated(LastSocketFail());
-            return;
-        }
+        // We do not check for errors here. Socket errors will be handled
+        // on the read-side in ReceiveThreadProc(). This avoids potential
+        // issues related to receiving ICMP port unreachable messages due
+        // to sending a packet prior to the host PC binding to that port.
+        sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
 
         PltSleepMsInterruptible(&udpPingThread, 500);
     }
