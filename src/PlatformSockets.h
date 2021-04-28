@@ -13,33 +13,10 @@
 
 #define SHUT_RDWR SD_BOTH
 
-// errno.h will include incompatible definitions of these
-// values compared to what Winsock uses, so we must undef
-// them to ensure the correct value is used.
-
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
 #define EWOULDBLOCK WSAEWOULDBLOCK
-
-#ifdef EAGAIN
-#undef EAGAIN
-#endif
 #define EAGAIN WSAEWOULDBLOCK
-
-#ifdef EINPROGRESS
-#undef EINPROGRESS
-#endif
 #define EINPROGRESS WSAEINPROGRESS
-
-#ifdef EINTR
-#undef EINTR
-#endif
 #define EINTR WSAEINTR
-
-#ifdef ETIMEDOUT
-#undef ETIMEDOUT
-#endif
 #define ETIMEDOUT WSAETIMEDOUT
 
 typedef int SOCK_RET;

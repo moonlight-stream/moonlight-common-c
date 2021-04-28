@@ -1,5 +1,11 @@
 #pragma once
 
+#ifdef _WIN32
+// Prevent bogus definitions of error codes
+// that are incompatible with Winsock errors.
+#define _CRT_NO_POSIX_ERROR_CODES
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
