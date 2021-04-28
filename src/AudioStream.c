@@ -14,6 +14,7 @@ static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
 static PPLT_CRYPTO_CONTEXT audioDecryptionCtx;
+static uint32_t avRiKeyId;
 
 static unsigned short lastSeq;
 
@@ -75,6 +76,10 @@ int initializeAudioStream(void) {
     receivedDataFromPeer = false;
     firstReceiveTime = 0;
     audioDecryptionCtx = PltCreateCryptoContext();
+
+    // Copy and byte-swap the AV RI key ID used for the audio encryption IV
+    memcpy(&avRiKeyId, StreamConfig.remoteInputAesIv, sizeof(avRiKeyId));
+    avRiKeyId = BE32(avRiKeyId);
 
     // For GFE 3.22 compatibility, we must start the audio ping thread before the RTSP handshake.
     // It will not reply to our RTSP PLAY request until the audio ping has been received.
@@ -165,9 +170,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
         // The IV is the avkeyid (equivalent to the rikeyid) +
         // the RTP sequence number, in big endian.
-        uint32_t ivSeq = BE32(*(uint32_t*)StreamConfig.remoteInputAesIv);
-        ivSeq += rtp->sequenceNumber;
-        ivSeq = BE32(ivSeq);
+        uint32_t ivSeq = BE32(avRiKeyId + rtp->sequenceNumber);
 
         memcpy(iv, &ivSeq, sizeof(ivSeq));
 
