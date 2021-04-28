@@ -4,6 +4,7 @@
 #include <enet/enet.h>
 
 #define RTSP_TIMEOUT_SEC 10
+#define RTSP_RETRY_DELAY_MS 500
 
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
@@ -217,14 +218,36 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     int messageLen;
     char* responseBuffer;
     int responseBufferSize;
+    int connectRetries;
 
     *error = -1;
     ret = false;
     responseBuffer = NULL;
+    connectRetries = 0;
 
-    sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
+    // Retry up to 10 seconds if we receive ECONNREFUSED errors from the host PC.
+    // This can happen with GFE 3.22 when initially launching a session because it
+    // returns HTTP 200 OK for the /launch request before the RTSP handshake port
+    // is listening.
+    do {
+        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
+        if (sock == INVALID_SOCKET) {
+            *error = LastSocketError();
+            if (*error == ECONNREFUSED) {
+                // Try again after 500 ms on ECONNREFUSED
+                PltSleepMs(RTSP_RETRY_DELAY_MS);
+            }
+            else {
+                // Fail if we get some other error
+                break;
+            }
+        }
+        else {
+            // We successfully connected
+            break;
+        }
+    } while (connectRetries++ < (RTSP_TIMEOUT_SEC * 1000) / RTSP_RETRY_DELAY_MS && !ConnectionInterrupted);
     if (sock == INVALID_SOCKET) {
-        *error = LastSocketError();
         return ret;
     }
     setRecvTimeout(sock, RTSP_TIMEOUT_SEC);
