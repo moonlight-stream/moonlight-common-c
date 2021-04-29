@@ -5,7 +5,6 @@ project(moonlight-common-c LANGUAGES C)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(USE_MBEDTLS "Use MbedTLS instead of OpenSSL" OFF)
-option(USE_WERROR "Treat compile warning as errors" ON)
 
 SET(CMAKE_C_STANDARD 11)
 
@@ -31,10 +30,7 @@ if(MSVC)
   target_compile_definitions(moonlight-common-c PRIVATE -D_CRT_SECURE_NO_WARNINGS=1 -D_CRT_NONSTDC_NO_DEPRECATE=1)
   target_link_libraries(moonlight-common-c PRIVATE ws2_32.lib qwave.lib winmm.lib)
 else()
-  target_compile_options(moonlight-common-c PRIVATE -Wall -Wextra -Wno-unused-parameter)
-  if (USE_WERROR)
-    target_compile_options(moonlight-common-c PRIVATE -Werror)
-  endif()
+  target_compile_options(moonlight-common-c PRIVATE -Wall -Wextra -Wno-unused-parameter -Werror)
 endif()
 
 if (USE_MBEDTLS)
