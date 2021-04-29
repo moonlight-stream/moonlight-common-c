@@ -10,6 +10,11 @@
 #define TCPv6_MSS 1220
 
 #if defined(LC_WINDOWS)
+
+#ifndef SIO_UDP_CONNRESET
+#define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
+#endif
+
 static HMODULE WlanApiLibraryHandle;
 static HANDLE WlanHandle;
 
@@ -246,11 +251,20 @@ SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
         return INVALID_SOCKET;
     }
 
-#ifdef LC_DARWIN
+#if defined(LC_DARWIN)
     {
         // Disable SIGPIPE on iOS
         int val = 1;
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
+    }
+#elif defined(LC_WINDOWS)
+    {
+        // Disable WSAECONNRESET for UDP sockets on Windows
+        BOOL val = FALSE;
+        DWORD bytesReturned = 0;
+        if (WSAIoctl(s, SIO_UDP_CONNRESET, &val, sizeof(val), NULL, 0, &bytesReturned, NULL, NULL) != 0) {
+            Limelog("WSAIoctl(SIO_UDP_CONNRESET) failed: %d\n", LastSocketError());
+        }
     }
 #endif
 
