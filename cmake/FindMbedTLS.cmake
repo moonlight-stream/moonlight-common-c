@@ -13,7 +13,7 @@ find_library(MBEDCRYPTO_LIBRARY mbedcrypto)
 set(MBEDTLS_LIBRARIES "${MBEDTLS_LIBRARY}" "${MBEDX509_LIBRARY}" "${MBEDCRYPTO_LIBRARY}")
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(MBEDTLS
+find_package_handle_standard_args(MbedTLS
     REQUIRED_VARS MBEDTLS_LIBRARIES MBEDTLS_INCLUDE_DIRS
     VERSION_VAR MBEDTLS_VERSION_STRING
 )
