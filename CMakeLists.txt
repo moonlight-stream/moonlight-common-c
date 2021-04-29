@@ -6,7 +6,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(USE_MBEDTLS "Use MbedTLS instead of OpenSSL" OFF)
 option(USE_WERROR "Treat compile warning as errors" ON)
-option(BUILD_STATIC "Build static library" OFF)
 
 SET(CMAKE_C_STANDARD 11)
 
@@ -14,10 +13,17 @@ aux_source_directory(src SRC_LIST)
 aux_source_directory(enet SRC_LIST)
 aux_source_directory(reedsolomon SRC_LIST)
 
-if (BUILD_STATIC)
-  add_library(moonlight-common-c STATIC ${SRC_LIST})
-else()
-  add_library(moonlight-common-c SHARED ${SRC_LIST})
+# Build shared library by default, but allows user override
+if (NOT DEFINED BUILD_SHARED_LIBS)
+  set(BUILD_SHARED_LIBS ON)
+  set(BUILD_SHARED_LIBS_OVERRIDE ON)
+endif()
+
+add_library(moonlight-common-c ${SRC_LIST})
+
+if (BUILD_SHARED_LIBS_OVERRIDE)
+  unset(BUILD_SHARED_LIBS)
+  unset(BUILD_SHARED_LIBS_OVERRIDE)
 endif()
 
 if(MSVC)
