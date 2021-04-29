@@ -428,13 +428,21 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
 }
 
 // Caller must free() *packet on success!!!
-static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
+static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
     unsigned char iv[16] = { 0 };
 
     *packet = NULL;
 
     // It must be an encrypted packet to begin with
     LC_ASSERT(encPacket->encryptedHeaderType == 0x0001);
+
+    // Make sure the host isn't lying to us about the packet length
+    int expectedEncLength = encPacket->length + sizeof(encPacket->encryptedHeaderType) + sizeof(encPacket->length);
+    LC_ASSERT(encPacketLength == expectedEncLength);
+    if (encPacketLength < expectedEncLength) {
+        Limelog("Length exceeds packet boundary (needed %d, got %d)\n", expectedEncLength, encPacketLength);
+        return false;
+    }
 
     // Check length first so we don't underflow
     if (encPacket->length < sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(NVCTL_ENET_PACKET_HEADER_V2)) {
@@ -724,7 +732,8 @@ static void controlReceiveThreadFunc(void* context) {
                     encHdr->seq = LE32(encHdr->seq);
 
                     ctlHdr = NULL;
-                    if (!decryptControlMessageToV1(encHdr, &ctlHdr, &packetLength)) {
+                    packetLength = (int)event.packet->dataLength;
+                    if (!decryptControlMessageToV1(encHdr, packetLength, &ctlHdr, &packetLength)) {
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
                         continue;
