@@ -1,4 +1,3 @@
-#include "PlatformSockets.h"
 #include "Limelight-internal.h"
 
 #define TEST_PORT_TIMEOUT_SEC 3

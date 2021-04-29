@@ -1,10 +1,4 @@
 #include "Limelight-internal.h"
-#include "PlatformSockets.h"
-#include "PlatformThreads.h"
-
-#include "ByteBuffer.h"
-
-#include <enet/enet.h>
 
 // NV control stream packet header for TCP
 typedef struct _NVCTL_TCP_PACKET_HEADER {

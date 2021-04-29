@@ -1,5 +1,4 @@
 #include "Limelight-internal.h"
-#include "Platform.h"
 
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;

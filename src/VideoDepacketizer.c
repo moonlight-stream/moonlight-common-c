@@ -1,7 +1,4 @@
-#include "Platform.h"
 #include "Limelight-internal.h"
-#include "LinkedBlockingQueue.h"
-#include "Video.h"
 
 static PLENTRY nalChainHead;
 static PLENTRY nalChainTail;

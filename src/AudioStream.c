@@ -1,8 +1,4 @@
 #include "Limelight-internal.h"
-#include "PlatformSockets.h"
-#include "PlatformThreads.h"
-#include "LinkedBlockingQueue.h"
-#include "RtpReorderQueue.h"
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 

@@ -1,5 +1,4 @@
 #include "Limelight-internal.h"
-#include "RtpFecQueue.h"
 #include "rs.h"
 
 #ifdef LC_DEBUG

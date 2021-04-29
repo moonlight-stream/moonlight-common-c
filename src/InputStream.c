@@ -1,8 +1,4 @@
 #include "Limelight-internal.h"
-#include "PlatformSockets.h"
-#include "PlatformThreads.h"
-#include "LinkedBlockingQueue.h"
-#include "Input.h"
 
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];

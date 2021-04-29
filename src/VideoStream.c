@@ -1,7 +1,4 @@
 #include "Limelight-internal.h"
-#include "PlatformSockets.h"
-#include "PlatformThreads.h"
-#include "RtpFecQueue.h"
 
 #define FIRST_FRAME_MAX 1500
 #define FIRST_FRAME_TIMEOUT_SEC 10

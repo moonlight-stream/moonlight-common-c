@@ -1,10 +1,4 @@
-#define _GNU_SOURCE
-
-#include "Platform.h"
-#include "PlatformThreads.h"
-#include "PlatformSockets.h"
-
-#include <enet/enet.h>
+#include "Limelight-internal.h"
 
 // The maximum amount of time before observing an interrupt
 // in PltSleepMsInterruptible().

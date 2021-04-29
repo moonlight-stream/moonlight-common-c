@@ -1,8 +1,6 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 
-#include <enet/enet.h>
-
 #define RTSP_TIMEOUT_SEC 10
 #define RTSP_RETRY_DELAY_MS 500
 

@@ -1,5 +1,4 @@
 #include "Limelight-internal.h"
-#include "RtpReorderQueue.h"
 
 void RtpqInitializeQueue(PRTP_REORDER_QUEUE queue, int maxSize, int maxQueueTimeMs) {
     memset(queue, 0, sizeof(*queue));
