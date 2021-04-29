@@ -25,7 +25,6 @@
 #include <netinet/in.h>
 #include <psp2/kernel/threadmgr.h>
 #else
-#define _GNU_SOURCE
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/time.h>

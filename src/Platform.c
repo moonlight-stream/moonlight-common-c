@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "Limelight-internal.h"
 
 // The maximum amount of time before observing an interrupt
