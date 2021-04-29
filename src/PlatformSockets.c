@@ -505,7 +505,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
         // b) The caller asked us to test even with a single address
         if (tcpTestPort != 0 && (res->ai_next != NULL || (tcpTestPort & TCP_PORT_FLAG_ALWAYS_TEST))) {
             SOCKET testSocket = connectTcpSocket((struct sockaddr_storage*)currentAddr->ai_addr,
-                                                 currentAddr->ai_addrlen,
+                                                 (SOCKADDR_LEN)currentAddr->ai_addrlen,
                                                  tcpTestPort & TCP_PORT_MASK,
                                                  TEST_PORT_TIMEOUT_SEC);
             if (testSocket == INVALID_SOCKET) {
@@ -518,7 +518,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
         }
         
         memcpy(addr, currentAddr->ai_addr, currentAddr->ai_addrlen);
-        *addrLen = currentAddr->ai_addrlen;
+        *addrLen = (SOCKADDR_LEN)currentAddr->ai_addrlen;
         
         freeaddrinfo(res);
         return 0;
@@ -612,11 +612,11 @@ void enterLowLatencyMode(void) {
         return;
     }
 
-    pfnWlanOpenHandle = GetProcAddress(WlanApiLibraryHandle, "WlanOpenHandle");
-    pfnWlanCloseHandle = GetProcAddress(WlanApiLibraryHandle, "WlanCloseHandle");
-    pfnWlanFreeMemory = GetProcAddress(WlanApiLibraryHandle, "WlanFreeMemory");
-    pfnWlanEnumInterfaces = GetProcAddress(WlanApiLibraryHandle, "WlanEnumInterfaces");
-    pfnWlanSetInterface = GetProcAddress(WlanApiLibraryHandle, "WlanSetInterface");
+    pfnWlanOpenHandle = (void*)GetProcAddress(WlanApiLibraryHandle, "WlanOpenHandle");
+    pfnWlanCloseHandle = (void*)GetProcAddress(WlanApiLibraryHandle, "WlanCloseHandle");
+    pfnWlanFreeMemory = (void*)GetProcAddress(WlanApiLibraryHandle, "WlanFreeMemory");
+    pfnWlanEnumInterfaces = (void*)GetProcAddress(WlanApiLibraryHandle, "WlanEnumInterfaces");
+    pfnWlanSetInterface = (void*)GetProcAddress(WlanApiLibraryHandle, "WlanSetInterface");
 
     if (pfnWlanOpenHandle == NULL || pfnWlanCloseHandle == NULL ||
             pfnWlanFreeMemory == NULL || pfnWlanEnumInterfaces == NULL || pfnWlanSetInterface == NULL) {

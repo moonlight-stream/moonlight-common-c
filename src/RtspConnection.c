@@ -210,7 +210,7 @@ Exit:
 }
 
 // Send RTSP message and get response over TCP
-static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
+static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response, int* error) {
     SOCK_RET err;
     bool ret;
     int offset;
@@ -330,7 +330,7 @@ static bool transactRtspMessage(PRTSP_MESSAGE request, PRTSP_MESSAGE response, b
         return transactRtspMessageEnet(request, response, expectingPayload, error);
     }
     else {
-        return transactRtspMessageTcp(request, response, expectingPayload, error);
+        return transactRtspMessageTcp(request, response, error);
     }
 }
 

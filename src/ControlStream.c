@@ -742,12 +742,12 @@ static void controlReceiveThreadFunc(void* context) {
                 else {
                     // What do we do here???
                     LC_ASSERT(false);
-                    packetLength = event.packet->dataLength;
+                    packetLength = (int)event.packet->dataLength;
                 }
             }
             else {
                 // Take ownership of the packet data directly for the non-encrypted case
-                packetLength = event.packet->dataLength;
+                packetLength = (int)event.packet->dataLength;
                 event.packet->data = NULL;
             }
 

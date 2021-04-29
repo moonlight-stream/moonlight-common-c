@@ -93,7 +93,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
             // Send a request to each resolved address but stop if we get a response
             for (current = stunAddrs; current != NULL && bytesRead <= 0; current = current->ai_next) {
-                err = (int)sendto(sock, (char *)&reqMsg, sizeof(reqMsg), 0, current->ai_addr, current->ai_addrlen);
+                err = (int)sendto(sock, (char *)&reqMsg, sizeof(reqMsg), 0, current->ai_addr, (SOCKADDR_LEN)current->ai_addrlen);
                 if (err == SOCKET_ERROR) {
                     err = LastSocketFail();
                     Limelog("Failed to send STUN binding request: %d\n", err);

@@ -4,6 +4,10 @@
 // Prevent bogus definitions of error codes
 // that are incompatible with Winsock errors.
 #define _CRT_NO_POSIX_ERROR_CODES
+
+// Ignore CRT warnings about sprintf(), memcpy(), etc.
+#define _CRT_SECURE_NO_WARNINGS 1
+#define _CRT_NONSTDC_NO_DEPRECATE 1
 #endif
 
 #include <stdlib.h>

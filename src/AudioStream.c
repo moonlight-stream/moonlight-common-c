@@ -256,7 +256,7 @@ static void ReceiveThreadProc(void* context) {
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
 
             if (firstReceiveTime != 0) {
-                packetsToDrop = (PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
+                packetsToDrop = (uint32_t)(PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
                 Limelog("Initial audio resync period: %d milliseconds\n", packetsToDrop * AudioPacketDuration);
             }
         }
