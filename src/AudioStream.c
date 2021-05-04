@@ -195,7 +195,7 @@ static void ReceiveThreadProc(void* context) {
     int waitingForAudioMs;
 
     packet = NULL;
-    packetsToDrop = 0;
+    packetsToDrop = 500 / AudioPacketDuration;
 
     if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
         // SO_RCVTIMEO failed, so use select() to wait
@@ -252,7 +252,7 @@ static void ReceiveThreadProc(void* context) {
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
 
             if (firstReceiveTime != 0) {
-                packetsToDrop = (uint32_t)(PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
+                packetsToDrop += (uint32_t)(PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
                 Limelog("Initial audio resync period: %d milliseconds\n", packetsToDrop * AudioPacketDuration);
             }
         }
