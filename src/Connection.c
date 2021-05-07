@@ -226,6 +226,16 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     else if (StreamConfig.width > 8192 || StreamConfig.height > 8192) {
         Limelog("WARNING: Streaming at resolutions above 8K will likely fail! Trying anyway!\n");
     }
+
+    // Reference frame invalidation doesn't seem to work with resolutions much
+    // higher than 1440p. I haven't figured out a pattern to indicate which
+    // resolutions will work and which won't, but we can at least exclude
+    // 4K from RFI to avoid significant persistent artifacts after frame loss.
+    if (StreamConfig.width == 3840 && StreamConfig.height == 2160 &&
+            (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) {
+        Limelog("Disabling reference frame invalidation for 4K streaming\n");
+        VideoCallbacks.capabilities &= ~CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC;
+    }
     
     // Extract the appversion from the supplied string
     if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
