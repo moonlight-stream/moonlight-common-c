@@ -20,10 +20,16 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead
     head = queueHead->head;
 
     // Reinitialize the queue to empty
-    queueHead->head = NULL;
-    queueHead->tail = NULL;
-    queueHead->currentSize = 0;
-    PltClearEvent(&queueHead->containsDataEvent);
+    if (head != NULL) {
+        queueHead->head = NULL;
+        queueHead->tail = NULL;
+        queueHead->currentSize = 0;
+        PltClearEvent(&queueHead->containsDataEvent);
+    }
+    else {
+        LC_ASSERT(queueHead->tail == NULL);
+        LC_ASSERT(queueHead->currentSize == 0);
+    }
 
     PltUnlockMutex(&queueHead->mutex);
 
@@ -61,6 +67,8 @@ int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead) {
 }
 
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+    bool wasEmpty;
+
     if (queueHead->shutdown) {
         return LBQ_INTERRUPTED;
     }
@@ -75,7 +83,8 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
         return LBQ_BOUND_EXCEEDED;
     }
 
-    if (queueHead->head == NULL) {
+    wasEmpty = queueHead->head == NULL;
+    if (wasEmpty) {
         LC_ASSERT(queueHead->currentSize == 0);
         LC_ASSERT(queueHead->tail == NULL);
         queueHead->head = entry;
@@ -95,7 +104,11 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
 
     PltUnlockMutex(&queueHead->mutex);
 
-    PltSetEvent(&queueHead->containsDataEvent);
+    if (wasEmpty) {
+        // Only call PltSetEvent() when transitioning from empty -> non-empty
+        // to avoid a useless syscall for each additional entry.
+        PltSetEvent(&queueHead->containsDataEvent);
+    }
 
     return LBQ_SUCCESS;
 }
