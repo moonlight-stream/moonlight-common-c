@@ -1108,6 +1108,26 @@ int sendInputPacketOnControlStream(unsigned char* data, int length) {
     return 0;
 }
 
+bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVariance) {
+    bool ret = false;
+
+    PltLockMutex(&enetMutex);
+    if (peer != NULL && peer->state == ENET_PEER_STATE_CONNECTED) {
+        if (estimatedRtt != NULL) {
+            *estimatedRtt = peer->roundTripTime;
+        }
+
+        if (estimatedRttVariance != NULL) {
+            *estimatedRttVariance = peer->roundTripTimeVariance;
+        }
+
+        ret = true;
+    }
+    PltUnlockMutex(&enetMutex);
+
+    return ret;
+}
+
 // Starts the control stream
 int startControlStream(void) {
     int err;
