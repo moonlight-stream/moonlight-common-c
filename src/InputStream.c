@@ -31,7 +31,9 @@ typedef struct _PACKET_HOLDER {
 int initializeInputStream(void) {
     memcpy(currentAesIv, StreamConfig.remoteInputAesIv, sizeof(currentAesIv));
     
-    LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
+    // Set a high maximum queue size limit to ensure input isn't dropped
+    // while the input send thread is blocked for short periods.
+    LbqInitializeLinkedBlockingQueue(&packetQueue, 150);
 
     cryptoContext = PltCreateCryptoContext();
     return 0;
