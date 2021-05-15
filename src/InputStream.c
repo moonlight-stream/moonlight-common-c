@@ -313,6 +313,8 @@ static int sendEnableHaptics(void) {
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -407,6 +409,8 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -444,6 +448,8 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -474,6 +480,8 @@ int LiSendMouseButtonEvent(char action, int button) {
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -546,6 +554,8 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -612,6 +622,8 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
@@ -669,6 +681,8 @@ int LiSendHighResScrollEvent(short scrollAmount) {
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
         free(holder);
     }
 
