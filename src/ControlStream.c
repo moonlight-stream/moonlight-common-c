@@ -1,5 +1,8 @@
 #include "Limelight-internal.h"
 
+// This is a private header, but it just contains some time macros
+#include <enet/time.h>
+
 // NV control stream packet header for TCP
 typedef struct _NVCTL_TCP_PACKET_HEADER {
     unsigned short type;
@@ -640,11 +643,32 @@ static void controlReceiveThreadFunc(void* context) {
 
     while (!PltIsThreadInterrupted(&controlReceiveThread)) {
         ENetEvent event;
+        enet_uint32 waitTimeMs;
+
+        PltLockMutex(&enetMutex);
 
         // Poll for new packets and process retransmissions
-        PltLockMutex(&enetMutex);
         err = serviceEnetHost(client, &event, 0);
+
+        // Compute the next time we need to wake up to handle
+        // the RTO timer or a ping.
+        if (err == 0) {
+            if (ENET_TIME_LESS(peer->nextTimeout, client->serviceTime)) {
+                // This can happen when we have no unacked reliable messages
+                waitTimeMs = 10;
+            }
+            else {
+                // We add 1 ms just to ensure we're unlikely to undershoot the sleep() and have to
+                // do a tiny sleep for another iteration before the timeout is ready to be serviced.
+                waitTimeMs = ENET_TIME_DIFFERENCE(peer->nextTimeout, client->serviceTime) + 1;
+                if (waitTimeMs > peer->pingInterval) {
+                    waitTimeMs = peer->pingInterval;
+                }
+            }
+        }
+
         PltUnlockMutex(&enetMutex);
+
         if (err == 0) {
             // Handle a pending disconnect after unsuccessfully polling
             // for new events to handle.
@@ -680,15 +704,9 @@ static void controlReceiveThreadFunc(void* context) {
                 }
             }
             else {
-                // No events ready - wait for readability.
-                //
-                // NOTE: This wait *directly* impacts the lowest possible retransmission
-                // time for packets after a loss event. If we're busy sleeping here, we can't
-                // retransmit a dropped packet, so we keep the sleep time to a minimum.
-                //
-                // TODO: Dynamically sleep until next RTO rather than waking every 10 ms
+                // No events ready - wait for readability or a local RTO timer to expire
                 enet_uint32 condition = ENET_SOCKET_WAIT_RECEIVE;
-                enet_socket_wait(client->socket, &condition, 10);
+                enet_socket_wait(client->socket, &condition, waitTimeMs);
                 continue;
             }
         }
