@@ -533,16 +533,13 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
 
     PltLockMutex(&enetMutex);
     err = enet_peer_send(peer, 0, enetPacket);
+    enet_host_service(client, NULL, 0);
     PltUnlockMutex(&enetMutex);
     if (err < 0) {
         Limelog("Failed to send ENet control packet\n");
         enet_packet_destroy(enetPacket);
         return false;
     }
-    
-    PltLockMutex(&enetMutex);
-    enet_host_flush(client);
-    PltUnlockMutex(&enetMutex);
 
     return true;
 }
