@@ -1127,8 +1127,8 @@ int startControlStream(void) {
         // Ensure the connect verify ACK is sent immediately
         enet_host_flush(client);
         
-        // Set the max peer timeout to 10 seconds
-        enet_peer_timeout(peer, ENET_PEER_TIMEOUT_LIMIT, ENET_PEER_TIMEOUT_MINIMUM, 10000);
+        // Set the peer timeout to 10 seconds and limit backoff to 2x RTT
+        enet_peer_timeout(peer, 2, 10000, 10000);
     }
     else {
         ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
