@@ -75,6 +75,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_TERMINATION 7
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
+#define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
 
 static const short packetTypesGen3[] = {
     0x1407, // Request IDR frame
@@ -1053,9 +1054,19 @@ int stopControlStream(void) {
     }
 
     if (peer != NULL) {
-        // We use enet_peer_disconnect_now() so the host knows immediately
-        // of our termination and can cleanup properly for reconnection.
-        enet_peer_disconnect_now(peer, 0);
+        if (UserRequestedTermination) {
+            // Gracefully disconnect to ensure the remote host receives all of our final
+            // outbound traffic, including any key up events that might be sent.
+            gracefullyDisconnectEnetPeer(client, peer, CONTROL_STREAM_LINGER_TIMEOUT_SEC * 1000);
+            enet_peer_reset(peer);
+        }
+        else {
+            // This termination was requested by the remote host or caused due to a
+            // connection problem, so just do a quick abortive disconnect. The peer
+            // may be gone by this point.
+            enet_peer_disconnect_now(peer, 0);
+        }
+
         peer = NULL;
     }
     if (client != NULL) {

@@ -31,6 +31,7 @@ extern OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
 extern bool AudioEncryptionEnabled;
+extern bool UserRequestedTermination;
 
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
@@ -63,6 +64,7 @@ extern bool AudioEncryptionEnabled;
 #define MAGIC_BYTE_FROM_AUDIO_CONFIG(x) ((x) & 0xFF)
 
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
+int gracefullyDisconnectEnetPeer(ENetHost* host, ENetPeer* peer, enet_uint32 lingerTimeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
 bool isReferenceFrameInvalidationEnabled(void);
 void* extendBuffer(void* ptr, size_t newSize);
