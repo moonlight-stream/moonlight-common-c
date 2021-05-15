@@ -683,12 +683,15 @@ static void controlReceiveThreadFunc(void* context) {
                 }
             }
             else {
-                // No events ready - sleep for a short time
+                // No events ready - wait for readability.
                 //
-                // NOTE: This sleep *directly* impacts the lowest possible retransmission
+                // NOTE: This wait *directly* impacts the lowest possible retransmission
                 // time for packets after a loss event. If we're busy sleeping here, we can't
                 // retransmit a dropped packet, so we keep the sleep time to a minimum.
-                PltSleepMsInterruptible(&controlReceiveThread, 10);
+                //
+                // TODO: Dynamically sleep until next RTO rather than waking every 10 ms
+                enet_uint32 condition = ENET_SOCKET_WAIT_RECEIVE;
+                enet_socket_wait(client->socket, &condition, 10);
                 continue;
             }
         }
