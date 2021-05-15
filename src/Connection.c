@@ -24,7 +24,6 @@ OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
 int AudioPacketDuration;
 bool AudioEncryptionEnabled;
-bool UserRequestedTermination;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -56,12 +55,6 @@ void LiInterruptConnection(void) {
 
 // Stop the connection by undoing the step at the current stage and those before it
 void LiStopConnection(void) {
-    // If this was a fully complete connection and we haven't started any termination
-    // logic prior to this point, this termination is user requested.
-    if (stage == STAGE_MAX - 1 && !alreadyTerminated) {
-        UserRequestedTermination = true;
-    }
-
     // Disable termination callbacks now
     alreadyTerminated = true;
 
@@ -200,7 +193,6 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     alreadyTerminated = false;
     ConnectionInterrupted = false;
-    UserRequestedTermination = false;
     
     // Validate the audio configuration
     if (MAGIC_BYTE_FROM_AUDIO_CONFIG(StreamConfig.audioConfiguration) != 0xCA ||

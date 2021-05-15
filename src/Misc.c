@@ -38,37 +38,45 @@ int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs) {
 // This function performs a graceful disconnect, including lingering until outbound
 // traffic is acked (up until the linger timeout elapses).
 int gracefullyDisconnectEnetPeer(ENetHost* host, ENetPeer* peer, enet_uint32 lingerTimeoutMs) {
-    ENetEvent event;
-    int err;
+    // Check if this peer is currently alive. We won't get another ENET_EVENT_TYPE_DISCONNECT
+    // event from ENet if the peer is dead. In that case, we'll do an abortive disconnect.
+    if (peer->state == ENET_PEER_STATE_CONNECTED) {
+        ENetEvent event;
+        int err;
 
-    // Begin the disconnection process. If this peer is already a zombie, we'll get an
-    // immediate disconnect event that will complete the process. If it's still alive,
-    // we'll get the disconnect event after all outgoing messages have been acked.
-    enet_peer_disconnect_later(peer, 0);
+        // Begin the disconnection process. We'll get ENET_EVENT_TYPE_DISCONNECT once
+        // the peer acks all outstanding reliable sends.
+        enet_peer_disconnect_later(peer, 0);
 
-    // We must use the internal function which lets us ignore pending interrupts.
-    while ((err = serviceEnetHostInternal(host, &event, lingerTimeoutMs, true)) > 0) {
-        switch (event.type) {
-        case ENET_EVENT_TYPE_RECEIVE:
-            enet_packet_destroy(event.packet);
-            break;
-        case ENET_EVENT_TYPE_DISCONNECT:
-            Limelog("ENet peer disconnection is complete\n");
-            return 0;
-        default:
-            LC_ASSERT(false);
-            break;
+        // We must use the internal function which lets us ignore pending interrupts.
+        while ((err = serviceEnetHostInternal(host, &event, lingerTimeoutMs, true)) > 0) {
+            switch (event.type) {
+            case ENET_EVENT_TYPE_RECEIVE:
+                enet_packet_destroy(event.packet);
+                break;
+            case ENET_EVENT_TYPE_DISCONNECT:
+                Limelog("ENet peer acknowledged disconnection\n");
+                return 0;
+            default:
+                LC_ASSERT(false);
+                break;
+            }
         }
-    }
 
-    if (err == 0) {
-        Limelog("Timed out waiting for ENet peer to acknowledge disconnection\n");
+        if (err == 0) {
+            Limelog("Timed out waiting for ENet peer to acknowledge disconnection\n");
+        }
+        else {
+            Limelog("Failed to receive ENet peer disconnection acknowledgement\n");
+        }
+
+        return -1;
     }
     else {
-        Limelog("Failed to receive ENet peer disconnection acknowledgement\n");
+        Limelog("ENet peer is already disconnected\n");
+        enet_peer_disconnect_now(peer, 0);
+        return 0;
     }
-
-    return -1;
 }
 
 int extractVersionQuadFromString(const char* string, int* quad) {

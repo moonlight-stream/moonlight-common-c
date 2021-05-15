@@ -31,7 +31,6 @@ extern OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
 extern bool AudioEncryptionEnabled;
-extern bool UserRequestedTermination;
 
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF

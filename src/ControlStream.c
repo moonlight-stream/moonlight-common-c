@@ -834,7 +834,13 @@ static void controlReceiveThreadFunc(void* context) {
                 // GFE 3.20.3.63 we don't get one for 10 seconds after we first get
                 // this termination message. The termination message should be reliable
                 // enough to end the stream now, rather than waiting for an explicit
-                // disconnect.
+                // disconnect. The server will also not acknowledge our disconnect
+                // message once it sends this message, so we mark the peer as fully
+                // disconnected now to avoid delays waiting for an ack that will
+                // never arrive.
+                PltLockMutex(&enetMutex);
+                enet_peer_disconnect_now(peer, 0);
+                PltUnlockMutex(&enetMutex);
                 ListenerCallbacks.connectionTerminated((int)terminationErrorCode);
                 free(ctlHdr);
                 return;
@@ -1054,19 +1060,9 @@ int stopControlStream(void) {
     }
 
     if (peer != NULL) {
-        if (UserRequestedTermination) {
-            // Gracefully disconnect to ensure the remote host receives all of our final
-            // outbound traffic, including any key up events that might be sent.
-            gracefullyDisconnectEnetPeer(client, peer, CONTROL_STREAM_LINGER_TIMEOUT_SEC * 1000);
-            enet_peer_reset(peer);
-        }
-        else {
-            // This termination was requested by the remote host or caused due to a
-            // connection problem, so just do a quick abortive disconnect. The peer
-            // may be gone by this point.
-            enet_peer_disconnect_now(peer, 0);
-        }
-
+        // Gracefully disconnect to ensure the remote host receives all of our final
+        // outbound traffic, including any key up events that might be sent.
+        gracefullyDisconnectEnetPeer(client, peer, CONTROL_STREAM_LINGER_TIMEOUT_SEC * 1000);
         peer = NULL;
     }
     if (client != NULL) {
