@@ -168,6 +168,12 @@ static int addGen5Options(PSDP_OPTION* head) {
         // Ask for the encrypted control protocol to ensure remote input will be encrypted.
         // This used to be done via separate RI encryption, but now it is all or nothing.
         err |= addAttributeString(head, "x-nv-general.useReliableUdp", "13");
+
+        // Require at least 2 FEC packets for small frames. If a frame has fewer data shards
+        // than would generate 2 FEC shards, it will increase the FEC percentage for that frame
+        // above the set value (even going as high as 200% FEC to generate 2 FEC shards from a
+        // 1 data shard frame).
+        err |= addAttributeString(head, "x-nv-vqos[0].fec.minRequiredFecPackets", "2");
     }
     else {
         // We want to use the new ENet connections for control and input
