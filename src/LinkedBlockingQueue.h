@@ -20,6 +20,7 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     int sizeBound;
     int currentSize;
     bool shutdown;
+    bool draining;
     int lifetimeSize;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
@@ -33,4 +34,5 @@ int LbqPeekQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead);
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead);
 void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead);
+void LbqSignalQueueDrain(PLINKED_BLOCKING_QUEUE queueHead);
 int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead);
