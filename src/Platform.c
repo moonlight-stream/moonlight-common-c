@@ -167,7 +167,6 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltJoinThread(PLT_THREAD* thread) {
-    LC_ASSERT(thread->cancelled);
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
 #elif defined(__vita__)

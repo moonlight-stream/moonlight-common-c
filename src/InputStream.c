@@ -364,14 +364,12 @@ int stopInputStream(void) {
     // Signal the input send thread to drain all pending
     // input packets before shutting down.
     LbqSignalQueueDrain(&packetQueue);
+    PltJoinThread(&inputSendThread);
+    PltCloseThread(&inputSendThread);
 
     if (inputSock != INVALID_SOCKET) {
         shutdownTcpSocket(inputSock);
     }
-
-    PltInterruptThread(&inputSendThread);
-    PltJoinThread(&inputSendThread);
-    PltCloseThread(&inputSendThread);
     
     if (inputSock != INVALID_SOCKET) {
         closeSocket(inputSock);
