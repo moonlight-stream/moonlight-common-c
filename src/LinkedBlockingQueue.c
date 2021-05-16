@@ -184,9 +184,14 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     }
 
     for (;;) {
-        err = PltWaitForEvent(&queueHead->containsDataEvent);
-        if (err != PLT_WAIT_SUCCESS) {
-            return LBQ_INTERRUPTED;
+        // We can also avoid a syscall if the head pointer is non-NULL.
+        // It's not safe to dereference the value due to potential memory
+        // ordering hazards, but we can use its presence to elide the wait.
+        if (queueHead->head == NULL) {
+            err = PltWaitForEvent(&queueHead->containsDataEvent);
+            if (err != PLT_WAIT_SUCCESS) {
+                return LBQ_INTERRUPTED;
+            }
         }
 
         if (queueHead->shutdown) {
