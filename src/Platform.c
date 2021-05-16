@@ -100,7 +100,7 @@ void* ThreadProc(void* context) {
 
 void PltSleepMs(int ms) {
 #if defined(LC_WINDOWS)
-    WaitForSingleObjectEx(GetCurrentThread(), ms, FALSE);
+    SleepEx(ms, FALSE);
 #elif defined(__vita__)
     sceKernelDelayThread(ms * 1000);
 #else
