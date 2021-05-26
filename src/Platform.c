@@ -33,12 +33,10 @@ typedef struct tagTHREADNAME_INFO
 typedef HRESULT (WINAPI *SetThreadDescription_t)(HANDLE, PCWSTR);
 
 void setThreadNameWin32(const char* name) {
-    HMODULE hKernel32;
     SetThreadDescription_t setThreadDescriptionFunc;
 
     // This function is only supported on Windows 10 RS1 and later
-    hKernel32 = LoadLibraryA("kernel32.dll");
-    setThreadDescriptionFunc = (SetThreadDescription_t)GetProcAddress(hKernel32, "SetThreadDescription");
+    setThreadDescriptionFunc = (SetThreadDescription_t)GetProcAddress(GetModuleHandleA("kernel32.dll"), "SetThreadDescription");
     if (setThreadDescriptionFunc != NULL) {
         WCHAR nameW[16];
         size_t chars;
@@ -46,7 +44,6 @@ void setThreadNameWin32(const char* name) {
         mbstowcs_s(&chars, nameW, ARRAYSIZE(nameW), name, _TRUNCATE);
         setThreadDescriptionFunc(GetCurrentThread(), nameW);
     }
-    FreeLibrary(hKernel32);
 
 #ifdef _MSC_VER
     // This method works on legacy OSes and older tools not updated to use SetThreadDescription yet,
