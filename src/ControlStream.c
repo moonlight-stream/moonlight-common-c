@@ -520,7 +520,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
             return false;
         }
 
-        PltUnlockMutex(&enetMutex);
+        // enetMutex still locked here
     }
     else {
         PNVCTL_ENET_PACKET_HEADER_V1 packet;
@@ -532,12 +532,18 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
         packet = (PNVCTL_ENET_PACKET_HEADER_V1)enetPacket->data;
         packet->type = LE16(ptype);
         memcpy(&packet[1], payload, paylen);
+
+        PltLockMutex(&enetMutex);
     }
 
-    PltLockMutex(&enetMutex);
+    // Queue the packet to be sent
     err = enet_peer_send(peer, 0, enetPacket);
+
+    // Actually send it
     enet_host_service(client, NULL, 0);
+
     PltUnlockMutex(&enetMutex);
+
     if (err < 0) {
         Limelog("Failed to send ENet control packet\n");
         enet_packet_destroy(enetPacket);
