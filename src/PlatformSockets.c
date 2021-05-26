@@ -56,10 +56,14 @@ void shutdownTcpSocket(SOCKET s) {
 
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
 #if defined(LC_WINDOWS)
-    // Windows says that SO_RCVTIMEO puts the socket
-    // into an indeterminate state, so we won't use
-    // it for non-fatal socket operations.
-    return -1;
+    // Windows says that SO_RCVTIMEO puts the socket into an indeterminate state
+    // when a timeout occurs. MSDN doesn't go into it any more than that, but it
+    // seems likely that they are referring to the inability to know whether a
+    // cancelled request consumed some data or not (very relevant for stream-based
+    // protocols like TCP). Since our sockets are UDP which is already unreliable,
+    // losing some data in a very rare case is fine, especially because we get to
+    // halve the number of syscalls per packet by avoiding select().
+    return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeoutMs, sizeof(timeoutMs));
 #else
     struct timeval val;
 
@@ -195,7 +199,8 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
             if (err < 0 &&
                     (LastSocketError() == EWOULDBLOCK ||
                      LastSocketError() == EINTR ||
-                     LastSocketError() == EAGAIN)) {
+                     LastSocketError() == EAGAIN ||
+                     LastSocketError() == ETIMEDOUT)) {
                 // Return 0 for timeout
                 return 0;
             }
