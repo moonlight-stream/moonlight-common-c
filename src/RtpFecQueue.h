@@ -3,14 +3,13 @@
 #include "Video.h"
 
 typedef struct _RTPFEC_QUEUE_ENTRY {
-    PRTP_PACKET packet;
-    int length;
-    bool isParity;
-    uint64_t receiveTimeMs;
-    uint32_t presentationTimeMs;
-
     struct _RTPFEC_QUEUE_ENTRY* next;
     struct _RTPFEC_QUEUE_ENTRY* prev;
+    PRTP_PACKET packet;
+    uint64_t receiveTimeMs;
+    uint32_t presentationTimeMs;
+    int length;
+    bool isParity;
 } RTPFEC_QUEUE_ENTRY, *PRTPFEC_QUEUE_ENTRY;
 
 typedef struct _RTPFEC_QUEUE_LIST {

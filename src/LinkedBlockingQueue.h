@@ -17,13 +17,13 @@ typedef struct _LINKED_BLOCKING_QUEUE_ENTRY {
 typedef struct _LINKED_BLOCKING_QUEUE {
     PLT_MUTEX mutex;
     PLT_EVENT containsDataEvent;
-    int sizeBound;
-    int currentSize;
-    bool shutdown;
-    bool draining;
-    int lifetimeSize;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
+    int sizeBound;
+    int currentSize;
+    int lifetimeSize;
+    bool shutdown;
+    bool draining;
 } LINKED_BLOCKING_QUEUE, *PLINKED_BLOCKING_QUEUE;
 
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound);

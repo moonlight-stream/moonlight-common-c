@@ -11,11 +11,11 @@ typedef struct evp_cipher_ctx_st EVP_CIPHER_CTX;
 
 typedef struct _PLT_CRYPTO_CONTEXT {
 #ifdef USE_MBEDTLS
-    bool initialized;
     mbedtls_cipher_context_t ctx;
-#else
     bool initialized;
+#else
     EVP_CIPHER_CTX* ctx;
+    bool initialized;
 #endif
 } PLT_CRYPTO_CONTEXT, *PPLT_CRYPTO_CONTEXT;
 

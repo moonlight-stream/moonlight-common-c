@@ -15,16 +15,16 @@ typedef struct _RTP_QUEUE_ENTRY {
 } RTP_QUEUE_ENTRY, *PRTP_QUEUE_ENTRY;
 
 typedef struct _RTP_REORDER_QUEUE {
-    int maxSize;
-    uint32_t maxQueueTimeMs;
-
     PRTP_QUEUE_ENTRY queueHead;
     PRTP_QUEUE_ENTRY queueTail;
-    int queueSize;
-
-    unsigned short nextRtpSequenceNumber;
 
     uint64_t oldestQueuedTimeMs;
+
+    uint32_t maxQueueTimeMs;
+    int maxSize;
+    int queueSize;
+
+    uint16_t nextRtpSequenceNumber;
 } RTP_REORDER_QUEUE, *PRTP_REORDER_QUEUE;
 
 #define RTPQ_RET_PACKET_CONSUMED 0x1
