@@ -57,8 +57,6 @@ void PltSetEvent(PLT_EVENT* event);
 void PltClearEvent(PLT_EVENT* event);
 int PltWaitForEvent(PLT_EVENT* event);
 
-void PltRunThreadProc(void);
-
 #define PLT_WAIT_SUCCESS 0
 #define PLT_WAIT_INTERRUPTED 1
 
