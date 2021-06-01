@@ -213,9 +213,11 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
     }
 
     int res = reed_solomon_reconstruct(queue->rs, shards, block->marks, RTPA_TOTAL_SHARDS, block->blockSize);
-
-    // We should always have enough data to recover the entire block since we checked above.
-    LC_ASSERT(res == 0);
+    if (res != 0) {
+        // We should always have enough data to recover the entire block since we checked above.
+        LC_ASSERT(res == 0);
+        return false;
+    }
 
     // We will need to recover the RTP packet using the FEC header
     for (int i = 0; i < RTPA_DATA_SHARDS; i++) {
