@@ -1,5 +1,19 @@
 #include "Limelight-internal.h"
 
+#ifdef LC_DEBUG
+// This enables FEC validation mode with a synthetic drop
+// and recovered packet checks vs the original input. It
+// is on by default for debug builds.
+//
+// NB: Unlike the video FEC feature of the same name, this
+// is much more restrictive in terms of when the validation
+// runs. Due to the logic to immediately return in-order
+// data packets, it requires non-consecutive data packets to
+// trigger the call to completeFecBlock(). Missing or OOO
+// packets will do the job.
+#define FEC_VALIDATION_MODE
+#endif
+
 void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     memset(queue, 0, sizeof(*queue));
     queue->maxQueueTimeMs = RTPQ_DEFAULT_QUEUE_TIME;
@@ -193,16 +207,24 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
     uint8_t* shards[RTPA_TOTAL_SHARDS];
 
-    // If we don't have enough shards, we can't do anything
+    // If we don't have enough shards, we can't do anything.
+    // FEC validation mode requires one additional shard.
+#ifdef FEC_VALIDATION_MODE
+    if (block->dataShardsReceived + block->fecShardsReceived < RTPA_DATA_SHARDS + 1) {
+#else
     if (block->dataShardsReceived + block->fecShardsReceived < RTPA_DATA_SHARDS) {
+#endif
         return false;
     }
 
     // If we have all data shards, don't bother with any recovery
+    // unless we're in FEC validation mode
     LC_ASSERT(block->dataShardsReceived <= RTPA_DATA_SHARDS);
+#ifndef FEC_VALIDATION_MODE
     if (block->dataShardsReceived == RTPA_DATA_SHARDS) {
         return true;
     }
+#endif
 
     // We have recovery to do. Let's build the array.
     for (int i = 0; i < RTPA_DATA_SHARDS; i++) {
@@ -211,6 +233,23 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
     for (int i = 0; i < RTPA_FEC_SHARDS; i++) {
         shards[RTPA_DATA_SHARDS + i] = block->fecPackets[i];
     }
+
+#ifdef FEC_VALIDATION_MODE
+    unsigned int dropIndex;
+
+    // Choose a successfully received packet to drop
+    do {
+        dropIndex = rand() % RTPA_DATA_SHARDS;
+    } while (block->marks[dropIndex]);
+
+    // Copy the original data to validate later
+    PRTP_PACKET droppedRtpPacket = malloc(sizeof(RTP_PACKET) + block->blockSize);
+    memcpy(droppedRtpPacket, block->dataPackets[dropIndex], sizeof(RTP_PACKET) + block->blockSize);
+
+    // Fake the drop by setting the mark bit and zeroing the "missing" packet
+    block->marks[dropIndex] = 1;
+    memset(block->dataPackets[dropIndex], 0, sizeof(RTP_PACKET) + block->blockSize);
+#endif
 
     int res = reed_solomon_reconstruct(queue->rs, shards, block->marks, RTPA_TOTAL_SHARDS, block->blockSize);
     if (res != 0) {
@@ -231,6 +270,33 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
             block->marks[i] = 0;
         }
     }
+
+#ifdef FEC_VALIDATION_MODE
+    // Check the RTP header values
+    LC_ASSERT(block->dataPackets[dropIndex]->header == droppedRtpPacket->header);
+    LC_ASSERT(block->dataPackets[dropIndex]->packetType == droppedRtpPacket->packetType);
+    LC_ASSERT(block->dataPackets[dropIndex]->sequenceNumber == droppedRtpPacket->sequenceNumber);
+    LC_ASSERT(block->dataPackets[dropIndex]->timestamp == droppedRtpPacket->timestamp);
+    LC_ASSERT(block->dataPackets[dropIndex]->ssrc == droppedRtpPacket->ssrc);
+
+    // Check the data itself - use memcmp() and only loop if an error is detected
+    if (memcmp(block->dataPackets[dropIndex] + 1, droppedRtpPacket + 1, block->blockSize)) {
+        unsigned char* actualData = (unsigned char*)(block->dataPackets[dropIndex] + 1);
+        unsigned char* expectedData = (unsigned char*)(droppedRtpPacket + 1);
+        int recoveryErrors = 0;
+
+        for (int j = 0; j < block->blockSize; j++) {
+            if (actualData[j] != expectedData[j]) {
+                Limelog("Recovery error at %d: expected 0x%02x, actual 0x%02x\n",
+                        j, expectedData[j], actualData[j]);
+                recoveryErrors++;
+            }
+        }
+
+        LC_ASSERT(recoveryErrors == 0);
+    }
+    free(droppedRtpPacket);
+#endif
 
     return true;
 }
@@ -341,6 +407,7 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         fecBlock->fullyReassembled = true;
     }
 
+    // The completed FEC block may have readied a packet
     if (queueHasPacketReady(queue)) {
         return RTPQ_RET_PACKET_READY;
     }
