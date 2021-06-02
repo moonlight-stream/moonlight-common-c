@@ -326,7 +326,7 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         fecBlock->nextDataPacketIndex++;
 
         // If we've returned all packets in this FEC block, free it.
-        if (queue->nextRtpSequenceNumber == fecBlock->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS) {
+        if (queue->nextRtpSequenceNumber == U16(fecBlock->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS)) {
             LC_ASSERT(fecBlock == queue->blockHead);
             LC_ASSERT(fecBlock->nextDataPacketIndex == RTPA_DATA_SHARDS);
             freeFecBlockHead(queue);
