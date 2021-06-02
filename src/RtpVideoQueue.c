@@ -8,7 +8,7 @@
 #define FEC_VALIDATION_MODE
 #endif
 
-void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
+void RtpvInitializeQueue(PRTP_VIDEO_QUEUE queue) {
     reed_solomon_init();
     memset(queue, 0, sizeof(*queue));
     
@@ -17,9 +17,9 @@ void RtpfInitializeQueue(PRTP_FEC_QUEUE queue) {
     queue->multiFecCapable = APP_VERSION_AT_LEAST(7, 1, 431);
 }
 
-static void purgeListEntries(PRTPFEC_QUEUE_LIST list) {
+static void purgeListEntries(PRTPV_QUEUE_LIST list) {
     while (list->head != NULL) {
-        PRTPFEC_QUEUE_ENTRY entry = list->head;
+        PRTPV_QUEUE_ENTRY entry = list->head;
         list->head = entry->next;
         free(entry->packet);
     }
@@ -28,12 +28,12 @@ static void purgeListEntries(PRTPFEC_QUEUE_LIST list) {
     list->count = 0;
 }
 
-void RtpfCleanupQueue(PRTP_FEC_QUEUE queue) {
+void RtpvCleanupQueue(PRTP_VIDEO_QUEUE queue) {
     purgeListEntries(&queue->pendingFecBlockList);
     purgeListEntries(&queue->completedFecBlockList);
 }
 
-static void insertEntryIntoList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY entry) {
+static void insertEntryIntoList(PRTPV_QUEUE_LIST list, PRTPV_QUEUE_ENTRY entry) {
     LC_ASSERT(entry->prev == NULL);
     LC_ASSERT(entry->next == NULL);
 
@@ -44,7 +44,7 @@ static void insertEntryIntoList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY ent
     }
     else {
         LC_ASSERT(list->count != 0);
-        PRTPFEC_QUEUE_ENTRY oldTail = list->tail;
+        PRTPV_QUEUE_ENTRY oldTail = list->tail;
         entry->prev = oldTail;
         LC_ASSERT(oldTail->next == NULL);
         oldTail->next = entry;
@@ -54,7 +54,7 @@ static void insertEntryIntoList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY ent
     list->count++;
 }
 
-static void removeEntryFromList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY entry) {
+static void removeEntryFromList(PRTPV_QUEUE_LIST list, PRTPV_QUEUE_ENTRY entry) {
     LC_ASSERT(entry != NULL);
     LC_ASSERT(list->count != 0);
     LC_ASSERT(list->head != NULL);
@@ -83,8 +83,8 @@ static void removeEntryFromList(PRTPFEC_QUEUE_LIST list, PRTPFEC_QUEUE_ENTRY ent
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static bool queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, PRTP_PACKET packet, int length, bool isParity) {
-    PRTPFEC_QUEUE_ENTRY entry;
+static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP_PACKET packet, int length, bool isParity) {
+    PRTPV_QUEUE_ENTRY entry;
     
     LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextContiguousSequenceNumber));
 
@@ -129,7 +129,7 @@ static bool queuePacket(PRTP_FEC_QUEUE queue, PRTPFEC_QUEUE_ENTRY newEntry, PRTP
     continue
 
 // Returns 0 if the frame is completely constructed
-static int reconstructFrame(PRTP_FEC_QUEUE queue) {
+static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     unsigned int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
     int ret;
     
@@ -184,7 +184,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     memset(marks, 1, sizeof(char) * (totalPackets));
     
     int receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    int packetBufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
+    int packetBufferSize = receiveSize + sizeof(RTPV_QUEUE_ENTRY);
 
 #ifdef FEC_VALIDATION_MODE
     // Choose a packet to drop
@@ -193,7 +193,7 @@ static int reconstructFrame(PRTP_FEC_QUEUE queue) {
     int droppedRtpPacketLength = 0;
 #endif
 
-    PRTPFEC_QUEUE_ENTRY entry = queue->pendingFecBlockList.head;
+    PRTPV_QUEUE_ENTRY entry = queue->pendingFecBlockList.head;
     while (entry != NULL) {
         unsigned int index = U16(entry->packet->sequenceNumber - queue->bufferLowestSequenceNumber);
 
@@ -241,7 +241,7 @@ cleanup_packets:
         if (marks[i]) {
             // Only submit frame data, not FEC packets
             if (ret == 0 && i < queue->bufferDataPackets) {
-                PRTPFEC_QUEUE_ENTRY queueEntry = (PRTPFEC_QUEUE_ENTRY)&packets[i][receiveSize];
+                PRTPV_QUEUE_ENTRY queueEntry = (PRTPV_QUEUE_ENTRY)&packets[i][receiveSize];
                 PRTP_PACKET rtpPacket = (PRTP_PACKET) packets[i];
                 rtpPacket->sequenceNumber = U16(i + queue->bufferLowestSequenceNumber);
                 rtpPacket->header = queue->pendingFecBlockList.head->packet->header;
@@ -353,11 +353,11 @@ cleanup:
     return ret;
 }
 
-static void stageCompleteFecBlock(PRTP_FEC_QUEUE queue) {
+static void stageCompleteFecBlock(PRTP_VIDEO_QUEUE queue) {
     unsigned int nextSeqNum = queue->bufferLowestSequenceNumber;
 
     while (queue->pendingFecBlockList.count > 0) {
-        PRTPFEC_QUEUE_ENTRY entry = queue->pendingFecBlockList.head;
+        PRTPV_QUEUE_ENTRY entry = queue->pendingFecBlockList.head;
 
         unsigned int lowestRtpSequenceNumber = entry->packet->sequenceNumber;
 
@@ -367,7 +367,7 @@ static void stageCompleteFecBlock(PRTP_FEC_QUEUE queue) {
 
             // Never return parity packets
             if (entry->isParity) {
-                PRTPFEC_QUEUE_ENTRY parityEntry = entry;
+                PRTPV_QUEUE_ENTRY parityEntry = entry;
 
                 // Skip this entry
                 entry = parityEntry->next;
@@ -414,9 +414,9 @@ static void stageCompleteFecBlock(PRTP_FEC_QUEUE queue) {
     }
 }
 
-static void submitCompletedFrame(PRTP_FEC_QUEUE queue) {
+static void submitCompletedFrame(PRTP_VIDEO_QUEUE queue) {
     while (queue->completedFecBlockList.count > 0) {
-        PRTPFEC_QUEUE_ENTRY entry = queue->completedFecBlockList.head;
+        PRTPV_QUEUE_ENTRY entry = queue->completedFecBlockList.head;
 
         // Parity packets should have been removed by stageCompleteFecBlock()
         LC_ASSERT(!entry->isParity);
@@ -427,7 +427,7 @@ static void submitCompletedFrame(PRTP_FEC_QUEUE queue) {
     }
 }
 
-int RtpfAddPacket(PRTP_FEC_QUEUE queue, PRTP_PACKET packet, int length, PRTPFEC_QUEUE_ENTRY packetEntry) {
+int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_QUEUE_ENTRY packetEntry) {
     if (isBefore16(packet->sequenceNumber, queue->nextContiguousSequenceNumber)) {
         // Reject packets behind our current buffer window
         return RTPF_RET_REJECTED;

@@ -8,7 +8,7 @@
 
 #define RTP_RECV_BUFFER (512 * 1024)
 
-static RTP_FEC_QUEUE rtpQueue;
+static RTP_VIDEO_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 static SOCKET firstFrameSocket = INVALID_SOCKET;
@@ -30,7 +30,7 @@ static bool receivedFullFrame;
 // Initialize the video stream
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
-    RtpfInitializeQueue(&rtpQueue); //TODO RTP_QUEUE_DELAY
+    RtpvInitializeQueue(&rtpQueue);
     receivedDataFromPeer = false;
     firstDataTimeMs = 0;
     receivedFullFrame = false;
@@ -39,7 +39,7 @@ void initializeVideoStream(void) {
 // Clean up the video stream
 void destroyVideoStream(void) {
     destroyVideoDepacketizer();
-    RtpfCleanupQueue(&rtpQueue);
+    RtpvCleanupQueue(&rtpQueue);
 }
 
 // UDP Ping proc
@@ -71,7 +71,7 @@ static void ReceiveThreadProc(void* context) {
     int waitingForVideoMs;
 
     receiveSize = StreamConfig.packetSize + MAX_RTP_HEADER_SIZE;
-    bufferSize = receiveSize + sizeof(RTPFEC_QUEUE_ENTRY);
+    bufferSize = receiveSize + sizeof(RTPV_QUEUE_ENTRY);
     buffer = NULL;
 
     if (setNonFatalRecvTimeoutMs(rtpSocket, UDP_RECV_POLL_TIMEOUT_MS) < 0) {
@@ -141,7 +141,7 @@ static void ReceiveThreadProc(void* context) {
         packet->timestamp = BE32(packet->timestamp);
         packet->ssrc = BE32(packet->ssrc);
 
-        queueStatus = RtpfAddPacket(&rtpQueue, packet, err, (PRTPFEC_QUEUE_ENTRY)&buffer[receiveSize]);
+        queueStatus = RtpvAddPacket(&rtpQueue, packet, err, (PRTPV_QUEUE_ENTRY)&buffer[receiveSize]);
 
         if (queueStatus == RTPF_RET_QUEUED) {
             // The queue owns the buffer

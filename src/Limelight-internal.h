@@ -7,8 +7,8 @@
 #include "PlatformCrypto.h"
 #include "Video.h"
 #include "Input.h"
-#include "RtpFecQueue.h"
 #include "RtpAudioQueue.h"
+#include "RtpVideoQueue.h"
 #include "ByteBuffer.h"
 
 #include <enet/enet.h>
@@ -88,7 +88,7 @@ int performRtspHandshake(void);
 
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);
-void queueRtpPacket(PRTPFEC_QUEUE_ENTRY queueEntry);
+void queueRtpPacket(PRTPV_QUEUE_ENTRY queueEntry);
 void stopVideoDepacketizer(void);
 void requestDecoderRefresh(void);
 
