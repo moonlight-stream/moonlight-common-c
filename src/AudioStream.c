@@ -288,24 +288,25 @@ static void ReceiveThreadProc(void* context) {
             if (RTPQ_PACKET_READY(queueStatus)) {
                 // If packets are ready, pull them and send them to the decoder
                 uint16_t length;
-                while ((packet = (PQUEUED_AUDIO_PACKET)RtpaGetQueuedPacket(&rtpAudioQueue, sizeof(QUEUED_AUDIO_PACKET_HEADER), &length)) != NULL) {
+                PQUEUED_AUDIO_PACKET queuedPacket;
+                while ((queuedPacket = (PQUEUED_AUDIO_PACKET)RtpaGetQueuedPacket(&rtpAudioQueue, sizeof(QUEUED_AUDIO_PACKET_HEADER), &length)) != NULL) {
                     // Populate header data (not preserved in queued packets)
-                    packet->header.size = length;
+                    queuedPacket->header.size = length;
 
                     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-                        if (!queuePacketToLbq(&packet)) {
+                        if (!queuePacketToLbq(&queuedPacket)) {
                             // An exit signal was received
                             break;
                         }
                     }
                     else {
-                        decodeInputData(packet);
-                        free(packet);
+                        decodeInputData(queuedPacket);
+                        free(queuedPacket);
                     }
                 }
                 
                 // Break on exit
-                if (packet != NULL) {
+                if (queuedPacket != NULL) {
                     break;
                 }
             }
