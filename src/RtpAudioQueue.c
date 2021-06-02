@@ -350,6 +350,19 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     if (enforceQueueConstraints(queue)) {
         // Return all available audio data even if there are discontinuities
         queue->blockHead->allowDiscontinuity = true;
+
+        // If the next packet in sequence was in an FEC block that we completely missed,
+        // bump the next RTP sequence number to match the beginning of the next block
+        // that we received data from.
+        //
+        // We could avoid setting allowDiscontinuity to see if we can recover the next
+        // block. I'm not sure if it makes sense though since we already waited for any
+        // packets from the last block. We probably want to get things moving rather than
+        // risk waiting a long time again and really starving the audio device.
+        if (isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
+            queue->nextRtpSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber;
+        }
+
         return RTPQ_RET_PACKET_READY;
     }
 
