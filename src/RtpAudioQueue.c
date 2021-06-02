@@ -263,7 +263,7 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
 }
 
 int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
-    LC_ASSERT(!queue->blockHead || queue->nextRtpSequenceNumber < queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS);
+    LC_ASSERT(!queue->blockHead || isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS));
 
     PRTPA_FEC_BLOCK fecBlock = getFecBlockForRtpPacket(queue, packet, length);
     if (fecBlock == NULL) {
