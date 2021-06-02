@@ -348,28 +348,41 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     // We don't have enough to proceed. Let's ensure we haven't
     // violated queue constraints with this FEC block.
     if (enforceQueueConstraints(queue)) {
-        // We need to discard this FEC block and point the next RTP sequence number to the next block
-        queue->nextRtpSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS;
-
-        // NOTE: Here we elect to just throw away the entire FEC block. We could play back the source
-        // data that we have, but this is easier. It's also unclear whether playback of partial data
-        // after a significant delay is actually worse than dropping it due to causing additional
-        // latency to accumulate in the audio pipeline.
-        freeFecBlockHead(queue);
+        // Return all available audio data even if there are discontinuities
+        queue->blockHead->allowDiscontinuity = true;
+        return RTPQ_RET_PACKET_READY;
     }
 
     return queueHasPacketReady(queue) ? RTPQ_RET_PACKET_READY : 0;
 }
 
 PRTP_PACKET RtpaGetQueuedPacket(PRTP_AUDIO_QUEUE queue, uint16_t customHeaderLength, uint16_t* length) {
-    PRTPA_FEC_BLOCK nextBlock = queue->blockHead;
+    // If we're returning audio data even with discontinuities, find the next data packet
+    if (queue->blockHead != NULL && queue->blockHead->allowDiscontinuity) {
+        PRTPA_FEC_BLOCK nextBlock = queue->blockHead;
 
-    if (nextBlock == NULL) {
-        return NULL;
+        while (nextBlock->nextDataPacketIndex < RTPA_DATA_SHARDS) {
+            LC_ASSERT(nextBlock->fecHeader.baseSequenceNumber + nextBlock->nextDataPacketIndex == queue->nextRtpSequenceNumber);
+            if (nextBlock->marks[nextBlock->nextDataPacketIndex]) {
+                // This packet is missing. Skip it.
+                nextBlock->nextDataPacketIndex++;
+                queue->nextRtpSequenceNumber++;
+            }
+            else {
+                LC_ASSERT(queueHasPacketReady(queue));
+                break;
+            }
+        }
+
+        // If we've read everything from this FEC block, remove and free it
+        if (nextBlock->nextDataPacketIndex == RTPA_DATA_SHARDS) {
+            freeFecBlockHead(queue);
+        }
     }
 
     // Return the next RTP sequence number by indexing into the most recent FEC block
     if (queueHasPacketReady(queue)) {
+        PRTPA_FEC_BLOCK nextBlock = queue->blockHead;
         PRTP_PACKET packet = malloc(customHeaderLength + sizeof(RTP_PACKET) + nextBlock->blockSize);
         if (packet == NULL) {
             return NULL;

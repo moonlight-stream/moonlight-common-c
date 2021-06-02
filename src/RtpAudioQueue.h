@@ -35,6 +35,7 @@ typedef struct _RTPA_FEC_BLOCK {
 
     // Used when dequeuing data from FEC blocks for the caller
     uint8_t nextDataPacketIndex;
+    bool allowDiscontinuity;
 
     uint16_t blockSize;
 
