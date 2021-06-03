@@ -388,6 +388,13 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         return 0;
     }
 
+    // Synchronize the nextRtpSequenceNumber and oldestRtpBaseSequenceNumber values
+    // when the connection begins. We want to always start on FEC block boundaries.
+    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
+        queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlock->fecHeader.baseSequenceNumber;
+        validateFecBlockState(queue);
+    }
+
     if (packet->packetType == 97) {
         uint16_t pos = packet->sequenceNumber - fecBlock->fecHeader.baseSequenceNumber;
 
@@ -403,6 +410,28 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         else {
             // This is a duplicate packet - reject it
             return 0;
+        }
+
+        // This is the common case - an in-order receive of the next data shard.
+        // We handle this quickly by telling the caller to immediately consume it.
+        if (packet->sequenceNumber == queue->nextRtpSequenceNumber) {
+            queue->nextRtpSequenceNumber = packet->sequenceNumber + 1;
+
+            // We are going to return this entry, so update the FEC block
+            // state to indicate that the caller has already received it.
+            fecBlock->nextDataPacketIndex++;
+
+            // If we've returned all packets in this FEC block, free it.
+            if (queue->nextRtpSequenceNumber == U16(fecBlock->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS)) {
+                LC_ASSERT(fecBlock == queue->blockHead);
+                LC_ASSERT(fecBlock->nextDataPacketIndex == RTPA_DATA_SHARDS);
+                freeFecBlockHead(queue);
+            }
+            else {
+                validateFecBlockState(queue);
+            }
+
+            return RTPQ_RET_HANDLE_NOW;
         }
     }
     else if (packet->packetType == 127) {
@@ -426,35 +455,6 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         // getFecBlockForRtpPacket() would have already failed
         LC_ASSERT(false);
         return 0;
-    }
-
-    // Synchronize the nextRtpSequenceNumber and oldestRtpBaseSequenceNumber values
-    // when the connection begins. We want to always start on FEC block boundaries.
-    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
-        queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlock->fecHeader.baseSequenceNumber;
-        validateFecBlockState(queue);
-    }
-
-    // This is the common case - an in-order receive of the next data shard.
-    // We handle this quickly by telling the caller to immediately consume it.
-    if (packet->sequenceNumber == queue->nextRtpSequenceNumber) {
-        queue->nextRtpSequenceNumber = packet->sequenceNumber + 1;
-
-        // We are going to return this entry, so update the FEC block
-        // state to indicate that the caller has already received it.
-        fecBlock->nextDataPacketIndex++;
-
-        // If we've returned all packets in this FEC block, free it.
-        if (queue->nextRtpSequenceNumber == U16(fecBlock->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS)) {
-            LC_ASSERT(fecBlock == queue->blockHead);
-            LC_ASSERT(fecBlock->nextDataPacketIndex == RTPA_DATA_SHARDS);
-            freeFecBlockHead(queue);
-        }
-        else {
-            validateFecBlockState(queue);
-        }
-
-        return RTPQ_RET_HANDLE_NOW;
     }
 
     // Try to complete the FEC block via data shards or data+FEC shards
