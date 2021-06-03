@@ -17,6 +17,11 @@ static unsigned short lastSeq;
 static bool receivedDataFromPeer;
 static uint64_t firstReceiveTime;
 
+#ifdef LC_DEBUG
+#define INVALID_OPUS_HEADER 0x00
+static uint8_t opusHeaderByte;
+#endif
+
 #define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 1400
@@ -71,6 +76,9 @@ int initializeAudioStream(void) {
     receivedDataFromPeer = false;
     firstReceiveTime = 0;
     audioDecryptionCtx = PltCreateCryptoContext();
+#ifdef LC_DEBUG
+    opusHeaderByte = INVALID_OPUS_HEADER;
+#endif
 
     // Copy and byte-swap the AV RI key ID used for the audio encryption IV
     memcpy(&avRiKeyId, StreamConfig.remoteInputAesIv, sizeof(avRiKeyId));
@@ -178,9 +186,36 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
             return;
         }
 
+#ifdef LC_DEBUG
+        if (opusHeaderByte == INVALID_OPUS_HEADER) {
+            opusHeaderByte = decryptedOpusData[0];
+            LC_ASSERT(opusHeaderByte != INVALID_OPUS_HEADER);
+        }
+        else {
+            // Opus header should stay constant for the entire stream.
+            // If it doesn't, it may indicate that the RtpAudioQueue
+            // incorrectly recovered a data shard or the decryption
+            // of the audio packet failed.
+            LC_ASSERT(decryptedOpusData[0] == opusHeaderByte);
+        }
+#endif
+
         AudioCallbacks.decodeAndPlaySample((char*)decryptedOpusData, dataLength);
     }
     else {
+#ifdef LC_DEBUG
+        if (opusHeaderByte == INVALID_OPUS_HEADER) {
+            opusHeaderByte = ((uint8_t*)(rtp + 1))[0];
+            LC_ASSERT(opusHeaderByte != INVALID_OPUS_HEADER);
+        }
+        else {
+            // Opus header should stay constant for the entire stream.
+            // If it doesn't, it may indicate that the RtpAudioQueue
+            // incorrectly recovered a data shard.
+            LC_ASSERT(((uint8_t*)(rtp + 1))[0] == opusHeaderByte);
+        }
+#endif
+
         AudioCallbacks.decodeAndPlaySample((char*)(rtp + 1), packet->header.size - sizeof(*rtp));
     }
 }
