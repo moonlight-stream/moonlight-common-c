@@ -102,10 +102,12 @@ static void freeFecBlockHead(PRTP_AUDIO_QUEUE queue) {
 
 void RtpaCleanupQueue(PRTP_AUDIO_QUEUE queue) {
     while (queue->blockHead != NULL) {
-        freeFecBlockHead(queue);
+        PRTPA_FEC_BLOCK block = queue->blockHead;
+        queue->blockHead = block->next;
+        free(block);
     }
 
-    LC_ASSERT(queue->blockTail == NULL);
+    queue->blockTail = NULL;
 
     reed_solomon_release(queue->rs);
     queue->rs = NULL;
