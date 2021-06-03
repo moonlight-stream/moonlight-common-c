@@ -135,20 +135,21 @@ void destroyAudioStream(void) {
 static bool queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
     int err;
 
-    err = LbqOfferQueueItem(&packetQueue, *packet, &(*packet)->header.lentry);
-    if (err == LBQ_SUCCESS) {
-        // The LBQ owns the buffer now
-        *packet = NULL;
-    }
-    else if (err == LBQ_BOUND_EXCEEDED) {
-        Limelog("Audio packet queue overflow\n");
-        freePacketList(LbqFlushQueueItems(&packetQueue));
-    }
-    else if (err == LBQ_INTERRUPTED) {
-        return false;
-    }
+    do {
+        err = LbqOfferQueueItem(&packetQueue, *packet, &(*packet)->header.lentry);
+        if (err == LBQ_SUCCESS) {
+            // The LBQ owns the buffer now
+            *packet = NULL;
+        }
+        else if (err == LBQ_BOUND_EXCEEDED) {
+            Limelog("Audio packet queue overflow\n");
 
-    return true;
+            // The audio queue is full, so free all existing items and try again
+            freePacketList(LbqFlushQueueItems(&packetQueue));
+        }
+    } while (err == LBQ_BOUND_EXCEEDED);
+
+    return err == LBQ_SUCCESS;
 }
 
 static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
@@ -309,6 +310,10 @@ static void ReceiveThreadProc(void* context) {
                     // An exit signal was received
                     break;
                 }
+                else {
+                    // Ownership should have been taken by the LBQ
+                    LC_ASSERT(packet == NULL);
+                }
             }
             else {
                 decodeInputData(packet);
@@ -331,7 +336,12 @@ static void ReceiveThreadProc(void* context) {
                     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                         if (!queuePacketToLbq(&queuedPacket)) {
                             // An exit signal was received
+                            free(queuedPacket);
                             break;
+                        }
+                        else {
+                            // Ownership should have been taken by the LBQ
+                            LC_ASSERT(queuedPacket == NULL);
                         }
                     }
                     else {
