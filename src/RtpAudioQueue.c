@@ -183,7 +183,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             // If the block is completed, don't return it
             return existingBlock->fullyReassembled ? NULL : existingBlock;
         }
-        else if (existingBlock->fecHeader.baseSequenceNumber > fecBlockBaseSeqNum) {
+        else if (isBefore16(fecBlockBaseSeqNum, existingBlock->fecHeader.baseSequenceNumber)) {
             // The new block goes right before this one
             break;
         }
@@ -428,14 +428,16 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         return 0;
     }
 
-    if ((queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) &&
-            packet->sequenceNumber != fecBlock->fecHeader.baseSequenceNumber) {
-        // Our first packet was not the start of an FEC block, so go ahead and queue it
-        // but ensure nextRtpSequenceNumber is set to the start of the FEC block.
-        queue->nextRtpSequenceNumber = fecBlock->fecHeader.baseSequenceNumber;
+    // Synchronize the nextRtpSequenceNumber and oldestRtpBaseSequenceNumber values
+    // when the connection begins. We want to always start on FEC block boundaries.
+    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
+        queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlock->fecHeader.baseSequenceNumber;
+        validateFecBlockState(queue);
     }
-    else if ((queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) ||
-        packet->sequenceNumber == queue->nextRtpSequenceNumber) {
+
+    // This is the common case - an in-order receive of the next data shard.
+    // We handle this quickly by telling the caller to immediately consume it.
+    if (packet->sequenceNumber == queue->nextRtpSequenceNumber) {
         queue->nextRtpSequenceNumber = packet->sequenceNumber + 1;
 
         // We are going to return this entry, so update the FEC block
