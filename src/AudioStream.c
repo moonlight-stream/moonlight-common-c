@@ -153,13 +153,17 @@ static bool queuePacketToLbq(PQUEUED_AUDIO_PACKET* packet) {
 }
 
 static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
-    PRTP_PACKET rtp;
+    // If the packet size is zero, this is a placeholder for a missing
+    // packet. Trigger packet loss concealment logic in libopus by
+    // invoking the decoder with a NULL buffer.
+    if (packet->header.size == 0) {
+        AudioCallbacks.decodeAndPlaySample(NULL, 0);
+        return;
+    }
 
-    rtp = (PRTP_PACKET)&packet->data[0];
+    PRTP_PACKET rtp = (PRTP_PACKET)&packet->data[0];
     if (lastSeq != 0 && (unsigned short)(lastSeq + 1) != rtp->sequenceNumber) {
         Limelog("Received OOS audio data (expected %d, but got %d)\n", lastSeq + 1, rtp->sequenceNumber);
-
-        AudioCallbacks.decodeAndPlaySample(NULL, 0);
     }
 
     lastSeq = rtp->sequenceNumber;

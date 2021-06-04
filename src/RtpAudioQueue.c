@@ -501,21 +501,31 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
 PRTP_PACKET RtpaGetQueuedPacket(PRTP_AUDIO_QUEUE queue, uint16_t customHeaderLength, uint16_t* length) {
     validateFecBlockState(queue);
 
-    // If we're returning audio data even with discontinuities, find the next data packet
+    // If we're returning audio data even with discontinuities, we'll fill in blank entries
+    // for packets that were lost and could not be recovered.
     if (queue->blockHead != NULL && queue->blockHead->allowDiscontinuity) {
         PRTPA_FEC_BLOCK nextBlock = queue->blockHead;
+        PRTP_PACKET lostPacket;
 
-        while (nextBlock->nextDataPacketIndex < RTPA_DATA_SHARDS) {
-            LC_ASSERT(nextBlock->fecHeader.baseSequenceNumber + nextBlock->nextDataPacketIndex == queue->nextRtpSequenceNumber);
-            if (nextBlock->marks[nextBlock->nextDataPacketIndex]) {
-                // This packet is missing. Skip it.
-                nextBlock->nextDataPacketIndex++;
-                queue->nextRtpSequenceNumber++;
+        LC_ASSERT(nextBlock->fecHeader.baseSequenceNumber + nextBlock->nextDataPacketIndex == queue->nextRtpSequenceNumber);
+        if (nextBlock->marks[nextBlock->nextDataPacketIndex]) {
+            // This packet is missing. Return an empty entry to let the caller
+            // know to perform packet loss concealment for this frame.
+            lostPacket = malloc(customHeaderLength);
+            if (lostPacket == NULL) {
+                return NULL;
             }
-            else {
-                LC_ASSERT(queueHasPacketReady(queue));
-                break;
-            }
+
+            // Lost packet placeholder entries have no associated data
+            *length = 0;
+
+            // Move on to the next data shard
+            nextBlock->nextDataPacketIndex++;
+            queue->nextRtpSequenceNumber++;
+        }
+        else {
+            lostPacket = NULL;
+            LC_ASSERT(queueHasPacketReady(queue));
         }
 
         // If we've read everything from this FEC block, remove and free it
@@ -524,6 +534,10 @@ PRTP_PACKET RtpaGetQueuedPacket(PRTP_AUDIO_QUEUE queue, uint16_t customHeaderLen
         }
         else {
             validateFecBlockState(queue);
+        }
+
+        if (lostPacket != NULL) {
+            return lostPacket;
         }
     }
 
