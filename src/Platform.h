@@ -24,6 +24,14 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <psp2/kernel/threadmgr.h>
+#elif defined(__WIIU__)
+#include <unistd.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <malloc.h>
+#include <coreinit/thread.h>
+#include <coreinit/mutex.h>
+#include <coreinit/condition.h>
 #else
 #include <unistd.h>
 #include <pthread.h>

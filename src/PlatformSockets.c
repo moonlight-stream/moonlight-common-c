@@ -64,6 +64,8 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
     // losing some data in a very rare case is fine, especially because we get to
     // halve the number of syscalls per packet by avoiding select().
     return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeoutMs, sizeof(timeoutMs));
+#elif defined(__WIIU__)
+    // timeouts aren't supported on Wii U
 #else
     struct timeval val;
 
@@ -75,6 +77,9 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
 }
 
 void setRecvTimeout(SOCKET s, int timeoutSec) {
+#ifdef __WIIU__
+    // timeouts aren't supported on Wii U
+#else
 #if defined(LC_WINDOWS)
     int val = timeoutSec * 1000;
 #else
@@ -86,6 +91,7 @@ void setRecvTimeout(SOCKET s, int timeoutSec) {
     if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&val, sizeof(val)) < 0) {
         Limelog("setsockopt(SO_RCVTIMEO) failed: %d\n", (int)LastSocketError());
     }
+#endif
 }
 
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
@@ -704,7 +710,7 @@ int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
-#elif defined(__vita__)
+#elif defined(__vita__) || defined(__WIIU__)
     return 0; // already initialized
 #elif defined(LC_POSIX) && !defined(LC_CHROME)
     // Disable SIGPIPE signals to avoid us getting

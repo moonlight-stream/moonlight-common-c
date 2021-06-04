@@ -122,6 +122,8 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
     if (*mutex < 0) {
         return -1;
     }
+#elif defined(__WIIU__)
+    OSInitMutex(mutex);
 #else
     int err = pthread_mutex_init(mutex, NULL);
     if (err != 0) {
@@ -138,6 +140,8 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
     // No-op to destroy a SRWLOCK
 #elif defined(__vita__)
     sceKernelDeleteMutex(*mutex);
+#elif defined(__WIIU__)
+
 #else
     pthread_mutex_destroy(mutex);
 #endif
@@ -148,6 +152,8 @@ void PltLockMutex(PLT_MUTEX* mutex) {
     AcquireSRWLockExclusive(mutex);
 #elif defined(__vita__)
     sceKernelLockMutex(*mutex, 1, NULL);
+#elif defined(__WIIU__)
+    OSLockMutex(mutex);
 #else
     pthread_mutex_lock(mutex);
 #endif
@@ -158,6 +164,8 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
     ReleaseSRWLockExclusive(mutex);
 #elif defined(__vita__)
     sceKernelUnlockMutex(*mutex, 1);
+#elif defined(__WIIU__)
+    OSUnlockMutex(mutex);
 #else
     pthread_mutex_unlock(mutex);
 #endif
@@ -172,6 +180,8 @@ void PltJoinThread(PLT_THREAD* thread) {
     }
     if (thread->context != NULL)
         free(thread->context);
+#elif defined(__WIIU__)
+    OSJoinThread(&thread->thread, NULL);
 #else
     pthread_join(thread->thread, NULL);
 #endif
@@ -193,6 +203,12 @@ bool PltIsThreadInterrupted(PLT_THREAD* thread) {
 void PltInterruptThread(PLT_THREAD* thread) {
     thread->cancelled = true;
 }
+
+#ifdef __WIIU__
+static void thread_deallocator(OSThread *thread, void *stack) {
+    free(stack);
+}
+#endif
 
 int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THREAD* thread) {
     struct thread_context* ctx;
@@ -228,6 +244,22 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
         }
         sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
     }
+#elif defined(__WIIU__)
+    int stack_size = 4 * 1024 * 1024;
+    void* stack_addr = (uint8_t *)memalign(8, stack_size) + stack_size;
+
+    if (!OSCreateThread(&thread->thread,
+                        (OSThreadEntryPointFn)ThreadProc,
+                        (int)ctx, NULL,
+                        stack_addr, stack_size,
+                        0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
+    {
+        free(ctx);
+        return -1;
+    }
+
+    OSSetThreadDeallocator(&thread->thread, thread_deallocator);
+    OSResumeThread(&thread->thread);
 #else
     {
         int err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
@@ -260,6 +292,9 @@ int PltCreateEvent(PLT_EVENT* event) {
         return -1;
     }
     event->signalled = false;
+#elif defined(__WIIU__)
+    OSInitMutex(&event->mutex);
+    OSInitCond(&event->cond);
 #else
     pthread_mutex_init(&event->mutex, NULL);
     pthread_cond_init(&event->cond, NULL);
@@ -276,6 +311,8 @@ void PltCloseEvent(PLT_EVENT* event) {
 #elif defined(__vita__)
     sceKernelDeleteCond(event->cond);
     sceKernelDeleteMutex(event->mutex);
+#elif defined(__WIIU__)
+
 #else
     pthread_mutex_destroy(&event->mutex);
     pthread_cond_destroy(&event->cond);
@@ -290,6 +327,11 @@ void PltSetEvent(PLT_EVENT* event) {
     event->signalled = true;
     sceKernelUnlockMutex(event->mutex, 1);
     sceKernelSignalCondAll(event->cond);
+#elif defined(__WIIU__)
+    OSLockMutex(&event->mutex);
+    event->signalled = 1;
+    OSUnlockMutex(&event->mutex);
+    OSSignalCond(&event->cond);
 #else
     pthread_mutex_lock(&event->mutex);
     event->signalled = true;
@@ -324,6 +366,14 @@ int PltWaitForEvent(PLT_EVENT* event) {
         sceKernelWaitCond(event->cond, NULL);
     }
     sceKernelUnlockMutex(event->mutex, 1);
+
+    return PLT_WAIT_SUCCESS;
+#elif defined(__WIIU__)
+    OSLockMutex(&event->mutex);
+    while (!event->signalled) {
+        OSWaitCond(&event->cond, &event->mutex);
+    }
+    OSUnlockMutex(&event->mutex);
 
     return PLT_WAIT_SUCCESS;
 #else
