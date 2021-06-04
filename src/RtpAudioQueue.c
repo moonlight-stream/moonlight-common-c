@@ -167,6 +167,15 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
         return NULL;
     }
 
+    // Synchronize the nextRtpSequenceNumber and oldestRtpBaseSequenceNumber values
+    // when the connection begins. Start on the next FEC block boundary, so we can
+    // be sure we aren't starting in the middle (which will lead to a spurious audio
+    // data block recovery warning on connection start if we miss more than 2 packets).
+    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
+        queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlockBaseSeqNum + RTPA_DATA_SHARDS;
+        return NULL;
+    }
+
     // Drop packets from FEC blocks that have already been completed
     if (isBefore16(fecBlockBaseSeqNum, queue->oldestRtpBaseSequenceNumber)) {
         return NULL;
@@ -388,13 +397,6 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     if (fecBlock == NULL) {
         // Reject the packet
         return 0;
-    }
-
-    // Synchronize the nextRtpSequenceNumber and oldestRtpBaseSequenceNumber values
-    // when the connection begins. We want to always start on FEC block boundaries.
-    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
-        queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlock->fecHeader.baseSequenceNumber;
-        validateFecBlockState(queue);
     }
 
     if (packet->packetType == 97) {
