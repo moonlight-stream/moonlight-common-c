@@ -66,6 +66,7 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
     return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeoutMs, sizeof(timeoutMs));
 #elif defined(__WIIU__)
     // timeouts aren't supported on Wii U
+    return -1;
 #else
     struct timeval val;
 

@@ -69,6 +69,9 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 #elif defined(__vita__)
 int ThreadProc(SceSize args, void *argp) {
     struct thread_context* ctx = (struct thread_context*)argp;
+#elif defined(__WIIU__)
+int ThreadProc(int argc, const char** argv) {
+    struct thread_context* ctx = (struct thread_context*)argv;
 #else
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
@@ -88,7 +91,7 @@ void* ThreadProc(void* context) {
     free(ctx);
 #endif
 
-#if defined(LC_WINDOWS) || defined(__vita__)
+#if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__)
     return 0;
 #else
     return NULL;
@@ -123,7 +126,7 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
         return -1;
     }
 #elif defined(__WIIU__)
-    OSInitMutex(mutex);
+    OSFastMutex_Init(mutex, "");
 #else
     int err = pthread_mutex_init(mutex, NULL);
     if (err != 0) {
@@ -153,7 +156,7 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 #elif defined(__vita__)
     sceKernelLockMutex(*mutex, 1, NULL);
 #elif defined(__WIIU__)
-    OSLockMutex(mutex);
+    OSFastMutex_Lock(mutex);
 #else
     pthread_mutex_lock(mutex);
 #endif
@@ -165,7 +168,7 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 #elif defined(__vita__)
     sceKernelUnlockMutex(*mutex, 1);
 #elif defined(__WIIU__)
-    OSUnlockMutex(mutex);
+    OSFastMutex_Unlock(mutex);
 #else
     pthread_mutex_unlock(mutex);
 #endif
@@ -249,8 +252,8 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     void* stack_addr = (uint8_t *)memalign(8, stack_size) + stack_size;
 
     if (!OSCreateThread(&thread->thread,
-                        (OSThreadEntryPointFn)ThreadProc,
-                        (int)ctx, NULL,
+                        ThreadProc,
+                        0, (char*)ctx,
                         stack_addr, stack_size,
                         0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
     {
@@ -293,8 +296,8 @@ int PltCreateEvent(PLT_EVENT* event) {
     }
     event->signalled = false;
 #elif defined(__WIIU__)
-    OSInitMutex(&event->mutex);
-    OSInitCond(&event->cond);
+    OSFastMutex_Init(&event->mutex, "");
+    OSFastCond_Init(&event->cond, "");
 #else
     pthread_mutex_init(&event->mutex, NULL);
     pthread_cond_init(&event->cond, NULL);
@@ -328,10 +331,10 @@ void PltSetEvent(PLT_EVENT* event) {
     sceKernelUnlockMutex(event->mutex, 1);
     sceKernelSignalCondAll(event->cond);
 #elif defined(__WIIU__)
-    OSLockMutex(&event->mutex);
+    OSFastMutex_Lock(&event->mutex);
     event->signalled = 1;
-    OSUnlockMutex(&event->mutex);
-    OSSignalCond(&event->cond);
+    OSFastMutex_Unlock(&event->mutex);
+    OSFastCond_Signal(&event->cond);
 #else
     pthread_mutex_lock(&event->mutex);
     event->signalled = true;
@@ -369,11 +372,11 @@ int PltWaitForEvent(PLT_EVENT* event) {
 
     return PLT_WAIT_SUCCESS;
 #elif defined(__WIIU__)
-    OSLockMutex(&event->mutex);
+    OSFastMutex_Lock(&event->mutex);
     while (!event->signalled) {
-        OSWaitCond(&event->cond, &event->mutex);
+        OSFastCond_Wait(&event->cond, &event->mutex);
     }
-    OSUnlockMutex(&event->mutex);
+    OSFastMutex_Unlock(&event->mutex);
 
     return PLT_WAIT_SUCCESS;
 #else

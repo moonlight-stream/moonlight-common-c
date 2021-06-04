@@ -30,8 +30,8 @@
 #include <netinet/in.h>
 #include <malloc.h>
 #include <coreinit/thread.h>
-#include <coreinit/mutex.h>
-#include <coreinit/condition.h>
+#include <coreinit/fastmutex.h>
+#include <coreinit/fastcondition.h>
 #else
 #include <unistd.h>
 #include <pthread.h>
