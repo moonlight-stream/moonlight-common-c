@@ -25,6 +25,17 @@ typedef struct _PLT_THREAD {
     void *context;
     bool alive;
 } PLT_THREAD;
+#elif defined(__WIIU__)
+typedef OSFastMutex PLT_MUTEX;
+typedef struct _PLT_EVENT {
+    OSFastMutex mutex;
+    OSFastCondition cond;
+    int signalled;
+} PLT_EVENT;
+typedef struct _PLT_THREAD {
+    OSThread thread;
+    int cancelled;
+} PLT_THREAD;
 #elif defined (LC_POSIX)
 typedef pthread_mutex_t PLT_MUTEX;
 typedef struct _PLT_EVENT {
