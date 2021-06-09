@@ -395,7 +395,7 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
 
     // We will consider the FEC block irrecoverably lost if the entire duration of the
     // audio in the FEC block has elapsed (plus a little bit) without completing the block.
-    if (PltGetMillis() - queue->blockHead->queueTimeMs > (AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
+    if (PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
         Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
                 queue->blockHead->fecHeader.baseSequenceNumber,
                 queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
