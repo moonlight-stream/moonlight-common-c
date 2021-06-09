@@ -6,6 +6,7 @@
 // and recovered packet checks vs the original input. It
 // is on by default for debug builds.
 #define FEC_VALIDATION_MODE
+#define FEC_VERBOSE
 #endif
 
 void RtpvInitializeQueue(PRTP_VIDEO_QUEUE queue) {
@@ -235,6 +236,14 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     // We should always provide enough parity to recover the missing data successfully.
     // If this fails, something is probably wrong with our FEC state.
     LC_ASSERT(ret == 0);
+
+#ifdef FEC_VERBOSE
+    if (queue->bufferDataPackets != queue->receivedBufferDataPackets) {
+        Limelog("Recovered %d video data shards from frame %d\n",
+                queue->bufferDataPackets - queue->receivedBufferDataPackets,
+                queue->currentFrameNumber);
+    }
+#endif
 
 cleanup_packets:
     for (i = 0; i < totalPackets; i++) {

@@ -12,6 +12,7 @@
 // trigger the call to completeFecBlock(). Missing or OOO
 // packets will do the job.
 #define FEC_VALIDATION_MODE
+#define FEC_VERBOSE
 #endif
 
 void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
@@ -163,6 +164,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
         blockSize = length - sizeof(RTP_PACKET) - sizeof(AUDIO_FEC_HEADER);
     }
     else {
+        Limelog("Invalid RTP audio payload type: %u\n", packet->packetType);
         LC_ASSERT(false);
         return NULL;
     }
@@ -333,6 +335,14 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
             block->marks[i] = 0;
         }
     }
+
+#ifdef FEC_VERBOSE
+    if (block->dataShardsReceived != RTPA_DATA_SHARDS) {
+        Limelog("Recovered %d audio data shards from block %d\n",
+                RTPA_DATA_SHARDS - block->dataShardsReceived,
+                block->fecHeader.baseSequenceNumber);
+    }
+#endif
 
 #ifdef FEC_VALIDATION_MODE
     // Check the RTP header values
