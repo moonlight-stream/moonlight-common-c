@@ -81,6 +81,8 @@ void* ThreadProc(void* context) {
     setThreadNameWin32(ctx->name);
 #elif defined(__linux__)
     pthread_setname_np(pthread_self(), ctx->name);
+#elif defined(LC_DARWIN)
+    pthread_setname_np(ctx->name);
 #endif
 
     ctx->entry(ctx->context);
