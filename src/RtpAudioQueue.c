@@ -191,7 +191,14 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             LC_ASSERT(existingBlock->fecHeader.payloadType == fecBlockPayloadType);
             LC_ASSERT(existingBlock->fecHeader.baseTimestamp == fecBlockBaseTs);
             LC_ASSERT(existingBlock->fecHeader.ssrc == fecBlockSsrc);
-            LC_ASSERT(existingBlock->blockSize == blockSize);
+
+            // The block size must match in order to safely copy shards into it
+            if (existingBlock->blockSize != blockSize) {
+                LC_ASSERT(existingBlock->blockSize == blockSize);
+                Limelog("Audio block size mismatch (got %u, expected %u)\n",
+                        blockSize, existingBlock->blockSize);
+                return NULL;
+            }
 
             // If the block is completed, don't return it
             return existingBlock->fullyReassembled ? NULL : existingBlock;
