@@ -17,7 +17,6 @@
 
 void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     memset(queue, 0, sizeof(*queue));
-    queue->maxQueueTimeMs = RTPQ_DEFAULT_QUEUE_TIME;
     queue->nextRtpSequenceNumber = UINT16_MAX;
 
     reed_solomon_init();
@@ -394,8 +393,9 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
         return false;
     }
 
-    // Check that the queue's time constraint is satisfied
-    if (PltGetMillis() - queue->blockHead->queueTimeMs > queue->maxQueueTimeMs) {
+    // We will consider the FEC block irrecoverably lost if the entire duration of the
+    // audio in the FEC block has elapsed (plus a little bit) without completing the block.
+    if (PltGetMillis() - queue->blockHead->queueTimeMs > (AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
         Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
                 queue->blockHead->fecHeader.baseSequenceNumber,
                 queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
@@ -490,8 +490,11 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     }
 
     // We don't have enough to proceed. Let's ensure we haven't
-    // violated queue constraints with this FEC block.
-    if (enforceQueueConstraints(queue)) {
+    // violated queue constraints with this FEC block. We will only
+    // enforce the queue time limit if we have received a packet
+    // from the next FEC block to ensure we don't needlessly time out
+    // a block if we aren't getting any other audio data in the meantime.
+    if (fecBlock != queue->blockHead && enforceQueueConstraints(queue)) {
         // Return all available audio data even if there are discontinuities
         queue->blockHead->allowDiscontinuity = true;
 

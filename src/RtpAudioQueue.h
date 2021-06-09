@@ -4,7 +4,9 @@
 
 #include "rs.h"
 
-#define RTPQ_DEFAULT_QUEUE_TIME 40
+// Maximum time to wait for an OOS data/FEC shard
+// after the entire FEC block should have been received
+#define RTPQ_OOS_WAIT_TIME_MS 10
 
 #define RTPA_DATA_SHARDS 4
 #define RTPA_FEC_SHARDS 2
@@ -47,8 +49,6 @@ typedef struct _RTP_AUDIO_QUEUE {
     PRTPA_FEC_BLOCK blockTail;
 
     reed_solomon* rs;
-
-    uint32_t maxQueueTimeMs;
 
     uint16_t nextRtpSequenceNumber;
     uint16_t oldestRtpBaseSequenceNumber;
