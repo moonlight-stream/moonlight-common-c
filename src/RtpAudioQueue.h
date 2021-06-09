@@ -52,6 +52,9 @@ typedef struct _RTP_AUDIO_QUEUE {
 
     uint16_t nextRtpSequenceNumber;
     uint16_t oldestRtpBaseSequenceNumber;
+
+    uint16_t lastOosSequenceNumber;
+    bool receivedOosData;
 } RTP_AUDIO_QUEUE, *PRTP_AUDIO_QUEUE;
 
 #define RTPQ_RET_PACKET_CONSUMED 0x1

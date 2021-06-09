@@ -129,6 +129,23 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             return NULL;
         }
 
+        // Remember if we've received out-of-sequence packets lately. We can use
+        // this knowledge to more quickly give up on FEC blocks.
+        if (isBefore16(packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber)) {
+            queue->lastOosSequenceNumber = packet->sequenceNumber;
+            if (!queue->receivedOosData) {
+                Limelog("Leaving fast audio recovery mode after OOS audio data (%u < %u)\n",
+                        packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber);
+                queue->receivedOosData = true;
+            }
+        }
+        // This condition looks odd, but it's just a simple way to check if we've gone
+        // more than 32767 packets without an OOS packet.
+        else if (queue->receivedOosData && isBefore16(queue->oldestRtpBaseSequenceNumber, queue->lastOosSequenceNumber)) {
+            Limelog("Entering fast audio recovery mode after sequenced audio data\n");
+            queue->receivedOosData = false;
+        }
+
         // This is a data packet, so we will need to synthesize an FEC header
         fecBlockPayloadType = packet->packetType;
         fecBlockBaseSeqNum = (packet->sequenceNumber / RTPA_DATA_SHARDS) * RTPA_DATA_SHARDS;
@@ -393,9 +410,11 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
         return false;
     }
 
-    // We will consider the FEC block irrecoverably lost if the entire duration of the
-    // audio in the FEC block has elapsed (plus a little bit) without completing the block.
-    if (PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
+    // We will consider the FEC block irrecoverably lost if either:
+    // 1) We have not received OOS data, yet this data is from a future FEC block
+    // 2) The entire duration of the audio in the FEC block has elapsed (plus a little bit)
+    if (!queue->receivedOosData ||
+            PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
         Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
                 queue->blockHead->fecHeader.baseSequenceNumber,
                 queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
