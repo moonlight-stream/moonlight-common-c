@@ -12,6 +12,9 @@
 #define RTPA_FEC_SHARDS 2
 #define RTPA_TOTAL_SHARDS (RTPA_DATA_SHARDS + RTPA_FEC_SHARDS)
 
+// Maximum number of FEC block entries to cache
+#define RTPA_CACHED_FEC_BLOCK_LIMIT 4
+
 typedef struct _AUDIO_FEC_HEADER {
     uint8_t fecShardIndex;
     uint8_t payloadType;
@@ -49,6 +52,9 @@ typedef struct _RTP_AUDIO_QUEUE {
     PRTPA_FEC_BLOCK blockTail;
 
     reed_solomon* rs;
+
+    PRTPA_FEC_BLOCK freeBlockHead;
+    uint16_t freeBlockCount;
 
     uint16_t nextRtpSequenceNumber;
     uint16_t oldestRtpBaseSequenceNumber;

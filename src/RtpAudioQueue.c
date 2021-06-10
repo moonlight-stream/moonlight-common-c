@@ -81,6 +81,43 @@ static void validateFecBlockState(PRTP_AUDIO_QUEUE queue) {
 #endif
 }
 
+static PRTPA_FEC_BLOCK allocateFecBlock(PRTP_AUDIO_QUEUE queue, uint32_t blockSize) {
+    PRTPA_FEC_BLOCK block = queue->freeBlockHead;
+
+    if (block != NULL) {
+        LC_ASSERT(queue->freeBlockCount > 0);
+
+        // If the block size matches, we're good to go
+        if (block->blockSize == blockSize) {
+            // Advance the free block list to the next entry
+            queue->freeBlockHead = block->next;
+            queue->freeBlockCount--;
+
+            // Return the new block
+            return block;
+        }
+        else {
+            // The block size didn't match. This should never happen with GFE
+            // because it uses constant sized data shards, but Sunshine can
+            // trigger this condition. If it does happen, let's free the cached
+            // entry so we can populate the cache with correctly sized blocks.
+            queue->freeBlockHead = block->next;
+            queue->freeBlockCount--;
+
+            // Free the existing block
+            free(block);
+        }
+    }
+    else {
+        LC_ASSERT(queue->freeBlockCount == 0);
+    }
+
+    // We either didn't have any free entries or the block
+    // size didn't match, so allocate a new FEC block now.
+    uint16_t dataPacketSize = blockSize + sizeof(RTP_PACKET);
+    return malloc(sizeof(*block) + (RTPA_DATA_SHARDS * dataPacketSize) + (RTPA_FEC_SHARDS * blockSize));
+}
+
 static void freeFecBlockHead(PRTP_AUDIO_QUEUE queue) {
     PRTPA_FEC_BLOCK blockHead = queue->blockHead;
 
@@ -97,7 +134,16 @@ static void freeFecBlockHead(PRTP_AUDIO_QUEUE queue) {
 
     validateFecBlockState(queue);
 
-    free(blockHead);
+    if (queue->freeBlockCount >= RTPA_CACHED_FEC_BLOCK_LIMIT) {
+        // Too many entries cached, so just free this one
+        free(blockHead);
+    }
+    else {
+        // Place this entry at the head of the free list for better cache behavior
+        blockHead->next = queue->freeBlockHead;
+        queue->freeBlockHead = blockHead;
+        queue->freeBlockCount++;
+    }
 }
 
 void RtpaCleanupQueue(PRTP_AUDIO_QUEUE queue) {
@@ -108,6 +154,15 @@ void RtpaCleanupQueue(PRTP_AUDIO_QUEUE queue) {
     }
 
     queue->blockTail = NULL;
+
+    while (queue->freeBlockHead != NULL) {
+        PRTPA_FEC_BLOCK block = queue->freeBlockHead;
+        queue->freeBlockHead = block->next;
+        queue->freeBlockCount--;
+        free(block);
+    }
+
+    LC_ASSERT(queue->freeBlockCount == 0);
 
     reed_solomon_release(queue->rs);
     queue->rs = NULL;
@@ -227,9 +282,9 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
         existingBlock = existingBlock->next;
     }
 
-    // We didn't find an existing FEC block, so we'll have to make one
+    // We didn't find an existing FEC block, so we'll have to allocate one
     uint16_t dataPacketSize = blockSize + sizeof(RTP_PACKET);
-    PRTPA_FEC_BLOCK block = malloc(sizeof(*block) + (RTPA_DATA_SHARDS * dataPacketSize) + (RTPA_FEC_SHARDS * blockSize));
+    PRTPA_FEC_BLOCK block = allocateFecBlock(queue, blockSize);
     if (block == NULL) {
         return NULL;
     }
