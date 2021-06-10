@@ -329,25 +329,15 @@ void PltClearEvent(PLT_EVENT* event) {
 #endif
 }
 
-int PltWaitForEvent(PLT_EVENT* event) {
+void PltWaitForEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
-    DWORD error;
-
-    error = WaitForSingleObjectEx(*event, INFINITE, FALSE);
-    if (error == WAIT_OBJECT_0) {
-        return PLT_WAIT_SUCCESS;
-    }
-    else {
-        LC_ASSERT(false);
-        return -1;
-    }
+    WaitForSingleObjectEx(*event, INFINITE, FALSE);
 #else
     PltLockMutex(&event->mutex);
     while (!event->signalled) {
         PltWaitForConditionVariable(&event->cond, &event->mutex);
     }
     PltUnlockMutex(&event->mutex);
-    return PLT_WAIT_SUCCESS;
 #endif
 }
 

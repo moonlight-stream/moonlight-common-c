@@ -204,7 +204,6 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
 int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     PLINKED_BLOCKING_QUEUE_ENTRY entry;
-    int err;
 
     if (queueHead->shutdown) {
         return LBQ_INTERRUPTED;
@@ -217,10 +216,7 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
         //
         // If we're draining, we will never wait on the queue.
         if (queueHead->head == NULL && !queueHead->draining) {
-            err = PltWaitForEvent(&queueHead->containsDataEvent);
-            if (err != PLT_WAIT_SUCCESS) {
-                return LBQ_INTERRUPTED;
-            }
+            PltWaitForEvent(&queueHead->containsDataEvent);
         }
 
         PltLockMutex(&queueHead->mutex);

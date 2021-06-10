@@ -64,15 +64,12 @@ int PltCreateEvent(PLT_EVENT* event);
 void PltCloseEvent(PLT_EVENT* event);
 void PltSetEvent(PLT_EVENT* event);
 void PltClearEvent(PLT_EVENT* event);
-int PltWaitForEvent(PLT_EVENT* event);
+void PltWaitForEvent(PLT_EVENT* event);
 
 int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex);
 void PltDeleteConditionVariable(PLT_COND* cond);
 void PltSignalConditionVariable(PLT_COND* cond);
 void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex);
-
-#define PLT_WAIT_SUCCESS 0
-#define PLT_WAIT_INTERRUPTED 1
 
 void PltSleepMs(int ms);
 void PltSleepMsInterruptible(PLT_THREAD* thread, int ms);
