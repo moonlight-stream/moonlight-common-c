@@ -16,7 +16,7 @@ typedef struct _LINKED_BLOCKING_QUEUE_ENTRY {
 
 typedef struct _LINKED_BLOCKING_QUEUE {
     PLT_MUTEX mutex;
-    PLT_EVENT containsDataEvent;
+    PLT_COND cond;
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
     int sizeBound;
