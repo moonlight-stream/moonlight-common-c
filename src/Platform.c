@@ -286,23 +286,14 @@ int PltCreateEvent(PLT_EVENT* event) {
     if (!*event) {
         return -1;
     }
-#elif defined(__vita__)
-    event->mutex = sceKernelCreateMutex("", 0, 0, NULL);
-    if (event->mutex < 0) {
-        return -1;
-    }
-    event->cond = sceKernelCreateCond("", 0, event->mutex, NULL);
-    if (event->cond < 0) {
-        sceKernelDeleteMutex(event->mutex);
-        return -1;
-    }
-    event->signalled = false;
-#elif defined(__WIIU__)
-    OSFastMutex_Init(&event->mutex, "");
-    OSFastCond_Init(&event->cond, "");
 #else
-    pthread_mutex_init(&event->mutex, NULL);
-    pthread_cond_init(&event->cond, NULL);
+    if (PltCreateMutex(&event->mutex) < 0) {
+        return -1;
+    }
+    if (PltCreateConditionVariable(&event->cond, &event->mutex) < 0) {
+        PltDeleteMutex(&event->mutex);
+        return -1;
+    }
     event->signalled = false;
 #endif
     activeEvents++;
@@ -313,35 +304,20 @@ void PltCloseEvent(PLT_EVENT* event) {
     activeEvents--;
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
-#elif defined(__vita__)
-    sceKernelDeleteCond(event->cond);
-    sceKernelDeleteMutex(event->mutex);
-#elif defined(__WIIU__)
-
 #else
-    pthread_mutex_destroy(&event->mutex);
-    pthread_cond_destroy(&event->cond);
+    PltDeleteConditionVariable(&event->cond);
+    PltDeleteMutex(&event->mutex);
 #endif
 }
 
 void PltSetEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     SetEvent(*event);
-#elif defined(__vita__)
-    sceKernelLockMutex(event->mutex, 1, NULL);
-    event->signalled = true;
-    sceKernelUnlockMutex(event->mutex, 1);
-    sceKernelSignalCondAll(event->cond);
-#elif defined(__WIIU__)
-    OSFastMutex_Lock(&event->mutex);
-    event->signalled = 1;
-    OSFastMutex_Unlock(&event->mutex);
-    OSFastCond_Signal(&event->cond);
 #else
-    pthread_mutex_lock(&event->mutex);
+    PltLockMutex(&event->mutex);
     event->signalled = true;
-    pthread_mutex_unlock(&event->mutex);
-    pthread_cond_broadcast(&event->cond);
+    PltUnlockMutex(&event->mutex);
+    PltSignalConditionVariable(&event->cond);
 #endif
 }
 
@@ -365,30 +341,65 @@ int PltWaitForEvent(PLT_EVENT* event) {
         LC_ASSERT(false);
         return -1;
     }
-#elif defined(__vita__)
-    sceKernelLockMutex(event->mutex, 1, NULL);
-    while (!event->signalled) {
-        sceKernelWaitCond(event->cond, NULL);
-    }
-    sceKernelUnlockMutex(event->mutex, 1);
-
-    return PLT_WAIT_SUCCESS;
-#elif defined(__WIIU__)
-    OSFastMutex_Lock(&event->mutex);
-    while (!event->signalled) {
-        OSFastCond_Wait(&event->cond, &event->mutex);
-    }
-    OSFastMutex_Unlock(&event->mutex);
-
-    return PLT_WAIT_SUCCESS;
 #else
-    pthread_mutex_lock(&event->mutex);
+    PltLockMutex(&event->mutex);
     while (!event->signalled) {
-        pthread_cond_wait(&event->cond, &event->mutex);
+        PltWaitForConditionVariable(&event->cond, &event->mutex);
     }
-    pthread_mutex_unlock(&event->mutex);
-    
+    PltUnlockMutex(&event->mutex);
     return PLT_WAIT_SUCCESS;
+#endif
+}
+
+int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
+#if defined(LC_WINDOWS)
+    InitializeConditionVariable(cond);
+#elif defined(__vita__)
+    *cond = sceKernelCreateCond("", 0, *mutex, NULL);
+    if (*cond < 0) {
+        return -1;
+    }
+#elif defined(__WIIU__)
+    OSFastCond_Init(cond, "");
+#else
+    pthread_cond_init(cond, NULL);
+#endif
+    return 0;
+}
+
+void PltDeleteConditionVariable(PLT_COND* cond) {
+#if defined(LC_WINDOWS)
+    // No-op to delete a CONDITION_VARIABLE
+#elif defined(__vita__)
+    sceKernelDeleteCond(*cond);
+#elif defined(__WIIU__)
+    // No-op to delete an OSFastCondition
+#else
+    pthread_cond_destroy(cond);
+#endif
+}
+
+void PltSignalConditionVariable(PLT_COND* cond) {
+#if defined(LC_WINDOWS)
+    WakeConditionVariable(cond);
+#elif defined(__vita__)
+    sceKernelSignalCond(*cond);
+#elif defined(__WIIU__)
+    OSFastCond_Signal(cond);
+#else
+    pthread_cond_signal(cond);
+#endif
+}
+
+void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
+#if defined(LC_WINDOWS)
+    SleepConditionVariableSRW(cond, mutex, INFINITE, 0);
+#elif defined(__vita__)
+    sceKernelWaitCond(*cond, NULL);
+#elif defined(__WIIU__)
+    OSFastCond_Wait(cond, mutex);
+#else
+    pthread_cond_wait(cond, mutex);
 #endif
 }
 
