@@ -81,7 +81,7 @@ static void validateFecBlockState(PRTP_AUDIO_QUEUE queue) {
 #endif
 }
 
-static PRTPA_FEC_BLOCK allocateFecBlock(PRTP_AUDIO_QUEUE queue, uint32_t blockSize) {
+static PRTPA_FEC_BLOCK allocateFecBlock(PRTP_AUDIO_QUEUE queue, uint16_t blockSize) {
     PRTPA_FEC_BLOCK block = queue->freeBlockHead;
 
     if (block != NULL) {
