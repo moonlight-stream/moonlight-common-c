@@ -17,7 +17,10 @@
 
 void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     memset(queue, 0, sizeof(*queue));
-    queue->nextRtpSequenceNumber = UINT16_MAX;
+
+    // We will start in the synchronizing state, where we wait for the first
+    // full FEC block before reporting losses, out of order packets, etc.
+    queue->synchronizing = true;
 
     reed_solomon_init();
 
@@ -39,10 +42,8 @@ static void validateFecBlockState(PRTP_AUDIO_QUEUE queue) {
 #ifdef LC_DEBUG
     PRTPA_FEC_BLOCK lastBlock = queue->blockHead;
 
-    // The next sequence number must not be less than the oldest BSN unless we're in the
-    // starting state (prior to us setting nextRtpSequenceNumber and oldestRtpBaseSequenceNumber).
-    LC_ASSERT(!isBefore16(queue->nextRtpSequenceNumber, queue->oldestRtpBaseSequenceNumber) ||
-              (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0));
+    // The next sequence number must not be less than the oldest BSN unless we're still synchronizing with the source
+    LC_ASSERT(!isBefore16(queue->nextRtpSequenceNumber, queue->oldestRtpBaseSequenceNumber) || queue->synchronizing);
 
     if (lastBlock == NULL) {
         return;
@@ -132,6 +133,9 @@ static void freeFecBlockHead(PRTP_AUDIO_QUEUE queue) {
 
     queue->oldestRtpBaseSequenceNumber = blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS;
 
+    // Once we complete an FEC block (successfully or not), we're synchronized with the source
+    queue->synchronizing = false;
+
     validateFecBlockState(queue);
 
     if (queue->freeBlockCount >= RTPA_CACHED_FEC_BLOCK_LIMIT) {
@@ -186,7 +190,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 
         // Remember if we've received out-of-sequence packets lately. We can use
         // this knowledge to more quickly give up on FEC blocks.
-        if (isBefore16(packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber)) {
+        if (!queue->synchronizing && isBefore16(packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber)) {
             queue->lastOosSequenceNumber = packet->sequenceNumber;
             if (!queue->receivedOosData) {
                 Limelog("Leaving fast audio recovery mode after OOS audio data (%u < %u)\n",
@@ -244,7 +248,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
     // when the connection begins. Start on the next FEC block boundary, so we can
     // be sure we aren't starting in the middle (which will lead to a spurious audio
     // data block recovery warning on connection start if we miss more than 2 packets).
-    if (queue->nextRtpSequenceNumber == UINT16_MAX && queue->oldestRtpBaseSequenceNumber == 0) {
+    if (queue->synchronizing && queue->oldestRtpBaseSequenceNumber == 0) {
         queue->nextRtpSequenceNumber = queue->oldestRtpBaseSequenceNumber = fecBlockBaseSeqNum + RTPA_DATA_SHARDS;
         return NULL;
     }
