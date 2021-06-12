@@ -27,7 +27,7 @@ endif()
 
 if(MSVC)
   target_compile_options(moonlight-common-c PRIVATE /W3 /wd4100 /wd4232 /wd5105 /WX)
-  target_link_libraries(moonlight-common-c PRIVATE ws2_32.lib qwave.lib winmm.lib)
+  target_link_libraries(moonlight-common-c PRIVATE ws2_32.lib winmm.lib)
 else()
   target_compile_options(moonlight-common-c PRIVATE -Wall -Wextra -Wno-unused-parameter -Werror)
 endif()
