@@ -117,7 +117,7 @@ static void freeDecodeUnitList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
         nextEntry = entry->flink;
 
         // Complete this with a failure status
-        completeQueuedDecodeUnit((PQUEUED_DECODE_UNIT)entry->data, DR_CLEANUP);
+        LiCompleteVideoFrame(entry->data, DR_CLEANUP);
 
         entry = nextEntry;
     }
@@ -181,15 +181,52 @@ static bool getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
     return false;
 }
 
-// Get the first decode unit available
-bool getNextQueuedDecodeUnit(PQUEUED_DECODE_UNIT* qdu) {
-    int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)qdu);
-    return (err == LBQ_SUCCESS);
+bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit) {
+    PQUEUED_DECODE_UNIT qdu;
+
+    int err = LbqWaitForQueueElement(&decodeUnitQueue, (void**)&qdu);
+    if (err != LBQ_SUCCESS) {
+        return false;
+    }
+
+    *frameHandle = qdu;
+    *decodeUnit = &qdu->decodeUnit;
+    return true;
+}
+
+bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit) {
+    PQUEUED_DECODE_UNIT qdu;
+
+    int err = LbqPollQueueElement(&decodeUnitQueue, (void**)&qdu);
+    if (err != LBQ_SUCCESS) {
+        return false;
+    }
+
+    *frameHandle = qdu;
+    *decodeUnit = &qdu->decodeUnit;
+    return true;
+}
+
+bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit) {
+    PQUEUED_DECODE_UNIT qdu;
+
+    int err = LbqPeekQueueElement(&decodeUnitQueue, (void**)&qdu);
+    if (err != LBQ_SUCCESS) {
+        return false;
+    }
+
+    *decodeUnit = &qdu->decodeUnit;
+    return true;
 }
 
 // Cleanup a decode unit by freeing the buffer chain and the holder
-void completeQueuedDecodeUnit(PQUEUED_DECODE_UNIT qdu, int drStatus) {
+void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
+    PQUEUED_DECODE_UNIT qdu = handle;
     PLENTRY_INTERNAL lastEntry;
+
+    if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
+        notifyKeyFrameReceived();
+    }
 
     if (drStatus == DR_NEED_IDR) {
         Limelog("Requesting IDR frame on behalf of DR\n");
@@ -353,7 +390,7 @@ static void reassembleFrame(int frameNumber) {
             }
             else {
                 // Submit the frame to the decoder
-                submitFrame(qdu);
+                LiCompleteVideoFrame(qdu, VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit));
             }
 
             // Notify the control connection

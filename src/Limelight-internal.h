@@ -94,8 +94,8 @@ void requestDecoderRefresh(void);
 
 void initializeVideoStream(void);
 void destroyVideoStream(void);
+void notifyKeyFrameReceived(void);
 int startVideoStream(void* rendererContext, int drFlags);
-void submitFrame(PQUEUED_DECODE_UNIT qdu);
 void stopVideoStream(void);
 
 int initializeAudioStream(void);

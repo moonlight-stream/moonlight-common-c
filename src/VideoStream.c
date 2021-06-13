@@ -154,24 +154,22 @@ static void ReceiveThreadProc(void* context) {
     }
 }
 
-void submitFrame(PQUEUED_DECODE_UNIT qdu) {
-    // Pass the frame to the decoder
-    int ret = VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit);
-    completeQueuedDecodeUnit(qdu, ret);
-
+void notifyKeyFrameReceived(void) {
     // Remember that we got a full frame successfully
     receivedFullFrame = true;
 }
 
 // Decoder thread proc
 static void DecoderThreadProc(void* context) {
-    PQUEUED_DECODE_UNIT qdu;
     while (!PltIsThreadInterrupted(&decoderThread)) {
-        if (!getNextQueuedDecodeUnit(&qdu)) {
+        VIDEO_FRAME_HANDLE frameHandle;
+        PDECODE_UNIT decodeUnit;
+
+        if (!LiWaitForNextVideoFrame(&frameHandle, &decodeUnit)) {
             return;
         }
 
-        submitFrame(qdu);
+        LiCompleteVideoFrame(frameHandle, VideoCallbacks.submitDecodeUnit(decodeUnit));
     }
 }
 

@@ -241,6 +241,12 @@ typedef struct _DECODE_UNIT {
 // buffer size rather than just assuming it will always be 240.
 #define CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION 0x10
 
+// This flag opts the renderer into a pull-based model rather than the default push-based
+// callback model. The renderer must invoke the new functions (LiWaitForNextVideoFrame(),
+// LiCompleteVideoFrame(), and similar) to receive A/V data. Setting this capability while
+// also providing a sample callback is not allowed.
+#define CAPABILITY_PULL_RENDERER 0x20
+
 // If set in the video renderer capabilities field, this macro specifies that the renderer
 // supports slicing to increase decoding performance. The parameter specifies the desired
 // number of slices per frame. This capability is only valid on video renderers.
@@ -628,6 +634,18 @@ void LiStringifyPortFlags(unsigned int portFlags, const char* separator, char* o
 // The test server is available at https://github.com/cgutman/gfe-loopback
 #define ML_TEST_RESULT_INCONCLUSIVE 0xFFFFFFFF
 unsigned int LiTestClientConnectivity(const char* testServer, unsigned short referencePort, unsigned int testPortFlags);
+
+// This family of functions can be used for pull-based video renderers that opt to manage a decoding/rendering
+// thread themselves. After successfully calling the WaitFor/Poll variants that dequeue the video frame, you
+// must call LiCompleteVideoFrame() to notify that processing is completed. The same DR_* status values
+// from drSubmitDecodeUnit() must be passed to LiCompleteVideoFrame() as the drStatus argument.
+//
+// In order to safely use these functions, you must set CAPABILITY_PULL_RENDERER on the video decoder.
+typedef void* VIDEO_FRAME_HANDLE;
+bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
+bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
+bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit);
+void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
 
 #ifdef __cplusplus
 }
