@@ -197,7 +197,7 @@ void stopVideoStream(void) {
     
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+    if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltInterruptThread(&decoderThread);
     }
 
@@ -207,13 +207,13 @@ void stopVideoStream(void) {
 
     PltJoinThread(&udpPingThread);
     PltJoinThread(&receiveThread);
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+    if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltJoinThread(&decoderThread);
     }
 
     PltCloseThread(&udpPingThread);
     PltCloseThread(&receiveThread);
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+    if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltCloseThread(&decoderThread);
     }
     
@@ -260,7 +260,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         return err;
     }
 
-    if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+    if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         err = PltCreateThread("VideoDec", DecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             VideoCallbacks.stop();
@@ -281,15 +281,15 @@ int startVideoStream(void* rendererContext, int drFlags) {
             VideoCallbacks.stop();
             stopVideoDepacketizer();
             PltInterruptThread(&receiveThread);
-            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
                 PltInterruptThread(&decoderThread);
             }
             PltJoinThread(&receiveThread);
-            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
                 PltJoinThread(&decoderThread);
             }
             PltCloseThread(&receiveThread);
-            if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+            if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
                 PltCloseThread(&decoderThread);
             }
             closeSocket(rtpSocket);
@@ -305,15 +305,15 @@ int startVideoStream(void* rendererContext, int drFlags) {
         VideoCallbacks.stop();
         stopVideoDepacketizer();
         PltInterruptThread(&receiveThread);
-        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
             PltInterruptThread(&decoderThread);
         }
         PltJoinThread(&receiveThread);
-        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
             PltJoinThread(&decoderThread);
         }
         PltCloseThread(&receiveThread);
-        if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
+        if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
             PltCloseThread(&decoderThread);
         }
         closeSocket(rtpSocket);
