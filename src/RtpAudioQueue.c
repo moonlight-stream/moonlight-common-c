@@ -15,6 +15,9 @@
 #define FEC_VERBOSE
 #endif
 
+#define RTP_PAYLOAD_TYPE_AUDIO   97
+#define RTP_PAYLOAD_TYPE_FEC     127
+
 void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     memset(queue, 0, sizeof(*queue));
 
@@ -181,7 +184,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 
     validateFecBlockState(queue);
 
-    if (packet->packetType == 97) {
+    if (packet->packetType == RTP_PAYLOAD_TYPE_AUDIO) {
         if (length < sizeof(RTP_PACKET)) {
             Limelog("RTP audio data packet too small: %u\n", length);
             LC_ASSERT(false);
@@ -213,7 +216,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 
         blockSize = length - sizeof(RTP_PACKET);
     }
-    else if (packet->packetType == 127) {
+    else if (packet->packetType == RTP_PAYLOAD_TYPE_FEC) {
         PAUDIO_FEC_HEADER fecHeader = (PAUDIO_FEC_HEADER)(packet + 1);
 
         if (length < sizeof(RTP_PACKET) + sizeof(AUDIO_FEC_HEADER)) {
@@ -494,7 +497,7 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
         return 0;
     }
 
-    if (packet->packetType == 97) {
+    if (packet->packetType == RTP_PAYLOAD_TYPE_AUDIO) {
         uint16_t pos = packet->sequenceNumber - fecBlock->fecHeader.baseSequenceNumber;
 
         // This is validated in getFecBlockForRtpPacket()
@@ -533,7 +536,7 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
             return RTPQ_RET_HANDLE_NOW;
         }
     }
-    else if (packet->packetType == 127) {
+    else if (packet->packetType == RTP_PAYLOAD_TYPE_FEC) {
         PAUDIO_FEC_HEADER fecHeader = (PAUDIO_FEC_HEADER)(packet + 1);
 
         // This is validated in getFecBlockForRtpPacket()
