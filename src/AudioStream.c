@@ -268,10 +268,11 @@ static void ReceiveThreadProc(void* context) {
             if (!receivedDataFromPeer) {
                 waitingForAudioMs += UDP_RECV_POLL_TIMEOUT_MS;
             }
-
-            // If we hit this path, there are no queued audio packets on the host PC,
-            // so we don't need to drop anything.
-            packetsToDrop = 0;
+            else {
+                // If we hit this path, there are no queued audio packets on the host PC,
+                // so we don't need to drop anything.
+                packetsToDrop = 0;
+            }
             continue;
         }
 
@@ -288,8 +289,9 @@ static void ReceiveThreadProc(void* context) {
 
             if (firstReceiveTime != 0) {
                 packetsToDrop += (uint32_t)(PltGetMillis() - firstReceiveTime) / AudioPacketDuration;
-                Limelog("Initial audio resync period: %d milliseconds\n", packetsToDrop * AudioPacketDuration);
             }
+
+            Limelog("Initial audio resync period: %d milliseconds\n", packetsToDrop * AudioPacketDuration);
         }
 
         // GFE accumulates audio samples before we are ready to receive them, so
