@@ -272,9 +272,20 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 
             // The block size must match in order to safely copy shards into it
             if (existingBlock->blockSize != blockSize) {
-                LC_ASSERT(existingBlock->blockSize == blockSize);
-                Limelog("Audio block size mismatch (got %u, expected %u)\n",
-                        blockSize, existingBlock->blockSize);
+                // This can happen with older versions of GeForce Experience (3.13) and Sunshine that don't use a
+                // constant size for audio packets.
+                //
+                // In the case of GFE 3.13, it does send FEC packets but it requires very special handling because:
+                // a) data and FEC shards may vary in size
+                // b) FEC blocks can start on boundaries that are not multiples of RTPA_DATA_SHARDS
+                //
+                // It doesn't seem worth it to sink a bunch of hours into figure out how to properly handle audio FEC
+                // for a 3 year old version of GFE that almost nobody uses. Instead, we'll just disable the FEC queue
+                // entirely and pass all audio data straight to the decoder.
+                //
+                Limelog("Audio block size mismatch (got %u, expected %u)\n", blockSize, existingBlock->blockSize);
+                Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software!\n");
+                queue->incompatibleServer = true;
                 return NULL;
             }
 
@@ -491,6 +502,18 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
 }
 
 int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
+    if (queue->incompatibleServer) {
+        // Just feed audio data straight through to the decoder. We lose handling of out-of-order
+        // and duplicated packets in this mode, but it shouldn't be a problem for the very small
+        // portion of users that are running an ancient GFE or Sunshine version.
+        if (packet->packetType == RTP_PAYLOAD_TYPE_AUDIO) {
+            return RTPQ_RET_HANDLE_NOW;
+        }
+        else {
+            return 0;
+        }
+    }
+
     PRTPA_FEC_BLOCK fecBlock = getFecBlockForRtpPacket(queue, packet, length);
     if (fecBlock == NULL) {
         // Reject the packet
