@@ -41,7 +41,7 @@ typedef struct _QUEUED_AUDIO_PACKET {
     char data[MAX_PACKET_SIZE];
 } QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
 
-static void UdpPingThreadProc(void* context) {
+static void AudioPingThreadProc(void* context) {
     // Ping in ASCII
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
@@ -93,7 +93,7 @@ int initializeAudioStream(void) {
 
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
-    int err = PltCreateThread("AudioPing", UdpPingThreadProc, NULL, &udpPingThread);
+    int err = PltCreateThread("AudioPing", AudioPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         closeSocket(rtpSocket);
         rtpSocket = INVALID_SOCKET;
@@ -225,7 +225,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
     }
 }
 
-static void ReceiveThreadProc(void* context) {
+static void AudioReceiveThreadProc(void* context) {
     PRTP_PACKET rtp;
     PQUEUED_AUDIO_PACKET packet;
     int queueStatus;
@@ -369,7 +369,7 @@ static void ReceiveThreadProc(void* context) {
     }
 }
 
-static void DecoderThreadProc(void* context) {
+static void AudioDecoderThreadProc(void* context) {
     int err;
     PQUEUED_AUDIO_PACKET packet;
 
@@ -438,7 +438,7 @@ int startAudioStream(void* audioContext, int arFlags) {
 
     AudioCallbacks.start();
 
-    err = PltCreateThread("AudioRecv", ReceiveThreadProc, NULL, &receiveThread);
+    err = PltCreateThread("AudioRecv", AudioReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         AudioCallbacks.stop();
         closeSocket(rtpSocket);
@@ -447,7 +447,7 @@ int startAudioStream(void* audioContext, int arFlags) {
     }
 
     if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        err = PltCreateThread("AudioDec", DecoderThreadProc, NULL, &decoderThread);
+        err = PltCreateThread("AudioDec", AudioDecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             AudioCallbacks.stop();
             PltInterruptThread(&receiveThread);

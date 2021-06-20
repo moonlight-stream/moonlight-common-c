@@ -43,7 +43,7 @@ void destroyVideoStream(void) {
 }
 
 // UDP Ping proc
-static void UdpPingThreadProc(void* context) {
+static void VideoPingThreadProc(void* context) {
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
 
@@ -62,7 +62,7 @@ static void UdpPingThreadProc(void* context) {
 }
 
 // Receive thread proc
-static void ReceiveThreadProc(void* context) {
+static void VideoReceiveThreadProc(void* context) {
     int err;
     int bufferSize, receiveSize;
     char* buffer;
@@ -160,7 +160,7 @@ void notifyKeyFrameReceived(void) {
 }
 
 // Decoder thread proc
-static void DecoderThreadProc(void* context) {
+static void VideoDecoderThreadProc(void* context) {
     while (!PltIsThreadInterrupted(&decoderThread)) {
         VIDEO_FRAME_HANDLE frameHandle;
         PDECODE_UNIT decodeUnit;
@@ -252,7 +252,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     VideoCallbacks.start();
 
-    err = PltCreateThread("VideoRecv", ReceiveThreadProc, NULL, &receiveThread);
+    err = PltCreateThread("VideoRecv", VideoReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         VideoCallbacks.stop();
         closeSocket(rtpSocket);
@@ -261,7 +261,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
     }
 
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
-        err = PltCreateThread("VideoDec", DecoderThreadProc, NULL, &decoderThread);
+        err = PltCreateThread("VideoDec", VideoDecoderThreadProc, NULL, &decoderThread);
         if (err != 0) {
             VideoCallbacks.stop();
             PltInterruptThread(&receiveThread);
@@ -300,7 +300,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     // Start pinging before reading the first frame so GFE knows where
     // to send UDP data
-    err = PltCreateThread("VideoPing", UdpPingThreadProc, NULL, &udpPingThread);
+    err = PltCreateThread("VideoPing", VideoPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         VideoCallbacks.stop();
         stopVideoDepacketizer();
