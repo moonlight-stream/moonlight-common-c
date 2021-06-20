@@ -190,6 +190,11 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     memcpy(&VideoCallbacks, drCallbacks, sizeof(VideoCallbacks));
     memcpy(&AudioCallbacks, arCallbacks, sizeof(AudioCallbacks));
 
+#ifdef LC_DEBUG_RECORD_MODE
+    // Install the pass-through recorder callbacks
+    setRecorderCallbacks(&VideoCallbacks, &AudioCallbacks);
+#endif
+
     // Hook the termination callback so we can avoid issuing a termination callback
     // after LiStopConnection() is called.
     //
