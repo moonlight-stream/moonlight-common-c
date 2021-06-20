@@ -25,6 +25,24 @@ void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     // full FEC block before reporting losses, out of order packets, etc.
     queue->synchronizing = true;
 
+    // Older versions of GFE violate some invariants that our FEC code requires, so we turn it off for
+    // anything older than GFE 3.19 just to be safe. GFE seems to have changed to the "modern" behavior
+    // between GFE 3.18 and 3.19.
+    //
+    // In the case of GFE 3.13, it does send FEC packets but it requires very special handling because:
+    // a) data and FEC shards may vary in size
+    // b) FEC blocks can start on boundaries that are not multiples of RTPA_DATA_SHARDS
+    //
+    // It doesn't seem worth it to sink a bunch of hours into figure out how to properly handle audio FEC
+    // for a 3 year old version of GFE that almost nobody uses. Instead, we'll just disable the FEC queue
+    // entirely and pass all audio data straight to the decoder.
+    //
+    if (!APP_VERSION_AT_LEAST(7, 1, 415)) {
+        Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software.\n");
+        Limelog("Audio quality may suffer on unreliable network connections due to lack of FEC!\n");
+        queue->incompatibleServer = true;
+    }
+
     reed_solomon_init();
 
     // The number of data and parity shards is constant, so we can reuse
@@ -239,6 +257,18 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             return NULL;
         }
 
+        if (fecBlockBaseSeqNum % RTPA_DATA_SHARDS != 0) {
+            // The FEC blocks must start on a RTPA_DATA_SHARDS boundary for our queuing logic to work. This isn't
+            // the case for older versions of GeForce Experience (at least 3.13). Disable the FEC logic if this
+            // invariant is validated.
+            Limelog("Invalid FEC block base sequence number (got %u, expected %u)\n",
+                    fecBlockBaseSeqNum, (fecBlockBaseSeqNum / RTPA_DATA_SHARDS) * RTPA_DATA_SHARDS);
+            Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software!\n");
+            LC_ASSERT(fecBlockBaseSeqNum % RTPA_DATA_SHARDS == 0);
+            queue->incompatibleServer = true;
+            return NULL;
+        }
+
         blockSize = length - sizeof(RTP_PACKET) - sizeof(AUDIO_FEC_HEADER);
     }
     else {
@@ -274,17 +304,9 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             if (existingBlock->blockSize != blockSize) {
                 // This can happen with older versions of GeForce Experience (3.13) and Sunshine that don't use a
                 // constant size for audio packets.
-                //
-                // In the case of GFE 3.13, it does send FEC packets but it requires very special handling because:
-                // a) data and FEC shards may vary in size
-                // b) FEC blocks can start on boundaries that are not multiples of RTPA_DATA_SHARDS
-                //
-                // It doesn't seem worth it to sink a bunch of hours into figure out how to properly handle audio FEC
-                // for a 3 year old version of GFE that almost nobody uses. Instead, we'll just disable the FEC queue
-                // entirely and pass all audio data straight to the decoder.
-                //
                 Limelog("Audio block size mismatch (got %u, expected %u)\n", blockSize, existingBlock->blockSize);
                 Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software!\n");
+                LC_ASSERT(existingBlock->blockSize == blockSize);
                 queue->incompatibleServer = true;
                 return NULL;
             }
