@@ -133,7 +133,7 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
 
-    sprintf(payloadStr, "rtsp://%s:48010", addrStr);
+    sprintf(payloadStr, "rtsp://%s:%u", addrStr, RtspPortNumber);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
 
     return err;
@@ -464,7 +464,7 @@ static int fillSdpTail(char* buffer) {
     return sprintf(buffer,
         "t=0 0\r\n"
         "m=video %d  \r\n",
-        AppVersionQuad[0] < 4 ? 47996 : 47998);
+        AppVersionQuad[0] < 4 ? 47996 : VideoPortNumber);
 }
 
 // Get the SDP attributes for the stream config
