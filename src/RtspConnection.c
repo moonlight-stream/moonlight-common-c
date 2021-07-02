@@ -287,12 +287,12 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         if (err == 0) {
             *error = ETIMEDOUT;
             Limelog("RTSP request timed out\n");
+            goto Exit;
         }
         else if (err < 0) {
             *error = LastSocketError();
             Limelog("Failed to wait for RTSP response: %d\n", *error);
             goto Exit;
-            return false;
         }
 
         err = recv(sock, &responseBuffer[offset], responseBufferSize - offset, 0);
