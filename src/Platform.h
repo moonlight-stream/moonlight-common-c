@@ -32,6 +32,7 @@
 #include <coreinit/thread.h>
 #include <coreinit/fastmutex.h>
 #include <coreinit/fastcondition.h>
+#include <fcntl.h>
 #else
 #include <unistd.h>
 #include <pthread.h>
@@ -39,6 +40,7 @@
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <fcntl.h>
 #endif
 
 #ifdef _WIN32

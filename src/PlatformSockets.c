@@ -299,11 +299,13 @@ int setSocketNonBlocking(SOCKET s, bool enabled) {
 #if defined(__vita__)
     int val = enabled ? 1 : 0;
     return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
+#elif defined(O_NONBLOCK)
+    return fcntl(s, F_SETFL, (enabled ? O_NONBLOCK : 0) | (fcntl(s, F_GETFL) & ~O_NONBLOCK));
 #elif defined(FIONBIO)
     int val = enabled ? 1 : 0;
     return ioctlsocket(s, FIONBIO, &val);
 #else
-    return SOCKET_ERROR;
+#error Please define your platform's non-blocking sockets API!
 #endif
 }
 
