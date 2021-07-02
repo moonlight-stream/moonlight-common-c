@@ -445,6 +445,9 @@ typedef struct _SERVER_INFORMATION {
     
     // Text inside 'GfeVersion' tag in /serverinfo (if present)
     const char* serverInfoGfeVersion;
+
+    // Text inside 'sessionUrl0' tag in /resume and /launch (if present)
+    const char* rtspSessionUrl;
 } SERVER_INFORMATION, *PSERVER_INFORMATION;
 
 // Use this function to zero the server information when allocated on the stack or heap

@@ -171,6 +171,32 @@ static void ClInternalConnectionTerminated(int errorCode)
     PltCloseThread(&terminationCallbackThread);
 }
 
+static bool parseRtspPortNumberFromUrl(const char* rtspSessionUrl, uint16_t* port)
+{
+    // If the session URL is not present, we will just use the well known port
+    if (rtspSessionUrl == NULL) {
+        return false;
+    }
+
+    // Pick the last colon in the string to match the port number
+    char* portNumberStart = strrchr(rtspSessionUrl, ':');
+    if (portNumberStart == NULL) {
+        return false;
+    }
+
+    // Skip the colon
+    portNumberStart++;
+
+    // Validate the port number
+    long int rawPort = strtol(portNumberStart, NULL, 10);
+    if (rawPort <= 0 || rawPort > 65535) {
+        return false;
+    }
+
+    *port = (uint16_t)rawPort;
+    return true;
+}
+
 // Starts the connection to the streaming machine
 int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION streamConfig, PCONNECTION_LISTENER_CALLBACKS clCallbacks,
     PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDERER_CALLBACKS arCallbacks, void* renderContext, int drFlags,
@@ -212,11 +238,17 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
 
-    // Configure default ports
+    // Initialize port numbers to defaults. The values in RTSP SETUP (if valid)
+    // will override these to allow dynamic port selection.
     VideoPortNumber = 47998;
     ControlPortNumber = 47999;
     AudioPortNumber = 48000;
-    RtspPortNumber = 48010; // TODO: Parse this out of RTSP session URL
+
+    // Parse RTSP port number from RTSP session URL
+    if (!parseRtspPortNumberFromUrl(serverInfo->rtspSessionUrl, &RtspPortNumber)) {
+        // Use the well known port if parsing fails
+        RtspPortNumber = 48010;
+    }
 
     alreadyTerminated = false;
     ConnectionInterrupted = false;
