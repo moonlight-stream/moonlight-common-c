@@ -305,7 +305,7 @@ int setSocketNonBlocking(SOCKET s, bool enabled) {
     int val = enabled ? 1 : 0;
     return ioctlsocket(s, FIONBIO, &val);
 #else
-#error Please define your platform's non-blocking sockets API!
+#error Please define your platform non-blocking sockets API!
 #endif
 }
 
