@@ -248,7 +248,6 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     if (sock == INVALID_SOCKET) {
         return ret;
     }
-    setRecvTimeout(sock, RTSP_TIMEOUT_SEC);
 
     serializedMessage = serializeRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {
@@ -271,6 +270,8 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     offset = 0;
     responseBufferSize = 0;
     for (;;) {
+        struct pollfd pfd;
+
         if (offset >= responseBufferSize) {
             responseBufferSize = offset + 16384;
             responseBuffer = extendBuffer(responseBuffer, responseBufferSize);
@@ -278,6 +279,20 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
                 Limelog("Failed to allocate RTSP response buffer\n");
                 goto Exit;
             }
+        }
+
+        pfd.fd = sock;
+        pfd.events = POLLIN;
+        err = pollSockets(&pfd, 1, RTSP_TIMEOUT_SEC * 1000);
+        if (err == 0) {
+            *error = ETIMEDOUT;
+            Limelog("RTSP request timed out\n");
+        }
+        else if (err < 0) {
+            *error = LastSocketError();
+            Limelog("Failed to wait for RTSP response: %d\n", *error);
+            goto Exit;
+            return false;
         }
 
         err = recv(sock, &responseBuffer[offset], responseBufferSize - offset, 0);

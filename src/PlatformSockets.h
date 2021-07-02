@@ -99,7 +99,6 @@ int setSocketNonBlocking(SOCKET s, bool enabled);
 int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect);
 void shutdownTcpSocket(SOCKET s);
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
-void setRecvTimeout(SOCKET s, int timeoutSec);
 void closeSocket(SOCKET s);
 bool isPrivateNetworkAddress(struct sockaddr_storage* address);
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs);

@@ -77,24 +77,6 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
 #endif
 }
 
-void setRecvTimeout(SOCKET s, int timeoutSec) {
-#ifdef __WIIU__
-    // timeouts aren't supported on Wii U
-#else
-#if defined(LC_WINDOWS)
-    int val = timeoutSec * 1000;
-#else
-    struct timeval val;
-    val.tv_sec = timeoutSec;
-    val.tv_usec = 0;
-#endif
-    
-    if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&val, sizeof(val)) < 0) {
-        Limelog("setsockopt(SO_RCVTIMEO) failed: %d\n", (int)LastSocketError());
-    }
-#endif
-}
-
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 #if defined(LC_WINDOWS) || defined(__vita__)
     // We could have used WSAPoll() but it has some nasty bugs
