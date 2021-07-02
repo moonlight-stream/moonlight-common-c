@@ -3,7 +3,6 @@
 #define FIRST_FRAME_MAX 1500
 #define FIRST_FRAME_TIMEOUT_SEC 10
 
-#define RTP_PORT 47998
 #define FIRST_FRAME_PORT 47996
 
 #define RTP_RECV_BUFFER (512 * 1024)
@@ -48,7 +47,7 @@ static void VideoPingThreadProc(void* context) {
     LC_SOCKADDR saddr;
 
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
-    SET_PORT(&saddr, RTP_PORT);
+    SET_PORT(&saddr, VideoPortNumber);
 
     while (!PltIsThreadInterrupted(&udpPingThread)) {
         // We do not check for errors here. Socket errors will be handled

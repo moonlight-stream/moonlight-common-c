@@ -1143,7 +1143,7 @@ int startControlStream(void) {
         ENetEvent event;
         
         enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, RemoteAddrLen);
-        enet_address_set_port(&address, 47999);
+        enet_address_set_port(&address, ControlPortNumber);
 
         // Create a client that can use 1 outgoing connection and 1 channel
         client = enet_host_create(address.address.ss_family, NULL, 1, 1, 0, 0);
@@ -1166,7 +1166,7 @@ int startControlStream(void) {
         // Wait for the connect to complete
         if (serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
-            Limelog("Failed to connect to UDP port 47999\n");
+            Limelog("Failed to connect to UDP port %u\n", ControlPortNumber);
             stopping = true;
             enet_peer_reset(peer);
             peer = NULL;
@@ -1182,6 +1182,7 @@ int startControlStream(void) {
         enet_peer_timeout(peer, 2, 10000, 10000);
     }
     else {
+        // NB: Do NOT use ControlPortNumber here. 47995 is correct for these old versions.
         ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
             47995, CONTROL_STREAM_TIMEOUT_SEC);
         if (ctlSock == INVALID_SOCKET) {

@@ -228,7 +228,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // returns HTTP 200 OK for the /launch request before the RTSP handshake port
     // is listening.
     do {
-        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, 48010, RTSP_TIMEOUT_SEC);
+        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, RtspPortNumber, RTSP_TIMEOUT_SEC);
         if (sock == INVALID_SOCKET) {
             *error = LastSocketError();
             if (*error == ECONNREFUSED) {
@@ -525,6 +525,57 @@ static int parseOpusConfigFromParamString(char* paramStr, int channelCount, POPU
     return 0;
 }
 
+static bool parseMediaEntry(PRTSP_MESSAGE response, const char* mediaType, const char* transport, uint16_t* port) {
+    char paramsPrefix[128];
+    char paramsSuffix[128];
+    char* paramStart;
+
+    sprintf(paramsPrefix, "m=%s ", mediaType);
+    sprintf(paramsSuffix, " %s", transport);
+
+    // Look for the next match
+    paramStart = response->payload;
+    while ((paramStart = strstr(paramStart, paramsPrefix)) != NULL) {
+        // Skip the prefix
+        paramStart += strlen(paramsPrefix);
+
+        // The first part should be the port number
+        char* nextToken;
+        long int rawPort = strtol(paramStart, &nextToken, 10);
+        if (rawPort <= 0 || rawPort >= 65535) {
+            continue;
+        }
+
+        // Skip this entry if the transport isn't what we expect
+        if (strncmp(nextToken, paramsSuffix, strlen(paramsSuffix)) != 0) {
+            continue;
+        }
+
+        // This entry is a match
+        *port = (uint16_t)rawPort;
+        return true;
+    }
+
+    // No match for this media type and transport
+    return false;
+}
+
+static void parsePortConfigurations(PRTSP_MESSAGE response) {
+    // Don't parse ports on very old GFE versions
+    if (!APP_VERSION_AT_LEAST(7, 0, 0)) {
+        return;
+    }
+
+    parseMediaEntry(response, "video", "RTP/AVP", &VideoPortNumber);
+    parseMediaEntry(response, "audio", "RTP/AVP", &AudioPortNumber);
+
+    if (!parseMediaEntry(response, "application", "udp", &ControlPortNumber)) {
+        if (!parseMediaEntry(response, "application", "udp_enc", &ControlPortNumber)) {
+            parseMediaEntry(response, "application", "udp_ag", &ControlPortNumber);
+        }
+    }
+}
+
 // Parses the Opus configuration from an RTSP DESCRIBE response
 static int parseOpusConfigurations(PRTSP_MESSAGE response) {
     HighQualitySurroundSupported = false;
@@ -644,7 +695,7 @@ int performRtspHandshake(void) {
 
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
-    sprintf(rtspTargetUrl, "rtsp%s://%s:48010", useEnet ? "ru" : "", urlAddr);
+    sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
     currentSeqNumber = 1;
     hasSessionId = false;
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
@@ -676,7 +727,7 @@ int performRtspHandshake(void) {
         ENetEvent event;
         
         enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, RemoteAddrLen);
-        enet_address_set_port(&address, 48010);
+        enet_address_set_port(&address, RtspPortNumber);
         
         // Create a client that can use 1 outgoing connection and 1 channel
         client = enet_host_create(RemoteAddr.ss_family, NULL, 1, 1, 0, 0);
@@ -695,7 +746,7 @@ int performRtspHandshake(void) {
         // Wait for the connect to complete
         if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
-            Limelog("RTSP: Failed to connect to UDP port 48010\n");
+            Limelog("RTSP: Failed to connect to UDP port %u\n", RtspPortNumber);
             enet_peer_reset(peer);
             peer = NULL;
             enet_host_destroy(client);
@@ -772,6 +823,14 @@ int performRtspHandshake(void) {
                 Limelog("WARNING: Host PC doesn't support HEVC. Streaming at resolutions above 4K using H.264 will likely fail!\n");
             }
         }
+
+        // Parse audio, video, and control ports out of the RTSP DESCRIBE response.
+        parsePortConfigurations(&response);
+
+        // Let the audio stream know the port number is now finalized.
+        // NB: This is needed because audio stream init happens before RTSP,
+        // which is not the case for the video stream.
+        notifyAudioPortNegotiationComplete();
 
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
         ret = parseOpusConfigurations(&response);

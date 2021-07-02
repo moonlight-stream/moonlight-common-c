@@ -32,6 +32,11 @@ extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
 extern bool AudioEncryptionEnabled;
 
+extern uint16_t RtspPortNumber;
+extern uint16_t ControlPortNumber;
+extern uint16_t AudioPortNumber;
+extern uint16_t VideoPortNumber;
+
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
 #endif
@@ -100,6 +105,7 @@ int startVideoStream(void* rendererContext, int drFlags);
 void stopVideoStream(void);
 
 int initializeAudioStream(void);
+int notifyAudioPortNegotiationComplete(void);
 void destroyAudioStream(void);
 int startAudioStream(void* audioContext, int arFlags);
 void stopAudioStream(void);

@@ -14,6 +14,7 @@ static uint32_t avRiKeyId;
 
 static unsigned short lastSeq;
 
+static bool pingThreadStarted;
 static bool receivedDataFromPeer;
 static uint64_t firstReceiveTime;
 
@@ -21,8 +22,6 @@ static uint64_t firstReceiveTime;
 #define INVALID_OPUS_HEADER 0x00
 static uint8_t opusHeaderByte;
 #endif
-
-#define RTP_PORT 48000
 
 #define MAX_PACKET_SIZE 1400
 
@@ -47,7 +46,7 @@ static void AudioPingThreadProc(void* context) {
     LC_SOCKADDR saddr;
 
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
-    SET_PORT(&saddr, RTP_PORT);
+    SET_PORT(&saddr, AudioPortNumber);
 
     // Send PING every 500 milliseconds
     while (!PltIsThreadInterrupted(&udpPingThread)) {
@@ -74,6 +73,7 @@ int initializeAudioStream(void) {
     RtpaInitializeQueue(&rtpAudioQueue);
     lastSeq = 0;
     receivedDataFromPeer = false;
+    pingThreadStarted = false;
     firstReceiveTime = 0;
     audioDecryptionCtx = PltCreateCryptoContext();
 #ifdef LC_DEBUG
@@ -91,15 +91,23 @@ int initializeAudioStream(void) {
         return LastSocketFail();
     }
 
+    return 0;
+}
+
+// This is called when the RTSP DESCRIBE message is parsed and the audio port
+// number is parsed out of it. Alternatively, it's also called if parsing fails
+// and will use the well known audio port instead.
+int notifyAudioPortNegotiationComplete(void) {
+    LC_ASSERT(!pingThreadStarted);
+
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
     int err = PltCreateThread("AudioPing", AudioPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
-        closeSocket(rtpSocket);
-        rtpSocket = INVALID_SOCKET;
         return err;
     }
 
+    pingThreadStarted = true;
     return 0;
 }
 
@@ -119,9 +127,11 @@ static void freePacketList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
 // Tear down the audio stream once we're done with it
 void destroyAudioStream(void) {
     if (rtpSocket != INVALID_SOCKET) {
-        PltInterruptThread(&udpPingThread);
-        PltJoinThread(&udpPingThread);
-        PltCloseThread(&udpPingThread);
+        if (pingThreadStarted) {
+            PltInterruptThread(&udpPingThread);
+            PltJoinThread(&udpPingThread);
+            PltCloseThread(&udpPingThread);
+        }
 
         closeSocket(rtpSocket);
         rtpSocket = INVALID_SOCKET;

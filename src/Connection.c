@@ -24,6 +24,10 @@ OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
 int AudioPacketDuration;
 bool AudioEncryptionEnabled;
+uint16_t RtspPortNumber;
+uint16_t ControlPortNumber;
+uint16_t AudioPortNumber;
+uint16_t VideoPortNumber;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -207,6 +211,12 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
     OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
+
+    // Configure default ports
+    VideoPortNumber = 47998;
+    ControlPortNumber = 47999;
+    AudioPortNumber = 48000;
+    RtspPortNumber = 48010; // TODO: Parse this out of RTSP session URL
 
     alreadyTerminated = false;
     ConnectionInterrupted = false;
