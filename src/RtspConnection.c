@@ -525,55 +525,34 @@ static int parseOpusConfigFromParamString(char* paramStr, int channelCount, POPU
     return 0;
 }
 
-static bool parseMediaEntry(PRTSP_MESSAGE response, const char* mediaType, const char* transport, uint16_t* port) {
-    char paramsPrefix[128];
-    char paramsSuffix[128];
-    char* paramStart;
+// Parse the server port from the Transport header
+// Example: unicast;server_port=48000-48001;source=192.168.35.177
+static bool parseServerPortFromTransport(PRTSP_MESSAGE response, uint16_t* port) {
+    char* transport;
+    char* portStart;
 
-    sprintf(paramsPrefix, "m=%s ", mediaType);
-    sprintf(paramsSuffix, " %s", transport);
-
-    // Look for the next match
-    paramStart = response->payload;
-    while ((paramStart = strstr(paramStart, paramsPrefix)) != NULL) {
-        // Skip the prefix
-        paramStart += strlen(paramsPrefix);
-
-        // The first part should be the port number
-        char* nextToken;
-        long int rawPort = strtol(paramStart, &nextToken, 10);
-        if (rawPort <= 0 || rawPort >= 65535) {
-            continue;
-        }
-
-        // Skip this entry if the transport isn't what we expect
-        if (strncmp(nextToken, paramsSuffix, strlen(paramsSuffix)) != 0) {
-            continue;
-        }
-
-        // This entry is a match
-        *port = (uint16_t)rawPort;
-        return true;
+    transport = getOptionContent(response->options, "Transport");
+    if (transport == NULL) {
+        return false;
     }
 
-    // No match for this media type and transport
-    return false;
-}
-
-static void parsePortConfigurations(PRTSP_MESSAGE response) {
-    // Don't parse ports on very old GFE versions
-    if (!APP_VERSION_AT_LEAST(7, 0, 0)) {
-        return;
+    // Look for the server_port= entry in the Transport option
+    portStart = strstr(transport, "server_port=");
+    if (portStart == NULL) {
+        return false;
     }
 
-    parseMediaEntry(response, "video", "RTP/AVP", &VideoPortNumber);
-    parseMediaEntry(response, "audio", "RTP/AVP", &AudioPortNumber);
+    // Skip the prefix
+    portStart += strlen("server_port=");
 
-    if (!parseMediaEntry(response, "application", "udp", &ControlPortNumber)) {
-        if (!parseMediaEntry(response, "application", "udp_enc", &ControlPortNumber)) {
-            parseMediaEntry(response, "application", "udp_ag", &ControlPortNumber);
-        }
+    // Validate the port number
+    long int rawPort = strtol(portStart, NULL, 10);
+    if (rawPort <= 0 || rawPort >= 65535) {
+        return false;
     }
+
+    *port = (uint16_t)rawPort;
+    return true;
 }
 
 // Parses the Opus configuration from an RTSP DESCRIBE response
@@ -824,14 +803,6 @@ int performRtspHandshake(void) {
             }
         }
 
-        // Parse audio, video, and control ports out of the RTSP DESCRIBE response.
-        parsePortConfigurations(&response);
-
-        // Let the audio stream know the port number is now finalized.
-        // NB: This is needed because audio stream init happens before RTSP,
-        // which is not the case for the video stream.
-        notifyAudioPortNegotiationComplete();
-
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
         ret = parseOpusConfigurations(&response);
         if (ret != 0) {
@@ -860,6 +831,14 @@ int performRtspHandshake(void) {
             ret = response.message.response.statusCode;
             goto Exit;
         }
+
+        // Parse the audio port out of the RTSP SETUP response
+        parseServerPortFromTransport(&response, &AudioPortNumber);
+
+        // Let the audio stream know the port number is now finalized.
+        // NB: This is needed because audio stream init happens before RTSP,
+        // which is not the case for the video stream.
+        notifyAudioPortNegotiationComplete();
 
         sessionId = getOptionContent(response.options, "Session");
 
@@ -905,6 +884,9 @@ int performRtspHandshake(void) {
             goto Exit;
         }
 
+        // Parse the video port out of the RTSP SETUP response
+        parseServerPortFromTransport(&response, &VideoPortNumber);
+
         freeMessage(&response);
     }
     
@@ -926,6 +908,9 @@ int performRtspHandshake(void) {
             ret = response.message.response.statusCode;
             goto Exit;
         }
+
+        // Parse the control port out of the RTSP SETUP response
+        parseServerPortFromTransport(&response, &ControlPortNumber);
 
         freeMessage(&response);
     }
