@@ -833,7 +833,12 @@ int performRtspHandshake(void) {
         }
 
         // Parse the audio port out of the RTSP SETUP response
-        parseServerPortFromTransport(&response, &AudioPortNumber);
+        if (!parseServerPortFromTransport(&response, &AudioPortNumber)) {
+            Limelog("Audio port: %u (RTSP parsing failed)\n", AudioPortNumber);
+        }
+        else {
+            Limelog("Audio port: %u\n", AudioPortNumber);
+        }
 
         // Let the audio stream know the port number is now finalized.
         // NB: This is needed because audio stream init happens before RTSP,
@@ -885,7 +890,12 @@ int performRtspHandshake(void) {
         }
 
         // Parse the video port out of the RTSP SETUP response
-        parseServerPortFromTransport(&response, &VideoPortNumber);
+        if (!parseServerPortFromTransport(&response, &VideoPortNumber)) {
+            Limelog("Video port: %u (RTSP parsing failed)\n", VideoPortNumber);
+        }
+        else {
+            Limelog("Video port: %u\n", VideoPortNumber);
+        }
 
         freeMessage(&response);
     }
@@ -910,7 +920,12 @@ int performRtspHandshake(void) {
         }
 
         // Parse the control port out of the RTSP SETUP response
-        parseServerPortFromTransport(&response, &ControlPortNumber);
+        if (!parseServerPortFromTransport(&response, &ControlPortNumber)) {
+            Limelog("Control port: %u (RTSP parsing failed)\n", ControlPortNumber);
+        }
+        else {
+            Limelog("Control port: %u\n", ControlPortNumber);
+        }
 
         freeMessage(&response);
     }
