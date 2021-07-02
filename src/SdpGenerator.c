@@ -133,6 +133,7 @@ static int addGen4Options(PSDP_OPTION* head, char* addrStr) {
     char payloadStr[92];
     int err = 0;
 
+    LC_ASSERT(RtspPortNumber != 0);
     sprintf(payloadStr, "rtsp://%s:%u", addrStr, RtspPortNumber);
     err |= addAttributeString(head, "x-nv-general.serverAddress", payloadStr);
 
@@ -461,6 +462,7 @@ static int fillSdpHeader(char* buffer, int rtspClientVersion, char*urlSafeAddr) 
 
 // Populate the SDP tail with required information
 static int fillSdpTail(char* buffer) {
+    LC_ASSERT(VideoPortNumber != 0);
     return sprintf(buffer,
         "t=0 0\r\n"
         "m=video %d  \r\n",

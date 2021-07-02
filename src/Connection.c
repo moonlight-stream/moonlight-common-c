@@ -238,11 +238,10 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
 
-    // Initialize port numbers to defaults. The values in RTSP SETUP (if valid)
-    // will override these to allow dynamic port selection.
-    VideoPortNumber = 47998;
-    ControlPortNumber = 47999;
-    AudioPortNumber = 48000;
+    // The values in RTSP SETUP will be used to populate these.
+    VideoPortNumber = 0;
+    ControlPortNumber = 0;
+    AudioPortNumber = 0;
 
     // Parse RTSP port number from RTSP session URL
     if (!parseRtspPortNumberFromUrl(serverInfo->rtspSessionUrl, &RtspPortNumber)) {

@@ -672,6 +672,8 @@ int performRtspHandshake(void) {
         strcpy(urlAddr, "0.0.0.0");
     }
 
+    LC_ASSERT(RtspPortNumber != 0);
+
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
     sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
@@ -833,7 +835,11 @@ int performRtspHandshake(void) {
         }
 
         // Parse the audio port out of the RTSP SETUP response
+        LC_ASSERT(AudioPortNumber == 0);
         if (!parseServerPortFromTransport(&response, &AudioPortNumber)) {
+            // Use the well known port if parsing fails
+            AudioPortNumber = 48000;
+
             Limelog("Audio port: %u (RTSP parsing failed)\n", AudioPortNumber);
         }
         else {
@@ -890,7 +896,11 @@ int performRtspHandshake(void) {
         }
 
         // Parse the video port out of the RTSP SETUP response
+        LC_ASSERT(VideoPortNumber == 0);
         if (!parseServerPortFromTransport(&response, &VideoPortNumber)) {
+            // Use the well known port if parsing fails
+            VideoPortNumber = 47998;
+
             Limelog("Video port: %u (RTSP parsing failed)\n", VideoPortNumber);
         }
         else {
@@ -920,7 +930,11 @@ int performRtspHandshake(void) {
         }
 
         // Parse the control port out of the RTSP SETUP response
+        LC_ASSERT(ControlPortNumber == 0);
         if (!parseServerPortFromTransport(&response, &ControlPortNumber)) {
+            // Use the well known port if parsing fails
+            ControlPortNumber = 47999;
+
             Limelog("Control port: %u (RTSP parsing failed)\n", ControlPortNumber);
         }
         else {

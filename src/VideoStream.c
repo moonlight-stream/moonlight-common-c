@@ -46,6 +46,8 @@ static void VideoPingThreadProc(void* context) {
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
 
+    LC_ASSERT(VideoPortNumber != 0);
+
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     SET_PORT(&saddr, VideoPortNumber);
 

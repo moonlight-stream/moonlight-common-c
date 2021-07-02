@@ -45,6 +45,8 @@ static void AudioPingThreadProc(void* context) {
     char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
 
+    LC_ASSERT(AudioPortNumber != 0);
+
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     SET_PORT(&saddr, AudioPortNumber);
 
@@ -94,11 +96,12 @@ int initializeAudioStream(void) {
     return 0;
 }
 
-// This is called when the RTSP DESCRIBE message is parsed and the audio port
+// This is called when the RTSP SETUP message is parsed and the audio port
 // number is parsed out of it. Alternatively, it's also called if parsing fails
 // and will use the well known audio port instead.
 int notifyAudioPortNegotiationComplete(void) {
     LC_ASSERT(!pingThreadStarted);
+    LC_ASSERT(AudioPortNumber != 0);
 
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
