@@ -547,7 +547,7 @@ static bool parseServerPortFromTransport(PRTSP_MESSAGE response, uint16_t* port)
 
     // Validate the port number
     long int rawPort = strtol(portStart, NULL, 10);
-    if (rawPort <= 0 || rawPort >= 65535) {
+    if (rawPort <= 0 || rawPort > 65535) {
         return false;
     }
 
