@@ -37,6 +37,7 @@ typedef struct _LENTRY_INTERNAL {
 #define H264_NAL_TYPE(x) ((x) & 0x1F)
 #define HEVC_NAL_TYPE(x) (((x) & 0x7E) >> 1)
 
+#define H264_NAL_TYPE_SEI 6
 #define H264_NAL_TYPE_SPS 7
 #define H264_NAL_TYPE_PPS 8
 #define H264_NAL_TYPE_AUD 9
@@ -44,6 +45,7 @@ typedef struct _LENTRY_INTERNAL {
 #define HEVC_NAL_TYPE_SPS 33
 #define HEVC_NAL_TYPE_PPS 34
 #define HEVC_NAL_TYPE_AUD 35
+#define HEVC_NAL_TYPE_SEI 39
 
 // Init
 void initializeVideoDepacketizer(int pktSize) {
@@ -293,6 +295,25 @@ static bool isAccessUnitDelimiter(PBUFFER_DESC buffer) {
     }
 }
 
+static bool isSeiNal(PBUFFER_DESC buffer) {
+    BUFFER_DESC specialSeq;
+
+    if (!getSpecialSeq(buffer, &specialSeq)) {
+        return false;
+    }
+
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_SEI;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_SEI;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
+}
+
 // Advance the buffer descriptor to the start of the next NAL
 static void skipToNextNal(PBUFFER_DESC buffer) {
     BUFFER_DESC specialSeq;
@@ -507,6 +528,13 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
     LC_ASSERT(nalChainTail == NULL);
 
     while (currentPos->length != 0) {
+        // Skip any prepended AUD or SEI NALUs. We may have padding between
+        // these on IDR frames, so the check in processRtpPayload() is not
+        // completely sufficient to handle that case.
+        while (isAccessUnitDelimiter(currentPos) || isSeiNal(currentPos)) {
+            skipToNextNal(currentPos);
+        }
+
         int start = currentPos->offset;
         bool containsPicData = false;
 
@@ -730,6 +758,12 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         // Other parts of this code are not prepared to deal with a
         // NAL of that type, so stripping it is the easiest option.
         if (isAccessUnitDelimiter(&currentPos)) {
+            skipToNextNal(&currentPos);
+        }
+
+        // There may be one or more SEI NAL units prepended to the
+        // frame data *after* the (optional) AUD.
+        while (isSeiNal(&currentPos)) {
             skipToNextNal(&currentPos);
         }
     }
