@@ -768,6 +768,7 @@ static void controlReceiveThreadFunc(void* context) {
                     // What do we do here???
                     LC_ASSERT(false);
                     packetLength = (int)event.packet->dataLength;
+                    event.packet->data = NULL;
                 }
             }
             else {
