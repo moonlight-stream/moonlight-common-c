@@ -201,6 +201,8 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
                                NULL, 0,
                                (unsigned char*)(rtp + 1), dataLength,
                                decryptedOpusData, &dataLength)) {
+            Limelog("Failed to decrypt audio packet (sequence number: %u)\n", rtp->sequenceNumber);
+            LC_ASSERT(false);
             return;
         }
 
