@@ -410,15 +410,16 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     unsigned char iv[16] = { 0 };
     int encryptedSize = sizeof(*packet) + packet->payloadLength;
 
+    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+    // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
+    iv[0] = (unsigned char)encPacket->seq;
+
     encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
     encPacket->length = LE16(encPacket->length);
     encPacket->seq = LE32(encPacket->seq);
 
     packet->type = LE16(packet->type);
     packet->payloadLength = LE16(packet->payloadLength);
-
-    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-    iv[0] = (unsigned char)encPacket->seq;
 
     return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
                              (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
