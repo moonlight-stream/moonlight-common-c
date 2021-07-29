@@ -30,7 +30,7 @@ typedef struct _NV_KEYBOARD_PACKET {
 typedef struct _NV_UNICODE_PACKET {
     unsigned int size;
     int magic;
-    char text[UNICODE_EVENT_MAX_COUNT];
+    char text[UNICODE_EVENT_MAX_COUNT + 1];
 } NV_UNICODE_PACKET, *PNV_UNICODE_PACKET;
 
 #define PACKET_TYPE_REL_MOUSE_MOVE 0x08
