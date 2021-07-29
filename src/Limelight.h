@@ -519,6 +519,8 @@ int LiSendMouseButtonEvent(char action, int button);
 #define MODIFIER_META 0x08
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
+int LiSendUnicodeEvent(const char *text, unsigned int length);
+
 // Button flags
 #define A_FLAG     0x1000
 #define B_FLAG     0x2000
