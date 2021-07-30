@@ -26,6 +26,7 @@ typedef struct _PACKET_HOLDER {
         NV_MULTI_CONTROLLER_PACKET multiController;
         NV_SCROLL_PACKET scroll;
         NV_HAPTICS_PACKET haptics;
+        NV_UNICODE_PACKET unicode;
     } packet;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
@@ -596,6 +597,38 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     holder->packet.keyboard.keyCode = LE16(keyCode);
     holder->packet.keyboard.modifiers = modifiers;
     holder->packet.keyboard.zero2 = 0;
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendUtf8TextEvent(const char *text, unsigned int length) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    if (length > UTF8_TEXT_EVENT_MAX_COUNT) {
+        return -1;
+    }
+    holder = allocatePacketHolder();
+    if (holder == NULL) {
+        return -1;
+    }
+    // Size + magic + string length
+    holder->packetLength = 4 + 4 + length;
+    // Magic + string length
+    holder->packet.unicode.size = BE32(4 + length);
+    holder->packet.unicode.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
+    memcpy(holder->packet.unicode.text, text, length);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
