@@ -3,6 +3,7 @@
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
 static bool initialized;
+static bool encryptedControlStream;
 static PPLT_CRYPTO_CONTEXT cryptoContext;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -41,6 +42,7 @@ int initializeInputStream(void) {
     LbqInitializeLinkedBlockingQueue(&packetHolderFreeList, MAX_QUEUED_INPUT_PACKETS);
 
     cryptoContext = PltCreateCryptoContext();
+    encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
     return 0;
 }
 
@@ -136,17 +138,79 @@ static PPACKET_HOLDER allocatePacketHolder(void) {
     }
 }
 
+static bool sendInputPacket(PPACKET_HOLDER holder) {
+    SOCK_RET err;
+
+    // On GFE 3.22, the entire control stream is encrypted (and support for separate RI encrypted)
+    // has been removed. We send the plaintext packet through and the control stream code will do
+    // the encryption.
+    if (encryptedControlStream) {
+        err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, holder->packetLength);
+        if (err < 0) {
+            Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
+            ListenerCallbacks.connectionTerminated(err);
+            return false;
+        }
+    }
+    else {
+        char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
+        uint32_t encryptedSize;
+        uint32_t encryptedLengthPrefix;
+
+        // Encrypt the message into the output buffer while leaving room for the length
+        encryptedSize = sizeof(encryptedBuffer) - sizeof(encryptedLengthPrefix);
+        err = encryptData((unsigned char*)&holder->packet, holder->packetLength,
+            (unsigned char*)&encryptedBuffer[sizeof(encryptedLengthPrefix)], (int*)&encryptedSize);
+        if (err != 0) {
+            Limelog("Input: Encryption failed: %d\n", (int)err);
+            ListenerCallbacks.connectionTerminated(err);
+            return false;
+        }
+
+        // Prepend the length to the message
+        encryptedLengthPrefix = BE32(encryptedSize);
+        memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, sizeof(encryptedLengthPrefix));
+
+        if (AppVersionQuad[0] < 5) {
+            // Send the encrypted payload
+            err = send(inputSock, (const char*) encryptedBuffer,
+                (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
+            if (err <= 0) {
+                Limelog("Input: send() failed: %d\n", (int) LastSocketError());
+                ListenerCallbacks.connectionTerminated(LastSocketFail());
+                return false;
+            }
+        }
+        else {
+            // For reasons that I can't understand, NVIDIA decides to use the last 16
+            // bytes of ciphertext in the most recent game controller packet as the IV for
+            // future encryption. I think it may be a buffer overrun on their end but we'll have
+            // to mimic it to work correctly.
+            if (AppVersionQuad[0] >= 7 && encryptedSize >= 16 + sizeof(currentAesIv)) {
+                memcpy(currentAesIv,
+                       &encryptedBuffer[4 + encryptedSize - sizeof(currentAesIv)],
+                       sizeof(currentAesIv));
+            }
+
+            err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
+                (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
+            if (err < 0) {
+                Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
+                ListenerCallbacks.connectionTerminated(err);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 // Input thread proc
 static void inputSendThreadProc(void* context) {
     SOCK_RET err;
     PPACKET_HOLDER holder;
-    char encryptedBuffer[MAX_INPUT_PACKET_SIZE];
-    uint32_t encryptedSize;
-    bool encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
-        int encryptedLengthPrefix;
-
         err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
         if (err != LBQ_SUCCESS) {
             return;
@@ -275,64 +339,13 @@ static void inputSendThreadProc(void* context) {
             }
         }
 
-        // On GFE 3.22, the entire control stream is encrypted (and support for separate RI encrypted)
-        // has been removed. We send the plaintext packet through and the control stream code will do
-        // the encryption.
-        if (encryptedControlStream) {
-            err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, holder->packetLength);
+        // Encrypt and send the input packet
+        if (!sendInputPacket(holder)) {
             freePacketHolder(holder);
-            if (err < 0) {
-                Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
-                ListenerCallbacks.connectionTerminated(err);
-                return;
-            }
+            return;
         }
-        else {
-            // Encrypt the message into the output buffer while leaving room for the length
-            encryptedSize = sizeof(encryptedBuffer) - 4;
-            err = encryptData((unsigned char*)&holder->packet, holder->packetLength,
-                (unsigned char*)&encryptedBuffer[4], (int*)&encryptedSize);
-            freePacketHolder(holder);
-            if (err != 0) {
-                Limelog("Input: Encryption failed: %d\n", (int)err);
-                ListenerCallbacks.connectionTerminated(err);
-                return;
-            }
 
-            // Prepend the length to the message
-            encryptedLengthPrefix = BE32(encryptedSize);
-            memcpy(&encryptedBuffer[0], &encryptedLengthPrefix, 4);
-
-            if (AppVersionQuad[0] < 5) {
-                // Send the encrypted payload
-                err = send(inputSock, (const char*) encryptedBuffer,
-                    (int) (encryptedSize + sizeof(encryptedLengthPrefix)), 0);
-                if (err <= 0) {
-                    Limelog("Input: send() failed: %d\n", (int) LastSocketError());
-                    ListenerCallbacks.connectionTerminated(LastSocketFail());
-                    return;
-                }
-            }
-            else {
-                // For reasons that I can't understand, NVIDIA decides to use the last 16
-                // bytes of ciphertext in the most recent game controller packet as the IV for
-                // future encryption. I think it may be a buffer overrun on their end but we'll have
-                // to mimic it to work correctly.
-                if (AppVersionQuad[0] >= 7 && encryptedSize >= 16 + sizeof(currentAesIv)) {
-                    memcpy(currentAesIv,
-                           &encryptedBuffer[4 + encryptedSize - sizeof(currentAesIv)],
-                           sizeof(currentAesIv));
-                }
-
-                err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
-                    (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
-                if (err < 0) {
-                    Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
-                    ListenerCallbacks.connectionTerminated(err);
-                    return;
-                }
-            }
-        }
+        freePacketHolder(holder);
     }
 }
 
