@@ -608,7 +608,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     return err;
 }
 
-int LiSendUnicodeEvent(const char *text, unsigned int length) {
+int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -616,19 +616,19 @@ int LiSendUnicodeEvent(const char *text, unsigned int length) {
         return -2;
     }
 
-    if (length > UNICODE_EVENT_MAX_COUNT) {
+    if (length > UTF8_TEXT_EVENT_MAX_COUNT) {
         return -1;
     }
-
     holder = allocatePacketHolder();
     if (holder == NULL) {
         return -1;
     }
-    holder->packetLength = sizeof(NV_UNICODE_PACKET);
-    // Size field + string length
+    // Size + magic + string length
+    holder->packetLength = 4 + 4 + length;
+    // Magic + string length
     holder->packet.unicode.size = BE32(4 + length);
-    holder->packet.unicode.magic = UNICODE_EVENT_MAGIC;
-    strncpy(holder->packet.unicode.text, text, UNICODE_EVENT_MAX_COUNT);
+    holder->packet.unicode.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
+    memcpy(holder->packet.unicode.text, text, length);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {

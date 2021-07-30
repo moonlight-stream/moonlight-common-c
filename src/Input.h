@@ -25,12 +25,12 @@ typedef struct _NV_KEYBOARD_PACKET {
     short zero2;
 } NV_KEYBOARD_PACKET, *PNV_KEYBOARD_PACKET;
 
-#define UNICODE_EVENT_MAGIC 0x17
-#define UNICODE_EVENT_MAX_COUNT 32
+#define UTF8_TEXT_EVENT_MAGIC 0x17
+#define UTF8_TEXT_EVENT_MAX_COUNT 32
 typedef struct _NV_UNICODE_PACKET {
     unsigned int size;
     int magic;
-    char text[UNICODE_EVENT_MAX_COUNT + 1];
+    char text[UTF8_TEXT_EVENT_MAX_COUNT];
 } NV_UNICODE_PACKET, *PNV_UNICODE_PACKET;
 
 #define PACKET_TYPE_REL_MOUSE_MOVE 0x08
