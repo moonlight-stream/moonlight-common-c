@@ -520,7 +520,6 @@ int LiSendMouseButtonEvent(char action, int button);
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 // This function queues an UTF-8 encoded text to be sent to the remote server.
-// Currently maximum length is 32 bytes.
 int LiSendUtf8TextEvent(const char *text, unsigned int length);
 
 // Button flags

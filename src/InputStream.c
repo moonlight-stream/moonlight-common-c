@@ -112,15 +112,27 @@ static int encryptData(unsigned char* plaintext, int plaintextLen,
 }
 
 static void freePacketHolder(PPACKET_HOLDER holder) {
-    // Place the packet holder back into the free list
-    if (LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
+    LC_ASSERT(holder->packetLength != 0);
+
+    // Place the packet holder back into the free list if it's a standard size entry
+    if (holder->packetLength > sizeof(*holder) || LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
         free(holder);
     }
 }
 
-static PPACKET_HOLDER allocatePacketHolder(void) {
+static PPACKET_HOLDER allocatePacketHolder(int extraLength) {
     PPACKET_HOLDER holder;
     int err;
+
+    // If we're using an extended packet holder, we can't satisfy
+    // this allocation from the packet holder free list.
+    if (extraLength > 0) {
+        // We over-allocate here a bit since we're always adding sizeof(*holder),
+        // but this is on purpose. It allows us assume we have a full holder even
+        // if packetLength < sizeof(*holder) and put this allocation into the free
+        // list.
+        return malloc(sizeof(*holder) + extraLength);
+    }
 
     // Grab an entry from the free list (if available)
     err = LbqPollQueueElement(&packetHolderFreeList, (void**)&holder);
@@ -341,6 +353,33 @@ static void inputSendThreadProc(void* context) {
                 holder = mouseBatchHolder;
             }
         }
+        // If it's a UTF-8 text packet, we may need to split it into a several packets to send
+        else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
+            PACKET_HOLDER splitPacket;
+            uint32_t totalLength = BE32(holder->packet.unicode.header.size) - sizeof(uint32_t);
+            int i = 0;
+
+            while (i < totalLength) {
+                uint32_t copyLength = totalLength - i < UTF8_TEXT_EVENT_MAX_COUNT ?
+                                      totalLength - i : UTF8_TEXT_EVENT_MAX_COUNT;
+
+                splitPacket.packetLength = sizeof(uint32_t) + sizeof(uint32_t) + copyLength;
+                splitPacket.packet.unicode.header.size = BE32(splitPacket.packetLength - sizeof(uint32_t));
+                splitPacket.packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
+                memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], copyLength);
+
+                // Encrypt and send the split packet
+                if (!sendInputPacket(&splitPacket)) {
+                    freePacketHolder(holder);
+                    return;
+                }
+
+                i += copyLength;
+            }
+
+            freePacketHolder(holder);
+            continue;
+        }
 
         // Encrypt and send the input packet
         if (!sendInputPacket(holder)) {
@@ -363,7 +402,7 @@ static int sendEnableHaptics(void) {
         return 0;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -453,7 +492,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         return 0;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -488,7 +527,7 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
         return -2;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -527,7 +566,7 @@ int LiSendMouseButtonEvent(char action, int button) {
         return -2;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -560,7 +599,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
         return -2;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -633,17 +672,14 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
         return -2;
     }
 
-    if (length > UTF8_TEXT_EVENT_MAX_COUNT) {
-        return -1;
-    }
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(length);
     if (holder == NULL) {
         return -1;
     }
     // Size + magic + string length
     holder->packetLength = sizeof(uint32_t) + sizeof(uint32_t) + length;
     // Magic + string length
-    holder->packet.unicode.header.size = BE32(sizeof(uint32_t) + length);
+    holder->packet.unicode.header.size = BE32(holder->packetLength - sizeof(uint32_t));
     holder->packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
     memcpy(holder->packet.unicode.text, text, length);
 
@@ -668,7 +704,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         return -2;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
@@ -756,7 +792,7 @@ int LiSendHighResScrollEvent(short scrollAmount) {
         return 0;
     }
 
-    holder = allocatePacketHolder();
+    holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
     }
