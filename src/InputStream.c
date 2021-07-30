@@ -19,6 +19,7 @@ static PLT_THREAD inputSendThread;
 typedef struct _PACKET_HOLDER {
     int packetLength;
     union {
+        NV_INPUT_HEADER header;
         NV_KEYBOARD_PACKET keyboard;
         NV_REL_MOUSE_MOVE_PACKET mouseMoveRel;
         NV_ABS_MOUSE_MOVE_PACKET mouseMoveAbs;
@@ -141,6 +142,8 @@ static PPACKET_HOLDER allocatePacketHolder(void) {
 static bool sendInputPacket(PPACKET_HOLDER holder) {
     SOCK_RET err;
 
+    LC_ASSERT(holder->packet.header.size == BE32(holder->packetLength - sizeof(uint32_t)));
+
     // On GFE 3.22, the entire control stream is encrypted (and support for separate RI encrypted)
     // has been removed. We send the plaintext packet through and the control stream code will do
     // the encryption.
@@ -217,7 +220,7 @@ static void inputSendThreadProc(void* context) {
         }
 
         // If it's a multi-controller packet we can do batching
-        if (holder->packet.multiController.header.packetType == BE32(PACKET_TYPE_MULTI_CONTROLLER)) {
+        if (holder->packet.header.magic == LE32(MULTI_CONTROLLER_MAGIC)) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
 
@@ -231,7 +234,7 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a controller packet, we're done
-                if (controllerBatchHolder->packet.multiController.header.packetType != BE32(PACKET_TYPE_MULTI_CONTROLLER)) {
+                if (controllerBatchHolder->packet.header.magic != LE32(MULTI_CONTROLLER_MAGIC)) {
                     break;
                 }
 
@@ -266,7 +269,7 @@ static void inputSendThreadProc(void* context) {
             }
         }
         // If it's a relative mouse move packet, we can also do batching
-        else if (holder->packet.mouseMoveRel.header.packetType == BE32(PACKET_TYPE_REL_MOUSE_MOVE)) {
+        else if (holder->packet.header.magic == LE32(MOUSE_MOVE_REL_MAGIC)) {
             PPACKET_HOLDER mouseBatchHolder;
             int totalDeltaX = (short)BE16(holder->packet.mouseMoveRel.deltaX);
             int totalDeltaY = (short)BE16(holder->packet.mouseMoveRel.deltaY);
@@ -281,7 +284,7 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a mouse move packet, we're done
-                if (mouseBatchHolder->packet.mouseMoveRel.header.packetType != BE32(PACKET_TYPE_REL_MOUSE_MOVE)) {
+                if (mouseBatchHolder->packet.header.magic != LE32(MOUSE_MOVE_REL_MAGIC)) {
                     break;
                 }
 
@@ -314,7 +317,7 @@ static void inputSendThreadProc(void* context) {
             holder->packet.mouseMoveRel.deltaY = BE16((short)totalDeltaY);
         }
         // If it's an absolute mouse move packet, we should only send the latest
-        else if (holder->packet.mouseMoveAbs.header.packetType == BE32(PACKET_TYPE_ABS_MOUSE_MOVE)) {
+        else if (holder->packet.header.magic == LE32(MOUSE_MOVE_ABS_MAGIC)) {
             for (;;) {
                 PPACKET_HOLDER mouseBatchHolder;
 
@@ -324,7 +327,7 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a mouse position packet, we're done
-                if (mouseBatchHolder->packet.mouseMoveAbs.header.packetType != BE32(PACKET_TYPE_ABS_MOUSE_MOVE)) {
+                if (mouseBatchHolder->packet.header.magic != LE32(MOUSE_MOVE_ABS_MAGIC)) {
                     break;
                 }
 
@@ -366,9 +369,9 @@ static int sendEnableHaptics(void) {
     }
 
     holder->packetLength = sizeof(NV_HAPTICS_PACKET);
-    holder->packet.haptics.header.packetType = BE32(PACKET_TYPE_HAPTICS);
-    holder->packet.haptics.magicA = LE32(H_MAGIC_A);
-    holder->packet.haptics.magicB = LE32(H_MAGIC_B);
+    holder->packet.haptics.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.haptics.header.magic = LE32(ENABLE_HAPTICS_MAGIC);
+    holder->packet.haptics.enable = LE16(1);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
@@ -456,13 +459,13 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     }
 
     holder->packetLength = sizeof(NV_REL_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMoveRel.header.packetType = BE32(PACKET_TYPE_REL_MOUSE_MOVE);
-    holder->packet.mouseMoveRel.magic = MOUSE_MOVE_REL_MAGIC;
+    holder->packet.mouseMoveRel.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseMoveRel.header.magic = MOUSE_MOVE_REL_MAGIC;
     // On Gen 5 servers, the header code is incremented by one
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.mouseMoveRel.magic++;
+        holder->packet.mouseMoveRel.header.magic++;
     }
-    holder->packet.mouseMoveRel.magic = LE32(holder->packet.mouseMoveRel.magic);
+    holder->packet.mouseMoveRel.header.magic = LE32(holder->packet.mouseMoveRel.header.magic);
     holder->packet.mouseMoveRel.deltaX = BE16(deltaX);
     holder->packet.mouseMoveRel.deltaY = BE16(deltaY);
 
@@ -491,8 +494,8 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
     }
 
     holder->packetLength = sizeof(NV_ABS_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMoveAbs.header.packetType = BE32(PACKET_TYPE_ABS_MOUSE_MOVE);
-    holder->packet.mouseMoveAbs.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
+    holder->packet.mouseMoveAbs.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseMoveAbs.header.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
     holder->packet.mouseMoveAbs.x = BE16(x);
     holder->packet.mouseMoveAbs.y = BE16(y);
     holder->packet.mouseMoveAbs.unused = 0;
@@ -530,12 +533,13 @@ int LiSendMouseButtonEvent(char action, int button) {
     }
 
     holder->packetLength = sizeof(NV_MOUSE_BUTTON_PACKET);
-    holder->packet.mouseButton.header.packetType = BE32(PACKET_TYPE_MOUSE_BUTTON);
-    holder->packet.mouseButton.action = action;
+    holder->packet.mouseButton.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseButton.header.magic = (uint8_t)action;
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.mouseButton.action++;
+        holder->packet.mouseButton.header.magic++;
     }
-    holder->packet.mouseButton.button = BE32(button);
+    holder->packet.mouseButton.header.magic = LE32(holder->packet.mouseButton.header.magic);
+    holder->packet.mouseButton.button = (uint8_t)button;
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
@@ -604,8 +608,8 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     }
 
     holder->packetLength = sizeof(NV_KEYBOARD_PACKET);
-    holder->packet.keyboard.header.packetType = BE32(PACKET_TYPE_KEYBOARD);
-    holder->packet.keyboard.keyAction = keyAction;
+    holder->packet.keyboard.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.keyboard.header.magic = LE32((uint32_t)keyAction);
     holder->packet.keyboard.zero1 = 0;
     holder->packet.keyboard.keyCode = LE16(keyCode);
     holder->packet.keyboard.modifiers = modifiers;
@@ -637,10 +641,10 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
         return -1;
     }
     // Size + magic + string length
-    holder->packetLength = 4 + 4 + length;
+    holder->packetLength = sizeof(uint32_t) + sizeof(uint32_t) + length;
     // Magic + string length
-    holder->packet.unicode.size = BE32(4 + length);
-    holder->packet.unicode.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
+    holder->packet.unicode.header.size = BE32(sizeof(uint32_t) + length);
+    holder->packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
     memcpy(holder->packet.unicode.text, text, length);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
@@ -673,8 +677,8 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         // Generation 3 servers don't support multiple controllers so we send
         // the legacy packet
         holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
-        holder->packet.controller.header.packetType = BE32(PACKET_TYPE_CONTROLLER);
-        holder->packet.controller.headerA = LE32(C_HEADER_A);
+        holder->packet.controller.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+        holder->packet.controller.header.magic = LE32(CONTROLLER_MAGIC);
         holder->packet.controller.headerB = LE16(C_HEADER_B);
         holder->packet.controller.buttonFlags = LE16(buttonFlags);
         holder->packet.controller.leftTrigger = leftTrigger;
@@ -689,13 +693,13 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     else {
         // Generation 4+ servers support passing the controller number
         holder->packetLength = sizeof(NV_MULTI_CONTROLLER_PACKET);
-        holder->packet.multiController.header.packetType = BE32(PACKET_TYPE_MULTI_CONTROLLER);
-        holder->packet.multiController.headerA = MC_HEADER_A;
+        holder->packet.multiController.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+        holder->packet.multiController.header.magic = MULTI_CONTROLLER_MAGIC;
         // On Gen 5 servers, the header code is decremented by one
         if (AppVersionQuad[0] >= 5) {
-            holder->packet.multiController.headerA--;
+            holder->packet.multiController.header.magic--;
         }
-        holder->packet.multiController.headerA = LE32(holder->packet.multiController.headerA);
+        holder->packet.multiController.header.magic = LE32(holder->packet.multiController.header.magic);
         holder->packet.multiController.headerB = LE16(MC_HEADER_B);
         holder->packet.multiController.controllerNumber = LE16(controllerNumber);
         holder->packet.multiController.activeGamepadMask = LE16(activeGamepadMask);
@@ -758,14 +762,13 @@ int LiSendHighResScrollEvent(short scrollAmount) {
     }
 
     holder->packetLength = sizeof(NV_SCROLL_PACKET);
-    holder->packet.scroll.header.packetType = BE32(PACKET_TYPE_SCROLL);
-    holder->packet.scroll.magicA = MAGIC_A;
+    holder->packet.scroll.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.scroll.header.magic = SCROLL_MAGIC;
     // On Gen 5 servers, the header code is incremented by one
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.scroll.magicA++;
+        holder->packet.scroll.header.magic++;
     }
-    holder->packet.scroll.zero1 = 0;
-    holder->packet.scroll.zero2 = 0;
+    holder->packet.scroll.header.magic = LE32(holder->packet.scroll.header.magic);
     holder->packet.scroll.scrollAmt1 = BE16(scrollAmount);
     holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
     holder->packet.scroll.zero3 = 0;
