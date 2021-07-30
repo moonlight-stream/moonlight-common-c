@@ -115,7 +115,7 @@ static void freePacketHolder(PPACKET_HOLDER holder) {
     LC_ASSERT(holder->packetLength != 0);
 
     // Place the packet holder back into the free list if it's a standard size entry
-    if (holder->packetLength > sizeof(*holder) || LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
+    if (holder->packetLength > (int)sizeof(*holder) || LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
         free(holder);
     }
 }
@@ -357,7 +357,7 @@ static void inputSendThreadProc(void* context) {
         else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
             PACKET_HOLDER splitPacket;
             uint32_t totalLength = BE32(holder->packet.unicode.header.size) - sizeof(uint32_t);
-            int i = 0;
+            uint32_t i = 0;
 
             while (i < totalLength) {
                 uint32_t copyLength = totalLength - i < UTF8_TEXT_EVENT_MAX_COUNT ?
