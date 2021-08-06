@@ -224,6 +224,17 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
 static void inputSendThreadProc(void* context) {
     SOCK_RET err;
     PPACKET_HOLDER holder;
+    uint32_t multiControllerMagicLE;
+    uint32_t relMouseMagicLE;
+
+    if (AppVersionQuad[0] >= 5) {
+        multiControllerMagicLE = LE32(MULTI_CONTROLLER_MAGIC_GEN5);
+        relMouseMagicLE = LE32(MOUSE_MOVE_REL_MAGIC_GEN5);
+    }
+    else {
+        multiControllerMagicLE = LE32(MULTI_CONTROLLER_MAGIC);
+        relMouseMagicLE = LE32(MOUSE_MOVE_REL_MAGIC);
+    }
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
@@ -232,7 +243,7 @@ static void inputSendThreadProc(void* context) {
         }
 
         // If it's a multi-controller packet we can do batching
-        if (holder->packet.header.magic == LE32(MULTI_CONTROLLER_MAGIC)) {
+        if (holder->packet.header.magic == multiControllerMagicLE) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
 
@@ -246,7 +257,7 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a controller packet, we're done
-                if (controllerBatchHolder->packet.header.magic != LE32(MULTI_CONTROLLER_MAGIC)) {
+                if (controllerBatchHolder->packet.header.magic != multiControllerMagicLE) {
                     break;
                 }
 
@@ -281,7 +292,7 @@ static void inputSendThreadProc(void* context) {
             }
         }
         // If it's a relative mouse move packet, we can also do batching
-        else if (holder->packet.header.magic == LE32(MOUSE_MOVE_REL_MAGIC)) {
+        else if (holder->packet.header.magic == relMouseMagicLE) {
             PPACKET_HOLDER mouseBatchHolder;
             int totalDeltaX = (short)BE16(holder->packet.mouseMoveRel.deltaX);
             int totalDeltaY = (short)BE16(holder->packet.mouseMoveRel.deltaY);
@@ -296,7 +307,7 @@ static void inputSendThreadProc(void* context) {
                 }
 
                 // If it's not a mouse move packet, we're done
-                if (mouseBatchHolder->packet.header.magic != LE32(MOUSE_MOVE_REL_MAGIC)) {
+                if (mouseBatchHolder->packet.header.magic != relMouseMagicLE) {
                     break;
                 }
 
@@ -499,12 +510,12 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 
     holder->packetLength = sizeof(NV_REL_MOUSE_MOVE_PACKET);
     holder->packet.mouseMoveRel.header.size = BE32(holder->packetLength - sizeof(uint32_t));
-    holder->packet.mouseMoveRel.header.magic = MOUSE_MOVE_REL_MAGIC;
-    // On Gen 5 servers, the header code is incremented by one
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.mouseMoveRel.header.magic++;
+        holder->packet.mouseMoveRel.header.magic = LE32(MOUSE_MOVE_REL_MAGIC_GEN5);
     }
-    holder->packet.mouseMoveRel.header.magic = LE32(holder->packet.mouseMoveRel.header.magic);
+    else {
+        holder->packet.mouseMoveRel.header.magic = LE32(MOUSE_MOVE_REL_MAGIC);
+    }
     holder->packet.mouseMoveRel.deltaX = BE16(deltaX);
     holder->packet.mouseMoveRel.deltaY = BE16(deltaY);
 
@@ -730,12 +741,13 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         // Generation 4+ servers support passing the controller number
         holder->packetLength = sizeof(NV_MULTI_CONTROLLER_PACKET);
         holder->packet.multiController.header.size = BE32(holder->packetLength - sizeof(uint32_t));
-        holder->packet.multiController.header.magic = MULTI_CONTROLLER_MAGIC;
         // On Gen 5 servers, the header code is decremented by one
         if (AppVersionQuad[0] >= 5) {
-            holder->packet.multiController.header.magic--;
+            holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC_GEN5);
         }
-        holder->packet.multiController.header.magic = LE32(holder->packet.multiController.header.magic);
+        else {
+            holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC);
+        }
         holder->packet.multiController.headerB = LE16(MC_HEADER_B);
         holder->packet.multiController.controllerNumber = LE16(controllerNumber);
         holder->packet.multiController.activeGamepadMask = LE16(activeGamepadMask);
@@ -799,12 +811,12 @@ int LiSendHighResScrollEvent(short scrollAmount) {
 
     holder->packetLength = sizeof(NV_SCROLL_PACKET);
     holder->packet.scroll.header.size = BE32(holder->packetLength - sizeof(uint32_t));
-    holder->packet.scroll.header.magic = SCROLL_MAGIC;
-    // On Gen 5 servers, the header code is incremented by one
     if (AppVersionQuad[0] >= 5) {
-        holder->packet.scroll.header.magic++;
+        holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
     }
-    holder->packet.scroll.header.magic = LE32(holder->packet.scroll.header.magic);
+    else {
+        holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC);
+    }
     holder->packet.scroll.scrollAmt1 = BE16(scrollAmount);
     holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
     holder->packet.scroll.zero3 = 0;
