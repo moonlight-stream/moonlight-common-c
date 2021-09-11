@@ -7,7 +7,11 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <wlanapi.h>
+#ifndef __MINGW32__
 #include <timeapi.h>
+#else
+#include <mmsystem.h>
+#endif
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 
@@ -23,10 +27,12 @@
 #endif
 #define EINTR WSAEINTR
 
+#ifndef __MINGW32__
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define EINPROGRESS WSAEINPROGRESS
 #define ETIMEDOUT WSAETIMEDOUT
 #define ECONNREFUSED WSAECONNREFUSED
+#endif
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
