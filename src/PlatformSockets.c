@@ -306,7 +306,7 @@ int setSocketNonBlocking(SOCKET s, bool enabled) {
 #elif defined(O_NONBLOCK)
     return fcntl(s, F_SETFL, (enabled ? O_NONBLOCK : 0) | (fcntl(s, F_GETFL) & ~O_NONBLOCK));
 #elif defined(FIONBIO)
-    int val = enabled ? 1 : 0;
+    unsigned long val = enabled ? 1 : 0;
     return ioctlsocket(s, FIONBIO, &val);
 #else
 #error Please define your platform non-blocking sockets API!
