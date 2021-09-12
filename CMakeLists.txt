@@ -8,8 +8,8 @@ option(USE_MBEDTLS "Use MbedTLS instead of OpenSSL" OFF)
 
 SET(CMAKE_C_STANDARD 11)
 
+add_subdirectory(enet)
 aux_source_directory(src SRC_LIST)
-aux_source_directory(enet SRC_LIST)
 aux_source_directory(reedsolomon SRC_LIST)
 
 # Build shared library by default, but allows user override
@@ -24,6 +24,8 @@ if (BUILD_SHARED_LIBS_OVERRIDE)
   unset(BUILD_SHARED_LIBS)
   unset(BUILD_SHARED_LIBS_OVERRIDE)
 endif()
+
+target_link_libraries(moonlight-common-c PRIVATE enet)
 
 if(MSVC)
   target_compile_options(moonlight-common-c PRIVATE /W3 /wd4100 /wd4232 /wd5105 /WX)
@@ -66,7 +68,6 @@ endif()
 target_include_directories(moonlight-common-c SYSTEM PUBLIC src)
 
 target_include_directories(moonlight-common-c PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/enet/include
   ${CMAKE_CURRENT_SOURCE_DIR}/reedsolomon
 )
 
