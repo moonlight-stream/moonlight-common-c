@@ -12,18 +12,20 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: clang
       CXX: clang++
+      CMAKE_ARGS: -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: gcc
       CXX: g++
+      CMAKE_ARGS: -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: clang
       CXX: clang++
-      CMAKE_ARGS: -DUSE_MBEDTLS=ON
+      CMAKE_ARGS: -DUSE_MBEDTLS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON
       PREBUILD_CMD: sudo apt install -y libmbedtls-dev
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: gcc
       CXX: g++
-      CMAKE_ARGS: -DUSE_MBEDTLS=ON
+      CMAKE_ARGS: -DUSE_MBEDTLS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON
       PREBUILD_CMD: sudo apt install -y libmbedtls-dev
 
 before_build:
