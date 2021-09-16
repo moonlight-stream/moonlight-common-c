@@ -23,6 +23,10 @@ DWORD (WINAPI *pfnWlanEnumInterfaces)(HANDLE hClientHandle, PVOID pReserved, PWL
 VOID (WINAPI *pfnWlanFreeMemory)(PVOID pMemory);
 DWORD (WINAPI *pfnWlanSetInterface)(HANDLE hClientHandle, CONST GUID *pInterfaceGuid, WLAN_INTF_OPCODE OpCode, DWORD dwDataSize, CONST PVOID pData, PVOID pReserved);
 
+#ifndef WLAN_API_MAKE_VERSION
+#define WLAN_API_MAKE_VERSION(_major, _minor)   (((DWORD)(_minor)) << 16 | (_major))
+#endif
+
 #endif
 
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string)
@@ -302,7 +306,11 @@ int setSocketNonBlocking(SOCKET s, bool enabled) {
 #elif defined(O_NONBLOCK)
     return fcntl(s, F_SETFL, (enabled ? O_NONBLOCK : 0) | (fcntl(s, F_GETFL) & ~O_NONBLOCK));
 #elif defined(FIONBIO)
+#ifdef LC_WINDOWS
+    u_long val = enabled ? 1 : 0;
+#else
     int val = enabled ? 1 : 0;
+#endif
     return ioctlsocket(s, FIONBIO, &val);
 #else
 #error Please define your platform non-blocking sockets API!
