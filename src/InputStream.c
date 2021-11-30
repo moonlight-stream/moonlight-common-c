@@ -370,14 +370,36 @@ static void inputSendThreadProc(void* context) {
             uint32_t totalLength = BE32(holder->packet.unicode.header.size) - sizeof(uint32_t);
             uint32_t i = 0;
 
+            // We send each Unicode code point individually. This way we can always ensure they will
+            // never straddle a packet boundary (which will cause a parsing error on the host).
             while (i < totalLength) {
-                uint32_t copyLength = totalLength - i < UTF8_TEXT_EVENT_MAX_COUNT ?
-                                      totalLength - i : UTF8_TEXT_EVENT_MAX_COUNT;
+                uint32_t codePointLength;
+                uint8_t firstByte = (uint8_t)holder->packet.unicode.text[i];
+                if ((firstByte & 0x80) == 0x00) {
+                    // 1 byte code point
+                    codePointLength = 1;
+                }
+                else if ((firstByte & 0xE0) == 0xC0) {
+                    // 2 byte code point
+                    codePointLength = 2;
+                }
+                else if ((firstByte & 0xF0) == 0xE0) {
+                    // 3 byte code point
+                    codePointLength = 3;
+                }
+                else if ((firstByte & 0xF8) == 0xF0) {
+                    // 4 byte code point
+                    codePointLength = 4;
+                }
+                else {
+                    Limelog("Invalid unicode code point starting byte: %02x\n", firstByte);
+                    break;
+                }
 
-                splitPacket.packetLength = sizeof(uint32_t) + sizeof(uint32_t) + copyLength;
+                splitPacket.packetLength = sizeof(uint32_t) + sizeof(uint32_t) + codePointLength;
                 splitPacket.packet.unicode.header.size = BE32(splitPacket.packetLength - sizeof(uint32_t));
                 splitPacket.packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
-                memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], copyLength);
+                memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], codePointLength);
 
                 // Encrypt and send the split packet
                 if (!sendInputPacket(&splitPacket)) {
@@ -385,7 +407,7 @@ static void inputSendThreadProc(void* context) {
                     return;
                 }
 
-                i += copyLength;
+                i += codePointLength;
             }
 
             freePacketHolder(holder);
