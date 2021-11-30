@@ -17,7 +17,12 @@ static PLT_THREAD inputSendThread;
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
+    LINKED_BLOCKING_QUEUE_ENTRY entry;
     int packetLength;
+
+    // The union must be the last member since we abuse the NV_UNICODE_PACKET
+    // text field to store variable length data which gets split before being
+    // sent to the host.
     union {
         NV_INPUT_HEADER header;
         NV_KEYBOARD_PACKET keyboard;
@@ -30,7 +35,6 @@ typedef struct _PACKET_HOLDER {
         NV_HAPTICS_PACKET haptics;
         NV_UNICODE_PACKET unicode;
     } packet;
-    LINKED_BLOCKING_QUEUE_ENTRY entry;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
 // Initializes the input stream
