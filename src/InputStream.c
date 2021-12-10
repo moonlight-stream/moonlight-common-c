@@ -15,10 +15,12 @@ static PLT_THREAD inputSendThread;
 
 #define MAX_QUEUED_INPUT_PACKETS 150
 
+#define PAYLOAD_SIZE(x) BE32((x)->packet.header.size)
+#define PACKET_SIZE(x) (PAYLOAD_SIZE(x) + sizeof(uint32_t))
+
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
-    int packetLength;
 
     // The union must be the last member since we abuse the NV_UNICODE_PACKET
     // text field to store variable length data which gets split before being
@@ -116,10 +118,10 @@ static int encryptData(unsigned char* plaintext, int plaintextLen,
 }
 
 static void freePacketHolder(PPACKET_HOLDER holder) {
-    LC_ASSERT(holder->packetLength != 0);
+    LC_ASSERT(holder->packet.header.size != 0);
 
     // Place the packet holder back into the free list if it's a standard size entry
-    if (holder->packetLength > (int)sizeof(*holder) || LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
+    if (PACKET_SIZE(holder) > (int)sizeof(*holder) || LbqOfferQueueItem(&packetHolderFreeList, holder, &holder->entry) != LBQ_SUCCESS) {
         free(holder);
     }
 }
@@ -158,13 +160,11 @@ static PPACKET_HOLDER allocatePacketHolder(int extraLength) {
 static bool sendInputPacket(PPACKET_HOLDER holder) {
     SOCK_RET err;
 
-    LC_ASSERT(holder->packet.header.size == BE32(holder->packetLength - sizeof(uint32_t)));
-
     // On GFE 3.22, the entire control stream is encrypted (and support for separate RI encrypted)
     // has been removed. We send the plaintext packet through and the control stream code will do
     // the encryption.
     if (encryptedControlStream) {
-        err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, holder->packetLength);
+        err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, PACKET_SIZE(holder));
         if (err < 0) {
             Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
             ListenerCallbacks.connectionTerminated(err);
@@ -178,7 +178,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
 
         // Encrypt the message into the output buffer while leaving room for the length
         encryptedSize = sizeof(encryptedBuffer) - sizeof(encryptedLengthPrefix);
-        err = encryptData((unsigned char*)&holder->packet, holder->packetLength,
+        err = encryptData((unsigned char*)&holder->packet, PACKET_SIZE(holder),
             (unsigned char*)&encryptedBuffer[sizeof(encryptedLengthPrefix)], (int*)&encryptedSize);
         if (err != 0) {
             Limelog("Input: Encryption failed: %d\n", (int)err);
@@ -371,7 +371,7 @@ static void inputSendThreadProc(void* context) {
         // If it's a UTF-8 text packet, we may need to split it into a several packets to send
         else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
             PACKET_HOLDER splitPacket;
-            uint32_t totalLength = BE32(holder->packet.unicode.header.size) - sizeof(uint32_t);
+            uint32_t totalLength = PAYLOAD_SIZE(holder) - sizeof(uint32_t);
             uint32_t i = 0;
 
             // We send each Unicode code point individually. This way we can always ensure they will
@@ -400,8 +400,7 @@ static void inputSendThreadProc(void* context) {
                     break;
                 }
 
-                splitPacket.packetLength = sizeof(uint32_t) + sizeof(uint32_t) + codePointLength;
-                splitPacket.packet.unicode.header.size = BE32(splitPacket.packetLength - sizeof(uint32_t));
+                splitPacket.packet.unicode.header.size = BE32(sizeof(uint32_t) + codePointLength);
                 splitPacket.packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
                 memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], codePointLength);
 
@@ -444,8 +443,7 @@ static int sendEnableHaptics(void) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_HAPTICS_PACKET);
-    holder->packet.haptics.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.haptics.header.size = BE32(sizeof(NV_HAPTICS_PACKET) - sizeof(uint32_t));
     holder->packet.haptics.header.magic = LE32(ENABLE_HAPTICS_MAGIC);
     holder->packet.haptics.enable = LE16(1);
 
@@ -534,8 +532,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_REL_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMoveRel.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseMoveRel.header.size = BE32(sizeof(NV_REL_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     if (AppVersionQuad[0] >= 5) {
         holder->packet.mouseMoveRel.header.magic = LE32(MOUSE_MOVE_REL_MAGIC_GEN5);
     }
@@ -569,8 +566,7 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_ABS_MOUSE_MOVE_PACKET);
-    holder->packet.mouseMoveAbs.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseMoveAbs.header.size = BE32(sizeof(NV_ABS_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     holder->packet.mouseMoveAbs.header.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
     holder->packet.mouseMoveAbs.x = BE16(x);
     holder->packet.mouseMoveAbs.y = BE16(y);
@@ -608,8 +604,7 @@ int LiSendMouseButtonEvent(char action, int button) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_MOUSE_BUTTON_PACKET);
-    holder->packet.mouseButton.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.mouseButton.header.size = BE32(sizeof(NV_MOUSE_BUTTON_PACKET) - sizeof(uint32_t));
     holder->packet.mouseButton.header.magic = (uint8_t)action;
     if (AppVersionQuad[0] >= 5) {
         holder->packet.mouseButton.header.magic++;
@@ -683,8 +678,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
         break;
     }
 
-    holder->packetLength = sizeof(NV_KEYBOARD_PACKET);
-    holder->packet.keyboard.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.keyboard.header.size = BE32(sizeof(NV_KEYBOARD_PACKET) - sizeof(uint32_t));
     holder->packet.keyboard.header.magic = LE32((uint32_t)keyAction);
     holder->packet.keyboard.zero1 = 0;
     holder->packet.keyboard.keyCode = LE16(keyCode);
@@ -713,10 +707,8 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     if (holder == NULL) {
         return -1;
     }
-    // Size + magic + string length
-    holder->packetLength = sizeof(uint32_t) + sizeof(uint32_t) + length;
     // Magic + string length
-    holder->packet.unicode.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.unicode.header.size = BE32(sizeof(uint32_t) + length);
     holder->packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
     memcpy(holder->packet.unicode.text, text, length);
 
@@ -749,8 +741,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     if (AppVersionQuad[0] == 3) {
         // Generation 3 servers don't support multiple controllers so we send
         // the legacy packet
-        holder->packetLength = sizeof(NV_CONTROLLER_PACKET);
-        holder->packet.controller.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+        holder->packet.controller.header.size = BE32(sizeof(NV_CONTROLLER_PACKET) - sizeof(uint32_t));
         holder->packet.controller.header.magic = LE32(CONTROLLER_MAGIC);
         holder->packet.controller.headerB = LE16(C_HEADER_B);
         holder->packet.controller.buttonFlags = LE16(buttonFlags);
@@ -765,8 +756,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     }
     else {
         // Generation 4+ servers support passing the controller number
-        holder->packetLength = sizeof(NV_MULTI_CONTROLLER_PACKET);
-        holder->packet.multiController.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+        holder->packet.multiController.header.size = BE32(sizeof(NV_MULTI_CONTROLLER_PACKET) - sizeof(uint32_t));
         // On Gen 5 servers, the header code is decremented by one
         if (AppVersionQuad[0] >= 5) {
             holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC_GEN5);
@@ -835,8 +825,7 @@ int LiSendHighResScrollEvent(short scrollAmount) {
         return -1;
     }
 
-    holder->packetLength = sizeof(NV_SCROLL_PACKET);
-    holder->packet.scroll.header.size = BE32(holder->packetLength - sizeof(uint32_t));
+    holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
     if (AppVersionQuad[0] >= 5) {
         holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
     }
