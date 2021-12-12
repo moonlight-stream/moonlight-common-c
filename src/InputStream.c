@@ -4,6 +4,8 @@ static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
 static bool initialized;
 static bool encryptedControlStream;
+static bool needsBatchedScroll;
+static int batchedScrollDelta;
 static PPLT_CRYPTO_CONTEXT cryptoContext;
 
 static LINKED_BLOCKING_QUEUE packetQueue;
@@ -17,6 +19,9 @@ static PLT_THREAD inputSendThread;
 
 #define PAYLOAD_SIZE(x) BE32((x)->packet.header.size)
 #define PACKET_SIZE(x) (PAYLOAD_SIZE(x) + sizeof(uint32_t))
+
+// Matches Win32 WHEEL_DELTA definition
+#define LI_WHEEL_DELTA 120
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -50,6 +55,13 @@ int initializeInputStream(void) {
 
     cryptoContext = PltCreateCryptoContext();
     encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
+
+    // FIXME: Unsure if this is exactly right, but it's probably good enough.
+    //
+    // GFE 3.13.1.30 is not using NVVHCI for mouse/keyboard (and is confirmed unaffected)
+    // GFE 3.15.0.164 seems to be the first release using NVVHCI for mouse/keyboard
+    needsBatchedScroll = APP_VERSION_AT_LEAST(7, 1, 409);
+    batchedScrollDelta = 0;
     return 0;
 }
 
@@ -820,27 +832,74 @@ int LiSendHighResScrollEvent(short scrollAmount) {
         return 0;
     }
 
-    holder = allocatePacketHolder(0);
-    if (holder == NULL) {
-        return -1;
-    }
+    // Newer version of GFE that use virtual HID devices have a bug that requires
+    // the scroll events to be batched to WHEEL_DELTA. Due to the their HID report
+    // descriptor, they don't actually support smooth scrolling. _Any_ scroll gets
+    // converted into a full WHEEL_DELTA scroll, even if the actual delta is tiny.
+    // Similarly, large scrolls are capped at +/- WHEEL_DELTA too so we'll need to
+    // split those up too.
+    if (needsBatchedScroll) {
+        if ((batchedScrollDelta < 0 && scrollAmount > 0) ||
+            (batchedScrollDelta > 0 && scrollAmount < 0)) {
+            // Reset the accumulated scroll delta when the direction changes
+            // FIXME: Maybe reset accumulated delta based on time too?
+            batchedScrollDelta = 0;
+        }
 
-    holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
-    if (AppVersionQuad[0] >= 5) {
-        holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
+        batchedScrollDelta += scrollAmount;
+
+        while (abs(batchedScrollDelta) >= LI_WHEEL_DELTA) {
+            scrollAmount = batchedScrollDelta > 0 ? LI_WHEEL_DELTA : -LI_WHEEL_DELTA;
+
+            holder = allocatePacketHolder(0);
+            if (holder == NULL) {
+                return -1;
+            }
+
+            holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
+            if (AppVersionQuad[0] >= 5) {
+                holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
+            }
+            else {
+                holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC);
+            }
+            holder->packet.scroll.scrollAmt1 = BE16(scrollAmount);
+            holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
+            holder->packet.scroll.zero3 = 0;
+
+            err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+            if (err != LBQ_SUCCESS) {
+                LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+                Limelog("Input queue reached maximum size limit\n");
+                freePacketHolder(holder);
+            }
+
+            batchedScrollDelta -= scrollAmount;
+        }
     }
     else {
-        holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC);
-    }
-    holder->packet.scroll.scrollAmt1 = BE16(scrollAmount);
-    holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
-    holder->packet.scroll.zero3 = 0;
+        holder = allocatePacketHolder(0);
+        if (holder == NULL) {
+            return -1;
+        }
 
-    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
-    if (err != LBQ_SUCCESS) {
-        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
-        Limelog("Input queue reached maximum size limit\n");
-        freePacketHolder(holder);
+        holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
+        if (AppVersionQuad[0] >= 5) {
+            holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
+        }
+        else {
+            holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC);
+        }
+        holder->packet.scroll.scrollAmt1 = BE16(scrollAmount);
+        holder->packet.scroll.scrollAmt2 = holder->packet.scroll.scrollAmt1;
+        holder->packet.scroll.zero3 = 0;
+
+        err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+        if (err != LBQ_SUCCESS) {
+            LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+            Limelog("Input queue reached maximum size limit\n");
+            freePacketHolder(holder);
+        }
     }
 
     return err;
@@ -848,5 +907,5 @@ int LiSendHighResScrollEvent(short scrollAmount) {
 
 // Send a scroll event to the streaming machine
 int LiSendScrollEvent(signed char scrollClicks) {
-    return LiSendHighResScrollEvent(scrollClicks * 120);
+    return LiSendHighResScrollEvent(scrollClicks * LI_WHEEL_DELTA);
 }
