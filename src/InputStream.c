@@ -872,10 +872,13 @@ int LiSendHighResScrollEvent(short scrollAmount) {
                 LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
                 Limelog("Input queue reached maximum size limit\n");
                 freePacketHolder(holder);
+                return err;
             }
 
             batchedScrollDelta -= scrollAmount;
         }
+
+        err = 0;
     }
     else {
         holder = allocatePacketHolder(0);
