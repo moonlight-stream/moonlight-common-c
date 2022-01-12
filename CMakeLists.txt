@@ -49,7 +49,7 @@ if (USE_MBEDTLS)
     target_include_directories(moonlight-common-c SYSTEM PRIVATE ${MBEDTLS_INCLUDE_DIRS})
   else()
     # For sub project added via CMake
-    target_link_libraries(moonlight-common-c PRIVATE mbedtls)
+    target_link_libraries(moonlight-common-c PRIVATE mbedcrypto)
   endif()
 else()
   find_package(OpenSSL 1.0.2 REQUIRED)
