@@ -71,6 +71,13 @@ void LbqSignalQueueDrain(PLINKED_BLOCKING_QUEUE queueHead) {
     PltSignalConditionVariable(&queueHead->cond);
 }
 
+void LbqSignalQueueUserWake(PLINKED_BLOCKING_QUEUE queueHead) {
+    PltLockMutex(&queueHead->mutex);
+    queueHead->pendingUserWake = true;
+    PltUnlockMutex(&queueHead->mutex);
+    PltSignalConditionVariable(&queueHead->cond);
+}
+
 int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead) {
     return queueHead->currentSize;
 }
@@ -196,7 +203,7 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     PltLockMutex(&queueHead->mutex);
 
     // Wait for a waking condition: either data available or rundown
-    while (queueHead->head == NULL && !queueHead->draining && !queueHead->shutdown) {
+    while (queueHead->head == NULL && !queueHead->draining && !queueHead->shutdown && !queueHead->pendingUserWake) {
         PltWaitForConditionVariable(&queueHead->cond, &queueHead->mutex);
     }
 
@@ -204,6 +211,13 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
     if (queueHead->shutdown) {
         PltUnlockMutex(&queueHead->mutex);
         return LBQ_INTERRUPTED;
+    }
+
+    // If this is a user requested wake, process it now
+    if (queueHead->pendingUserWake) {
+        queueHead->pendingUserWake = false;
+        PltUnlockMutex(&queueHead->mutex);
+        return LBQ_USER_WAKE;
     }
 
     // If we're draining, only abort if we have no data available

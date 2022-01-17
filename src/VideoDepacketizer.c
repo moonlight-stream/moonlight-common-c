@@ -221,6 +221,10 @@ bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit) {
     return true;
 }
 
+void LiWakeWaitForVideoFrame(void) {
+    LbqSignalQueueUserWake(&decodeUnitQueue);
+}
+
 // Cleanup a decode unit by freeing the buffer chain and the holder
 void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
     PQUEUED_DECODE_UNIT qdu = handle;

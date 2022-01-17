@@ -7,6 +7,7 @@
 #define LBQ_INTERRUPTED 1
 #define LBQ_BOUND_EXCEEDED 2
 #define LBQ_NO_ELEMENT 3
+#define LBQ_USER_WAKE 4
 
 typedef struct _LINKED_BLOCKING_QUEUE_ENTRY {
     struct _LINKED_BLOCKING_QUEUE_ENTRY* flink;
@@ -24,6 +25,7 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     int lifetimeSize;
     bool shutdown;
     bool draining;
+    bool pendingUserWake;
 } LINKED_BLOCKING_QUEUE, *PLINKED_BLOCKING_QUEUE;
 
 int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeBound);
@@ -35,4 +37,5 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqDestroyLinkedBlockingQueue(PLINKED_BLOCKING_QUEU
 PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead);
 void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead);
 void LbqSignalQueueDrain(PLINKED_BLOCKING_QUEUE queueHead);
+void LbqSignalQueueUserWake(PLINKED_BLOCKING_QUEUE queueHead);
 int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead);
