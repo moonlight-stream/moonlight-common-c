@@ -386,6 +386,17 @@ static void inputSendThreadProc(void* context) {
             uint32_t totalLength = PAYLOAD_SIZE(holder) - sizeof(uint32_t);
             uint32_t i = 0;
 
+            // HACK: This is a workaround for the fact that GFE doesn't appear to synchronize keyboard
+            // and UTF-8 text events with each other. We need to make sure any previous keyboard events
+            // have been processed prior to sending these UTF-8 events to avoid interference between
+            // the two (especially with modifier keys).
+            while (!PltIsThreadInterrupted(&inputSendThread) && isControlDataInTransit()) {
+                PltSleepMs(10);
+            }
+
+            // Finally, sleep an additional 50 ms to allow the events to be processed by Windows
+            PltSleepMs(50);
+
             // We send each Unicode code point individually. This way we can always ensure they will
             // never straddle a packet boundary (which will cause a parsing error on the host).
             while (i < totalLength) {

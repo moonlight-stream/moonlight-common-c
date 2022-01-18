@@ -1116,6 +1116,20 @@ int sendInputPacketOnControlStream(unsigned char* data, int length) {
     return 0;
 }
 
+bool isControlDataInTransit(void) {
+    bool ret = false;
+
+    PltLockMutex(&enetMutex);
+    if (peer != NULL && peer->state == ENET_PEER_STATE_CONNECTED) {
+        if (peer->reliableDataInTransit != 0) {
+            ret = true;
+        }
+    }
+    PltUnlockMutex(&enetMutex);
+
+    return ret;
+}
+
 bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVariance) {
     bool ret = false;
 

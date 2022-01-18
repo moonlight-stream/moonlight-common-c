@@ -89,6 +89,7 @@ void connectionReceivedCompleteFrame(int frameIndex);
 void connectionSawFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 int sendInputPacketOnControlStream(unsigned char* data, int length);
+bool isControlDataInTransit(void);
 
 int performRtspHandshake(void);
 
