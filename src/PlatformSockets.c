@@ -82,7 +82,7 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
 }
 
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
-#if defined(LC_WINDOWS) || defined(__vita__)
+#if defined(LC_WINDOWS)
     // We could have used WSAPoll() but it has some nasty bugs
     // https://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
     //
@@ -107,19 +107,10 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
         if (pollFds[i].events & POLLOUT) {
             FD_SET(pollFds[i].fd, &writeFds);
 
-#ifdef LC_WINDOWS
             // Windows signals failed connections as an exception,
             // while Linux signals them as writeable.
             FD_SET(pollFds[i].fd, &exceptFds);
-#endif
         }
-
-#ifndef LC_WINDOWS
-        // nfds is unused on Windows
-        if (pollFds[i].fd >= nfds) {
-            nfds = pollFds[i].fd + 1;
-        }
-#endif
     }
 
     tv.tv_sec = timeoutMs / 1000;
