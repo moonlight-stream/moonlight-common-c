@@ -36,6 +36,7 @@ static void fakeClConnectionTerminated(int errorCode) {}
 static void fakeClLogMessage(const char* format, ...) {}
 static void fakeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor) {}
 static void fakeClConnectionStatusUpdate(int connectionStatus) {}
+static void fakeClSetHdrMode(bool enabled) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,
@@ -45,7 +46,8 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .connectionTerminated = fakeClConnectionTerminated,
     .logMessage = fakeClLogMessage,
     .rumble = fakeClRumble,
-    .connectionStatusUpdate = fakeClConnectionStatusUpdate
+    .connectionStatusUpdate = fakeClConnectionStatusUpdate,
+    .setHdrMode = fakeClSetHdrMode,
 };
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
@@ -120,6 +122,9 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         }
         if ((*clCallbacks)->connectionStatusUpdate == NULL) {
             (*clCallbacks)->connectionStatusUpdate = fakeClConnectionStatusUpdate;
+        }
+        if ((*clCallbacks)->setHdrMode == NULL) {
+            (*clCallbacks)->setHdrMode = fakeClSetHdrMode;
         }
     }
 }

@@ -421,6 +421,12 @@ typedef void(*ConnListenerRumble)(unsigned short controllerNumber, unsigned shor
 #define CONN_STATUS_POOR    1
 typedef void(*ConnListenerConnectionStatusUpdate)(int connectionStatus);
 
+// This callback is invoked to notify the client of a change in HDR mode on
+// the host. The client will probably want to update the local display mode
+// to match the state of HDR on the host. This callback may be invoked even
+// if enableHdr is false in the stream configuration.
+typedef void(*ConnListenerSetHdrMode)(bool hdrEnabled);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -430,6 +436,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerLogMessage logMessage;
     ConnListenerRumble rumble;
     ConnListenerConnectionStatusUpdate connectionStatusUpdate;
+    ConnListenerSetHdrMode setHdrMode;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
@@ -653,6 +660,10 @@ bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeU
 bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit);
 void LiWakeWaitForVideoFrame(void);
 void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
+
+// This function returns the last reported HDR mode from the host PC.
+// See ConnListenerSetHdrMode() for more details.
+bool LiGetCurrentHostDisplayHdrMode(void);
 
 #ifdef __cplusplus
 }

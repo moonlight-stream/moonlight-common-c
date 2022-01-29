@@ -49,6 +49,7 @@ static int lastSeenFrame;
 static bool stopping;
 static bool disconnectPending;
 static bool encryptedControlStream;
+static bool hdrEnabled;
 
 static int intervalGoodFrameCount;
 static int intervalTotalFrameCount;
@@ -76,6 +77,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_INPUT_DATA 5
 #define IDX_RUMBLE_DATA 6
 #define IDX_TERMINATION 7
+#define IDX_HDR_INFO 8
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -89,6 +91,7 @@ static const short packetTypesGen3[] = {
     -1,     // Input data (unused)
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
+    -1,     // HDR mode (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -99,6 +102,7 @@ static const short packetTypesGen4[] = {
     -1,     // Input data (unused)
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
+    -1,     // HDR mode (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -109,6 +113,7 @@ static const short packetTypesGen5[] = {
     0x0207, // Input data
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
+    -1,     // HDR mode (unknown)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -119,6 +124,7 @@ static const short packetTypesGen7[] = {
     0x0206, // Input data
     0x010b, // Rumble data
     0x0100, // Termination
+    0x010e, // HDR mode
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -129,6 +135,7 @@ static const short packetTypesGen7Enc[] = {
     0x0206, // Input data
     0x010b, // Rumble data
     0x0109, // Termination (extended)
+    0x010e, // HDR mode
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -267,6 +274,7 @@ int initializeControlStream(void) {
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
     encryptionCtx = PltCreateCryptoContext();
     decryptionCtx = PltCreateCryptoContext();
+    hdrEnabled = false;
 
     return 0;
 }
@@ -798,6 +806,19 @@ static void controlReceiveThreadFunc(void* context) {
                 BbGet16(&bb, &highFreqRumble);
 
                 ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
+            }
+            else if (ctlHdr->type == packetTypes[IDX_HDR_INFO]) {
+                BYTE_BUFFER bb;
+                uint8_t enableByte;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+
+                // FIXME: There are 7 additional bytes that appear to always be all zeros. What do they mean?
+                // Is there some way that GFE tells us the HDR mastering metadata (NV_HDR_COLOR_DATA) set by the game?
+                BbGet8(&bb, &enableByte);
+
+                hdrEnabled = (enableByte != 0);
+                ListenerCallbacks.setHdrMode(hdrEnabled);
             }
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
@@ -1395,4 +1416,8 @@ int startControlStream(void) {
     }
 
     return 0;
+}
+
+bool LiGetCurrentHostDisplayHdrMode(void) {
+    return hdrEnabled;
 }
