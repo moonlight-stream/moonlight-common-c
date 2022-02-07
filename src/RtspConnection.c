@@ -1,7 +1,8 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 
-#define RTSP_TIMEOUT_SEC 10
+#define RTSP_CONNECT_TIMEOUT_SEC 10
+#define RTSP_RECEIVE_TIMEOUT_SEC 15
 #define RTSP_RETRY_DELAY_MS 500
 
 static int currentSeqNumber;
@@ -141,7 +142,7 @@ static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE respons
     }
     
     // Wait for a reply
-    if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+    if (serviceEnetHost(client, &event, RTSP_RECEIVE_TIMEOUT_SEC * 1000) <= 0 ||
         event.type != ENET_EVENT_TYPE_RECEIVE) {
         Limelog("Failed to receive RTSP reply\n");
         goto Exit;
@@ -162,7 +163,7 @@ static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE respons
     // Wait for the payload if we're expecting some
     if (expectingPayload) {
         // The payload comes in a second packet
-        if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, RTSP_RECEIVE_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             Limelog("Failed to receive RTSP reply payload\n");
             goto Exit;
@@ -228,7 +229,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // returns HTTP 200 OK for the /launch request before the RTSP handshake port
     // is listening.
     do {
-        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, RtspPortNumber, RTSP_TIMEOUT_SEC);
+        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, RtspPortNumber, RTSP_CONNECT_TIMEOUT_SEC);
         if (sock == INVALID_SOCKET) {
             *error = LastSocketError();
             if (*error == ECONNREFUSED) {
@@ -244,7 +245,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
             // We successfully connected
             break;
         }
-    } while (connectRetries++ < (RTSP_TIMEOUT_SEC * 1000) / RTSP_RETRY_DELAY_MS && !ConnectionInterrupted);
+    } while (connectRetries++ < (RTSP_CONNECT_TIMEOUT_SEC * 1000) / RTSP_RETRY_DELAY_MS && !ConnectionInterrupted);
     if (sock == INVALID_SOCKET) {
         return ret;
     }
@@ -283,7 +284,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
 
         pfd.fd = sock;
         pfd.events = POLLIN;
-        err = pollSockets(&pfd, 1, RTSP_TIMEOUT_SEC * 1000);
+        err = pollSockets(&pfd, 1, RTSP_RECEIVE_TIMEOUT_SEC * 1000);
         if (err == 0) {
             *error = ETIMEDOUT;
             Limelog("RTSP request timed out\n");
@@ -725,7 +726,7 @@ int performRtspHandshake(void) {
         }
     
         // Wait for the connect to complete
-        if (serviceEnetHost(client, &event, RTSP_TIMEOUT_SEC * 1000) <= 0 ||
+        if (serviceEnetHost(client, &event, RTSP_CONNECT_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_CONNECT) {
             Limelog("RTSP: Failed to connect to UDP port %u\n", RtspPortNumber);
             enet_peer_reset(peer);
