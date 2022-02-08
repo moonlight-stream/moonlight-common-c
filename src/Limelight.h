@@ -70,7 +70,9 @@ typedef struct _STREAM_CONFIGURATION {
     // This should only be set if:
     // 1) The client decoder supports HEVC Main10 profile (supportsHevc must be set too)
     // 2) The server has support for HDR as indicated by ServerCodecModeSupport in /serverinfo
-    // 3) The app supports HDR as indicated by IsHdrSupported in /applist
+    //
+    // See ConnListenerSetHdrMode() for a callback to indicate when to set
+    // the client display into HDR mode.
     bool enableHdr;
 
     // Specifies the percentage that the specified bitrate will be adjusted
