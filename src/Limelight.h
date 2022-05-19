@@ -177,6 +177,9 @@ typedef struct _DECODE_UNIT {
 // Specifies that the audio stream should be encoded in stereo (default)
 #define AUDIO_CONFIGURATION_STEREO MAKE_AUDIO_CONFIGURATION(2, 0x3)
 
+// Specifies that the audio stream should be in 4.0 surround sound if the PC is able
+#define AUDIO_CONFIGURATION_4_SURROUND MAKE_AUDIO_CONFIGURATION(4, 0x33)
+
 // Specifies that the audio stream should be in 5.1 surround sound if the PC is able
 #define AUDIO_CONFIGURATION_51_SURROUND MAKE_AUDIO_CONFIGURATION(6, 0x3F)
 
