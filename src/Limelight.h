@@ -509,6 +509,25 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY);
 // referenceWidth and referenceHeight to your window width and height.
 int LiSendMousePositionEvent(short x, short y, short referenceWidth, short referenceHeight);
 
+// This function queues a mouse position update event to be sent to the remote server, so
+// all of the limitations of LiSendMousePositionEvent() mentioned above apply here too!
+//
+// This function behaves like a combination of LiSendMouseMoveEvent() and LiSendMousePositionEvent()
+// in that it sends a relative motion event, however it sends this data as an absolute position
+// based on the computed position of a virtual client cursor which is "moved" any time that
+// LiSendMousePositionEvent() or LiSendMouseMoveAsMousePositionEvent() is called. As a result
+// of this internal virtual cursor state, callers must ensure LiSendMousePositionEvent() and
+// LiSendMouseMoveAsMousePositionEvent() are not called concurrently!
+//
+// The big advantage of this function is that it allows callers to avoid mouse acceleration that
+// would otherwise affect motion when using LiSendMouseMoveEvent(). The downside is that it has the
+// same game compatibility issues as LiSendMousePositionEvent().
+//
+// This function can be useful when mouse capture is the only feasible way to receive mouse input,
+// like on Android or iOS, and the OS cannot provide raw unaccelerated mouse motion when capturing.
+// Using this function avoids double-acceleration in cases when the client motion is also accelerated.
+int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short referenceWidth, short referenceHeight);
+
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
 #define BUTTON_ACTION_RELEASE 0x08

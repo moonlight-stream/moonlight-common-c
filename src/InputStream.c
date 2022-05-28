@@ -12,6 +12,11 @@ static LINKED_BLOCKING_QUEUE packetQueue;
 static LINKED_BLOCKING_QUEUE packetHolderFreeList;
 static PLT_THREAD inputSendThread;
 
+static float absCurrentPosX;
+static float absCurrentPosY;
+
+#define CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
+
 #define MAX_INPUT_PACKET_SIZE 128
 #define INPUT_STREAM_TIMEOUT_SEC 10
 
@@ -62,6 +67,9 @@ int initializeInputStream(void) {
     // GFE 3.15.0.164 seems to be the first release using NVVHCI for mouse/keyboard
     needsBatchedScroll = APP_VERSION_AT_LEAST(7, 1, 409);
     batchedScrollDelta = 0;
+
+    // Start with the virtual mouse centered
+    absCurrentPosX = absCurrentPosY = 0.5f;
     return 0;
 }
 
@@ -610,7 +618,25 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
         freePacketHolder(holder);
     }
 
+    // This is not thread safe, but it's not a big deal because callers that want to
+    // use LiSendRelativeMotionAsMousePositionEvent() must not mix these function
+    // without synchronization (otherwise the state of the cursor on the host is
+    // undefined anyway).
+    absCurrentPosX = CLAMP(x, 0, referenceWidth - 1) / (float)(referenceWidth - 1);
+    absCurrentPosY = CLAMP(y, 0, referenceHeight - 1) / (float)(referenceHeight - 1);
+
     return err;
+}
+
+// Send a relative motion event using absolute position to the streaming machine
+int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short referenceWidth, short referenceHeight) {
+    // Convert the current position to be relative to the provided reference dimensions
+    short oldPositionX = (short)(absCurrentPosX * referenceWidth);
+    short oldPositionY = (short)(absCurrentPosY * referenceHeight);
+
+    return LiSendMousePositionEvent(CLAMP(oldPositionX + deltaX, 0, referenceWidth),
+                                    CLAMP(oldPositionY + deltaY, 0, referenceHeight),
+                                    referenceWidth, referenceHeight);
 }
 
 // Send a mouse button event to the streaming machine
