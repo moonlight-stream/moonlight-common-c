@@ -214,8 +214,9 @@ typedef struct _DECODE_UNIT {
 #define VIDEO_FORMAT_H265_MAIN10 0x0200
 
 // Masks for clients to use to match video codecs without profile-specific details.
-#define VIDEO_FORMAT_MASK_H264 0x00FF
-#define VIDEO_FORMAT_MASK_H265 0xFF00
+#define VIDEO_FORMAT_MASK_H264  0x00FF
+#define VIDEO_FORMAT_MASK_H265  0xFF00
+#define VIDEO_FORMAT_MASK_10BIT 0x0200
 
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the
