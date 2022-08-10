@@ -1203,9 +1203,17 @@ int startControlStream(void) {
         }
 
         // Wait for the connect to complete
-        if (serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000) <= 0 ||
-            event.type != ENET_EVENT_TYPE_CONNECT) {
-            Limelog("Failed to connect to UDP port %u\n", ControlPortNumber);
+        err = serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000);
+        if (err <= 0 || event.type != ENET_EVENT_TYPE_CONNECT) {
+            if (err < 0) {
+                Limelog("Failed to establish ENet connection on UDP port %u: error %d\n", ControlPortNumber, LastSocketFail());
+            }
+            else if (err == 0) {
+                Limelog("Failed to establish ENet connection on UDP port %u: timed out\n", ControlPortNumber);
+            }
+            else {
+                Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, event.type, LastSocketError());
+            }
             stopping = true;
             enet_peer_reset(peer);
             peer = NULL;
