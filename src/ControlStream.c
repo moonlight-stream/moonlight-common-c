@@ -1214,12 +1214,24 @@ int startControlStream(void) {
             else {
                 Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, event.type, LastSocketError());
             }
+
             stopping = true;
             enet_peer_reset(peer);
             peer = NULL;
             enet_host_destroy(client);
             client = NULL;
-            return ETIMEDOUT;
+
+            if (err == 0) {
+                return ETIMEDOUT;
+            }
+            else if (err > 0 && event.type != ENET_EVENT_TYPE_CONNECT && LastSocketError() == 0) {
+                // If we got an unexpected event type and have no other error to return, return the event type
+                LC_ASSERT(event.type != ENET_EVENT_TYPE_NONE);
+                return event.type != ENET_EVENT_TYPE_NONE ? event.type : LastSocketFail();
+            }
+            else {
+                return LastSocketFail();
+            }
         }
 
         // Ensure the connect verify ACK is sent immediately
