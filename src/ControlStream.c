@@ -1212,7 +1212,7 @@ int startControlStream(void) {
                 Limelog("Failed to establish ENet connection on UDP port %u: timed out\n", ControlPortNumber);
             }
             else {
-                Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, event.type, LastSocketError());
+                Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, (int)event.type, LastSocketError());
             }
 
             stopping = true;
@@ -1227,7 +1227,7 @@ int startControlStream(void) {
             else if (err > 0 && event.type != ENET_EVENT_TYPE_CONNECT && LastSocketError() == 0) {
                 // If we got an unexpected event type and have no other error to return, return the event type
                 LC_ASSERT(event.type != ENET_EVENT_TYPE_NONE);
-                return event.type != ENET_EVENT_TYPE_NONE ? event.type : LastSocketFail();
+                return event.type != ENET_EVENT_TYPE_NONE ? (int)event.type : LastSocketFail();
             }
             else {
                 return LastSocketFail();
