@@ -135,39 +135,19 @@ void destroyVideoDepacketizer(void) {
     cleanupFrameState();
 }
 
-static bool isSeqFrameStart(PBUFFER_DESC candidate) {
-    return (candidate->length == 4 && candidate->data[candidate->offset + candidate->length - 1] == 1);
-}
-
-static bool isSeqAnnexBStart(PBUFFER_DESC candidate) {
-    return (candidate->data[candidate->offset + candidate->length - 1] == 1);
-}
-
-static bool isSeqPadding(PBUFFER_DESC candidate) {
-    return (candidate->data[candidate->offset + candidate->length - 1] == 0);
-}
-
-static bool getSpecialSeq(PBUFFER_DESC current, PBUFFER_DESC candidate) {
+static bool getAnnexBStartSequence(PBUFFER_DESC current, PBUFFER_DESC candidate) {
     if (current->length < 3) {
         return false;
     }
 
     if (current->data[current->offset] == 0 &&
         current->data[current->offset + 1] == 0) {
-        // Padding or frame start
         if (current->data[current->offset + 2] == 0) {
             if (current->length >= 4 && current->data[current->offset + 3] == 1) {
                 // Frame start
                 candidate->data = current->data;
                 candidate->offset = current->offset;
                 candidate->length = 4;
-                return true;
-            }
-            else {
-                // Padding
-                candidate->data = current->data;
-                candidate->offset = current->offset;
-                candidate->length = 3;
                 return true;
             }
         }
@@ -256,12 +236,12 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
     }
 }
 
-static bool isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
+static bool isSeqReferenceFrameStart(PBUFFER_DESC startSeq) {
     if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
-        return H264_NAL_TYPE(specialSeq->data[specialSeq->offset + specialSeq->length]) == 5;
+        return H264_NAL_TYPE(startSeq->data[startSeq->offset + startSeq->length]) == 5;
     }
     else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
-        switch (HEVC_NAL_TYPE(specialSeq->data[specialSeq->offset + specialSeq->length])) {
+        switch (HEVC_NAL_TYPE(startSeq->data[startSeq->offset + startSeq->length])) {
             case 16:
             case 17:
             case 18:
@@ -281,17 +261,17 @@ static bool isSeqReferenceFrameStart(PBUFFER_DESC specialSeq) {
 }
 
 static bool isAccessUnitDelimiter(PBUFFER_DESC buffer) {
-    BUFFER_DESC specialSeq;
+    BUFFER_DESC startSeq;
 
-    if (!getSpecialSeq(buffer, &specialSeq)) {
+    if (!getAnnexBStartSequence(buffer, &startSeq)) {
         return false;
     }
 
     if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
-        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_AUD;
+        return H264_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == H264_NAL_TYPE_AUD;
     }
     else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
-        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_AUD;
+        return HEVC_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == HEVC_NAL_TYPE_AUD;
     }
     else {
         LC_ASSERT(false);
@@ -300,17 +280,17 @@ static bool isAccessUnitDelimiter(PBUFFER_DESC buffer) {
 }
 
 static bool isSeiNal(PBUFFER_DESC buffer) {
-    BUFFER_DESC specialSeq;
+    BUFFER_DESC startSeq;
 
-    if (!getSpecialSeq(buffer, &specialSeq)) {
+    if (!getAnnexBStartSequence(buffer, &startSeq)) {
         return false;
     }
 
     if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
-        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_SEI;
+        return H264_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == H264_NAL_TYPE_SEI;
     }
     else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
-        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_SEI;
+        return HEVC_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == HEVC_NAL_TYPE_SEI;
     }
     else {
         LC_ASSERT(false);
@@ -318,21 +298,20 @@ static bool isSeiNal(PBUFFER_DESC buffer) {
     }
 }
 
-// Advance the buffer descriptor to the start of the next NAL
-static void skipToNextNal(PBUFFER_DESC buffer) {
-    BUFFER_DESC specialSeq;
+// Advance the buffer descriptor to the start of the next NAL or end of buffer
+static void skipToNextNalOrEnd(PBUFFER_DESC buffer) {
+    BUFFER_DESC startSeq;
 
     // If we're starting on a NAL boundary, skip to the next one
-    if (getSpecialSeq(buffer, &specialSeq) && isSeqAnnexBStart(&specialSeq)) {
-        buffer->offset += specialSeq.length;
-        buffer->length -= specialSeq.length;
+    if (getAnnexBStartSequence(buffer, &startSeq)) {
+        buffer->offset += startSeq.length;
+        buffer->length -= startSeq.length;
     }
 
     // Loop until we find an Annex B start sequence (3 or 4 byte)
-    while (!getSpecialSeq(buffer, &specialSeq) || !isSeqAnnexBStart(&specialSeq)) {
+    while (!getAnnexBStartSequence(buffer, &startSeq)) {
         if (buffer->length == 0) {
-            // If we skipped all the data, something has gone horribly wrong
-            LC_ASSERT(buffer->length > 0);
+            // Reach the end of the buffer
             return;
         }
 
@@ -341,18 +320,26 @@ static void skipToNextNal(PBUFFER_DESC buffer) {
     }
 }
 
-static bool isIdrFrameStart(PBUFFER_DESC buffer) {
-    BUFFER_DESC specialSeq;
+// Advance the buffer descriptor to the start of the next NAL
+static void skipToNextNal(PBUFFER_DESC buffer) {
+    skipToNextNalOrEnd(buffer);
 
-    if (!getSpecialSeq(buffer, &specialSeq) || !isSeqFrameStart(&specialSeq)) {
+    // If we skipped all the data, something has gone horribly wrong
+    LC_ASSERT(buffer->length > 0);
+}
+
+static bool isIdrFrameStart(PBUFFER_DESC buffer) {
+    BUFFER_DESC startSeq;
+
+    if (!getAnnexBStartSequence(buffer, &startSeq)) {
         return false;
     }
 
     if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
-        return H264_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == H264_NAL_TYPE_SPS;
+        return H264_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == H264_NAL_TYPE_SPS;
     }
     else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
-        return HEVC_NAL_TYPE(specialSeq.data[specialSeq.offset + specialSeq.length]) == HEVC_NAL_TYPE_VPS;
+        return HEVC_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == HEVC_NAL_TYPE_VPS;
     }
     else {
         LC_ASSERT(false);
@@ -435,7 +422,7 @@ static int getBufferFlags(char* data, int length) {
     buffer.length = (unsigned int)length;
     buffer.offset = 0;
 
-    if (!getSpecialSeq(&buffer, &candidate) || !isSeqFrameStart(&candidate)) {
+    if (!getAnnexBStartSequence(&buffer, &candidate)) {
         return BUFFER_TYPE_PICDATA;
     }
 
@@ -524,14 +511,19 @@ static void queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
 
 // Process an RTP Payload using the slow path that handles multiple NALUs per packet
 static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
-    BUFFER_DESC specialSeq;
-    bool decodingVideo = false;
+    BUFFER_DESC startSeq;
 
     // We should not have any NALUs when processing the first packet in an IDR frame
     LC_ASSERT(nalChainHead == NULL);
     LC_ASSERT(nalChainTail == NULL);
 
     while (currentPos->length != 0) {
+        // Skip through any padding bytes
+        if (!getAnnexBStartSequence(currentPos, &startSeq)) {
+            skipToNextNal(currentPos);
+            getAnnexBStartSequence(currentPos, &startSeq);
+        }
+
         // Skip any prepended AUD or SEI NALUs. We may have padding between
         // these on IDR frames, so the check in processRtpPayload() is not
         // completely sufficient to handle that case.
@@ -542,62 +534,37 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
         int start = currentPos->offset;
         bool containsPicData = false;
 
-        if (getSpecialSeq(currentPos, &specialSeq)) {
-            if (isSeqAnnexBStart(&specialSeq)) {
-                // Now we're decoding video
-                decodingVideo = true;
+        // Now we're decoding a frame
+        decodingFrame = true;
 
-                if (isSeqFrameStart(&specialSeq)) {
-                    // Now we're working on a frame
-                    decodingFrame = true;
+        if (isSeqReferenceFrameStart(&startSeq)) {
+            // No longer waiting for an IDR frame
+            waitingForIdrFrame = false;
 
-                    if (isSeqReferenceFrameStart(&specialSeq)) {
-                        // No longer waiting for an IDR frame
-                        waitingForIdrFrame = false;
-                        
-                        // Cancel any pending IDR frame request
-                        waitingForNextSuccessfulFrame = false;
+            // Cancel any pending IDR frame request
+            waitingForNextSuccessfulFrame = false;
 
-                        // Use the cached LENTRY for this NALU since it will be
-                        // the bulk of the data in this packet.
-                        containsPicData = true;
-                    }
-                }
+            // Use the cached LENTRY for this NALU since it will be
+            // the bulk of the data in this packet.
+            containsPicData = true;
+        }
 
-                // Skip the start sequence
-                currentPos->length -= specialSeq.length;
-                currentPos->offset += specialSeq.length;
-            }
-            else {
-                // Not decoding video
-                decodingVideo = false;
+        // Move to the next NALU
+        skipToNextNalOrEnd(currentPos);
 
-                // Just skip this byte
-                currentPos->length--;
-                currentPos->offset++;
+        // If this is the picture data, we expect it to extend to the end of the packet
+        if (containsPicData) {
+            while (currentPos->length != 0) {
+                // Any NALUs we encounter on the way to the end of the packet must be reference frame slices
+                LC_ASSERT(getAnnexBStartSequence(currentPos, &startSeq) && isSeqReferenceFrameStart(&startSeq));
+                skipToNextNalOrEnd(currentPos);
             }
         }
 
-        // Move to the next special sequence
-        while (currentPos->length != 0) {
-            // Check if this should end the current NAL
-            if (getSpecialSeq(currentPos, &specialSeq)) {
-                if (decodingVideo || !isSeqPadding(&specialSeq)) {
-                    break;
-                }
-            }
-
-            // This byte is part of the NAL data
-            currentPos->offset++;
-            currentPos->length--;
-        }
-
-        if (decodingVideo) {
-            // To minimize copies, we'll use allocate for SPS, PPS, and VPS to allow
-            // us to reuse the packet buffer for the picture data in the I-frame.
-            queueFragment(containsPicData ? existingEntry : NULL,
-                          currentPos->data, start, currentPos->offset - start);
-        }
+        // To minimize copies, we'll allocate for SPS, PPS, and VPS to allow
+        // us to reuse the packet buffer for the picture data in the I-frame.
+        queueFragment(containsPicData ? existingEntry : NULL,
+                      currentPos->data, start, currentPos->offset - start);
     }
 }
 
@@ -752,11 +719,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // Other versions don't have a frame header at all
         }
 
-        // Assert that the frame start NALU prefix is next
+        // Assert that the 3 or 4 byte Annex B NALU prefix is next
         LC_ASSERT(currentPos.data[currentPos.offset + 0] == 0);
         LC_ASSERT(currentPos.data[currentPos.offset + 1] == 0);
-        LC_ASSERT(currentPos.data[currentPos.offset + 2] == 0);
-        LC_ASSERT(currentPos.data[currentPos.offset + 3] == 1);
+        LC_ASSERT(currentPos.data[currentPos.offset + 2] == 0 || currentPos.data[currentPos.offset + 2] == 1);
+        LC_ASSERT(currentPos.data[currentPos.offset + 3] == 1 || currentPos.data[currentPos.offset + 2] == 1);
 
         // If an AUD NAL is prepended to this frame data, remove it.
         // Other parts of this code are not prepared to deal with a
