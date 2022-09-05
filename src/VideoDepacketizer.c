@@ -1,5 +1,8 @@
 #include "Limelight-internal.h"
 
+// Uncomment to test 3 byte Annex B start sequences with GFE
+//#define FORCE_3_BYTE_START_SEQUENCES
+
 static PLENTRY nalChainHead;
 static PLENTRY nalChainTail;
 static int nalChainDataLength;
@@ -534,6 +537,10 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
         int start = currentPos->offset;
         bool containsPicData = false;
 
+#ifdef FORCE_3_BYTE_START_SEQUENCES
+        start++;
+#endif
+
         // Now we're decoding a frame
         decodingFrame = true;
 
@@ -746,6 +753,12 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     }
     else
     {
+#ifdef FORCE_3_BYTE_START_SEQUENCES
+        if (firstPacket) {
+            currentPos.offset++;
+            currentPos.length--;
+        }
+#endif
         queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
     }
 
