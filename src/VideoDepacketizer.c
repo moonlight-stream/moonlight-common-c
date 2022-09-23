@@ -697,13 +697,24 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     // If this is the first packet, skip the frame header (if one exists)
     if (firstPacket) {
-        if (APP_VERSION_AT_LEAST(7, 1, 415)) {
-            // >= 7.1.415
-            // The first IDR frame now has smaller headers than the rest. We seem to be able to tell
-            // them apart by looking at the first byte. It will be 0x81 for the long header and 0x01
-            // for the short header.
-            // TODO: This algorithm seems to actually work on GFE 3.18 (first byte always 0x01), so
-            // maybe we could unify this codepath in the future.
+        if (APP_VERSION_AT_LEAST(7, 1, 446)) {
+            // >= 7.1.446 uses 2 different header lengths based on the first byte:
+            // 0x01 indicates an 8 byte header
+            // 0x81 indicates a 41 byte header
+            if (currentPos.data[0] == 0x01) {
+                currentPos.offset += 8;
+                currentPos.length -= 8;
+            }
+            else {
+                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                currentPos.offset += 41;
+                currentPos.length -= 41;
+            }
+        }
+        else if (APP_VERSION_AT_LEAST(7, 1, 415)) {
+            // [7.1.415, 7.1.446) uses 2 different header lengths based on the first byte:
+            // 0x01 indicates an 8 byte header
+            // 0x81 indicates a 24 byte header
             if (currentPos.data[0] == 0x01) {
                 currentPos.offset += 8;
                 currentPos.length -= 8;
