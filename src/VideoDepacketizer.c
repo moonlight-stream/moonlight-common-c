@@ -744,11 +744,15 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // Other versions don't have a frame header at all
         }
 
-        // Assert that the 3 or 4 byte Annex B NALU prefix is next
-        LC_ASSERT(currentPos.data[currentPos.offset + 0] == 0);
-        LC_ASSERT(currentPos.data[currentPos.offset + 1] == 0);
-        LC_ASSERT(currentPos.data[currentPos.offset + 2] == 0 || currentPos.data[currentPos.offset + 2] == 1);
-        LC_ASSERT(currentPos.data[currentPos.offset + 3] == 1 || currentPos.data[currentPos.offset + 2] == 1);
+        // The Annex B NALU start prefix must be next
+        if (!getAnnexBStartSequence(&currentPos, NULL)) {
+            // If we aren't starting on a start prefix, something went wrong.
+            LC_ASSERT(false);
+
+            // For release builds, we will try to recover by searching for one.
+            // This mimics the way most decoders handle this situation.
+            skipToNextNal(&currentPos);
+        }
 
         // If an AUD NAL is prepended to this frame data, remove it.
         // Other parts of this code are not prepared to deal with a
