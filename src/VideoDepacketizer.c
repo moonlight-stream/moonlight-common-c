@@ -839,11 +839,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             if (waitingForIdrFrame) {
                 Limelog("Waiting for IDR frame\n");
 
-                // If waiting for next successful frame and we got here
-                // with an end flag, we can send a message to the server
+                // We wait for the first fully received frame after a loss to approximate
+                // detection of the recovery of the network. Requesting an IDR frame while
+                // the network is unstable will just contribute to congestion collapse.
                 if (waitingForNextSuccessfulFrame) {
-                    // This is the next successful frame after a loss event
-                    connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+                    requestIdrOnDemand();
                 }
             }
             else {
