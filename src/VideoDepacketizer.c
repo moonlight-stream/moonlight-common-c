@@ -11,6 +11,7 @@ static unsigned int nextFrameNumber;
 static unsigned int startFrameNumber;
 static bool waitingForNextSuccessfulFrame;
 static bool waitingForIdrFrame;
+static bool waitingForRefInvalFrame;
 static unsigned int lastPacketInStream;
 static bool decodingFrame;
 static bool strictIdrFrameWait;
@@ -58,6 +59,7 @@ void initializeVideoDepacketizer(int pktSize) {
     startFrameNumber = 0;
     waitingForNextSuccessfulFrame = false;
     waitingForIdrFrame = true;
+    waitingForRefInvalFrame = false;
     lastPacketInStream = UINT32_MAX;
     decodingFrame = false;
     firstPacketReceiveTime = 0;
@@ -90,10 +92,13 @@ static void dropFrameState(void) {
     // We're dropping frame state now
     dropStatePending = false;
 
-    // We'll need an IDR frame now if we're in strict mode
-    // or if we've never seen one before
-    if (strictIdrFrameWait || !idrFrameProcessed) {
+    if (strictIdrFrameWait || !idrFrameProcessed || waitingForIdrFrame) {
+        // We'll need an IDR frame now if we're in non-RFI mode, if we've never
+        // received an IDR frame, or if we explicitly need an IDR frame.
         waitingForIdrFrame = true;
+    }
+    else {
+        waitingForRefInvalFrame = true;
     }
 
     // Count the number of consecutive frames dropped
@@ -558,6 +563,7 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
         if (isSeqReferenceFrameStart(currentPos)) {
             // No longer waiting for an IDR frame
             waitingForIdrFrame = false;
+            waitingForRefInvalFrame = false;
 
             // Cancel any pending IDR frame request
             waitingForNextSuccessfulFrame = false;
@@ -701,6 +707,35 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     // If this is the first packet, skip the frame header (if one exists)
     if (firstPacket) {
+        // Parse the frame type from the header
+        if (APP_VERSION_AT_LEAST(7, 1, 415)) {
+            switch (currentPos.data[currentPos.offset + 3]) {
+            case 1: // Normal P-frame
+                break;
+            case 2: // IDR frame
+            case 4: // Intra-refresh
+            case 5: // P-frame with reference frames invalidated
+                if (waitingForRefInvalFrame) {
+                    Limelog("Next post-invalidation frame is: %d (%s-frame)\n",
+                            frameIndex,
+                            currentPos.data[currentPos.offset + 3] == 5 ? "P" : "I");
+                    waitingForRefInvalFrame = false;
+                    waitingForNextSuccessfulFrame = false;
+                }
+                break;
+            case 104: // Sunshine hardcoded header
+                break;
+            default:
+                Limelog("Unrecognized frame type: %d", currentPos.data[currentPos.offset + 3]);
+                LC_ASSERT(false);
+                break;
+            }
+        }
+        else {
+            // Hope for the best with older servers
+            waitingForRefInvalFrame = false;
+        }
+
         if (APP_VERSION_AT_LEAST(7, 1, 446)) {
             // >= 7.1.446 uses 2 different header lengths based on the first byte:
             // 0x01 indicates an 8 byte header
@@ -793,21 +828,33 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
 
-        // If waiting for next successful frame and we got here
-        // with an end flag, we can send a message to the server
-        if (waitingForNextSuccessfulFrame) {
-            // This is the next successful frame after a loss event
-            connectionDetectedFrameLoss(startFrameNumber, frameIndex - 1);
+        // If we can't submit this frame due to a discontinuity in the bitstream,
+        // inform the host (if needed) and drop the data.
+        if (waitingForIdrFrame || waitingForRefInvalFrame) {
+            // IDR wait takes priority over RFI wait (and an IDR frame will satisfy both)
+            if (waitingForIdrFrame) {
+                Limelog("Waiting for IDR frame\n");
+
+                // If waiting for next successful frame and we got here
+                // with an end flag, we can send a message to the server
+                if (waitingForNextSuccessfulFrame) {
+                    // This is the next successful frame after a loss event
+                    connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+                }
+            }
+            else {
+                // If we need an RFI frame first, then drop this frame
+                // and update the reference frame invalidation window.
+                Limelog("Waiting for RFI frame\n");
+                connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+            }
+
             waitingForNextSuccessfulFrame = false;
-        }
-
-        // If we need an IDR frame first, then drop this frame
-        if (waitingForIdrFrame) {
-            Limelog("Waiting for IDR frame\n");
-
             dropFrameState();
             return;
         }
+
+        LC_ASSERT(!waitingForNextSuccessfulFrame);
 
         // Carry out any pending state drops. We can't just do this
         // arbitrarily in the middle of processing a frame because
