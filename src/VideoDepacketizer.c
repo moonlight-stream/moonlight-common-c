@@ -708,7 +708,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     // If this is the first packet, skip the frame header (if one exists)
     if (firstPacket) {
         // Parse the frame type from the header
-        if (APP_VERSION_AT_LEAST(7, 1, 415)) {
+        if (APP_VERSION_AT_LEAST(7, 1, 350)) {
             switch (currentPos.data[currentPos.offset + 3]) {
             case 1: // Normal P-frame
                 break;
