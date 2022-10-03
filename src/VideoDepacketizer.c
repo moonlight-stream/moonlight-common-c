@@ -397,18 +397,19 @@ static void reassembleFrame(int frameNumber) {
                 if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
                     Limelog("Video decode unit queue overflow\n");
 
-                    // Clear frame state and wait for an IDR
+                    // Clear NAL state for the frame that we failed to enqueue
                     nalChainHead = qdu->decodeUnit.bufferList;
                     nalChainDataLength = qdu->decodeUnit.fullLength;
                     dropFrameState();
 
-                    // Free the DU
+                    // Free the DU we were going to queue
                     free(qdu);
 
-                    // Flush the decode unit queue
+                    // Free all frames in the decode unit queue
                     freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
-                    // FIXME: Get proper bounds to use reference frame invalidation
+                    // Request an IDR frame to recover (RFI recovery is not supported here)
+                    waitingForIdrFrame = true;
                     requestIdrOnDemand();
                     return;
                 }
@@ -423,6 +424,9 @@ static void reassembleFrame(int frameNumber) {
 
             // Clear frame drops
             consecutiveFrameDrops = 0;
+
+            // Move the start of our (potential) RFI window to the next frame
+            startFrameNumber = nextFrameNumber;
         }
     }
 }
@@ -826,8 +830,6 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         reassembleFrame(frameIndex);
-
-        startFrameNumber = nextFrameNumber;
     }
 }
 
