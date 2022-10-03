@@ -733,7 +733,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
         else {
             // Hope for the best with older servers
-            waitingForRefInvalFrame = false;
+            if (waitingForRefInvalFrame) {
+                connectionDetectedFrameLoss(startFrameNumber, frameIndex - 1);
+                waitingForRefInvalFrame = false;
+                waitingForNextSuccessfulFrame = false;
+            }
         }
 
         if (APP_VERSION_AT_LEAST(7, 1, 446)) {
