@@ -175,6 +175,13 @@ static int addGen5Options(PSDP_OPTION* head) {
         // above the set value (even going as high as 200% FEC to generate 2 FEC shards from a
         // 1 data shard frame).
         err |= addAttributeString(head, "x-nv-vqos[0].fec.minRequiredFecPackets", "2");
+
+        // BLL-FEC appears to adjust dynamically based on the loss rate and instantaneous bitrate
+        // of each frame, however we can't dynamically control it from our side yet. As a result,
+        // the effective FEC amount is significantly lower (single digit percentages for many
+        // large frames) and the result is worse performance during packet loss. Disabling BLL-FEC
+        // results in GFE 3.26 falling back to the legacy FEC method as we would like.
+        err |= addAttributeString(head, "x-nv-vqos[0].bllFec.enable", "0");
     }
     else {
         // We want to use the new ENet connections for control and input
