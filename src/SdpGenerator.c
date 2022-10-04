@@ -197,8 +197,20 @@ static int addGen5Options(PSDP_OPTION* head) {
         }
     }
     
-    // Disable dynamic resolution switching
-    err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
+    if (APP_VERSION_AT_LEAST(7, 1, 446) && (StreamConfig.width < 720 || StreamConfig.height < 540)) {
+        // We enable DRC with a static DRC table for very low resoutions on GFE 3.26 to work around
+        // a bug that causes nvstreamer.exe to crash due to failing to populate a list of valid resolutions.
+        //
+        // Despite the fact that the DRC table doesn't include our target streaming resolution, we still
+        // seem to stream at the target resolution, presumably because we don't send control data to tell
+        // the host otherwise.
+        err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "1");
+        err |= addAttributeString(head, "x-nv-vqos[0].drc.tableType", "2");
+    }
+    else {
+        // Disable dynamic resolution switching
+        err |= addAttributeString(head, "x-nv-vqos[0].drc.enable", "0");
+    }
 
     // Recovery mode can cause the FEC percentage to change mid-frame, which
     // breaks many assumptions in RTP FEC queue.
