@@ -407,6 +407,12 @@ typedef void(*ConnListenerConnectionTerminated)(int errorCode);
 // due to a protected content error from the host. This value is supported on GFE 3.22+.
 #define ML_ERROR_PROTECTED_CONTENT -103
 
+// This error is passed to ConnListenerConnectionTerminated() if the stream ends
+// due a frame conversion error. This is most commonly due to an incompatible
+// desktop resolution and streaming resolution with HDR enabled. This value is
+// supported on GFE 3.22+.
+#define ML_ERROR_FRAME_CONVERSION -104
+
 // This callback is invoked to log debug message
 typedef void(*ConnListenerLogMessage)(const char* format, ...);
 
