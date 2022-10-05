@@ -312,20 +312,20 @@ void queueFrameInvalidationTuple(int startFrame, int endFrame) {
                 // Too many invalidation tuples, so we need an IDR frame now
                 Limelog("RFI range list reached maximum size limit\n");
                 free(qfit);
-                requestIdrOnDemand();
+                LiRequestIdrFrame();
             }
         }
         else {
-            requestIdrOnDemand();
+            LiRequestIdrFrame();
         }
     }
     else {
-        requestIdrOnDemand();
+        LiRequestIdrFrame();
     }
 }
 
 // Request an IDR frame on demand by the decoder
-void requestIdrOnDemand(void) {
+void LiRequestIdrFrame(void) {
     // Any reference frame invalidation requests should be dropped now.
     // We require a full IDR frame to recover.
     freeFrameInvalidationList(LbqFlushQueueItems(&invalidReferenceFrameTuples));

@@ -113,7 +113,7 @@ static void dropFrameState(void) {
 
         // Request an IDR frame
         waitingForIdrFrame = true;
-        requestIdrOnDemand();
+        LiRequestIdrFrame();
     }
 
     cleanupFrameState();
@@ -415,7 +415,7 @@ static void reassembleFrame(int frameNumber) {
 
                     // Request an IDR frame to recover (RFI recovery is not supported here)
                     waitingForIdrFrame = true;
-                    requestIdrOnDemand();
+                    LiRequestIdrFrame();
                     return;
                 }
             }
@@ -608,7 +608,7 @@ void requestDecoderRefresh(void) {
     dropStatePending = true;
     
     // Request the IDR frame
-    requestIdrOnDemand();
+    LiRequestIdrFrame();
 }
 
 // Return 1 if packet is the first one in the frame
@@ -843,7 +843,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 // detection of the recovery of the network. Requesting an IDR frame while
                 // the network is unstable will just contribute to congestion collapse.
                 if (waitingForNextSuccessfulFrame) {
-                    requestIdrOnDemand();
+                    LiRequestIdrFrame();
                 }
             }
             else {

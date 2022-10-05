@@ -693,6 +693,13 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
 // See ConnListenerSetHdrMode() for more details.
 bool LiGetCurrentHostDisplayHdrMode(void);
 
+// This function requests an IDR frame from the host. Typically this is done using DR_NEED_IDR, but clients
+// processing frames asynchronously may need to reset their decoder state even after returning DR_OK for
+// the prior frame. Rather than wait for a new frame and return DR_NEED_IDR for that one, they can just
+// call this API instead. Note that this function does not guarantee that the *next* frame will be an IDR
+// frame, just that an IDR frame will arrive soon.
+void LiRequestIdrFrame(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -83,7 +83,6 @@ int initializeControlStream(void);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
-void requestIdrOnDemand(void);
 void connectionDetectedFrameLoss(int startFrame, int endFrame);
 void connectionReceivedCompleteFrame(int frameIndex);
 void connectionSawFrame(int frameIndex);
