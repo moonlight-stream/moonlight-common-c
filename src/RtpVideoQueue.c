@@ -105,10 +105,10 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
             }
             else if (!isFecRecovery && isBefore16(packet->sequenceNumber, entry->packet->sequenceNumber)) {
                 // This packet was received after a higher sequence number packet, so note that we
-                // received an out of order packet to disable our fast RFI recovery logic.
+                // received an out of order packet to disable our predictive RFI recovery logic.
                 queue->lastOosSequenceNumber = packet->sequenceNumber;
                 if (!queue->receivedOosData) {
-                    Limelog("Leaving fast RFI mode after OOS video data (%u < %u)\n",
+                    Limelog("Leaving predictive RFI mode after OOS video data (%u < %u)\n",
                             packet->sequenceNumber, entry->packet->sequenceNumber);
                     queue->receivedOosData = true;
                 }
@@ -120,7 +120,7 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
 
     // This is just a fancy way of determining if 32767 packets have passed since our last OOS data
     if (queue->receivedOosData && isBefore16(queue->bufferHighestSequenceNumber, queue->lastOosSequenceNumber)) {
-        Limelog("Entering fast RFI mode after sequenced video data\n");
+        Limelog("Entering predictive RFI mode after sequenced video data\n");
         queue->receivedOosData = false;
     }
 
@@ -156,19 +156,26 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     // We'll need an extra packet to run in FEC validation mode, because we will
     // be "dropping" one below and recovering it using parity. However, some frames
     // are so large that FEC is disabled entirely, so don't wait for parity on those.
-    neededPackets += (queue->fecPercentage ? 1 : 0);
+    neededPackets += queue->fecPercentage ? 1 : 0;
 #endif
 
     if (queue->pendingFecBlockList.count < neededPackets) {
-        // If we've never seen OOS data and we've seen parity packets but not enough to recover the frame without
-        // additional data (which is unlikely to come, given that we've never seen OOS data from this host), we
-        // will presume the frame is lost and tell the host immediately.
-        if (!queue->reportedLostFrame &&
-                !queue->receivedOosData &&
-                queue->receivedParityPackets != 0 &&
-                neededPackets - queue->pendingFecBlockList.count > U16(queue->bufferHighestSequenceNumber - queue->receivedParityHighestSequenceNumber)) {
-            notifyFrameLost(queue->currentFrameNumber);
-            queue->reportedLostFrame = true;
+        // If we've never received OOS data from this host, we can predict whether this frame will be recoverable
+        // based on the packets we've received (or not) so far.
+        if (!queue->reportedLostFrame && !queue->receivedOosData) {
+            if (queue->missingDataPackets > queue->bufferParityPackets) {
+                // If the number of missing data shards exceeds the total number of possible parity shards,
+                // we will presume the frame is lost.
+                notifyFrameLost(queue->currentFrameNumber);
+                queue->reportedLostFrame = true;
+            }
+            else if (queue->receivedParityPackets != 0 &&
+                     neededPackets - queue->pendingFecBlockList.count > U16(queue->bufferHighestSequenceNumber - queue->receivedParityHighestSequenceNumber)) {
+                // If we've seen some parity shards but not enough parity shards remain to recover this frame
+                // without additional data shards, we will presume the frame is lost.
+                notifyFrameLost(queue->currentFrameNumber);
+                queue->reportedLostFrame = true;
+            }
         }
 
         // Not enough data to recover yet
@@ -178,7 +185,8 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     // If we make it here and reported a lost frame, we lied to the host. This can happen if we happen to get
     // unlucky and this particular frame happens to be the one with OOS data, but it should almost never happen.
     LC_ASSERT(!queue->reportedLostFrame);
-    
+    LC_ASSERT(queue->receivedParityPackets >= queue->missingDataPackets);
+
 #ifdef FEC_VALIDATION_MODE
     // If FEC is disabled or unsupported for this frame, we must bail early here.
     if ((queue->fecPercentage == 0 || AppVersionQuad[0] < 5) &&
@@ -187,6 +195,7 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     if (queue->receivedBufferDataPackets == queue->bufferDataPackets) {
 #endif
         // We've received a full frame with no need for FEC.
+        LC_ASSERT(queue->missingDataPackets == 0);
         return 0;
     }
 
@@ -590,7 +599,9 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->nextContiguousSequenceNumber = queue->bufferLowestSequenceNumber;
         queue->receivedBufferDataPackets = 0;
         queue->receivedParityPackets = 0;
+        queue->receivedDataHighestSequenceNumber = 0;
         queue->receivedParityHighestSequenceNumber = 0;
+        queue->missingDataPackets = 0;
         queue->reportedLostFrame = false;
         queue->bufferDataPackets = (nvPacket->fecInfo & 0xFFC00000) >> 22;
         queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;
@@ -624,6 +635,24 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
     else {
         if (isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber)) {
             queue->receivedBufferDataPackets++;
+
+            if (queue->receivedBufferDataPackets == 1) {
+                queue->missingDataPackets += U16(packet->sequenceNumber - queue->bufferLowestSequenceNumber);
+                queue->receivedDataHighestSequenceNumber = packet->sequenceNumber;
+            }
+            else if (isBefore16(queue->receivedDataHighestSequenceNumber, packet->sequenceNumber)) {
+                // If we receive a packet above the highest data sequence number,
+                // adjust our missing packets count based on that new sequence number.
+                queue->missingDataPackets += U16(packet->sequenceNumber - queue->receivedDataHighestSequenceNumber - 1);
+                queue->receivedDataHighestSequenceNumber = packet->sequenceNumber;
+            }
+            else {
+                // If we receive a packet behind the highest data sequence number and
+                // queuePacket() accepted it, we must have received a missing packet.
+                queue->missingDataPackets--;
+            }
+
+            LC_ASSERT(queue->missingDataPackets < queue->bufferDataPackets);
         }
         else {
             queue->receivedParityPackets++;
