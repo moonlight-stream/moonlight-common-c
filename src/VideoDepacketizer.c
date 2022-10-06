@@ -884,6 +884,29 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     }
 }
 
+// Called by the video RTP FEC queue to notify us of a lost frame
+// if it determines the frame to be unrecoverable. This lets us
+// avoid having to wait until the next received frame to determine
+// that we lost a frame and submit an RFI request.
+void notifyFrameLost(int frameNumber) {
+    // This may only be called at frame boundaries
+    LC_ASSERT(!decodingFrame);
+
+    // If RFI is enabled, we will notify the host PC now
+    if (isReferenceFrameInvalidationEnabled()) {
+        Limelog("Sending predictive RFI request for probable loss of frame %d\n", frameNumber);
+
+        // Advance the frame number since we won't be expecting this one anymore
+        nextFrameNumber = frameNumber + 1;
+
+        // Drop any existing frame state (shouldn't have any) and set the RFI wait flag
+        dropFrameState();
+
+        // Notify the host that we lost this one
+        connectionDetectedFrameLoss(startFrameNumber, frameNumber);
+    }
+}
+
 // Add an RTP Packet to the queue
 void queueRtpPacket(PRTPV_QUEUE_ENTRY queueEntryPtr) {
     int dataOffset;

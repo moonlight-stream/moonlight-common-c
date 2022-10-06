@@ -29,14 +29,20 @@ typedef struct _RTP_VIDEO_QUEUE {
     uint32_t bufferDataPackets;
     uint32_t bufferParityPackets;
     uint32_t receivedBufferDataPackets;
+    uint32_t receivedParityPackets;
+    uint32_t receivedParityHighestSequenceNumber;
     uint32_t fecPercentage;
     uint32_t nextContiguousSequenceNumber;
+    bool reportedLostFrame;
 
     uint32_t currentFrameNumber;
 
     bool multiFecCapable;
     uint8_t multiFecCurrentBlockNumber;
     uint8_t multiFecLastBlockNumber;
+
+    uint16_t lastOosSequenceNumber;
+    bool receivedOosData;
 } RTP_VIDEO_QUEUE, *PRTP_VIDEO_QUEUE;
 
 #define RTPF_RET_QUEUED    0

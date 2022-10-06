@@ -84,9 +84,10 @@ static void removeEntryFromList(PRTPV_QUEUE_LIST list, PRTPV_QUEUE_ENTRY entry) 
 }
 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
-static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP_PACKET packet, int length, bool isParity) {
+static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP_PACKET packet, int length, bool isParity, bool isFecRecovery) {
     PRTPV_QUEUE_ENTRY entry;
     
+    LC_ASSERT(!(isFecRecovery && isParity));
     LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextContiguousSequenceNumber));
 
     // If the packet is in order, we can take the fast path and avoid having
@@ -99,12 +100,28 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
         // Check for duplicates
         entry = queue->pendingFecBlockList.head;
         while (entry != NULL) {
-            if (entry->packet->sequenceNumber == packet->sequenceNumber) {
+            if (packet->sequenceNumber == entry->packet->sequenceNumber) {
                 return false;
+            }
+            else if (!isFecRecovery && isBefore16(packet->sequenceNumber, entry->packet->sequenceNumber)) {
+                // This packet was received after a higher sequence number packet, so note that we
+                // received an out of order packet to disable our fast RFI recovery logic.
+                queue->lastOosSequenceNumber = packet->sequenceNumber;
+                if (!queue->receivedOosData) {
+                    Limelog("Leaving fast RFI mode after OOS video data (%u < %u)\n",
+                            packet->sequenceNumber, entry->packet->sequenceNumber);
+                    queue->receivedOosData = true;
+                }
             }
 
             entry = entry->next;
         }
+    }
+
+    // This is just a fancy way of determining if 32767 packets have passed since our last OOS data
+    if (queue->receivedOosData && isBefore16(queue->bufferHighestSequenceNumber, queue->lastOosSequenceNumber)) {
+        Limelog("Entering fast RFI mode after sequenced video data\n");
+        queue->receivedOosData = false;
     }
 
     newEntry->packet = packet;
@@ -132,19 +149,35 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
 // Returns 0 if the frame is completely constructed
 static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     unsigned int totalPackets = U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1;
+    unsigned int neededPackets = queue->bufferDataPackets;
     int ret;
     
 #ifdef FEC_VALIDATION_MODE
     // We'll need an extra packet to run in FEC validation mode, because we will
     // be "dropping" one below and recovering it using parity. However, some frames
     // are so large that FEC is disabled entirely, so don't wait for parity on those.
-    if (queue->pendingFecBlockList.count < queue->bufferDataPackets + (queue->fecPercentage ? 1 : 0)) {
-#else
-    if (queue->pendingFecBlockList.count < queue->bufferDataPackets) {
+    neededPackets += (queue->fecPercentage ? 1 : 0);
 #endif
+
+    if (queue->pendingFecBlockList.count < neededPackets) {
+        // If we've never seen OOS data and we've seen parity packets but not enough to recover the frame without
+        // additional data (which is unlikely to come, given that we've never seen OOS data from this host), we
+        // will presume the frame is lost and tell the host immediately.
+        if (!queue->reportedLostFrame &&
+                !queue->receivedOosData &&
+                queue->receivedParityPackets != 0 &&
+                neededPackets - queue->pendingFecBlockList.count > U16(queue->bufferHighestSequenceNumber - queue->receivedParityHighestSequenceNumber)) {
+            notifyFrameLost(queue->currentFrameNumber);
+            queue->reportedLostFrame = true;
+        }
+
         // Not enough data to recover yet
         return -1;
     }
+
+    // If we make it here and reported a lost frame, we lied to the host. This can happen if we happen to get
+    // unlucky and this particular frame happens to be the one with OOS data, but it should almost never happen.
+    LC_ASSERT(!queue->reportedLostFrame);
     
 #ifdef FEC_VALIDATION_MODE
     // If FEC is disabled or unsupported for this frame, we must bail early here.
@@ -343,7 +376,7 @@ cleanup_packets:
                 // it may be a legitimate part of the H.264 bytestream.
 
                 LC_ASSERT(isBefore16(rtpPacket->sequenceNumber, queue->bufferFirstParitySequenceNumber));
-                queuePacket(queue, queueEntry, rtpPacket, StreamConfig.packetSize + dataOffset, false);
+                queuePacket(queue, queueEntry, rtpPacket, StreamConfig.packetSize + dataOffset, false, true);
             } else if (packets[i] != NULL) {
                 free(packets[i]);
             }
@@ -487,7 +520,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
                         queue->currentFrameNumber, queue->multiFecCurrentBlockNumber+1,
                         queue->multiFecLastBlockNumber+1,
                         queue->receivedBufferDataPackets,
-                        queue->pendingFecBlockList.count - queue->receivedBufferDataPackets,
+                        queue->receivedParityPackets,
                         queue->pendingFecBlockList.count,
                         queue->bufferDataPackets);
 
@@ -499,6 +532,9 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
                     purgeListEntries(&queue->pendingFecBlockList);
                     purgeListEntries(&queue->completedFecBlockList);
 
+                    // Notify the host of the loss of this frame
+                    notifyFrameLost(queue->currentFrameNumber);
+
                     queue->currentFrameNumber++;
                     queue->multiFecCurrentBlockNumber = 0;
                     return RTPF_RET_REJECTED;
@@ -507,7 +543,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
             else {
                 Limelog("Unrecoverable frame %d: %d+%d=%d received < %d needed\n",
                         queue->currentFrameNumber, queue->receivedBufferDataPackets,
-                        queue->pendingFecBlockList.count - queue->receivedBufferDataPackets,
+                        queue->receivedParityPackets,
                         queue->pendingFecBlockList.count,
                         queue->bufferDataPackets);
             }
@@ -525,6 +561,9 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
             // Discard any unsubmitted buffers from the previous frame
             purgeListEntries(&queue->pendingFecBlockList);
             purgeListEntries(&queue->completedFecBlockList);
+
+            // Notify the host of the loss of this frame
+            notifyFrameLost(queue->currentFrameNumber);
 
             // We dropped a block of this frame, so we must skip to the next one.
             queue->currentFrameNumber = nvPacket->frameIndex + 1;
@@ -550,6 +589,9 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->bufferLowestSequenceNumber = U16(packet->sequenceNumber - fecIndex);
         queue->nextContiguousSequenceNumber = queue->bufferLowestSequenceNumber;
         queue->receivedBufferDataPackets = 0;
+        queue->receivedParityPackets = 0;
+        queue->receivedParityHighestSequenceNumber = 0;
+        queue->reportedLostFrame = false;
         queue->bufferDataPackets = (nvPacket->fecInfo & 0xFFC00000) >> 22;
         queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;
         queue->bufferParityPackets = (queue->bufferDataPackets * queue->fecPercentage + 99) / 100;
@@ -576,12 +618,18 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
     LC_ASSERT(((nvPacket->multiFecBlocks >> 6) & 0x3) == queue->multiFecLastBlockNumber);
 
     LC_ASSERT((nvPacket->flags & FLAG_EOF) || length - dataOffset == StreamConfig.packetSize);
-    if (!queuePacket(queue, packetEntry, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber))) {
+    if (!queuePacket(queue, packetEntry, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber), false)) {
         return RTPF_RET_REJECTED;
     }
     else {
         if (isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber)) {
             queue->receivedBufferDataPackets++;
+        }
+        else {
+            queue->receivedParityPackets++;
+            if (queue->receivedParityPackets == 1 || isBefore16(queue->receivedParityHighestSequenceNumber, packet->sequenceNumber)) {
+                queue->receivedParityHighestSequenceNumber = packet->sequenceNumber;
+            }
         }
         
         // Try to submit this frame. If we haven't received enough packets,
