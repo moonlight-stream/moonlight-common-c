@@ -177,14 +177,14 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
             if (queue->missingDataPackets > queue->bufferParityPackets) {
                 // If the number of missing data shards exceeds the total number of possible parity shards,
                 // we will presume the frame is lost.
-                notifyFrameLost(queue->currentFrameNumber);
+                notifyFrameLost(queue->currentFrameNumber, true);
                 queue->reportedLostFrame = true;
             }
             else if (queue->receivedParityPackets != 0 &&
                      neededPackets - queue->pendingFecBlockList.count > U16(queue->bufferHighestSequenceNumber - queue->receivedParityHighestSequenceNumber)) {
                 // If we've seen some parity shards but not enough parity shards remain to recover this frame
                 // without additional data shards, we will presume the frame is lost.
-                notifyFrameLost(queue->currentFrameNumber);
+                notifyFrameLost(queue->currentFrameNumber, true);
                 queue->reportedLostFrame = true;
             }
         }
@@ -560,7 +560,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
 
                     // Notify the host of the loss of this frame
                     if (!queue->reportedLostFrame) {
-                        notifyFrameLost(queue->currentFrameNumber);
+                        notifyFrameLost(queue->currentFrameNumber, false);
                         queue->reportedLostFrame = true;
                     }
 
@@ -593,7 +593,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
 
             // Notify the host of the loss of this frame
             if (!queue->reportedLostFrame) {
-                notifyFrameLost(queue->currentFrameNumber);
+                notifyFrameLost(queue->currentFrameNumber, false);
                 queue->reportedLostFrame = true;
             }
 
@@ -623,7 +623,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
                 // NB: We only have to notify for the most recent lost frame, since
                 // the depacketizer will report the RFI range starting at the last
                 // frame it saw.
-                notifyFrameLost(nvPacket->frameIndex - 1);
+                notifyFrameLost(nvPacket->frameIndex - 1, false);
             }
         }
 

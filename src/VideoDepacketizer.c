@@ -893,7 +893,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 // if it determines the frame to be unrecoverable. This lets us
 // avoid having to wait until the next received frame to determine
 // that we lost a frame and submit an RFI request.
-void notifyFrameLost(unsigned int frameNumber) {
+void notifyFrameLost(unsigned int frameNumber, bool speculative) {
     // This may only be called at frame boundaries
     LC_ASSERT(!decodingFrame);
 
@@ -902,7 +902,12 @@ void notifyFrameLost(unsigned int frameNumber) {
 
     // If RFI is enabled, we will notify the host PC now
     if (isReferenceFrameInvalidationEnabled()) {
-        Limelog("Sending speculative RFI request for predicted loss of frame %d\n", frameNumber);
+        if (speculative) {
+            Limelog("Sending speculative RFI request for predicted loss of frame %d\n", frameNumber);
+        }
+        else {
+            Limelog("Sending RFI request for unrecoverable frame %d\n", frameNumber);
+        }
 
         // Advance the frame number since we won't be expecting this one anymore
         nextFrameNumber = frameNumber + 1;
