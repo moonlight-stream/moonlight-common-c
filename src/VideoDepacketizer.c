@@ -664,8 +664,13 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         Limelog("Depacketizer detected corrupt frame: %d", frameIndex);
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
-        waitingForNextSuccessfulFrame = true;
         dropFrameState();
+        if (waitingForIdrFrame) {
+            LiRequestIdrFrame();
+        }
+        else {
+            connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+        }
         return;
     }
     
