@@ -893,9 +893,12 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 // if it determines the frame to be unrecoverable. This lets us
 // avoid having to wait until the next received frame to determine
 // that we lost a frame and submit an RFI request.
-void notifyFrameLost(int frameNumber) {
+void notifyFrameLost(unsigned int frameNumber) {
     // This may only be called at frame boundaries
     LC_ASSERT(!decodingFrame);
+
+    // We may not invalidate frames that we've already received
+    LC_ASSERT(frameNumber >= startFrameNumber);
 
     // If RFI is enabled, we will notify the host PC now
     if (isReferenceFrameInvalidationEnabled()) {
