@@ -806,6 +806,12 @@ int performRtspHandshake(void) {
             }
         }
 
+        // Look for the SDP attribute that indicates we're dealing with a server that supports RFI
+        ReferenceFrameInvalidationSupported = strstr(response.payload, "x-nv-video[0].refPicInvalidation") != NULL;
+        if (!ReferenceFrameInvalidationSupported) {
+            Limelog("Reference frame invalidation is not supported by this host\n");
+        }
+
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
         ret = parseOpusConfigurations(&response);
         if (ret != 0) {

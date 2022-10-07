@@ -31,6 +31,7 @@ extern OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
 extern bool AudioEncryptionEnabled;
+extern bool ReferenceFrameInvalidationSupported;
 
 extern uint16_t RtspPortNumber;
 extern uint16_t ControlPortNumber;

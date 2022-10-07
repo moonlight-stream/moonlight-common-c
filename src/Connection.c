@@ -24,6 +24,7 @@ OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
 int OriginalVideoBitrate;
 int AudioPacketDuration;
 bool AudioEncryptionEnabled;
+bool ReferenceFrameInvalidationSupported;
 uint16_t RtspPortNumber;
 uint16_t ControlPortNumber;
 uint16_t AudioPortNumber;
