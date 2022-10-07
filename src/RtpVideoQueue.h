@@ -43,7 +43,7 @@ typedef struct _RTP_VIDEO_QUEUE {
     uint8_t multiFecCurrentBlockNumber;
     uint8_t multiFecLastBlockNumber;
 
-    uint16_t lastOosSequenceNumber;
+    uint32_t lastOosFramePresentationTimestamp;
     bool receivedOosData;
 } RTP_VIDEO_QUEUE, *PRTP_VIDEO_QUEUE;
 
