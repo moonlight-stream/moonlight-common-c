@@ -12,9 +12,8 @@
 void RtpvInitializeQueue(PRTP_VIDEO_QUEUE queue) {
     reed_solomon_init();
     memset(queue, 0, sizeof(*queue));
-    
-    queue->currentFrameNumber = UINT16_MAX;
 
+    queue->currentFrameNumber = 1;
     queue->multiFecCapable = APP_VERSION_AT_LEAST(7, 1, 431);
 }
 
@@ -542,7 +541,10 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
                     purgeListEntries(&queue->completedFecBlockList);
 
                     // Notify the host of the loss of this frame
-                    notifyFrameLost(queue->currentFrameNumber);
+                    if (!queue->reportedLostFrame) {
+                        notifyFrameLost(queue->currentFrameNumber);
+                        queue->reportedLostFrame = true;
+                    }
 
                     queue->currentFrameNumber++;
                     queue->multiFecCurrentBlockNumber = 0;
@@ -572,7 +574,10 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
             purgeListEntries(&queue->completedFecBlockList);
 
             // Notify the host of the loss of this frame
-            notifyFrameLost(queue->currentFrameNumber);
+            if (!queue->reportedLostFrame) {
+                notifyFrameLost(queue->currentFrameNumber);
+                queue->reportedLostFrame = true;
+            }
 
             // We dropped a block of this frame, so we must skip to the next one.
             queue->currentFrameNumber = nvPacket->frameIndex + 1;
@@ -586,6 +591,22 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         // Discard any completed FEC blocks from the previous frame
         if (queue->currentFrameNumber != nvPacket->frameIndex) {
             purgeListEntries(&queue->completedFecBlockList);
+        }
+
+        // If the frame numbers are not contiguous, the network dropped an entire frame.
+        // The check here looks weird, but that's because we increment the frame number
+        // after successfully processing a frame.
+        if (queue->currentFrameNumber != nvPacket->frameIndex) {
+            LC_ASSERT(queue->currentFrameNumber < nvPacket->frameIndex);
+
+            // If the frame immediately preceding this one was lost, we may have already
+            // reported it using our predictive RFI logic. Don't report it again.
+            if (queue->currentFrameNumber + 1 != nvPacket->frameIndex || !queue->reportedLostFrame) {
+                // NB: We only have to notify for the most recent lost frame, since
+                // the depacketizer will report the RFI range starting at the last
+                // frame it saw.
+                notifyFrameLost(nvPacket->frameIndex - 1);
+            }
         }
 
         queue->currentFrameNumber = nvPacket->frameIndex;
