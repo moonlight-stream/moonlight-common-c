@@ -402,6 +402,9 @@ static void reassembleFrame(int frameNumber) {
                 if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
                     Limelog("Video decode unit queue overflow\n");
 
+                    // RFI recovery is not supported here
+                    waitingForIdrFrame = true;
+
                     // Clear NAL state for the frame that we failed to enqueue
                     nalChainHead = qdu->decodeUnit.bufferList;
                     nalChainDataLength = qdu->decodeUnit.fullLength;
@@ -413,8 +416,7 @@ static void reassembleFrame(int frameNumber) {
                     // Free all frames in the decode unit queue
                     freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
-                    // Request an IDR frame to recover (RFI recovery is not supported here)
-                    waitingForIdrFrame = true;
+                    // Request an IDR frame to recover
                     LiRequestIdrFrame();
                     return;
                 }
