@@ -104,10 +104,10 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
             }
             else if (!isFecRecovery && isBefore16(packet->sequenceNumber, entry->packet->sequenceNumber)) {
                 // This packet was received after a higher sequence number packet, so note that we
-                // received an out of order packet to disable our predictive RFI recovery logic.
+                // received an out of order packet to disable our speculative RFI recovery logic.
                 queue->lastOosSequenceNumber = packet->sequenceNumber;
                 if (!queue->receivedOosData) {
-                    Limelog("Leaving predictive RFI mode after OOS video data (%u < %u)\n",
+                    Limelog("Leaving speculative RFI mode after OOS video data (%u < %u)\n",
                             packet->sequenceNumber, entry->packet->sequenceNumber);
                     queue->receivedOosData = true;
                 }
@@ -119,7 +119,7 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
 
     // This is just a fancy way of determining if 32767 packets have passed since our last OOS data
     if (queue->receivedOosData && isBefore16(queue->bufferHighestSequenceNumber, queue->lastOosSequenceNumber)) {
-        Limelog("Entering predictive RFI mode after sequenced video data\n");
+        Limelog("Entering speculative RFI mode after sequenced video data\n");
         queue->receivedOosData = false;
     }
 
@@ -600,7 +600,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
             LC_ASSERT(queue->currentFrameNumber < nvPacket->frameIndex);
 
             // If the frame immediately preceding this one was lost, we may have already
-            // reported it using our predictive RFI logic. Don't report it again.
+            // reported it using our speculative RFI logic. Don't report it again.
             if (queue->currentFrameNumber + 1 != nvPacket->frameIndex || !queue->reportedLostFrame) {
                 // NB: We only have to notify for the most recent lost frame, since
                 // the depacketizer will report the RFI range starting at the last

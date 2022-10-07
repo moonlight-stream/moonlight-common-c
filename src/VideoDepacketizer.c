@@ -902,7 +902,7 @@ void notifyFrameLost(unsigned int frameNumber) {
 
     // If RFI is enabled, we will notify the host PC now
     if (isReferenceFrameInvalidationEnabled()) {
-        Limelog("Sending predictive RFI request for probable loss of frame %d\n", frameNumber);
+        Limelog("Sending speculative RFI request for predicted loss of frame %d\n", frameNumber);
 
         // Advance the frame number since we won't be expecting this one anymore
         nextFrameNumber = frameNumber + 1;
