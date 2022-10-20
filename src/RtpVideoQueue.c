@@ -92,7 +92,7 @@ static void removeEntryFromList(PRTPV_QUEUE_LIST list, PRTPV_QUEUE_ENTRY entry) 
 // newEntry is contained within the packet buffer so we free the whole entry by freeing entry->packet
 static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP_PACKET packet, int length, bool isParity, bool isFecRecovery) {
     PRTPV_QUEUE_ENTRY entry;
-    bool outOfSequence = false;
+    bool outOfSequence;
     
     LC_ASSERT(!(isFecRecovery && isParity));
     LC_ASSERT(!isBefore16(packet->sequenceNumber, queue->nextContiguousSequenceNumber));
@@ -102,8 +102,15 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
     // packet, the fast path will stop working and we'll use the loop instead.
     if (packet->sequenceNumber == queue->nextContiguousSequenceNumber) {
         queue->nextContiguousSequenceNumber = U16(packet->sequenceNumber + 1);
+
+        // If we received the next contiguous sequence number but already have missing
+        // packets, that means we received some later packets before falling back into
+        // sequence with this one. By definition, that's OOS data so let's tag it.
+        outOfSequence = queue->missingPackets != 0;
     }
     else {
+        outOfSequence = false;
+
         // Check for duplicates
         entry = queue->pendingFecBlockList.head;
         while (entry != NULL) {
