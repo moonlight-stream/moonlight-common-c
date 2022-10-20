@@ -28,13 +28,12 @@ typedef struct _RTP_VIDEO_QUEUE {
     uint32_t bufferFirstParitySequenceNumber;
     uint32_t bufferDataPackets;
     uint32_t bufferParityPackets;
-    uint32_t receivedBufferDataPackets;
+    uint32_t receivedDataPackets;
     uint32_t receivedParityPackets;
-    uint32_t receivedParityHighestSequenceNumber;
-    uint32_t receivedDataHighestSequenceNumber;
+    uint32_t receivedHighestSequenceNumber;
     uint32_t fecPercentage;
     uint32_t nextContiguousSequenceNumber;
-    uint32_t missingDataPackets; // # of holes behind receivedDataHighestSequenceNumber
+    uint32_t missingPackets; // # of holes behind receivedHighestSequenceNumber
     bool reportedLostFrame;
 
     uint32_t currentFrameNumber;
