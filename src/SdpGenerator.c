@@ -361,9 +361,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
                 }
             }
 
-            if (AppVersionQuad[0] < 7 ||
-                (AppVersionQuad[0] == 7 && AppVersionQuad[1] < 1) ||
-                (AppVersionQuad[0] == 7 && AppVersionQuad[1] == 1 && AppVersionQuad[2] < 408)) {
+            if (!APP_VERSION_AT_LEAST(7, 1, 408)) {
                 // This disables split frame encode on GFE 3.10 which seems to produce broken
                 // HEVC output at 1080p60 (full of artifacts even on the SHIELD itself, go figure).
                 // It now appears to work fine on GFE 3.14.1.

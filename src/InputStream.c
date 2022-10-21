@@ -465,7 +465,7 @@ static int sendEnableHaptics(void) {
 
     // Avoid sending this on earlier server versions, since they may terminate
     // the connection upon receiving an unexpected packet.
-    if (AppVersionQuad[0] < 7 || (AppVersionQuad[0] == 7 && AppVersionQuad[1] < 1)) {
+    if (!APP_VERSION_AT_LEAST(7, 1, 0)) {
         return 0;
     }
 
