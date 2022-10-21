@@ -600,8 +600,6 @@ int LiSendScrollEvent(signed char scrollClicks);
 int LiSendHighResScrollEvent(short scrollAmount);
 
 // This function returns a time in milliseconds with an implementation-defined epoch.
-// NOTE: This will be populated from gettimeofday() if !HAVE_CLOCK_GETTIME and
-// populated from clock_gettime(CLOCK_MONOTONIC) if HAVE_CLOCK_GETTIME.
 uint64_t LiGetMillis(void);
 
 // This is a simplistic STUN function that can assist clients in getting the WAN address
