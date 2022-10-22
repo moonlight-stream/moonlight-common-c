@@ -170,7 +170,7 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     unsigned int neededPackets = queue->bufferDataPackets;
     int ret;
 
-    LC_ASSERT(totalPackets == U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1);
+    LC_ASSERT(totalPackets == U16(queue->bufferHighestSequenceNumber - queue->bufferLowestSequenceNumber) + 1U);
     
 #ifdef FEC_VALIDATION_MODE
     // We'll need an extra packet to run in FEC validation mode, because we will
