@@ -510,13 +510,18 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
     // 2) The entire duration of the audio in the FEC block has elapsed (plus a little bit)
     if (!queue->receivedOosData ||
             PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
-        Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
-                queue->blockHead->fecHeader.baseSequenceNumber,
-                queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
-                queue->blockHead->dataShardsReceived,
-                queue->blockHead->fecShardsReceived,
-                queue->blockHead->dataShardsReceived + queue->blockHead->fecShardsReceived,
-                RTPA_DATA_SHARDS);
+        // Only print the head FEC block state if that was the block we were waiting on.
+        // If we were actually waiting on a previous block, printing the current block is misleading.
+        if (!isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
+            LC_ASSERT(isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS));
+            Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
+                    queue->blockHead->fecHeader.baseSequenceNumber,
+                    queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
+                    queue->blockHead->dataShardsReceived,
+                    queue->blockHead->fecShardsReceived,
+                    queue->blockHead->dataShardsReceived + queue->blockHead->fecShardsReceived,
+                    RTPA_DATA_SHARDS);
+        }
         return true;
     }
 
