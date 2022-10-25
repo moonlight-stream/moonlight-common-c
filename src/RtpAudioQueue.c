@@ -505,10 +505,12 @@ static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
         return false;
     }
 
-    // We will consider the FEC block irrecoverably lost if either:
+    // We will consider the FEC block irrecoverably lost if any of the following are true:
     // 1) We have not received OOS data, yet this data is from a future FEC block
-    // 2) The entire duration of the audio in the FEC block has elapsed (plus a little bit)
-    if (!queue->receivedOosData ||
+    // 2) The packet we're waiting on precedes our earliest FEC block (likely means a previous FEC block was completely lost)
+    // 3) The entire duration of the audio in the FEC block has elapsed (plus a little bit)
+    if ((!queue->receivedOosData && queue->blockHead != queue->blockTail) ||
+            isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber) ||
             PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
         // Only print the head FEC block state if that was the block we were waiting on.
         // If we were actually waiting on a previous block, printing the current block is misleading.
@@ -621,11 +623,9 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     }
 
     // We don't have enough to proceed. Let's ensure we haven't
-    // violated queue constraints with this FEC block. We will only
-    // enforce the queue time limit if we have received a packet
-    // from the next FEC block to ensure we don't needlessly time out
-    // a block if we aren't getting any other audio data in the meantime.
-    if (fecBlock != queue->blockHead && enforceQueueConstraints(queue)) {
+    // violated queue constraints with this FEC block.
+    LC_ASSERT(fecBlock == queue->blockHead || queue->blockHead != queue->blockTail);
+    if (enforceQueueConstraints(queue)) {
         // Return all available audio data even if there are discontinuities
         queue->blockHead->allowDiscontinuity = true;
 
