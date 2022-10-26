@@ -494,40 +494,58 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
 }
 
 static bool queueHasPacketReady(PRTP_AUDIO_QUEUE queue) {
+    validateFecBlockState(queue);
     return queue->blockHead != NULL &&
-            queue->blockHead->marks[queue->blockHead->nextDataPacketIndex] == 0 &&
-            queue->blockHead->fecHeader.baseSequenceNumber + queue->blockHead->nextDataPacketIndex == queue->nextRtpSequenceNumber;
+            ((queue->blockHead->marks[queue->blockHead->nextDataPacketIndex] == 0 &&
+              queue->blockHead->fecHeader.baseSequenceNumber + queue->blockHead->nextDataPacketIndex == queue->nextRtpSequenceNumber)
+            || queue->blockHead->allowDiscontinuity);
 }
 
-static bool enforceQueueConstraints(PRTP_AUDIO_QUEUE queue) {
-    // Empty queue is fine
+static void handleMissingPackets(PRTP_AUDIO_QUEUE queue) {
+    // Nothing to do for an empty queue
     if (queue->blockHead == NULL) {
-        return false;
+        return;
     }
 
-    // We will consider the FEC block irrecoverably lost if any of the following are true:
-    // 1) We have not received OOS data, yet this data is from a future FEC block
-    // 2) The packet we're waiting on precedes our earliest FEC block (likely means a previous FEC block was completely lost)
-    // 3) The entire duration of the audio in the FEC block has elapsed (plus a little bit)
-    if ((!queue->receivedOosData && queue->blockHead != queue->blockTail) ||
-            isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber) ||
-            PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
-        // Only print the head FEC block state if that was the block we were waiting on.
-        // If we were actually waiting on a previous block, printing the current block is misleading.
-        if (!isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
-            LC_ASSERT(isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS));
-            Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
-                    queue->blockHead->fecHeader.baseSequenceNumber,
-                    queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
-                    queue->blockHead->dataShardsReceived,
-                    queue->blockHead->fecShardsReceived,
-                    queue->blockHead->dataShardsReceived + queue->blockHead->fecShardsReceived,
-                    RTPA_DATA_SHARDS);
-        }
-        return true;
+    // If the packet we're waiting on precedes our earliest FEC block, a previous FEC block was completely lost.
+    // We should resynchronize immediately by advancing the queue state to play our oldest block next.
+    //
+    // NB: We do NOT want to set allowDiscontinuity here, because that will result in playing back the entire
+    // FEC block immediately but we've only received a single packet from that block. Worse still, when the
+    // remaining packets from this block arrive, they will trigger the OOS detection and kick us out of fast
+    // audio recovery mode.
+    if (isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
+        queue->nextRtpSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber;
+        return;
     }
 
-    return false;
+    // If we reach this point, we know the next packet resides in the first FEC block we're
+    // currently waiting on. In that case, we want to wait at least until we have a second FEC
+    // block to give up on the first one. If we don't have a second block now, just keep waiting.
+    LC_ASSERT(isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS));
+    if (queue->blockHead == queue->blockTail) {
+        return;
+    }
+
+    // At this point, we know we've got a second FEC block queued up waiting on the first one to complete.
+    // If we've never seen OOS data from this host, we'll assume the first one is lost and skip forward.
+    // If we have seen OOS data, we'll wait for a little while longer to see if OOS packets arrive before giving up.
+    if (!queue->receivedOosData || PltGetMillis() - queue->blockHead->queueTimeMs > (uint32_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + RTPQ_OOS_WAIT_TIME_MS) {
+        LC_ASSERT(!isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber));
+
+        Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
+                queue->blockHead->fecHeader.baseSequenceNumber,
+                queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
+                queue->blockHead->dataShardsReceived,
+                queue->blockHead->fecShardsReceived,
+                queue->blockHead->dataShardsReceived + queue->blockHead->fecShardsReceived,
+                RTPA_DATA_SHARDS);
+
+        // Return all available audio data even if there are discontinuities
+        queue->blockHead->allowDiscontinuity = true;
+
+        LC_ASSERT(queueHasPacketReady(queue));
+    }
 }
 
 int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
@@ -612,38 +630,15 @@ int RtpaAddPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACKET packet, uint16_t length) {
     }
 
     // Try to complete the FEC block via data shards or data+FEC shards
+    LC_ASSERT(fecBlock == queue->blockHead || queue->blockHead != queue->blockTail);
     if (completeFecBlock(queue, fecBlock)) {
         // We completed a FEC block
         fecBlock->fullyReassembled = true;
     }
 
-    // The completed FEC block may have readied a packet
-    if (queueHasPacketReady(queue)) {
-        return RTPQ_RET_PACKET_READY;
-    }
-
-    // We don't have enough to proceed. Let's ensure we haven't
-    // violated queue constraints with this FEC block.
-    LC_ASSERT(fecBlock == queue->blockHead || queue->blockHead != queue->blockTail);
-    if (enforceQueueConstraints(queue)) {
-        // Return all available audio data even if there are discontinuities
-        queue->blockHead->allowDiscontinuity = true;
-
-        // If the next packet in sequence was in an FEC block that we completely missed,
-        // bump the next RTP sequence number to match the beginning of the next block
-        // that we received data from.
-        //
-        // We could avoid setting allowDiscontinuity to see if we can recover the next
-        // block. I'm not sure if it makes sense though since we already waited for any
-        // packets from the last block. We probably want to get things moving rather than
-        // risk waiting a long time again and really starving the audio device.
-        if (isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
-            queue->nextRtpSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber;
-        }
-
-        validateFecBlockState(queue);
-
-        return RTPQ_RET_PACKET_READY;
+    // If we still have nothing ready, see if we should skip the missing packets.
+    if (!queueHasPacketReady(queue)) {
+        handleMissingPackets(queue);
     }
 
     return queueHasPacketReady(queue) ? RTPQ_RET_PACKET_READY : 0;
