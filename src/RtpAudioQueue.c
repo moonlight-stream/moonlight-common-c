@@ -516,6 +516,7 @@ static void handleMissingPackets(PRTP_AUDIO_QUEUE queue) {
     // audio recovery mode.
     if (isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber)) {
         queue->nextRtpSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber;
+        queue->oldestRtpBaseSequenceNumber = queue->blockHead->fecHeader.baseSequenceNumber;
         return;
     }
 
