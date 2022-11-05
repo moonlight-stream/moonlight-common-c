@@ -91,7 +91,7 @@ void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 int sendInputPacketOnControlStream(unsigned char* data, int length);
 bool isControlDataInTransit(void);
 
-int performRtspHandshake(void);
+int performRtspHandshake(PSERVER_INFORMATION serverInfo);
 
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);

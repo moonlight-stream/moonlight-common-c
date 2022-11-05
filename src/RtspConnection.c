@@ -657,31 +657,100 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
     return 0;
 }
 
-// Perform RTSP Handshake with the streaming server machine as part of the connection process
-int performRtspHandshake(void) {
-    int ret;
+static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* destination) {
+    char* rtspUrlScratchBuffer;
+    char* portSeparator;
+    char* v6EscapeEndChar;
+    char* urlPathSeparator;
+    int prefixLen;
 
-    // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
-    // fake our target address so it doesn't match any of the PC's local interfaces. It seems
-    // that the only way to get it to give you "low quality" stereo audio nowadays is if it
-    // thinks you are remote (target address != any local address).
-    if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
-            (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
-        addrToUrlSafeString(&RemoteAddr, urlAddr);
+    // Create a copy that we can modify
+    rtspUrlScratchBuffer = strdup(rtspUrlString);
+    if (rtspUrlScratchBuffer == NULL) {
+        return false;
     }
-    else {
-        strcpy(urlAddr, "0.0.0.0");
+
+    // If we have a v6 address, we want to stop one character after the closing ]
+    // If we have a v4 address, we want to stop at the port separator
+    portSeparator = strrchr(rtspUrlScratchBuffer, ':');
+    v6EscapeEndChar = strchr(rtspUrlScratchBuffer, ']');
+
+    // Count the prefix length to skip past the initial rtsp:// or rtspru:// part
+    for (prefixLen = 2; rtspUrlScratchBuffer[prefixLen - 2] != 0 && (rtspUrlScratchBuffer[prefixLen - 2] != '/' || rtspUrlScratchBuffer[prefixLen - 1] != '/'); prefixLen++);
+
+    // If we hit the end of the string prior to parsing the prefix, we cannot proceed
+    if (rtspUrlScratchBuffer[prefixLen - 2] == 0) {
+        free(rtspUrlScratchBuffer);
+        return false;
     }
+
+    // Look for a slash at the end of the host portion of the URL (may not be present)
+    urlPathSeparator = strchr(rtspUrlScratchBuffer + prefixLen, '/');
+
+    // Check for a v6 address first since they also have colons
+    if (v6EscapeEndChar) {
+        // Terminate the string at the next character
+        *(v6EscapeEndChar + 1) = 0;
+    }
+    else if (portSeparator) {
+        // Terminate the string prior to the port separator
+        *portSeparator = 0;
+    }
+    else if (urlPathSeparator) {
+        // Terminate the string prior to the path separator
+        *urlPathSeparator = 0;
+    }
+
+    strcpy(destination, rtspUrlScratchBuffer + prefixLen);
+
+    free(rtspUrlScratchBuffer);
+    return true;
+}
+
+// Perform RTSP Handshake with the streaming server machine as part of the connection process
+int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
+    int ret;
 
     LC_ASSERT(RtspPortNumber != 0);
 
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
-    sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
     currentSeqNumber = 1;
     hasSessionId = false;
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
     AudioEncryptionEnabled = false;
+
+    // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
+    // fake our target address so it doesn't match any of the PC's local interfaces. It seems
+    // that the only way to get it to give you "low quality" stereo audio nowadays is if it
+    // thinks you are remote (target address != any local address).
+    //
+    // We will enable high quality audio if the following are all true:
+    // 1. Video bitrate is higher than 15 Mbps (to ensure most bandwidth is reserved for video)
+    // 2. The audio decoder has not declared that it is slow
+    // 3. The stream is either local or not surround sound (to prevent MTU issues over the Internet)
+    LC_ASSERT(StreamConfig.streamingRemotely != STREAM_CFG_AUTO);
+    if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
+            (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0 &&
+            (StreamConfig.streamingRemotely != STREAM_CFG_REMOTE || CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) <= 2)) {
+        // If we have an RTSP URL string and it was successfully parsed, use that string
+        if (serverInfo->rtspSessionUrl != NULL && parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr)) {
+            strcpy(rtspTargetUrl, serverInfo->rtspSessionUrl);
+        }
+        else {
+            // If an RTSP URL string was not provided or failed to parse, we will construct one now as best we can.
+            //
+            // NB: If the remote address is not a LAN address, the host will likely not enable high quality
+            // audio since it only does that for local streaming normally. We can avoid this limitation,
+            // but only if the caller gave us the RTSP session URL that it received from the host during launch.
+            addrToUrlSafeString(&RemoteAddr, urlAddr);
+            sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+        }
+    }
+    else {
+        strcpy(urlAddr, "0.0.0.0");
+        sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+    }
 
     switch (AppVersionQuad[0]) {
         case 3:
