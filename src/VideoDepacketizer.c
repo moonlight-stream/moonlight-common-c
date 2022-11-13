@@ -896,14 +896,16 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 // avoid having to wait until the next received frame to determine
 // that we lost a frame and submit an RFI request.
 void notifyFrameLost(unsigned int frameNumber, bool speculative) {
-    // This may only be called at frame boundaries
-    LC_ASSERT(!decodingFrame);
-
     // We may not invalidate frames that we've already received
     LC_ASSERT(frameNumber >= startFrameNumber);
 
-    // If RFI is enabled, we will notify the host PC now
-    if (isReferenceFrameInvalidationEnabled()) {
+    // Drop state and determine if we need an IDR frame or if RFI is okay
+    dropFrameState();
+
+    // If dropFrameState() determined that RFI was usable, issue it now
+    if (!waitingForIdrFrame) {
+        LC_ASSERT(waitingForRefInvalFrame);
+
         if (speculative) {
             Limelog("Sending speculative RFI request for predicted loss of frame %d\n", frameNumber);
         }
@@ -913,9 +915,6 @@ void notifyFrameLost(unsigned int frameNumber, bool speculative) {
 
         // Advance the frame number since we won't be expecting this one anymore
         nextFrameNumber = frameNumber + 1;
-
-        // Drop any existing frame state (shouldn't have any) and set the RFI wait flag
-        dropFrameState();
 
         // Notify the host that we lost this one
         connectionDetectedFrameLoss(startFrameNumber, frameNumber);
