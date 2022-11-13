@@ -225,6 +225,10 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
     if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
         notifyKeyFrameReceived();
     }
+    else {
+        // We must never submit a P-frame until an IDR frame was processed
+        LC_ASSERT(idrFrameProcessed);
+    }
 
     if (drStatus == DR_NEED_IDR) {
         Limelog("Requesting IDR frame on behalf of DR\n");
