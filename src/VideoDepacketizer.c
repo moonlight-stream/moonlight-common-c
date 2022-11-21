@@ -175,6 +175,52 @@ static bool getAnnexBStartSequence(PBUFFER_DESC current, PBUFFER_DESC startSeq) 
     return false;
 }
 
+void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
+    // Frames must always have at least one buffer
+    LC_ASSERT(decodeUnit->bufferList != NULL);
+    LC_ASSERT(decodeUnit->fullLength != 0);
+
+    // Validate the buffers in the frame
+    if (decodeUnit->frameType == FRAME_TYPE_IDR) {
+        // IDR frames always start with codec configuration data
+        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+            // H.264 IDR frames should have an SPS, PPS, then picture data
+            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_SPS);
+            LC_ASSERT(decodeUnit->bufferList->next != NULL);
+            LC_ASSERT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_PPS);
+            LC_ASSERT(decodeUnit->bufferList->next->next != NULL);
+            LC_ASSERT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PICDATA);
+        }
+        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+            // HEVC IDR frames should have an VPS, SPS, PPS, then picture data
+            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_VPS);
+            LC_ASSERT(decodeUnit->bufferList->next != NULL);
+            LC_ASSERT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_SPS);
+            LC_ASSERT(decodeUnit->bufferList->next->next != NULL);
+            LC_ASSERT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
+            LC_ASSERT(decodeUnit->bufferList->next->next->next != NULL);
+
+            // We get 2 sets of VPS, SPS, and PPS NALUs when we use HEVC Main 10.
+            // FIXME: Should we normalize this or something for clients?
+            if (NegotiatedVideoFormat != VIDEO_FORMAT_H265_MAIN10) {
+                LC_ASSERT(decodeUnit->bufferList->next->next->next->bufferType == BUFFER_TYPE_PICDATA);
+            }
+        }
+        else {
+            LC_ASSERT(false);
+        }
+    }
+    else {
+        LC_ASSERT(decodeUnit->frameType == FRAME_TYPE_PFRAME);
+
+        // P frames always start with picture data
+        LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
+
+        // We must not dequeue a P frame before an IDR frame has been successfully processed
+        LC_ASSERT(idrFrameProcessed);
+    }
+}
+
 bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit) {
     PQUEUED_DECODE_UNIT qdu;
 
@@ -182,6 +228,8 @@ bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* deco
     if (err != LBQ_SUCCESS) {
         return false;
     }
+
+    validateDecodeUnitForPlayback(&qdu->decodeUnit);
 
     *frameHandle = qdu;
     *decodeUnit = &qdu->decodeUnit;
@@ -196,6 +244,8 @@ bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeU
         return false;
     }
 
+    validateDecodeUnitForPlayback(&qdu->decodeUnit);
+
     *frameHandle = qdu;
     *decodeUnit = &qdu->decodeUnit;
     return true;
@@ -208,6 +258,8 @@ bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit) {
     if (err != LBQ_SUCCESS) {
         return false;
     }
+
+    validateDecodeUnitForPlayback(&qdu->decodeUnit);
 
     *decodeUnit = &qdu->decodeUnit;
     return true;
@@ -224,10 +276,6 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
 
     if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
         notifyKeyFrameReceived();
-    }
-    else {
-        // We must never submit a P-frame until an IDR frame was processed
-        LC_ASSERT(idrFrameProcessed);
     }
 
     if (drStatus == DR_NEED_IDR) {
@@ -427,6 +475,7 @@ static void reassembleFrame(int frameNumber) {
             }
             else {
                 // Submit the frame to the decoder
+                validateDecodeUnitForPlayback(&qdu->decodeUnit);
                 LiCompleteVideoFrame(qdu, VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit));
             }
 
