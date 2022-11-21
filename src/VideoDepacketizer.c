@@ -274,10 +274,6 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
     PQUEUED_DECODE_UNIT qdu = handle;
     PLENTRY_INTERNAL lastEntry;
 
-    if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
-        notifyKeyFrameReceived();
-    }
-
     if (drStatus == DR_NEED_IDR) {
         Limelog("Requesting IDR frame on behalf of DR\n");
         requestDecoderRefresh();
@@ -442,6 +438,7 @@ static void reassembleFrame(int frameNumber) {
             // IDR frames will have leading CSD buffers
             if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
                 qdu->decodeUnit.frameType = FRAME_TYPE_IDR;
+                notifyKeyFrameReceived();
             }
             else {
                 qdu->decodeUnit.frameType = FRAME_TYPE_PFRAME;
