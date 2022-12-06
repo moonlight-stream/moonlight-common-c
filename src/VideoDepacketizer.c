@@ -764,7 +764,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
         
         if (!presentationTimeMs && frameIndex > 0) {
-            firstPacketPresentationTime = receiveTimeMs - syntheticPtsBase;
+            firstPacketPresentationTime = (unsigned int)(receiveTimeMs - syntheticPtsBase);
         }
         else {
             firstPacketPresentationTime = presentationTimeMs;
