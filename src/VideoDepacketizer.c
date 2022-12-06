@@ -15,6 +15,7 @@ static bool waitingForRefInvalFrame;
 static unsigned int lastPacketInStream;
 static bool decodingFrame;
 static bool strictIdrFrameWait;
+static uint64_t syntheticPtsBase;
 static uint64_t firstPacketReceiveTime;
 static unsigned int firstPacketPresentationTime;
 static bool dropStatePending;
@@ -62,6 +63,7 @@ void initializeVideoDepacketizer(int pktSize) {
     waitingForRefInvalFrame = false;
     lastPacketInStream = UINT32_MAX;
     decodingFrame = false;
+    syntheticPtsBase = 0;
     firstPacketReceiveTime = 0;
     firstPacketPresentationTime = 0;
     dropStatePending = false;
@@ -757,7 +759,19 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         // We're now decoding a frame
         decodingFrame = true;
         firstPacketReceiveTime = receiveTimeMs;
-        firstPacketPresentationTime = presentationTimeMs;
+        
+        // Some versions of Sunshine don't send a valid PTS, so we will
+        // synthesize one using the receive time as the time base.
+        if (!syntheticPtsBase) {
+            syntheticPtsBase = receiveTimeMs;
+        }
+        
+        if (!presentationTimeMs && frameIndex > 0) {
+            firstPacketPresentationTime = receiveTimeMs - syntheticPtsBase;
+        }
+        else {
+            firstPacketPresentationTime = presentationTimeMs;
+        }
     }
 
     lastPacketInStream = streamPacketIndex;
