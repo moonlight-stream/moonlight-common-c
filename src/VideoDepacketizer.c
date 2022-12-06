@@ -202,11 +202,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
             LC_ASSERT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
             LC_ASSERT(decodeUnit->bufferList->next->next->next != NULL);
 
-            // We get 2 sets of VPS, SPS, and PPS NALUs when we use HEVC Main 10.
+            // We get 2 sets of VPS, SPS, and PPS NALUs in HDR mode.
             // FIXME: Should we normalize this or something for clients?
-            if (NegotiatedVideoFormat != VIDEO_FORMAT_H265_MAIN10) {
-                LC_ASSERT(decodeUnit->bufferList->next->next->next->bufferType == BUFFER_TYPE_PICDATA);
-            }
         }
         else {
             LC_ASSERT(false);
