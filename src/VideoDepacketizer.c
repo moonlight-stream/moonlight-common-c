@@ -363,6 +363,25 @@ static bool isSeiNal(PBUFFER_DESC buffer) {
     }
 }
 
+static bool isPictureParameterSetNal(PBUFFER_DESC buffer) {
+    BUFFER_DESC startSeq;
+
+    if (!getAnnexBStartSequence(buffer, &startSeq)) {
+        return false;
+    }
+
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == H264_NAL_TYPE_PPS;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        return HEVC_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == HEVC_NAL_TYPE_PPS;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
+}
+
 // Advance the buffer descriptor to the start of the next NAL or end of buffer
 static void skipToNextNalOrEnd(PBUFFER_DESC buffer) {
     BUFFER_DESC startSeq;
@@ -886,6 +905,12 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     }
     else
     {
+        // Intel's H.264 Media Foundation encoder prepends a PPS to each P-frame.
+        // Skip it to avoid confusing clients.
+        if (firstPacket && isPictureParameterSetNal(&currentPos)) {
+            skipToNextNal(&currentPos);
+        }
+
 #ifdef FORCE_3_BYTE_START_SEQUENCES
         if (firstPacket) {
             currentPos.offset++;
