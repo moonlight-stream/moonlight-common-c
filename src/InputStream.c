@@ -66,7 +66,9 @@ int initializeInputStream(void) {
     //
     // GFE 3.13.1.30 is not using NVVHCI for mouse/keyboard (and is confirmed unaffected)
     // GFE 3.15.0.164 seems to be the first release using NVVHCI for mouse/keyboard
-    needsBatchedScroll = APP_VERSION_AT_LEAST(7, 1, 409);
+    //
+    // Sunshine also uses SendInput() so it's not affected either.
+    needsBatchedScroll = APP_VERSION_AT_LEAST(7, 1, 409) && !IS_SUNSHINE();
     batchedScrollDelta = 0;
 
     // Start with the virtual mouse centered
