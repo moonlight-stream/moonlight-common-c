@@ -17,7 +17,7 @@ typedef struct _NV_HAPTICS_PACKET {
 #define KEY_UP_EVENT_MAGIC 0x00000004
 typedef struct _NV_KEYBOARD_PACKET {
     NV_INPUT_HEADER header;
-    char zero1;
+    char flags; // Sunshine extension (always 0 for GFE)
     short keyCode;
     char modifiers;
     short zero2;

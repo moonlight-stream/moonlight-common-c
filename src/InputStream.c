@@ -675,7 +675,7 @@ int LiSendMouseButtonEvent(char action, int button) {
 }
 
 // Send a key press event to the streaming machine
-int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
+int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char flags) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -732,7 +732,7 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
 
     holder->packet.keyboard.header.size = BE32(sizeof(NV_KEYBOARD_PACKET) - sizeof(uint32_t));
     holder->packet.keyboard.header.magic = LE32((uint32_t)keyAction);
-    holder->packet.keyboard.zero1 = 0;
+    holder->packet.keyboard.flags = IS_SUNSHINE() ? flags : 0;
     holder->packet.keyboard.keyCode = LE16(keyCode);
     holder->packet.keyboard.modifiers = modifiers;
     holder->packet.keyboard.zero2 = 0;
@@ -745,6 +745,10 @@ int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
     }
 
     return err;
+}
+
+int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
+    return LiSendKeyboardEvent2(keyCode, keyAction, modifiers, 0);
 }
 
 int LiSendUtf8TextEvent(const char *text, unsigned int length) {
