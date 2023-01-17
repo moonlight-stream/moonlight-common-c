@@ -215,8 +215,9 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
             // Opus header should stay constant for the entire stream.
             // If it doesn't, it may indicate that the RtpAudioQueue
             // incorrectly recovered a data shard or the decryption
-            // of the audio packet failed.
-            LC_ASSERT(decryptedOpusData[0] == opusHeaderByte);
+            // of the audio packet failed. Sunshine violates this for
+            // surround sound in some cases, so just ignore it.
+            LC_ASSERT(decryptedOpusData[0] == opusHeaderByte || IS_SUNSHINE());
         }
 #endif
 
