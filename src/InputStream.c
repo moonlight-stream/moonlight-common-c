@@ -990,6 +990,8 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
         Limelog("Input queue reached maximum size limit\n");
         freePacketHolder(holder);
     }
+
+    return err;
 }
 
 int LiSendHScrollEvent(signed char scrollClicks) {
