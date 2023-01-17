@@ -705,6 +705,34 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
 // See ConnListenerSetHdrMode() for more details.
 bool LiGetCurrentHostDisplayHdrMode(void);
 
+typedef struct _SS_HDR_METADATA {
+    // RGB order
+    struct {
+        uint16_t x; // Normalized to 50,000
+        uint16_t y; // Normalized to 50,000
+    } displayPrimaries[3];
+
+    struct {
+        uint16_t x; // Normalized to 50,000
+        uint16_t y; // Normalized to 50,000
+    } whitePoint;
+
+    uint16_t maxDisplayLuminance; // Nits
+    uint16_t minDisplayLuminance; // 1/10000th of a nit
+
+    // These are content-specific values which may not be available for all hosts.
+    uint16_t maxContentLightLevel; // Nits
+    uint16_t maxFrameAverageLightLevel; // Nits
+
+    // These are display-specific values which may not be available for all hosts.
+    uint16_t maxFullFrameLuminance; // Nits
+} SS_HDR_METADATA, *PSS_HDR_METADATA;
+
+// This function populates the provided mastering metadata struct with the HDR metadata
+// from the host PC's monitor and content (if available). It is only valid to call this
+// function when HDR mode is active on the host. This is a Sunshine protocol extension.
+bool LiGetHdrMetadata(PSS_HDR_METADATA metadata);
+
 // This function requests an IDR frame from the host. Typically this is done using DR_NEED_IDR, but clients
 // processing frames asynchronously may need to reset their decoder state even after returning DR_OK for
 // the prior frame. Rather than wait for a new frame and return DR_NEED_IDR for that one, they can just

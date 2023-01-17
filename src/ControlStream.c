@@ -50,6 +50,7 @@ static bool stopping;
 static bool disconnectPending;
 static bool encryptedControlStream;
 static bool hdrEnabled;
+static SS_HDR_METADATA hdrMetadata;
 
 static int intervalGoodFrameCount;
 static int intervalTotalFrameCount;
@@ -275,6 +276,7 @@ int initializeControlStream(void) {
     encryptionCtx = PltCreateCryptoContext();
     decryptionCtx = PltCreateCryptoContext();
     hdrEnabled = false;
+    memset(&hdrMetadata, 0, sizeof(hdrMetadata));
 
     return 0;
 }
@@ -813,9 +815,24 @@ static void controlReceiveThreadFunc(void* context) {
 
                 BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
-                // FIXME: There are 7 additional bytes that appear to always be all zeros. What do they mean?
-                // Is there some way that GFE tells us the HDR mastering metadata (NV_HDR_COLOR_DATA) set by the game?
                 BbGet8(&bb, &enableByte);
+                if (IS_SUNSHINE()) {
+                    // Zero the metadata buffer to properly handle older servers if we have to add new fields
+                    memset(&hdrMetadata, 0, sizeof(hdrMetadata));
+
+                    // Sunshine sends HDR metadata in this message too
+                    for (int i = 0; i < 3; i++) {
+                        BbGet16(&bb, &hdrMetadata.displayPrimaries[i].x);
+                        BbGet16(&bb, &hdrMetadata.displayPrimaries[i].y);
+                    }
+                    BbGet16(&bb, &hdrMetadata.whitePoint.x);
+                    BbGet16(&bb, &hdrMetadata.whitePoint.y);
+                    BbGet16(&bb, &hdrMetadata.maxDisplayLuminance);
+                    BbGet16(&bb, &hdrMetadata.minDisplayLuminance);
+                    BbGet16(&bb, &hdrMetadata.maxContentLightLevel);
+                    BbGet16(&bb, &hdrMetadata.maxFrameAverageLightLevel);
+                    BbGet16(&bb, &hdrMetadata.maxFullFrameLuminance);
+                }
 
                 hdrEnabled = (enableByte != 0);
                 ListenerCallbacks.setHdrMode(hdrEnabled);
@@ -1446,4 +1463,13 @@ int startControlStream(void) {
 
 bool LiGetCurrentHostDisplayHdrMode(void) {
     return hdrEnabled;
+}
+
+bool LiGetHdrMetadata(PSS_HDR_METADATA metadata) {
+    if (!IS_SUNSHINE() || !hdrEnabled) {
+        return false;
+    }
+
+    *metadata = hdrMetadata;
+    return true;
 }
