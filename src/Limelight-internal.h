@@ -55,7 +55,7 @@ extern uint16_t VideoPortNumber;
      (AppVersionQuad[0] == (a) && AppVersionQuad[1] > (b)) ||                               \
      (AppVersionQuad[0] == (a) && AppVersionQuad[1] == (b) && AppVersionQuad[2] >= (c)))
 
-#define IS_SUNSHINE() (AppVersionQuad[3] == -1)
+#define IS_SUNSHINE() (AppVersionQuad[3] < 0)
 
 #define UDP_RECV_POLL_TIMEOUT_MS 100
 
