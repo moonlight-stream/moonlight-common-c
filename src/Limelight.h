@@ -599,6 +599,12 @@ int LiSendScrollEvent(signed char scrollClicks);
 // scrolling (Apple Trackpads, Microsoft Precision Touchpads, etc.).
 int LiSendHighResScrollEvent(short scrollAmount);
 
+// These functions send horizontal scroll events to the host which are
+// analogous to LiSendScrollEvent() and LiSendHighResScrollEvent().
+// This is a Sunshine protocol extension.
+int LiSendHScrollEvent(signed char scrollClicks);
+int LiSendHighResHScrollEvent(short scrollAmount);
+
 // This function returns a time in milliseconds with an implementation-defined epoch.
 uint64_t LiGetMillis(void);
 

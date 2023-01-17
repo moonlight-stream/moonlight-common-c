@@ -44,6 +44,7 @@ typedef struct _PACKET_HOLDER {
         NV_CONTROLLER_PACKET controller;
         NV_MULTI_CONTROLLER_PACKET multiController;
         NV_SCROLL_PACKET scroll;
+        SS_HSCROLL_PACKET hscroll;
         NV_HAPTICS_PACKET haptics;
         NV_UNICODE_PACKET unicode;
     } packet;
@@ -948,4 +949,43 @@ int LiSendHighResScrollEvent(short scrollAmount) {
 // Send a scroll event to the streaming machine
 int LiSendScrollEvent(signed char scrollClicks) {
     return LiSendHighResScrollEvent(scrollClicks * LI_WHEEL_DELTA);
+}
+
+// Send a high resolution horizontal scroll event
+int LiSendHighResHScrollEvent(short scrollAmount) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!IS_SUNSHINE()) {
+        return -3;
+    }
+
+    if (scrollAmount == 0) {
+        return 0;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.hscroll.header.size = BE32(sizeof(SS_HSCROLL_PACKET) - sizeof(uint32_t));
+    holder->packet.hscroll.header.magic = LE32(SS_HSCROLL_MAGIC);
+    holder->packet.hscroll.scrollAmount = BE16(scrollAmount);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+}
+
+int LiSendHScrollEvent(signed char scrollClicks) {
+    return LiSendHighResHScrollEvent(scrollClicks * LI_WHEEL_DELTA);
 }

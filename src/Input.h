@@ -110,4 +110,10 @@ typedef struct _NV_SCROLL_PACKET {
     short zero3;
 } NV_SCROLL_PACKET, *PNV_SCROLL_PACKET;
 
+#define SS_HSCROLL_MAGIC 0x55000001
+typedef struct _SS_HSCROLL_PACKET {
+    NV_INPUT_HEADER header;
+    short scrollAmount;
+} SS_HSCROLL_PACKET, *PSS_HSCROLL_EVENT;
+
 #pragma pack(pop)
