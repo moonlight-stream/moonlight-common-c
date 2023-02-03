@@ -81,6 +81,11 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
         LC_ASSERT(tagLength == 16);
         // Assume outputData is right after tag
         LC_ASSERT(outputData == tag + tagLength);
+#ifndef LC_DEBUG
+        if (tagLength != 16 || outputData != tag + tagLength) {
+            return false;
+        }
+#endif
         size_t encryptedLength = 0;
         unsigned char * encryptedData = tag;
         size_t encryptedCapacity = outLength + tagLength;
@@ -277,6 +282,11 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
         LC_ASSERT(tagLength == 16);
         // Assume inputData is right after tag
         LC_ASSERT(inputData == tag + tagLength);
+#ifndef LC_DEBUG
+        if (tagLength != 16 || inputData != tag + tagLength) {
+            return false;
+        }
+#endif
         unsigned char * encryptedData = tag;
         size_t encryptedDataLen = inputDataLength + tagLength;
         unsigned char tagTemp[16];
