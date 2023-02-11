@@ -160,7 +160,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
                 }
                 newOpt->flags = 0;
                 newOpt->option = opt;
-                newOpt->content = token;
+                newOpt->content = token + 1; // Skip the protocol defined blank space
                 newOpt->next = NULL;
                 insertOption(&options, newOpt);
 
