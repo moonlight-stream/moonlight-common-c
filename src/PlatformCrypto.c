@@ -1,7 +1,12 @@
 #include "Limelight-internal.h"
 
 #ifdef USE_MBEDTLS
+
+#if MBEDTLS_VERSION_MAJOR > 2 || (MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >= 25)
+#define USE_MBEDTLS_CRYPTO_EXT
 #include <mbedtls/gcm.h>
+#endif
+
 #include <mbedtls/entropy.h>
 #include <mbedtls/ctr_drbg.h>
 
@@ -70,10 +75,16 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     outLength = *outputDataLength;
 
     if (tag != NULL) {
+#ifdef USE_MBEDTLS_CRYPTO_EXT
         if (mbedtls_gcm_crypt_and_tag(ctx->ctx.cipher_ctx, MBEDTLS_GCM_ENCRYPT, inputDataLength, iv, ivLength, NULL, 0,
                                       inputData, outputData, tagLength, tag) != 0) {
             return false;
         }
+#else
+        if (mbedtls_cipher_auth_encrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
+            return false;
+        }
+#endif
     }
     else {
         if (flags & CIPHER_FLAG_RESET_IV) {
@@ -243,9 +254,15 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
     outLength = *outputDataLength;
 
     if (tag != NULL) {
+#ifdef USE_MBEDTLS_CRYPTO_EXT
         if (mbedtls_gcm_auth_decrypt(ctx->ctx.cipher_ctx, inputDataLength, iv, ivLength, NULL, 0, tag, tagLength, inputData, outputData) != 0) {
             return false;
         }
+#else
+        if (mbedtls_cipher_auth_decrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
+            return false;
+        }
+#endif
     }
     else {
         if (flags & CIPHER_FLAG_RESET_IV) {
