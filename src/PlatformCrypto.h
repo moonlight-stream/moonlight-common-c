@@ -3,6 +3,12 @@
 #include <stdbool.h>
 
 #ifdef USE_MBEDTLS
+#include <mbedtls/version.h>
+
+#if MBEDTLS_VERSION_MAJOR >= 3
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#endif
+
 #include <mbedtls/cipher.h>
 #else
 // Hide the real OpenSSL definition from other code
