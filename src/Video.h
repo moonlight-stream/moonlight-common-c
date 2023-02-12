@@ -36,4 +36,9 @@ typedef struct _RTP_PACKET {
     uint32_t ssrc;
 } RTP_PACKET, *PRTP_PACKET;
 
+typedef struct _SS_PING {
+    char payload[16];
+    uint32_t sequenceNumber;
+} SS_PING, *PSS_PING;
+
 #pragma pack(pop)

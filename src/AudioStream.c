@@ -41,8 +41,7 @@ typedef struct _QUEUED_AUDIO_PACKET {
 } QUEUED_AUDIO_PACKET, *PQUEUED_AUDIO_PACKET;
 
 static void AudioPingThreadProc(void* context) {
-    // Ping in ASCII
-    char pingData[] = { 0x50, 0x49, 0x4E, 0x47 };
+    char legacyPingData[] = { 0x50, 0x49, 0x4E, 0x47 };
     LC_SOCKADDR saddr;
 
     LC_ASSERT(AudioPortNumber != 0);
@@ -50,19 +49,20 @@ static void AudioPingThreadProc(void* context) {
     memcpy(&saddr, &RemoteAddr, sizeof(saddr));
     SET_PORT(&saddr, AudioPortNumber);
 
-    // Send PING every 500 milliseconds
+    // We do not check for errors here. Socket errors will be handled
+    // on the read-side in ReceiveThreadProc(). This avoids potential
+    // issues related to receiving ICMP port unreachable messages due
+    // to sending a packet prior to the host PC binding to that port.
+    int pingCount = 0;
     while (!PltIsThreadInterrupted(&udpPingThread)) {
-        // We do not check for errors here. Socket errors will be handled
-        // on the read-side in ReceiveThreadProc(). This avoids potential
-        // issues related to receiving ICMP port unreachable messages due
-        // to sending a packet prior to the host PC binding to that port.
-        sendto(rtpSocket, pingData, sizeof(pingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
+        if (AudioPingPayload.payload[0] != 0) {
+            pingCount++;
+            AudioPingPayload.sequenceNumber = BE32(pingCount);
 
-        if (firstReceiveTime == 0 && isSocketReadable(rtpSocket)) {
-            // Remember the time when we got our first incoming audio packet.
-            // We will need to adjust for the delay between this event and
-            // when the real receive thread is ready to avoid falling behind.
-            firstReceiveTime = PltGetMillis();
+            sendto(rtpSocket, (char*)&AudioPingPayload, sizeof(AudioPingPayload), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
+        }
+        else {
+            sendto(rtpSocket, legacyPingData, sizeof(legacyPingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
         }
 
         PltSleepMsInterruptible(&udpPingThread, 500);

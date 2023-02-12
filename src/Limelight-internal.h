@@ -38,6 +38,9 @@ extern uint16_t ControlPortNumber;
 extern uint16_t AudioPortNumber;
 extern uint16_t VideoPortNumber;
 
+extern SS_PING AudioPingPayload;
+extern SS_PING VideoPingPayload;
+
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
 #endif

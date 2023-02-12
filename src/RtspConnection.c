@@ -893,6 +893,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     {
         RTSP_MESSAGE response;
         char* sessionId;
+        char* pingPayload;
         int error = -1;
 
         if (!setupStream(&response,
@@ -920,6 +921,13 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         }
         else {
             Limelog("Audio port: %u\n", AudioPortNumber);
+        }
+
+        // Parse the Sunshine ping payload protocol extension if present
+        memset(&AudioPingPayload, 0, sizeof(AudioPingPayload));
+        pingPayload = getOptionContent(response.options, "X-SS-Ping-Payload");
+        if (pingPayload != NULL && strlen(pingPayload) == sizeof(AudioPingPayload.payload)) {
+            memcpy(AudioPingPayload.payload, pingPayload, sizeof(AudioPingPayload.payload));
         }
 
         // Let the audio stream know the port number is now finalized.
@@ -955,6 +963,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     {
         RTSP_MESSAGE response;
         int error = -1;
+        char* pingPayload;
 
         if (!setupStream(&response,
                          AppVersionQuad[0] >= 5 ? "streamid=video/0/0" : "streamid=video",
@@ -969,6 +978,13 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
             goto Exit;
+        }
+
+        // Parse the Sunshine ping payload protocol extension if present
+        memset(&VideoPingPayload, 0, sizeof(VideoPingPayload));
+        pingPayload = getOptionContent(response.options, "X-SS-Ping-Payload");
+        if (pingPayload != NULL && strlen(pingPayload) == sizeof(VideoPingPayload.payload)) {
+            memcpy(VideoPingPayload.payload, pingPayload, sizeof(VideoPingPayload.payload));
         }
 
         // Parse the video port out of the RTSP SETUP response

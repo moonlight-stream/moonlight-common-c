@@ -29,6 +29,8 @@ uint16_t RtspPortNumber;
 uint16_t ControlPortNumber;
 uint16_t AudioPortNumber;
 uint16_t VideoPortNumber;
+SS_PING AudioPingPayload;
+SS_PING VideoPingPayload;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
