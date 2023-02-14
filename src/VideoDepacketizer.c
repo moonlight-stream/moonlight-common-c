@@ -827,8 +827,22 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             }
         }
 
-        if (APP_VERSION_AT_LEAST(7, 1, 446)) {
-            // >= 7.1.446 uses 2 different header lengths based on the first byte:
+        if (APP_VERSION_AT_LEAST(7, 1, 450)) {
+            // >= 7.1.450 uses 2 different header lengths based on the first byte:
+            // 0x01 indicates an 8 byte header
+            // 0x81 indicates a 44 byte header
+            if (currentPos.data[0] == 0x01) {
+                currentPos.offset += 8;
+                currentPos.length -= 8;
+            }
+            else {
+                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                currentPos.offset += 44;
+                currentPos.length -= 44;
+            }
+        }
+        else if (APP_VERSION_AT_LEAST(7, 1, 446)) {
+            // [7.1.446, 7.1.450) uses 2 different header lengths based on the first byte:
             // 0x01 indicates an 8 byte header
             // 0x81 indicates a 41 byte header
             if (currentPos.data[0] == 0x01) {
