@@ -188,6 +188,12 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
                     (LastSocketError() == EWOULDBLOCK ||
                      LastSocketError() == EINTR ||
                      LastSocketError() == EAGAIN ||
+         #if defined(LC_WINDOWS)
+                     // This error is specific to overlapped I/O which isn't even
+                     // possible to perform with recvfrom(). It seems to randomly
+                     // be returned instead of WSAETIMEDOUT on certain systems.
+                     LastSocketError() == WSA_IO_PENDING ||
+         #endif
                      LastSocketError() == ETIMEDOUT)) {
                 // Return 0 for timeout
                 return 0;
