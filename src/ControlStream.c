@@ -492,7 +492,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
 static void enetPacketFreeCb(ENetPacket* packet) {
     if (packet->userData) {
         // userData contains a bool that we will set when freed
-        *(bool*)packet->userData = true;
+        *(volatile bool*)packet->userData = true;
     }
 }
 
@@ -574,7 +574,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload) {
         PltLockMutex(&enetMutex);
     }
 
-    bool packetFreed = false;
+    volatile bool packetFreed = false;
 
     // Set a callback to use to let us know if the packet has been freed.
     // Freeing can only happen when the packet is acked or send fails.
