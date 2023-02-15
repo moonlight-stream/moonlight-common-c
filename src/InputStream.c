@@ -28,6 +28,13 @@ static float absCurrentPosY;
 // Matches Win32 WHEEL_DELTA definition
 #define LI_WHEEL_DELTA 120
 
+// If we try to send more than one gamepad or mouse motion event
+// per millisecond, we'll wait a little bit to try to batch with
+// the next one. This batching wait paradoxically _decreases_
+// effective input latency by avoiding packet queuing in ENet.
+#define CONTROLLER_BATCHING_INTERVAL_MS 1
+#define MOUSE_BATCHING_INTERVAL_MS 1
+
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
@@ -263,6 +270,9 @@ static void inputSendThreadProc(void* context) {
         relMouseMagicLE = LE32(MOUSE_MOVE_REL_MAGIC);
     }
 
+    uint64_t lastControllerPacketTime = 0;
+    uint64_t lastMousePacketTime = 0;
+
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
         if (err != LBQ_SUCCESS) {
@@ -273,6 +283,13 @@ static void inputSendThreadProc(void* context) {
         if (holder->packet.header.magic == multiControllerMagicLE) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
+            uint64_t now = PltGetMillis();
+
+            // Delay for batching if required
+            if (now < lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS) {
+                PltSleepMs(lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS - now);
+                now = PltGetMillis();
+            }
 
             origPkt = &holder->packet.multiController;
             for (;;) {
@@ -317,12 +334,21 @@ static void inputSendThreadProc(void* context) {
                 // Free the batched packet holder
                 freePacketHolder(controllerBatchHolder);
             }
+
+            lastControllerPacketTime = now;
         }
         // If it's a relative mouse move packet, we can also do batching
         else if (holder->packet.header.magic == relMouseMagicLE) {
             PPACKET_HOLDER mouseBatchHolder;
             int totalDeltaX = (short)BE16(holder->packet.mouseMoveRel.deltaX);
             int totalDeltaY = (short)BE16(holder->packet.mouseMoveRel.deltaY);
+            uint64_t now = PltGetMillis();
+
+            // Delay for batching if required
+            if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
+                PltSleepMs(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now);
+                now = PltGetMillis();
+            }
 
             for (;;) {
                 int partialDeltaX;
@@ -362,12 +388,22 @@ static void inputSendThreadProc(void* context) {
                 freePacketHolder(mouseBatchHolder);
             }
 
+            lastMousePacketTime = now;
+
             // Update the original packet
             holder->packet.mouseMoveRel.deltaX = BE16((short)totalDeltaX);
             holder->packet.mouseMoveRel.deltaY = BE16((short)totalDeltaY);
         }
         // If it's an absolute mouse move packet, we should only send the latest
         else if (holder->packet.header.magic == LE32(MOUSE_MOVE_ABS_MAGIC)) {
+            uint64_t now = PltGetMillis();
+
+            // Delay for batching if required
+            if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
+                PltSleepMs(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now);
+                now = PltGetMillis();
+            }
+
             for (;;) {
                 PPACKET_HOLDER mouseBatchHolder;
 
@@ -390,6 +426,8 @@ static void inputSendThreadProc(void* context) {
                 freePacketHolder(holder);
                 holder = mouseBatchHolder;
             }
+
+            lastMousePacketTime = now;
         }
         // If it's a UTF-8 text packet, we may need to split it into a several packets to send
         else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
