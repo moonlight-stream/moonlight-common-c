@@ -287,7 +287,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS) {
-                PltSleepMs(lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS - now);
+                PltSleepMs((int)(lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
@@ -346,7 +346,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
-                PltSleepMs(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now);
+                PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
@@ -400,7 +400,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
-                PltSleepMs(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now);
+                PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
