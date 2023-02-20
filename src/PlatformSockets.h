@@ -15,8 +15,6 @@
 #define SetLastSocketError(x) WSASetLastError(x)
 #define LastSocketError() WSAGetLastError()
 
-#define SHUT_RD SD_RECEIVE
-#define SHUT_WR SD_SEND
 #define SHUT_RDWR SD_BOTH
 
 #ifdef EAGAIN

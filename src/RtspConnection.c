@@ -267,9 +267,6 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         goto Exit;
     }
 
-    // Notify the server that we're finished sending the request with a FIN
-    shutdown(sock, SHUT_WR);
-
     // Read the response until the server closes the connection
     offset = 0;
     responseBufferSize = 0;
