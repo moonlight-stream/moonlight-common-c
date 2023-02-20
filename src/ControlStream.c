@@ -1039,8 +1039,11 @@ static void lossStatsThreadFunc(void* context) {
                     if (!sendMessageEnet(SS_FRAME_FEC_PTYPE, sizeof(queuedFrameStatus->fecStatus), &queuedFrameStatus->fecStatus, false)) {
                         Limelog("Loss Stats: Sending frame FEC status message failed: %d\n", (int)LastSocketError());
                         ListenerCallbacks.connectionTerminated(LastSocketFail());
+                        free(queuedFrameStatus);
                         return;
                     }
+                    
+                    free(queuedFrameStatus);
                 }
             }
 
