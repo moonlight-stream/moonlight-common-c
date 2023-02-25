@@ -731,41 +731,43 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     // GFE will synthesize an errant key down event for the non-extended key, causing that key to be
     // stuck down after the extended modifier key is raised. For non-extended keys, we must set the
     // MODIFIER flag for correct behavior.
-    switch (keyCode & 0xFF) {
-    case 0x5B: // VK_LWIN
-    case 0x5C: // VK_RWIN
-        // Any keyboard event with the META modifier flag is dropped by all known GFE versions.
-        // This prevents us from sending shortcuts involving the meta key (Win+X, Win+Tab, etc).
-        // The catch is that the meta key event itself would actually work if it didn't set its
-        // own modifier flag, so we'll clear that here. This should be safe even if a new GFE
-        // release comes out that stops dropping events with MODIFIER_META flag.
-        modifiers &= ~MODIFIER_META;
-        break;
+    if (!IS_SUNSHINE()) {
+        switch (keyCode & 0xFF) {
+            case 0x5B: // VK_LWIN
+            case 0x5C: // VK_RWIN
+                // Any keyboard event with the META modifier flag is dropped by all known GFE versions.
+                // This prevents us from sending shortcuts involving the meta key (Win+X, Win+Tab, etc).
+                // The catch is that the meta key event itself would actually work if it didn't set its
+                // own modifier flag, so we'll clear that here. This should be safe even if a new GFE
+                // release comes out that stops dropping events with MODIFIER_META flag.
+                modifiers &= ~MODIFIER_META;
+                break;
 
-    case 0xA0: // VK_LSHIFT
-        modifiers |= MODIFIER_SHIFT;
-        break;
-    case 0xA1: // VK_RSHIFT
-        modifiers &= ~MODIFIER_SHIFT;
-        break;
+            case 0xA0: // VK_LSHIFT
+                modifiers |= MODIFIER_SHIFT;
+                break;
+            case 0xA1: // VK_RSHIFT
+                modifiers &= ~MODIFIER_SHIFT;
+                break;
 
-    case 0xA2: // VK_LCONTROL
-        modifiers |= MODIFIER_CTRL;
-        break;
-    case 0xA3: // VK_RCONTROL
-        modifiers &= ~MODIFIER_CTRL;
-        break;
+            case 0xA2: // VK_LCONTROL
+                modifiers |= MODIFIER_CTRL;
+                break;
+            case 0xA3: // VK_RCONTROL
+                modifiers &= ~MODIFIER_CTRL;
+                break;
 
-    case 0xA4: // VK_LMENU
-        modifiers |= MODIFIER_ALT;
-        break;
-    case 0xA5: // VK_RMENU
-        modifiers &= ~MODIFIER_ALT;
-        break;
+            case 0xA4: // VK_LMENU
+                modifiers |= MODIFIER_ALT;
+                break;
+            case 0xA5: // VK_RMENU
+                modifiers &= ~MODIFIER_ALT;
+                break;
 
-    default:
-        // No fixups
-        break;
+            default:
+                // No fixups
+                break;
+        }
     }
 
     holder->packet.keyboard.header.size = BE32(sizeof(NV_KEYBOARD_PACKET) - sizeof(uint32_t));
