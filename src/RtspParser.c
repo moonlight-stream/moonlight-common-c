@@ -175,6 +175,16 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
 
                     break;
                 }
+                else if (startsWith(endCheck, "\n\r") && endCheck[2] == '\0') {
+                    // Previous `if` statement already handle situation when two bytes are missing.
+                    // This is the workaround for the same problem, but for only one byte missing.
+                    // Sometimes on android emulators last byte or two bytes are missing.
+                    // This is link to this bug in Goggle Issue Tracker:
+                    // https://issuetracker.google.com/issues/150758736?pli=1
+                    messageEnded = true;
+
+                    break;
+                }
                 else if (startsWith(endCheck, "\n\r\n")) {
                     // We've encountered the end of the message - mark it thus
                     messageEnded = true;
