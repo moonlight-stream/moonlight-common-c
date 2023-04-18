@@ -151,6 +151,12 @@ typedef struct _DECODE_UNIT {
     // Frame type
     int frameType;
 
+    // Optional host processing latency of the frame, in 1/10 ms units.
+    // Zero when the host doesn't provide the latency data
+    // or frame processing latency is not applicable to the current frame
+    // (happens when the frame is repeated).
+    uint16_t frameHostProcessingLatency;
+
     // Receive time of first buffer. This value uses an implementation-defined epoch,
     // but the same epoch as enqueueTimeMs and LiGetMillis().
     uint64_t receiveTimeMs;

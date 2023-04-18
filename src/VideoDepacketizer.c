@@ -16,6 +16,7 @@ static unsigned int lastPacketInStream;
 static bool decodingFrame;
 static bool strictIdrFrameWait;
 static uint64_t syntheticPtsBase;
+static uint16_t frameHostProcessingLatency;
 static uint64_t firstPacketReceiveTime;
 static unsigned int firstPacketPresentationTime;
 static bool dropStatePending;
@@ -64,6 +65,7 @@ void initializeVideoDepacketizer(int pktSize) {
     lastPacketInStream = UINT32_MAX;
     decodingFrame = false;
     syntheticPtsBase = 0;
+    frameHostProcessingLatency = 0;
     firstPacketReceiveTime = 0;
     firstPacketPresentationTime = 0;
     dropStatePending = false;
@@ -449,6 +451,7 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.bufferList = nalChainHead;
             qdu->decodeUnit.fullLength = nalChainDataLength;
             qdu->decodeUnit.frameNumber = frameNumber;
+            qdu->decodeUnit.frameHostProcessingLatency = frameHostProcessingLatency;
             qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
             qdu->decodeUnit.presentationTimeMs = firstPacketPresentationTime;
             qdu->decodeUnit.enqueueTimeMs = LiGetMillis();
@@ -832,6 +835,13 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 waitingForRefInvalFrame = false;
                 waitingForNextSuccessfulFrame = false;
             }
+        }
+
+        // Sunshine can provide host processing latency of the frame
+        if (IS_SUNSHINE()) {
+            BYTE_BUFFER bb;
+            BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 1, 2, BYTE_ORDER_LITTLE);
+            BbGet16(&bb, &frameHostProcessingLatency);
         }
 
         if (APP_VERSION_AT_LEAST(7, 1, 450)) {
