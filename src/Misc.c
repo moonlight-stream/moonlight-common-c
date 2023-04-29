@@ -119,16 +119,16 @@ void* extendBuffer(void* ptr, size_t newSize) {
     return newBuf;
 }
 
-bool isReferenceFrameInvalidationEnabled(void) {
+bool isReferenceFrameInvalidationSupportedByDecoder(void) {
     LC_ASSERT(NegotiatedVideoFormat != 0);
-
-    // Even if the client wants it, we can't enable it without server support.
-    if (!ReferenceFrameInvalidationSupported) {
-        return false;
-    }
 
     return ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) ||
            ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) && (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_HEVC));
+}
+
+bool isReferenceFrameInvalidationEnabled(void) {
+    // RFI must be supported by the server and the client decoder to be used
+    return ReferenceFrameInvalidationSupported && isReferenceFrameInvalidationSupportedByDecoder();
 }
 
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig) {

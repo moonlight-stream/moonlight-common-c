@@ -76,6 +76,7 @@ extern SS_PING VideoPingPayload;
 int serviceEnetHost(ENetHost* client, ENetEvent* event, enet_uint32 timeoutMs);
 int gracefullyDisconnectEnetPeer(ENetHost* host, ENetPeer* peer, enet_uint32 lingerTimeoutMs);
 int extractVersionQuadFromString(const char* string, int* quad);
+bool isReferenceFrameInvalidationSupportedByDecoder(void);
 bool isReferenceFrameInvalidationEnabled(void);
 void* extendBuffer(void* ptr, size_t newSize);
 

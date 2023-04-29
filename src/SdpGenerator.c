@@ -386,7 +386,11 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         }
 
         if (AppVersionQuad[0] >= 7) {
-            if (isReferenceFrameInvalidationEnabled()) {
+            // If the decoder supports reference frame invalidation, that indicates it also supports
+            // the maximum number of reference frames allowed by the codec. Even if we can't use RFI
+            // due to lack of host support, we can still allow the host to pick a number of reference
+            // frames greater than 1 to improve encoding efficiency.
+            if (isReferenceFrameInvalidationSupportedByDecoder()) {
                 err |= addAttributeString(&optionHead, "x-nv-video[0].maxNumReferenceFrames", "0");
             }
             else {
