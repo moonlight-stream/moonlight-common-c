@@ -454,6 +454,17 @@ typedef void(*ConnListenerConnectionStatusUpdate)(int connectionStatus);
 // if enableHdr is false in the stream configuration.
 typedef void(*ConnListenerSetHdrMode)(bool hdrEnabled);
 
+// This callback is invoked to rumble a gamepad's triggers. For more details,
+// see the comment above on ConnListenerRumble().
+typedef void(*ConnListenerRumbleTriggers)(uint16_t controllerNumber, uint16_t leftTriggerMotor, uint16_t rightTriggerMotor);
+
+// This callback is invoked to notify the client that the host would like motion
+// sensor reports for the specified gamepad (see LiSendControllerMotionEvent())
+// at the specified reporting rate (or as close as possible).
+//
+// If reportRateHz is 0, the host is asking for motion event reporting to stop.
+typedef void(*ConnListenerSetMotionEventState)(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -464,6 +475,8 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerRumble rumble;
     ConnListenerConnectionStatusUpdate connectionStatusUpdate;
     ConnListenerSetHdrMode setHdrMode;
+    ConnListenerRumbleTriggers rumbleTriggers;
+    ConnListenerSetMotionEventState setMotionEventState;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap

@@ -85,6 +85,8 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_RUMBLE_DATA 6
 #define IDX_TERMINATION 7
 #define IDX_HDR_INFO 8
+#define IDX_RUMBLE_TRIGGER_DATA 9
+#define IDX_SET_MOTION_EVENT 10
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -99,6 +101,8 @@ static const short packetTypesGen3[] = {
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
     -1,     // HDR mode (unused)
+    -1,     // Rumble triggers (unused)
+    -1,     // Set motion event (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -110,6 +114,8 @@ static const short packetTypesGen4[] = {
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
     -1,     // HDR mode (unused)
+    -1,     // Rumble triggers (unused)
+    -1,     // Set motion event (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -121,6 +127,8 @@ static const short packetTypesGen5[] = {
     -1,     // Rumble data (unused)
     -1,     // Termination (unused)
     -1,     // HDR mode (unknown)
+    -1,     // Rumble triggers (unused)
+    -1,     // Set motion event (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -132,6 +140,8 @@ static const short packetTypesGen7[] = {
     0x010b, // Rumble data
     0x0100, // Termination
     0x010e, // HDR mode
+    -1,     // Rumble triggers (unused)
+    -1,     // Set motion event (unused)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -143,6 +153,8 @@ static const short packetTypesGen7Enc[] = {
     0x010b, // Rumble data
     0x0109, // Termination (extended)
     0x010e, // HDR mode
+    0x5500, // Rumble triggers (Sunshine protocol extension)
+    0x5501, // Set motion event (Sunshine protocol extension)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -898,6 +910,36 @@ static void controlReceiveThreadFunc(void* context) {
                 BbGet16(&bb, &highFreqRumble);
 
                 ListenerCallbacks.rumble(controllerNumber, lowFreqRumble, highFreqRumble);
+            }
+            else if (ctlHdr->type == packetTypes[IDX_RUMBLE_TRIGGER_DATA]) {
+                BYTE_BUFFER bb;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+
+                uint16_t controllerNumber;
+                uint16_t leftTriggerMotor;
+                uint16_t rightTriggerMotor;
+
+                BbGet16(&bb, &controllerNumber);
+                BbGet16(&bb, &leftTriggerMotor);
+                BbGet16(&bb, &rightTriggerMotor);
+
+                ListenerCallbacks.rumbleTriggers(controllerNumber, leftTriggerMotor, rightTriggerMotor);
+            }
+            else if (ctlHdr->type == packetTypes[IDX_SET_MOTION_EVENT]) {
+                BYTE_BUFFER bb;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+
+                uint16_t controllerNumber;
+                uint16_t reportRateHz;
+                uint8_t motionType;
+
+                BbGet16(&bb, &controllerNumber);
+                BbGet16(&bb, &reportRateHz);
+                BbGet8(&bb, &motionType);
+
+                ListenerCallbacks.setMotionEventState(controllerNumber, motionType, reportRateHz);
             }
             else if (ctlHdr->type == packetTypes[IDX_HDR_INFO]) {
                 BYTE_BUFFER bb;

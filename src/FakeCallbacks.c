@@ -37,6 +37,8 @@ static void fakeClLogMessage(const char* format, ...) {}
 static void fakeClRumble(unsigned short controllerNumber, unsigned short lowFreqMotor, unsigned short highFreqMotor) {}
 static void fakeClConnectionStatusUpdate(int connectionStatus) {}
 static void fakeClSetHdrMode(bool enabled) {}
+static void fakeClRumbleTriggers(uint16_t controllerNumber, uint16_t leftTriggerMotor, uint16_t rightTriggerMotor) {}
+static void fakeClSetMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz);
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,
@@ -48,6 +50,8 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .rumble = fakeClRumble,
     .connectionStatusUpdate = fakeClConnectionStatusUpdate,
     .setHdrMode = fakeClSetHdrMode,
+    .rumbleTriggers = fakeClRumbleTriggers,
+    .setMotionEventState = fakeClSetMotionEventState,
 };
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
@@ -125,6 +129,12 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         }
         if ((*clCallbacks)->setHdrMode == NULL) {
             (*clCallbacks)->setHdrMode = fakeClSetHdrMode;
+        }
+        if ((*clCallbacks)->rumbleTriggers == NULL) {
+            (*clCallbacks)->rumbleTriggers = fakeClRumbleTriggers;
+        }
+        if ((*clCallbacks)->setMotionEventState == NULL) {
+            (*clCallbacks)->setMotionEventState = fakeClSetMotionEventState;
         }
     }
 }
