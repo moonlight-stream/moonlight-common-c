@@ -107,6 +107,7 @@
 #define BE16(x) (x)
 #define BE32(x) (x)
 #define BE64(x) (x)
+#define IS_LITTLE_ENDIAN() (false)
 #else
 #define LE16(x) (x)
 #define LE32(x) (x)
@@ -114,6 +115,7 @@
 #define BE16(x) BSWAP16(x)
 #define BE32(x) BSWAP32(x)
 #define BE64(x) BSWAP64(x)
+#define IS_LITTLE_ENDIAN() (true)
 #endif
 
 int initializePlatform(void);
