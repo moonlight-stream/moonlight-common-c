@@ -41,6 +41,10 @@ extern uint16_t VideoPortNumber;
 extern SS_PING AudioPingPayload;
 extern SS_PING VideoPingPayload;
 
+#define SS_FF_PEN_TOUCH_EVENTS 0x01
+#define SS_FF_CONTROLLER_TOUCH_EVENTS 0x02
+extern uint16_t SunshineFeatureFlags;
+
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
 #endif

@@ -553,6 +553,38 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 // Using this function avoids double-acceleration in cases when the client motion is also accelerated.
 int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short referenceWidth, short referenceHeight);
 
+// Error return value to indicate that the requested functionality is not supported by the host
+#define LI_ERR_UNSUPPORTED -5501
+
+// This function allows multi-touch input to be sent directly to Sunshine hosts. The x and y values
+// are normalized device coordinates stretching top-left corner (0.0, 0.0) to bottom-right corner
+// (1.0, 1.0) of the video area. Pressure is a 0.0 to 1.0 range value from min to max pressure.
+//
+// Sending a down/move event with a pressure of 0.0 indicates the actual pressure is unknown.
+//
+// If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
+// falling back to other functions to send this input (such as LiSendMousePositionEvent()).
+#define LI_TOUCH_EVENT_HOVER  0x00
+#define LI_TOUCH_EVENT_DOWN   0x01
+#define LI_TOUCH_EVENT_UP     0x02
+#define LI_TOUCH_EVENT_MOVE   0x03
+#define LI_TOUCH_EVENT_CANCEL 0x04
+int LiSendTouchEvent(uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure);
+
+// This function is similar to LiSendTouchEvent() but allows additional parameters relevant for pen
+// input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
+// (parallel to screen) and tilt is in degrees from vertical in Z dimension (perpendicular to screen).
+#define LI_TOOL_TYPE_PEN    0x01
+#define LI_TOOL_TYPE_ERASER 0x02
+#define LI_PEN_BUTTON_PRIMARY   0x01
+#define LI_PEN_BUTTON_SECONDARY 0x02
+#define LI_PEN_BUTTON_TERTIARY  0x04
+#define LI_TILT_UNKNOWN 0xFF
+#define LI_ROT_UNKNOWN 0xFF
+int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
+                   float x, float y, float pressure,
+                   uint16_t rotation, uint8_t tiltX, uint8_t tiltY);
+
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
 #define BUTTON_ACTION_RELEASE 0x08
@@ -613,6 +645,43 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
     short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
+
+// This function provides a method of informing the host of the available buttons and capabilities
+// on a new controller. This can be used as an alternative to calling LiSendMultiControllerEvent()
+// to indicate the arrival of a new controller.
+//
+// This can allow the host to make better decisions about what type of controller to emulate and what
+// capabilities to advertise to the OS on the virtual controller.
+//
+// If controller arrival events are unsupported by the host, this will fall back to indicating
+// arrival via LiSendMultiControllerEvent().
+#define LI_CTYPE_UNKNOWN  0x00
+#define LI_CTYPE_XBOX     0x01
+#define LI_CTYPE_PS       0x02
+#define LI_CTYPE_NINTENDO 0x03
+#define LI_CCAP_ANALOG_TRIGGERS 0x01
+#define LI_CCAP_RUMBLE          0x02
+#define LI_CCAP_TRIGGER_RUMBLE  0x04
+#define LI_CCAP_TOUCHPAD        0x08
+#define LI_CCAP_ACCEL           0x10
+#define LI_CCAP_GYRO            0x20
+int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
+                                 uint32_t supportedButtonFlags, uint16_t capabilities);
+
+// This function is similar to LiSendTouchEvent(), but the touch events are associated with a
+// touchpad device present on a game controller instead of a touchscreen.
+//
+// If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
+// using this touch input to simulate trackpad input.
+int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure);
+
+// This function allows clients to send controller-associated motion events to a supported host.
+//
+// For power and performance reasons, motion sensors should not be enabled unless the host has
+// explicitly asked for motion event reports via ConnListenerSetMotionEventState().
+#define LI_MOTION_TYPE_ACCEL 0x01
+#define LI_MOTION_TYPE_GYRO  0x02
+int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
 
 // This function queues a vertical scroll event to the remote server.
 // The number of "clicks" is multiplied by WHEEL_DELTA (120) before

@@ -1,6 +1,12 @@
 #pragma once
 
+#include <stdint.h>
+
 #pragma pack(push, 1)
+
+// netfloat is just a little-endian float in byte form
+// for network transmission.
+typedef uint8_t netfloat[4];
 
 typedef struct _NV_INPUT_HEADER {
     uint32_t size; // Size of packet (excluding this field) - Big Endian
@@ -115,5 +121,63 @@ typedef struct _SS_HSCROLL_PACKET {
     NV_INPUT_HEADER header;
     short scrollAmount;
 } SS_HSCROLL_PACKET, *PSS_HSCROLL_PACKET;
+
+#define SS_TOUCH_MAGIC 0x55000002
+typedef struct _SS_TOUCH_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t eventType;
+    uint8_t touchIndex;
+    uint8_t zero[2]; // Alignment/reserved
+    netfloat x;
+    netfloat y;
+    netfloat pressure;
+} SS_TOUCH_PACKET, *PSS_TOUCH_PACKET;
+
+#define SS_PEN_MAGIC 0x55000003
+typedef struct _SS_PEN_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t eventType;
+    uint8_t toolType;
+    uint8_t penButtons;
+    uint8_t zero[1]; // Alignment/reserved
+    netfloat x;
+    netfloat y;
+    netfloat pressure;
+    uint16_t rotation;
+    uint8_t tiltX;
+    uint8_t tiltY;
+} SS_PEN_PACKET, *PSS_PEN_PACKET;
+
+#define SS_CONTROLLER_ARRIVAL_MAGIC 0x55000004
+typedef struct _SS_CONTROLLER_ARRIVAL_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t type;
+    uint8_t zero[1]; // Alignment/reserved
+    uint16_t capabilities;
+    uint32_t supportedButtonFlags;
+} SS_CONTROLLER_ARRIVAL_PACKET, *PSS_CONTROLLER_ARRIVAL_PACKET;
+
+#define SS_CONTROLLER_TOUCH_MAGIC 0x55000005
+typedef struct _SS_CONTROLLER_TOUCH_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t controllerNumber;
+    uint8_t eventType;
+    uint8_t touchIndex;
+    uint8_t zero[1]; // Alignment/reserved
+    netfloat x;
+    netfloat y;
+    netfloat pressure;
+} SS_CONTROLLER_TOUCH_PACKET, *PSS_CONTROLLER_TOUCH_PACKET;
+
+#define SS_CONTROLLER_MOTION_MAGIC 0x55000006
+typedef struct _SS_CONTROLLER_MOTION_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t controllerNumber;
+    uint8_t motionType;
+    uint8_t zero[2]; // Alignment/reserved
+    netfloat x;
+    netfloat y;
+    netfloat z;
+} SS_CONTROLLER_MOTION_PACKET, *PSS_CONTROLLER_MOTION_PACKET;
 
 #pragma pack(pop)

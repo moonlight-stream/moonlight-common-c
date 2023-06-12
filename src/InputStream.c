@@ -53,6 +53,11 @@ typedef struct _PACKET_HOLDER {
         NV_SCROLL_PACKET scroll;
         SS_HSCROLL_PACKET hscroll;
         NV_HAPTICS_PACKET haptics;
+        SS_TOUCH_PACKET touch;
+        SS_PEN_PACKET pen;
+        SS_CONTROLLER_ARRIVAL_PACKET controllerArrival;
+        SS_CONTROLLER_TOUCH_PACKET controllerTouch;
+        SS_CONTROLLER_MOTION_PACKET controllerMotion;
         NV_UNICODE_PACKET unicode;
     } packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
@@ -586,6 +591,19 @@ int stopInputStream(void) {
     return 0;
 }
 
+void floatToNetfloat(float in, netfloat out) {
+    if (IS_LITTLE_ENDIAN()) {
+        memcpy(out, &in, sizeof(in));
+    }
+    else {
+        uint8_t* inb = (uint8_t*)&in;
+        out[0] = inb[3];
+        out[1] = inb[2];
+        out[2] = inb[1];
+        out[3] = inb[0];
+    }
+}
+
 // Send a mouse move event to the streaming machine
 int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     PPACKET_HOLDER holder;
@@ -1008,7 +1026,7 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
 
     // This is a protocol extension only supported with Sunshine
     if (!IS_SUNSHINE()) {
-        return -3;
+        return LI_ERR_UNSUPPORTED;
     }
 
     if (scrollAmount == 0) {
@@ -1036,4 +1054,194 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
 
 int LiSendHScrollEvent(signed char scrollClicks) {
     return LiSendHighResHScrollEvent(scrollClicks * LI_WHEEL_DELTA);
+}
+
+int LiSendTouchEvent(uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!(SunshineFeatureFlags & SS_FF_PEN_TOUCH_EVENTS)) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.touch.header.size = BE32(sizeof(SS_TOUCH_PACKET) - sizeof(uint32_t));
+    holder->packet.touch.header.magic = LE32(SS_TOUCH_MAGIC);
+    holder->packet.touch.eventType = eventType;
+    holder->packet.touch.touchIndex = touchIndex;
+    memset(holder->packet.touch.zero, 0, sizeof(holder->packet.touch.zero));
+    floatToNetfloat(x, holder->packet.touch.x);
+    floatToNetfloat(y, holder->packet.touch.y);
+    floatToNetfloat(pressure, holder->packet.touch.pressure);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
+                   float x, float y, float pressure,
+                   uint16_t rotation, uint8_t tiltX, uint8_t tiltY) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!(SunshineFeatureFlags & SS_FF_PEN_TOUCH_EVENTS)) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.pen.header.size = BE32(sizeof(SS_PEN_PACKET) - sizeof(uint32_t));
+    holder->packet.pen.header.magic = LE32(SS_PEN_MAGIC);
+    holder->packet.pen.eventType = eventType;
+    holder->packet.pen.toolType = toolType;
+    holder->packet.pen.penButtons = penButtons;
+    memset(holder->packet.pen.zero, 0, sizeof(holder->packet.pen.zero));
+    floatToNetfloat(x, holder->packet.touch.x);
+    floatToNetfloat(y, holder->packet.touch.y);
+    floatToNetfloat(pressure, holder->packet.touch.pressure);
+    holder->packet.pen.rotation = rotation;
+    holder->packet.pen.tiltX = tiltX;
+    holder->packet.pen.tiltY = tiltY;
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
+                                 uint32_t supportedButtonFlags, uint16_t capabilities) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // The arrival event is only supported by Sunshine
+    if (IS_SUNSHINE()) {
+        holder = allocatePacketHolder(0);
+        if (holder == NULL) {
+            return -1;
+        }
+
+        holder->packet.controllerArrival.header.size = BE32(sizeof(SS_CONTROLLER_ARRIVAL_PACKET) - sizeof(uint32_t));
+        holder->packet.controllerArrival.header.magic = LE32(SS_CONTROLLER_ARRIVAL_MAGIC);
+        holder->packet.controllerArrival.type = type;
+        memset(holder->packet.controllerArrival.zero, 0, sizeof(holder->packet.controllerArrival.zero));
+        holder->packet.controllerArrival.capabilities = capabilities;
+        holder->packet.controllerArrival.supportedButtonFlags = supportedButtonFlags;
+
+        err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+        if (err != LBQ_SUCCESS) {
+            LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+            Limelog("Input queue reached maximum size limit\n");
+            freePacketHolder(holder);
+            return err;
+        }
+    }
+
+    // Send a MC event just in case the host software doesn't support arrival events.
+    return LiSendMultiControllerEvent(controllerNumber, activeGamepadMask, 0, 0, 0, 0, 0, 0, 0);
+}
+
+int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!(SunshineFeatureFlags & SS_FF_CONTROLLER_TOUCH_EVENTS)) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.controllerTouch.header.size = BE32(sizeof(SS_CONTROLLER_TOUCH_PACKET) - sizeof(uint32_t));
+    holder->packet.controllerTouch.header.magic = LE32(SS_CONTROLLER_TOUCH_MAGIC);
+    holder->packet.controllerTouch.controllerNumber = controllerNumber;
+    holder->packet.controllerTouch.eventType = eventType;
+    holder->packet.controllerTouch.touchIndex = touchIndex;
+    memset(holder->packet.controllerTouch.zero, 0, sizeof(holder->packet.controllerTouch.zero));
+    floatToNetfloat(x, holder->packet.controllerTouch.x);
+    floatToNetfloat(y, holder->packet.controllerTouch.y);
+    floatToNetfloat(pressure, holder->packet.controllerTouch.pressure);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!(SunshineFeatureFlags & SS_FF_CONTROLLER_TOUCH_EVENTS)) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.controllerMotion.header.size = BE32(sizeof(SS_CONTROLLER_MOTION_PACKET) - sizeof(uint32_t));
+    holder->packet.controllerMotion.header.magic = LE32(SS_CONTROLLER_MOTION_MAGIC);
+    holder->packet.controllerMotion.controllerNumber = controllerNumber;
+    memset(holder->packet.controllerMotion.zero, 0, sizeof(holder->packet.controllerMotion.zero));
+    floatToNetfloat(x, holder->packet.controllerMotion.x);
+    floatToNetfloat(y, holder->packet.controllerMotion.y);
+    floatToNetfloat(z, holder->packet.controllerMotion.z);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
 }
