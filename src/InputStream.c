@@ -1056,7 +1056,7 @@ int LiSendHScrollEvent(signed char scrollClicks) {
     return LiSendHighResHScrollEvent(scrollClicks * LI_WHEEL_DELTA);
 }
 
-int LiSendTouchEvent(uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure) {
+int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressure) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -1077,7 +1077,7 @@ int LiSendTouchEvent(uint8_t eventType, uint8_t touchIndex, float x, float y, fl
     holder->packet.touch.header.size = BE32(sizeof(SS_TOUCH_PACKET) - sizeof(uint32_t));
     holder->packet.touch.header.magic = LE32(SS_TOUCH_MAGIC);
     holder->packet.touch.eventType = eventType;
-    holder->packet.touch.touchIndex = touchIndex;
+    holder->packet.touch.pointerId = LE32(pointerId);
     memset(holder->packet.touch.zero, 0, sizeof(holder->packet.touch.zero));
     floatToNetfloat(x, holder->packet.touch.x);
     floatToNetfloat(y, holder->packet.touch.y);
@@ -1172,7 +1172,7 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
     return LiSendMultiControllerEvent(controllerNumber, activeGamepadMask, 0, 0, 0, 0, 0, 0, 0);
 }
 
-int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure) {
+int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -1194,8 +1194,8 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
     holder->packet.controllerTouch.header.magic = LE32(SS_CONTROLLER_TOUCH_MAGIC);
     holder->packet.controllerTouch.controllerNumber = controllerNumber;
     holder->packet.controllerTouch.eventType = eventType;
-    holder->packet.controllerTouch.touchIndex = touchIndex;
     memset(holder->packet.controllerTouch.zero, 0, sizeof(holder->packet.controllerTouch.zero));
+    holder->packet.controllerTouch.pointerId = LE32(pointerId);
     floatToNetfloat(x, holder->packet.controllerTouch.x);
     floatToNetfloat(y, holder->packet.controllerTouch.y);
     floatToNetfloat(pressure, holder->packet.controllerTouch.pressure);

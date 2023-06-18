@@ -126,8 +126,8 @@ typedef struct _SS_HSCROLL_PACKET {
 typedef struct _SS_TOUCH_PACKET {
     NV_INPUT_HEADER header;
     uint8_t eventType;
-    uint8_t touchIndex;
-    uint8_t zero[2]; // Alignment/reserved
+    uint8_t zero[3]; // Alignment/reserved
+    uint32_t pointerId;
     netfloat x;
     netfloat y;
     netfloat pressure;
@@ -162,8 +162,8 @@ typedef struct _SS_CONTROLLER_TOUCH_PACKET {
     NV_INPUT_HEADER header;
     uint8_t controllerNumber;
     uint8_t eventType;
-    uint8_t touchIndex;
-    uint8_t zero[1]; // Alignment/reserved
+    uint8_t zero[2]; // Alignment/reserved
+    uint32_t pointerId;
     netfloat x;
     netfloat y;
     netfloat pressure;

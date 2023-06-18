@@ -575,6 +575,9 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 //
 // Sending a down/move event with a pressure of 0.0 indicates the actual pressure is unknown.
 //
+// Pointer ID is an opaque ID that must uniquely identify each active touch on screen. It must
+// remain constant through any down/up/move/cancel events involved in a single touch interaction.
+//
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // falling back to other functions to send this input (such as LiSendMousePositionEvent()).
 #define LI_TOUCH_EVENT_HOVER  0x00
@@ -582,7 +585,7 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 #define LI_TOUCH_EVENT_UP     0x02
 #define LI_TOUCH_EVENT_MOVE   0x03
 #define LI_TOUCH_EVENT_CANCEL 0x04
-int LiSendTouchEvent(uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure);
+int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
 
 // This function is similar to LiSendTouchEvent() but allows additional parameters relevant for pen
 // input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
@@ -686,7 +689,7 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
 //
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // using this touch input to simulate trackpad input.
-int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint8_t touchIndex, float x, float y, float pressure);
+int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
 
 // This function allows clients to send controller-associated motion events to a supported host.
 //
