@@ -664,8 +664,10 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 // This function queues a controller event to be sent to the remote server. The controllerNumber
 // parameter is a zero-based index of which controller this event corresponds to. The largest legal
 // controller number is 3 (for a total of 4 controllers, the Xinput maximum). On generation 3 servers (GFE 2.1.x),
-// these will be sent as controller 0 regardless of the controllerNumber parameter. The activeGamepadMask
-// parameter is a bitfield with bits set for each controller present up to a maximum of 4 (0xF).
+// these will be sent as controller 0 regardless of the controllerNumber parameter.
+//
+// The activeGamepadMask parameter is a bitfield with bits set for each controller present.
+// On GFE, activeGamepadMask is limited to a maximum of 4 (0xF). On Sunshine, it is limited to 16 (0xFFFF).
 int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
     int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);

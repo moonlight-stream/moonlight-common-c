@@ -961,6 +961,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     else {
         // Generation 4+ servers support passing the controller number
         holder->packet.multiController.header.size = BE32(sizeof(NV_MULTI_CONTROLLER_PACKET) - sizeof(uint32_t));
+
         // On Gen 5 servers, the header code is decremented by one
         if (AppVersionQuad[0] >= 5) {
             holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC_GEN5);
@@ -968,6 +969,13 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         else {
             holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC);
         }
+
+        // GFE only supports a maximum of 4 controllers
+        if (!IS_SUNSHINE()) {
+            controllerNumber %= 4;
+            activeGamepadMask &= 0xF;
+        }
+
         holder->packet.multiController.headerB = LE16(MC_HEADER_B);
         holder->packet.multiController.controllerNumber = LE16(controllerNumber);
         holder->packet.multiController.activeGamepadMask = LE16(activeGamepadMask);
