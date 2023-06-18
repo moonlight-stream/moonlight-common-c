@@ -1122,7 +1122,7 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     floatToNetfloat(x, holder->packet.touch.x);
     floatToNetfloat(y, holder->packet.touch.y);
     floatToNetfloat(pressure, holder->packet.touch.pressure);
-    holder->packet.pen.rotation = rotation;
+    holder->packet.pen.rotation = LE16(rotation);
     holder->packet.pen.tiltX = tiltX;
     holder->packet.pen.tiltY = tiltY;
 
@@ -1156,8 +1156,8 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
         holder->packet.controllerArrival.header.magic = LE32(SS_CONTROLLER_ARRIVAL_MAGIC);
         holder->packet.controllerArrival.type = type;
         memset(holder->packet.controllerArrival.zero, 0, sizeof(holder->packet.controllerArrival.zero));
-        holder->packet.controllerArrival.capabilities = capabilities;
-        holder->packet.controllerArrival.supportedButtonFlags = supportedButtonFlags;
+        holder->packet.controllerArrival.capabilities = LE16(capabilities);
+        holder->packet.controllerArrival.supportedButtonFlags = LE32(supportedButtonFlags);
 
         err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
         if (err != LBQ_SUCCESS) {
