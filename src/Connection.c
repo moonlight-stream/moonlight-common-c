@@ -31,7 +31,7 @@ uint16_t AudioPortNumber;
 uint16_t VideoPortNumber;
 SS_PING AudioPingPayload;
 SS_PING VideoPingPayload;
-uint16_t SunshineFeatureFlags;
+uint32_t SunshineFeatureFlags;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {

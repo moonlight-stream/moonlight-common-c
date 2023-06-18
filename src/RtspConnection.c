@@ -707,6 +707,64 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
     return true;
 }
 
+// SDP attributes are in the form:
+// a=x-nv-bwe.bwuSafeZoneLowLimit:70\r\n
+bool parseSdpAttributeToUInt(const char* payload, const char* name, unsigned int* val) {
+    // Find the entry for the specified attribute name
+    char* attribute = strstr(payload, name);
+    if (!attribute) {
+        return false;
+    }
+
+    // Locate the start of the value
+    char* valst = strstr(attribute, ":");
+    if (!valst) {
+        return false;
+    }
+
+    // Locate the end of the value
+    char* valend;
+    if (!(valend = strstr(valst, "\r")) && !(valend = strstr(valst, "\n"))) {
+        return false;
+    }
+
+    // Swap the end character for a null terminator, read the integer, then swap it back
+    char valendchar = *valend;
+    *valend = 0;
+    *val = strtoul(valst + 1, NULL, 0);
+    *valend = valendchar;
+
+    return true;
+}
+
+bool parseSdpAttributeToInt(const char* payload, const char* name, int* val) {
+    // Find the entry for the specified attribute name
+    char* attribute = strstr(payload, name);
+    if (!attribute) {
+        return false;
+    }
+
+    // Locate the start of the value
+    char* valst = strstr(attribute, ":");
+    if (!valst) {
+        return false;
+    }
+
+    // Locate the end of the value
+    char* valend;
+    if (!(valend = strstr(valst, "\r")) && !(valend = strstr(valst, "\n"))) {
+        return false;
+    }
+
+    // Swap the end character for a null terminator, read the integer, then swap it back
+    char valendchar = *valend;
+    *valend = 0;
+    *val = strtol(valst + 1, NULL, 0);
+    *valend = valendchar;
+
+    return true;
+}
+
 // Perform RTSP Handshake with the streaming server machine as part of the connection process
 int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     int ret;
@@ -879,6 +937,11 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         ReferenceFrameInvalidationSupported = strstr(response.payload, "x-nv-video[0].refPicInvalidation") != NULL;
         if (!ReferenceFrameInvalidationSupported) {
             Limelog("Reference frame invalidation is not supported by this host\n");
+        }
+
+        // Look for the Sunshine feature flags in the SDP attributes
+        if (!parseSdpAttributeToUInt(response.payload, "x-ss-general.featureFlags", &SunshineFeatureFlags)) {
+            SunshineFeatureFlags = 0;
         }
 
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
