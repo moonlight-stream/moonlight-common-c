@@ -34,6 +34,11 @@ static float absCurrentPosY;
 // effective input latency by avoiding packet queuing in ENet.
 #define CONTROLLER_BATCHING_INTERVAL_MS 1
 #define MOUSE_BATCHING_INTERVAL_MS 1
+#define PEN_BATCHING_INTERVAL_MS 1
+#define MOTION_BATCHING_INTERVAL_MS 1
+
+// Don't batch up/down/cancel events
+#define TOUCH_EVENT_IS_BATCHABLE(x) ((x) == LI_TOUCH_EVENT_HOVER || (x) == LI_TOUCH_EVENT_MOVE)
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -277,6 +282,8 @@ static void inputSendThreadProc(void* context) {
 
     uint64_t lastControllerPacketTime = 0;
     uint64_t lastMousePacketTime = 0;
+    uint64_t lastPenPacketTime = 0;
+    uint64_t lastMotionPacketTime = 0;
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
@@ -434,6 +441,88 @@ static void inputSendThreadProc(void* context) {
             }
 
             lastMousePacketTime = now;
+        }
+        // If it's a pen packet, we should only send the latest move or hover events
+        else if (holder->packet.header.magic == LE32(SS_PEN_MAGIC) && TOUCH_EVENT_IS_BATCHABLE(holder->packet.pen.eventType)) {
+            uint64_t now = PltGetMillis();
+
+            // Delay for batching if required
+            if (now < lastPenPacketTime + PEN_BATCHING_INTERVAL_MS) {
+                PltSleepMs((int)(lastPenPacketTime + PEN_BATCHING_INTERVAL_MS - now));
+                now = PltGetMillis();
+            }
+
+            for (;;) {
+                PPACKET_HOLDER penBatchHolder;
+
+                // Peek at the next packet
+                if (LbqPeekQueueElement(&packetQueue, (void**)&penBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // If it's not a pen packet, we're done
+                if (penBatchHolder->packet.header.magic != LE32(SS_PEN_MAGIC)) {
+                    break;
+                }
+
+                // If the buttons or event type is different, we cannot batch
+                if (holder->packet.pen.penButtons != penBatchHolder->packet.pen.penButtons ||
+                    holder->packet.pen.eventType != penBatchHolder->packet.pen.eventType) {
+                    break;
+                }
+
+                // Remove the next packet
+                if (LbqPollQueueElement(&packetQueue, (void**)&penBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // Replace the current packet with the new one
+                freePacketHolder(holder);
+                holder = penBatchHolder;
+            }
+
+            lastPenPacketTime = now;
+        }
+        // If it's a motion packet, only send the latest for each sensor type
+        else if (holder->packet.header.magic == LE32(SS_CONTROLLER_MOTION_MAGIC)) {
+            uint64_t now = PltGetMillis();
+
+            // Delay for batching if required
+            if (now < lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS) {
+                PltSleepMs((int)(lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS - now));
+                now = PltGetMillis();
+            }
+
+            for (;;) {
+                PPACKET_HOLDER motionBatchHolder;
+
+                // Peek at the next packet
+                if (LbqPeekQueueElement(&packetQueue, (void**)&motionBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // If it's not a motion packet, we're done
+                if (motionBatchHolder->packet.header.magic != LE32(SS_CONTROLLER_MOTION_MAGIC)) {
+                    break;
+                }
+
+                // If the controller or sensor type is different, we cannot batch
+                if (holder->packet.controllerMotion.motionType != motionBatchHolder->packet.controllerMotion.motionType ||
+                    holder->packet.controllerMotion.controllerNumber != motionBatchHolder->packet.controllerMotion.controllerNumber) {
+                    break;
+                }
+
+                // Remove the next packet
+                if (LbqPollQueueElement(&packetQueue, (void**)&motionBatchHolder) != LBQ_SUCCESS) {
+                    break;
+                }
+
+                // Replace the current packet with the new one
+                freePacketHolder(holder);
+                holder = motionBatchHolder;
+            }
+
+            lastMotionPacketTime = now;
         }
         // If it's a UTF-8 text packet, we may need to split it into a several packets to send
         else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
