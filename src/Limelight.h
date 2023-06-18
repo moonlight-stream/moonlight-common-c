@@ -648,6 +648,14 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length);
 #define RS_CLK_FLAG  0x0080
 #define SPECIAL_FLAG 0x0400
 
+// Extended buttons (Sunshine only)
+#define PADDLE1_FLAG  0x010000
+#define PADDLE2_FLAG  0x020000
+#define PADDLE3_FLAG  0x040000
+#define PADDLE4_FLAG  0x080000
+#define TOUCHPAD_FLAG 0x100000 // Touchpad buttons on Sony controllers
+#define MISC_FLAG     0x200000 // Share/Mic/Capture/Mute buttons on various controllers
+
 // This function queues a controller event to be sent to the remote server. It will
 // be seen by the computer as the first controller.
 int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
@@ -659,7 +667,7 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 // these will be sent as controller 0 regardless of the controllerNumber parameter. The activeGamepadMask
 // parameter is a bitfield with bits set for each controller present up to a maximum of 4 (0xF).
 int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
-    short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+    int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function provides a method of informing the host of the available buttons and capabilities

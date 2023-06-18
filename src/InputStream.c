@@ -317,6 +317,7 @@ static void inputSendThreadProc(void* context) {
                 // calls to LiSendMultiControllerEvent() with different values for analog sticks (max -> zero).
                 newPkt = &controllerBatchHolder->packet.multiController;
                 if (newPkt->buttonFlags != origPkt->buttonFlags ||
+                    newPkt->buttonFlags2 != origPkt->buttonFlags2 ||
                     newPkt->controllerNumber != origPkt->controllerNumber ||
                     newPkt->activeGamepadMask != origPkt->activeGamepadMask) {
                     // Batching not allowed
@@ -837,7 +838,7 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
 }
 
 static int sendControllerEventInternal(short controllerNumber, short activeGamepadMask,
-    short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+    int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     PPACKET_HOLDER holder;
@@ -882,14 +883,15 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         holder->packet.multiController.controllerNumber = LE16(controllerNumber);
         holder->packet.multiController.activeGamepadMask = LE16(activeGamepadMask);
         holder->packet.multiController.midB = LE16(MC_MID_B);
-        holder->packet.multiController.buttonFlags = LE16(buttonFlags);
+        holder->packet.multiController.buttonFlags = LE16((short)buttonFlags);
         holder->packet.multiController.leftTrigger = leftTrigger;
         holder->packet.multiController.rightTrigger = rightTrigger;
         holder->packet.multiController.leftStickX = LE16(leftStickX);
         holder->packet.multiController.leftStickY = LE16(leftStickY);
         holder->packet.multiController.rightStickX = LE16(rightStickX);
         holder->packet.multiController.rightStickY = LE16(rightStickY);
-        holder->packet.multiController.tailA = LE32(MC_TAIL_A);
+        holder->packet.multiController.tailA = LE16(MC_TAIL_A);
+        holder->packet.multiController.buttonFlags2 = IS_SUNSHINE() ? LE16((short)(buttonFlags >> 16)) : 0;
         holder->packet.multiController.tailB = LE16(MC_TAIL_B);
     }
 
@@ -913,7 +915,7 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 
 // Send a controller event to the streaming machine
 int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
-    short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+    int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(controllerNumber, activeGamepadMask,

@@ -88,7 +88,7 @@ typedef struct _NV_CONTROLLER_PACKET {
 #define MULTI_CONTROLLER_MAGIC_GEN5 0x0000000C
 #define MC_HEADER_B 0x001A
 #define MC_MID_B 0x0014
-#define MC_TAIL_A 0x0000009C
+#define MC_TAIL_A 0x009C
 #define MC_TAIL_B 0x0055
 typedef struct _NV_MULTI_CONTROLLER_PACKET {
     NV_INPUT_HEADER header;
@@ -103,7 +103,8 @@ typedef struct _NV_MULTI_CONTROLLER_PACKET {
     short leftStickY;
     short rightStickX;
     short rightStickY;
-    int tailA;
+    short tailA;
+    short buttonFlags2; // Sunshine protocol extension (always 0 for GFE)
     short tailB;
 } NV_MULTI_CONTROLLER_PACKET, *PNV_MULTI_CONTROLLER_PACKET;
 
