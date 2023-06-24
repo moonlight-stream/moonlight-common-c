@@ -599,7 +599,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 #define LI_ROT_UNKNOWN 0xFF
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressure,
-                   uint16_t rotation, uint8_t tiltX, uint8_t tiltY);
+                   uint16_t rotation, int8_t tiltX, int8_t tiltY);
 
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
