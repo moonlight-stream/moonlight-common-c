@@ -145,7 +145,7 @@ typedef struct _SS_PEN_PACKET {
     netfloat y;
     netfloat pressure;
     uint16_t rotation;
-    int8_t tilt;
+    uint8_t tilt;
     uint8_t zero2[1];
 } SS_PEN_PACKET, *PSS_PEN_PACKET;
 

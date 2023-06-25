@@ -1194,7 +1194,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressure,
-                   uint16_t rotation, int8_t tilt) {
+                   uint16_t rotation, uint8_t tilt) {
     PPACKET_HOLDER holder;
     int err;
 

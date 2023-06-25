@@ -590,8 +590,8 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 
 // This function is similar to LiSendTouchEvent() but allows additional parameters relevant for pen
 // input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
-// (parallel to screen, 0..359) and tilt is in degrees from vertical in Z dimension (perpendicular
-// to screen, -90..90).
+// (parallel to screen, 0..360) and tilt is in degrees from vertical in Z dimension (perpendicular
+// to screen, 0..90).
 #define LI_TOOL_TYPE_PEN    0x01
 #define LI_TOOL_TYPE_ERASER 0x02
 #define LI_PEN_BUTTON_PRIMARY   0x01
@@ -601,7 +601,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 #define LI_TILT_UNKNOWN 0xFF
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressure,
-                   uint16_t rotation, int8_t tilt);
+                   uint16_t rotation, uint8_t tilt);
 
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
