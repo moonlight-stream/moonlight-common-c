@@ -707,6 +707,9 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
 //
 // For power and performance reasons, motion sensors should not be enabled unless the host has
 // explicitly asked for motion event reports via ConnListenerSetMotionEventState().
+//
+// LI_MOTION_TYPE_ACCEL should report data in m/s^2.
+// LI_MOTION_TYPE_GYRO should report data in deg/s.
 #define LI_MOTION_TYPE_ACCEL 0x01
 #define LI_MOTION_TYPE_GYRO  0x02
 int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
