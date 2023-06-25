@@ -1194,7 +1194,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressure,
-                   uint16_t rotation, int8_t tiltX, int8_t tiltY) {
+                   uint16_t rotation, int8_t tilt) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -1222,8 +1222,8 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     floatToNetfloat(y, holder->packet.touch.y);
     floatToNetfloat(pressure, holder->packet.touch.pressure);
     holder->packet.pen.rotation = LE16(rotation);
-    holder->packet.pen.tiltX = tiltX;
-    holder->packet.pen.tiltY = tiltY;
+    holder->packet.pen.tilt = tilt;
+    memset(holder->packet.pen.zero2, 0, sizeof(holder->packet.pen.zero2));
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {

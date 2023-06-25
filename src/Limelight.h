@@ -580,26 +580,28 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 //
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // falling back to other functions to send this input (such as LiSendMousePositionEvent()).
-#define LI_TOUCH_EVENT_HOVER  0x00
-#define LI_TOUCH_EVENT_DOWN   0x01
-#define LI_TOUCH_EVENT_UP     0x02
-#define LI_TOUCH_EVENT_MOVE   0x03
-#define LI_TOUCH_EVENT_CANCEL 0x04
+#define LI_TOUCH_EVENT_HOVER       0x00
+#define LI_TOUCH_EVENT_DOWN        0x01
+#define LI_TOUCH_EVENT_UP          0x02
+#define LI_TOUCH_EVENT_MOVE        0x03
+#define LI_TOUCH_EVENT_CANCEL      0x04
+#define LI_TOUCH_EVENT_BUTTON_ONLY 0x05
 int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
 
 // This function is similar to LiSendTouchEvent() but allows additional parameters relevant for pen
 // input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
-// (parallel to screen) and tilt is in degrees from vertical in Z dimension (perpendicular to screen).
+// (parallel to screen, 0..359) and tilt is in degrees from vertical in Z dimension (perpendicular
+// to screen, -90..90).
 #define LI_TOOL_TYPE_PEN    0x01
 #define LI_TOOL_TYPE_ERASER 0x02
 #define LI_PEN_BUTTON_PRIMARY   0x01
 #define LI_PEN_BUTTON_SECONDARY 0x02
 #define LI_PEN_BUTTON_TERTIARY  0x04
+#define LI_ROT_UNKNOWN 0xFFFF
 #define LI_TILT_UNKNOWN 0xFF
-#define LI_ROT_UNKNOWN 0xFF
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressure,
-                   uint16_t rotation, int8_t tiltX, int8_t tiltY);
+                   uint16_t rotation, int8_t tilt);
 
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07

@@ -145,8 +145,8 @@ typedef struct _SS_PEN_PACKET {
     netfloat y;
     netfloat pressure;
     uint16_t rotation;
-    int8_t tiltX;
-    int8_t tiltY;
+    int8_t tilt;
+    uint8_t zero2[1];
 } SS_PEN_PACKET, *PSS_PEN_PACKET;
 
 #define SS_CONTROLLER_ARRIVAL_MAGIC 0x55000004
