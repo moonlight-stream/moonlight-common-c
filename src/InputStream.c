@@ -1253,8 +1253,8 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
 
         holder->packet.controllerArrival.header.size = BE32(sizeof(SS_CONTROLLER_ARRIVAL_PACKET) - sizeof(uint32_t));
         holder->packet.controllerArrival.header.magic = LE32(SS_CONTROLLER_ARRIVAL_MAGIC);
+        holder->packet.controllerArrival.controllerNumber = controllerNumber;
         holder->packet.controllerArrival.type = type;
-        memset(holder->packet.controllerArrival.zero, 0, sizeof(holder->packet.controllerArrival.zero));
         holder->packet.controllerArrival.capabilities = LE16(capabilities);
         holder->packet.controllerArrival.supportedButtonFlags = LE32(supportedButtonFlags);
 

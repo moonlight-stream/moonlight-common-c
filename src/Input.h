@@ -152,8 +152,8 @@ typedef struct _SS_PEN_PACKET {
 #define SS_CONTROLLER_ARRIVAL_MAGIC 0x55000004
 typedef struct _SS_CONTROLLER_ARRIVAL_PACKET {
     NV_INPUT_HEADER header;
+    uint8_t controllerNumber;
     uint8_t type;
-    uint8_t zero[1]; // Alignment/reserved
     uint16_t capabilities;
     uint32_t supportedButtonFlags;
 } SS_CONTROLLER_ARRIVAL_PACKET, *PSS_CONTROLLER_ARRIVAL_PACKET;
