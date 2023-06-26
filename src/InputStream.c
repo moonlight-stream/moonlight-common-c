@@ -1218,9 +1218,9 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     holder->packet.pen.toolType = toolType;
     holder->packet.pen.penButtons = penButtons;
     memset(holder->packet.pen.zero, 0, sizeof(holder->packet.pen.zero));
-    floatToNetfloat(x, holder->packet.touch.x);
-    floatToNetfloat(y, holder->packet.touch.y);
-    floatToNetfloat(pressure, holder->packet.touch.pressure);
+    floatToNetfloat(x, holder->packet.pen.x);
+    floatToNetfloat(y, holder->packet.pen.y);
+    floatToNetfloat(pressure, holder->packet.pen.pressure);
     holder->packet.pen.rotation = LE16(rotation);
     holder->packet.pen.tilt = tilt;
     memset(holder->packet.pen.zero2, 0, sizeof(holder->packet.pen.zero2));
