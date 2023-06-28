@@ -593,8 +593,12 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 // input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
 // (parallel to screen, 0..360) and tilt is in degrees from vertical in Z dimension (perpendicular
 // to screen, 0..90).
-#define LI_TOOL_TYPE_PEN    0x01
-#define LI_TOOL_TYPE_ERASER 0x02
+//
+// x, y, pressure, rotation, and tilt are ignored for LI_TOUCH_EVENT_BUTTON_ONLY events. If one of
+// those changes, send LI_TOUCH_EVENT_MOVE or LI_TOUCH_EVENT_HOVER instead.
+#define LI_TOOL_TYPE_UNKNOWN 0x00
+#define LI_TOOL_TYPE_PEN     0x01
+#define LI_TOOL_TYPE_ERASER  0x02
 #define LI_PEN_BUTTON_PRIMARY   0x01
 #define LI_PEN_BUTTON_SECONDARY 0x02
 #define LI_PEN_BUTTON_TERTIARY  0x04
