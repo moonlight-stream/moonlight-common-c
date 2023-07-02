@@ -734,6 +734,7 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
 #define LI_BATTERY_STATE_CHARGING     0x03
 #define LI_BATTERY_STATE_NOT_CHARGING 0x04 // Connected to power but not charging
 #define LI_BATTERY_STATE_FULL         0x05
+#define LI_BATTERY_PERCENTAGE_UNKNOWN 0xFF
 int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage);
 
 // This function queues a vertical scroll event to the remote server.
