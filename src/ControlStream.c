@@ -87,6 +87,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_HDR_INFO 8
 #define IDX_RUMBLE_TRIGGER_DATA 9
 #define IDX_SET_MOTION_EVENT 10
+#define IDX_SET_RGB_LED 11
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -103,6 +104,7 @@ static const short packetTypesGen3[] = {
     -1,     // HDR mode (unused)
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
+    -1,     // Set RGB LED (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -116,6 +118,7 @@ static const short packetTypesGen4[] = {
     -1,     // HDR mode (unused)
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
+    -1,     // Set RGB LED (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -129,6 +132,7 @@ static const short packetTypesGen5[] = {
     -1,     // HDR mode (unknown)
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
+    -1,     // Set RGB LED (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -142,6 +146,7 @@ static const short packetTypesGen7[] = {
     0x010e, // HDR mode
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
+    -1,     // Set RGB LED (unused)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -155,6 +160,7 @@ static const short packetTypesGen7Enc[] = {
     0x010e, // HDR mode
     0x5500, // Rumble triggers (Sunshine protocol extension)
     0x5501, // Set motion event (Sunshine protocol extension)
+    0x5502, // Set RGB LED (Sunshine protocol extension)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -940,6 +946,21 @@ static void controlReceiveThreadFunc(void* context) {
                 BbGet8(&bb, &motionType);
 
                 ListenerCallbacks.setMotionEventState(controllerNumber, motionType, reportRateHz);
+            }
+            else if (ctlHdr->type == packetTypes[IDX_SET_RGB_LED]) {
+                BYTE_BUFFER bb;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+
+                uint16_t controllerNumber;
+                uint8_t r, g, b;
+
+                BbGet16(&bb, &controllerNumber);
+                BbGet8(&bb, &r);
+                BbGet8(&bb, &g);
+                BbGet8(&bb, &b);
+
+                ListenerCallbacks.setControllerLED(controllerNumber, r, g, b);
             }
             else if (ctlHdr->type == packetTypes[IDX_HDR_INFO]) {
                 BYTE_BUFFER bb;

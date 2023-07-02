@@ -181,4 +181,13 @@ typedef struct _SS_CONTROLLER_MOTION_PACKET {
     netfloat z;
 } SS_CONTROLLER_MOTION_PACKET, *PSS_CONTROLLER_MOTION_PACKET;
 
+#define SS_CONTROLLER_BATTERY_MAGIC 0x55000007
+typedef struct _SS_CONTROLLER_BATTERY_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t controllerNumber;
+    uint8_t batteryState;
+    uint8_t batteryPercentage;
+    uint8_t zero[1]; // Alignment/reserved
+} SS_CONTROLLER_BATTERY_PACKET, *PSS_CONTROLLER_BATTERY_PACKET;
+
 #pragma pack(pop)

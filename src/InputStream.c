@@ -63,6 +63,7 @@ typedef struct _PACKET_HOLDER {
         SS_CONTROLLER_ARRIVAL_PACKET controllerArrival;
         SS_CONTROLLER_TOUCH_PACKET controllerTouch;
         SS_CONTROLLER_MOTION_PACKET controllerMotion;
+        SS_CONTROLLER_BATTERY_PACKET controllerBattery;
         NV_UNICODE_PACKET unicode;
     } packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
@@ -1334,6 +1335,41 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     floatToNetfloat(x, holder->packet.controllerMotion.x);
     floatToNetfloat(y, holder->packet.controllerMotion.y);
     floatToNetfloat(z, holder->packet.controllerMotion.z);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!IS_SUNSHINE()) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->packet.controllerBattery.header.size = BE32(sizeof(SS_CONTROLLER_BATTERY_PACKET) - sizeof(uint32_t));
+    holder->packet.controllerBattery.header.magic = LE32(SS_CONTROLLER_BATTERY_MAGIC);
+    holder->packet.controllerBattery.controllerNumber = controllerNumber;
+    holder->packet.controllerBattery.batteryState = batteryState;
+    holder->packet.controllerBattery.batteryPercentage = batteryPercentage;
+    memset(holder->packet.controllerBattery.zero, 0, sizeof(holder->packet.controllerBattery.zero));
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {

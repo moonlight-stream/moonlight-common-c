@@ -465,6 +465,9 @@ typedef void(*ConnListenerRumbleTriggers)(uint16_t controllerNumber, uint16_t le
 // If reportRateHz is 0, the host is asking for motion event reporting to stop.
 typedef void(*ConnListenerSetMotionEventState)(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz);
 
+// This callback is invoked to set a controller's RGB LED (if present).
+typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -477,6 +480,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerSetHdrMode setHdrMode;
     ConnListenerRumbleTriggers rumbleTriggers;
     ConnListenerSetMotionEventState setMotionEventState;
+    ConnListenerSetControllerLED setControllerLED;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
@@ -692,12 +696,14 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CTYPE_XBOX     0x01
 #define LI_CTYPE_PS       0x02
 #define LI_CTYPE_NINTENDO 0x03
-#define LI_CCAP_ANALOG_TRIGGERS 0x01
-#define LI_CCAP_RUMBLE          0x02
-#define LI_CCAP_TRIGGER_RUMBLE  0x04
-#define LI_CCAP_TOUCHPAD        0x08
-#define LI_CCAP_ACCEL           0x10
-#define LI_CCAP_GYRO            0x20
+#define LI_CCAP_ANALOG_TRIGGERS 0x01 // Reports values between 0x00 and 0xFF for trigger axes
+#define LI_CCAP_RUMBLE          0x02 // Can rumble in response to ConnListenerRumble() callback
+#define LI_CCAP_TRIGGER_RUMBLE  0x04 // Can rumble triggers in response to ConnListenerRumbleTriggers() callback
+#define LI_CCAP_TOUCHPAD        0x08 // Reports touchpad events via LiSendControllerTouchEvent()
+#define LI_CCAP_ACCEL           0x10 // Can report accelerometer events via LiSendControllerMotionEvent()
+#define LI_CCAP_GYRO            0x20 // Can report gyroscope events via LiSendControllerMotionEvent()
+#define LI_CCAP_BATTERY_STATE   0x40 // Reports battery state via LiSendControllerBatteryEvent()
+#define LI_CCAP_RGB_LED         0x80 // Can set RGB LED state via ConnListenerSetControllerLED()
 int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
                                  uint32_t supportedButtonFlags, uint16_t capabilities);
 
@@ -718,6 +724,17 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
 #define LI_MOTION_TYPE_ACCEL 0x01
 #define LI_MOTION_TYPE_GYRO  0x02
 int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
+
+// This function allows clients to send controller battery state to a supported host. If the
+// host can adjust battery state on the emulated controller, it can use this information to
+// make the virtual controller match the physical controller on the client.
+#define LI_BATTERY_STATE_UNKNOWN      0x00
+#define LI_BATTERY_STATE_NOT_PRESENT  0x01
+#define LI_BATTERY_STATE_DISCHARGING  0x02
+#define LI_BATTERY_STATE_CHARGING     0x03
+#define LI_BATTERY_STATE_NOT_CHARGING 0x04 // Connected to power but not charging
+#define LI_BATTERY_STATE_FULL         0x05
+int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState, uint8_t batteryPercentage);
 
 // This function queues a vertical scroll event to the remote server.
 // The number of "clicks" is multiplied by WHEEL_DELTA (120) before

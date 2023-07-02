@@ -39,6 +39,7 @@ static void fakeClConnectionStatusUpdate(int connectionStatus) {}
 static void fakeClSetHdrMode(bool enabled) {}
 static void fakeClRumbleTriggers(uint16_t controllerNumber, uint16_t leftTriggerMotor, uint16_t rightTriggerMotor) {}
 static void fakeClSetMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz) {}
+static void fakeClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,
@@ -52,6 +53,7 @@ static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .setHdrMode = fakeClSetHdrMode,
     .rumbleTriggers = fakeClRumbleTriggers,
     .setMotionEventState = fakeClSetMotionEventState,
+    .setControllerLED = fakeClSetControllerLED,
 };
 
 void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_RENDERER_CALLBACKS* arCallbacks,
@@ -135,6 +137,9 @@ void fixupMissingCallbacks(PDECODER_RENDERER_CALLBACKS* drCallbacks, PAUDIO_REND
         }
         if ((*clCallbacks)->setMotionEventState == NULL) {
             (*clCallbacks)->setMotionEventState = fakeClSetMotionEventState;
+        }
+        if ((*clCallbacks)->setControllerLED == NULL) {
+            (*clCallbacks)->setControllerLED = fakeClSetControllerLED;
         }
     }
 }
