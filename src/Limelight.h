@@ -226,9 +226,9 @@ typedef struct _DECODE_UNIT {
 // and to DecoderRendererSetup() to specify selected codec.
 #define VIDEO_FORMAT_H264        0x0001 // H.264 High Profile
 #define VIDEO_FORMAT_H265        0x0100 // HEVC Main Profile
-#define VIDEO_FORMAT_H265_MAIN10 0x0200 // HEVC Main10 Profile (requires enableHdr)
+#define VIDEO_FORMAT_H265_MAIN10 0x0200 // HEVC Main10 Profile
 #define VIDEO_FORMAT_AV1_MAIN8   0x1000 // AV1 Main 8-bit profile
-#define VIDEO_FORMAT_AV1_MAIN10  0x2000 // AV1 Main 10-bit profile (requires enableHdr)
+#define VIDEO_FORMAT_AV1_MAIN10  0x2000 // AV1 Main 10-bit profile
 
 // Masks for clients to use to match video codecs without profile-specific details.
 #define VIDEO_FORMAT_MASK_H264  0x000F
@@ -455,7 +455,7 @@ typedef void(*ConnListenerConnectionStatusUpdate)(int connectionStatus);
 // This callback is invoked to notify the client of a change in HDR mode on
 // the host. The client will probably want to update the local display mode
 // to match the state of HDR on the host. This callback may be invoked even
-// if enableHdr is false in the stream configuration.
+// if the stream is not using an HDR-capable codec.
 typedef void(*ConnListenerSetHdrMode)(bool hdrEnabled);
 
 // This callback is invoked to rumble a gamepad's triggers. For more details,
