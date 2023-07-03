@@ -904,13 +904,27 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             goto Exit;
         }
         
-        // The RTSP DESCRIBE reply will contain a collection of SDP media attributes that
-        // describe the various supported video stream formats and include the SPS, PPS,
-        // and VPS (if applicable). We will use this information to determine whether the
-        // server can support HEVC. For some reason, they still set the MIME type of the HEVC
-        // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
-        // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
-        if (StreamConfig.supportsHevc && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
+        if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "a=rtpmap:200 AV1/90000")) {
+            if (StreamConfig.enableHdr) {
+                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN10;
+            }
+            else {
+                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN8;
+
+                // Apply bitrate adjustment for SDR AV1 if the client requested one
+                if (StreamConfig.av1BitratePercentageMultiplier != 0) {
+                    StreamConfig.bitrate *= StreamConfig.av1BitratePercentageMultiplier;
+                    StreamConfig.bitrate /= 100;
+                }
+            }
+        }
+        else if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_H265) && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
+            // The RTSP DESCRIBE reply will contain a collection of SDP media attributes that
+            // describe the various supported video stream formats and include the SPS, PPS,
+            // and VPS (if applicable). We will use this information to determine whether the
+            // server can support HEVC. For some reason, they still set the MIME type of the HEVC
+            // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
+            // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
             if (StreamConfig.enableHdr) {
                 NegotiatedVideoFormat = VIDEO_FORMAT_H265_MAIN10;
             }

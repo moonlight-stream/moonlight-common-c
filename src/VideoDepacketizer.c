@@ -14,6 +14,7 @@ static bool waitingForIdrFrame;
 static bool waitingForRefInvalFrame;
 static unsigned int lastPacketInStream;
 static bool decodingFrame;
+static int frameType;
 static bool strictIdrFrameWait;
 static uint64_t syntheticPtsBase;
 static uint16_t frameHostProcessingLatency;
@@ -148,6 +149,9 @@ void destroyVideoDepacketizer(void) {
 }
 
 static bool getAnnexBStartSequence(PBUFFER_DESC current, PBUFFER_DESC startSeq) {
+    // We must not get called for other codecs
+    LC_ASSERT(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265));
+
     if (current->length < 3) {
         return false;
     }
@@ -206,6 +210,10 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
 
             // We get 2 sets of VPS, SPS, and PPS NALUs in HDR mode.
             // FIXME: Should we normalize this or something for clients?
+        }
+        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
+            // We don't parse the AV1 bitstream
+            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
         }
         else {
             LC_ASSERT(false);
@@ -450,6 +458,7 @@ static void reassembleFrame(int frameNumber) {
         if (qdu != NULL) {
             qdu->decodeUnit.bufferList = nalChainHead;
             qdu->decodeUnit.fullLength = nalChainDataLength;
+            qdu->decodeUnit.frameType = frameType;
             qdu->decodeUnit.frameNumber = frameNumber;
             qdu->decodeUnit.frameHostProcessingLatency = frameHostProcessingLatency;
             qdu->decodeUnit.receiveTimeMs = firstPacketReceiveTime;
@@ -463,13 +472,9 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.hdrActive = LiGetCurrentHostDisplayHdrMode();
             qdu->decodeUnit.colorspace = (uint8_t)(qdu->decodeUnit.hdrActive ? COLORSPACE_REC_2020 : StreamConfig.colorSpace);
 
-            // IDR frames will have leading CSD buffers
-            if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
-                qdu->decodeUnit.frameType = FRAME_TYPE_IDR;
+            // Invoke the key frame callback if needed
+            if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
                 notifyKeyFrameReceived();
-            }
-            else {
-                qdu->decodeUnit.frameType = FRAME_TYPE_PFRAME;
             }
 
             nalChainHead = nalChainTail = NULL;
@@ -519,6 +524,11 @@ static void reassembleFrame(int frameNumber) {
 static int getBufferFlags(char* data, int length) {
     BUFFER_DESC buffer;
     BUFFER_DESC candidate;
+
+    // We only parse H.264 and HEVC bitstreams
+    if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
+        return BUFFER_TYPE_PICDATA;
+    }
 
     buffer.data = data;
     buffer.length = (unsigned int)length;
@@ -612,7 +622,7 @@ static void queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
 }
 
 // Process an RTP Payload using the slow path that handles multiple NALUs per packet
-static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
+static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
     // We should not have any NALUs when processing the first packet in an IDR frame
     LC_ASSERT(nalChainHead == NULL);
     LC_ASSERT(nalChainTail == NULL);
@@ -637,9 +647,6 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
         start++;
 #endif
 
-        // Now we're decoding a frame
-        decodingFrame = true;
-
         if (isSeqReferenceFrameStart(currentPos)) {
             // No longer waiting for an IDR frame
             waitingForIdrFrame = false;
@@ -651,6 +658,9 @@ static void processRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* exi
             // Use the cached LENTRY for this NALU since it will be
             // the bulk of the data in this packet.
             containsPicData = true;
+
+            // This is an IDR frame
+            frameType = FRAME_TYPE_IDR;
         }
 
         // Move to the next NALU
@@ -784,6 +794,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
         // We're now decoding a frame
         decodingFrame = true;
+        frameType = FRAME_TYPE_PFRAME;
         firstPacketReceiveTime = receiveTimeMs;
         
         // Some versions of Sunshine don't send a valid PTS, so we will
@@ -810,6 +821,13 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             case 1: // Normal P-frame
                 break;
             case 2: // IDR frame
+                // For other codecs, we trust the frame header rather than parsing the bitstream
+                // to determine if a given frame is an IDR frame.
+                if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
+                    waitingForIdrFrame = false;
+                    frameType = FRAME_TYPE_IDR;
+                }
+                // Fall-through
             case 4: // Intra-refresh
             case 5: // P-frame with reference frames invalidated
                 if (waitingForRefInvalFrame) {
@@ -905,49 +923,57 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // Other versions don't have a frame header at all
         }
 
-        // The Annex B NALU start prefix must be next
-        if (!getAnnexBStartSequence(&currentPos, NULL)) {
-            // If we aren't starting on a start prefix, something went wrong.
-            LC_ASSERT(false);
+        // We only parse H.264 and HEVC at the NALU level
+        if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
+            // The Annex B NALU start prefix must be next
+            if (!getAnnexBStartSequence(&currentPos, NULL)) {
+                // If we aren't starting on a start prefix, something went wrong.
+                LC_ASSERT(false);
 
-            // For release builds, we will try to recover by searching for one.
-            // This mimics the way most decoders handle this situation.
-            skipToNextNal(&currentPos);
-        }
+                // For release builds, we will try to recover by searching for one.
+                // This mimics the way most decoders handle this situation.
+                skipToNextNal(&currentPos);
+            }
 
-        // If an AUD NAL is prepended to this frame data, remove it.
-        // Other parts of this code are not prepared to deal with a
-        // NAL of that type, so stripping it is the easiest option.
-        if (isAccessUnitDelimiter(&currentPos)) {
-            skipToNextNal(&currentPos);
-        }
+            // If an AUD NAL is prepended to this frame data, remove it.
+            // Other parts of this code are not prepared to deal with a
+            // NAL of that type, so stripping it is the easiest option.
+            if (isAccessUnitDelimiter(&currentPos)) {
+                skipToNextNal(&currentPos);
+            }
 
-        // There may be one or more SEI NAL units prepended to the
-        // frame data *after* the (optional) AUD.
-        while (isSeiNal(&currentPos)) {
-            skipToNextNal(&currentPos);
+            // There may be one or more SEI NAL units prepended to the
+            // frame data *after* the (optional) AUD.
+            while (isSeiNal(&currentPos)) {
+                skipToNextNal(&currentPos);
+            }
         }
     }
 
-    if (firstPacket && isIdrFrameStart(&currentPos))
-    {
-        // SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
-        processRtpPayloadSlow(&currentPos, existingEntry);
-    }
-    else
-    {
-        // Intel's H.264 Media Foundation encoder prepends a PPS to each P-frame.
-        // Skip it to avoid confusing clients.
-        if (firstPacket && isPictureParameterSetNal(&currentPos)) {
-            skipToNextNal(&currentPos);
+    if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
+        if (firstPacket && isIdrFrameStart(&currentPos)) {
+            // SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
+            processAvcHevcRtpPayloadSlow(&currentPos, existingEntry);
         }
+        else {
+            // Intel's H.264 Media Foundation encoder prepends a PPS to each P-frame.
+            // Skip it to avoid confusing clients.
+            if (firstPacket && isPictureParameterSetNal(&currentPos)) {
+                skipToNextNal(&currentPos);
+            }
 
 #ifdef FORCE_3_BYTE_START_SEQUENCES
-        if (firstPacket) {
-            currentPos.offset++;
-            currentPos.length--;
-        }
+            if (firstPacket) {
+                currentPos.offset++;
+                currentPos.length--;
+            }
 #endif
+
+            queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
+        }
+    }
+    else {
+        // Other codecs are just passed through as is.
         queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
     }
 
@@ -991,7 +1017,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         // depacketizer will next try to process a non-SOF packet,
         // and cause it to assert.
         if (dropStatePending) {
-            if (nalChainHead && nalChainHead->bufferType != BUFFER_TYPE_PICDATA) {
+            if (nalChainHead && frameType == FRAME_TYPE_IDR) {
                 // Don't drop the frame state if this frame is an IDR frame itself,
                 // otherwise we'll lose this IDR frame without another in flight
                 // and have to wait until we hit our consecutive drop limit to

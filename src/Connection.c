@@ -288,7 +288,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     }
 
     // Dimensions over 4096 are only supported with HEVC on NVENC
-    if (!StreamConfig.supportsHevc &&
+    if (!(StreamConfig.supportedVideoFormats & ~VIDEO_FORMAT_MASK_H264) &&
             (StreamConfig.width > 4096 || StreamConfig.height > 4096)) {
         Limelog("WARNING: Streaming at resolutions above 4K using H.264 will likely fail! Trying anyway!\n");
     }

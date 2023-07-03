@@ -61,14 +61,14 @@ typedef struct _STREAM_CONFIGURATION {
     // See AUDIO_CONFIGURATION constants and MAKE_AUDIO_CONFIGURATION() below.
     int audioConfiguration;
     
-    // Specifies that the client can accept an H.265 video stream
-    // if the server is able to provide one.
-    bool supportsHevc;
+    // Specifies the mask of supported video formats.
+    // See VIDEO_FORMAT constants below.
+    int supportedVideoFormats;
 
-    // Specifies that the client is requesting an HDR H.265 video stream.
+    // Specifies that the client is requesting an HDR video stream.
     //
     // This should only be set if:
-    // 1) The client decoder supports HEVC Main10 profile (supportsHevc must be set too)
+    // 1) The client decoder supports a 10-bit format (as set in supportedVideoFormats)
     // 2) The server has support for HDR as indicated by ServerCodecModeSupport in /serverinfo
     //
     // See ConnListenerSetHdrMode() for a callback to indicate when to set
@@ -80,6 +80,12 @@ typedef struct _STREAM_CONFIGURATION {
     // reduce bandwidth when HEVC is chosen as the video codec rather than
     // (or in addition to) improving image quality.
     int hevcBitratePercentageMultiplier;
+
+    // Specifies the percentage that the specified bitrate will be adjusted
+    // when an AV1 stream will be delivered. This allows clients to opt to
+    // reduce bandwidth when AV1 is chosen as the video codec rather than
+    // (or in addition to) improving image quality.
+    int av1BitratePercentageMultiplier;
 
     // If specified, the client's display refresh rate x 100. For example,
     // 59.94 Hz would be specified as 5994. This is used by recent versions
@@ -113,7 +119,8 @@ typedef struct _STREAM_CONFIGURATION {
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
 
 // These identify codec configuration data in the buffer lists
-// of frames identified as IDR frames.
+// of frames identified as IDR frames for H.264 and HEVC formats.
+// For other codecs, all data is marked as BUFFER_TYPE_PICDATA.
 #define BUFFER_TYPE_PICDATA  0x00
 #define BUFFER_TYPE_SPS      0x01
 #define BUFFER_TYPE_PPS      0x02
@@ -129,7 +136,7 @@ typedef struct _LENTRY {
     // Size of data in bytes (never <= 0)
     int length;
 
-    // Buffer type (listed above)
+    // Buffer type (listed above, only set for H.264 and HEVC formats)
     int bufferType;
 } LENTRY, *PLENTRY;
 
@@ -137,10 +144,13 @@ typedef struct _LENTRY {
 // previous P-frames.
 #define FRAME_TYPE_PFRAME 0x00
 
-// Indicates this frame contains SPS, PPS, and VPS (if applicable)
-// as the first buffers in the list. Each NALU will appear as a separate
-// buffer in the buffer list. The I-frame data follows immediately
+// This is a key frame.
+//
+// For H.264 and HEVC, this means the frame contains SPS, PPS, and VPS (HEVC only) NALUs
+// as the first buffers in the list. The I-frame data follows immediately
 // after the codec configuration NALUs.
+//
+// For other codecs, any configuration data is not split into separate buffers.
 #define FRAME_TYPE_IDR    0x01
 
 // A decode unit describes a buffer chain of video data from multiple packets
@@ -219,22 +229,19 @@ typedef struct _DECODE_UNIT {
 // The maximum number of channels supported
 #define AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT 8
 
-// Passed to DecoderRendererSetup to indicate that the following video stream will be
-// in H.264 High Profile.
-#define VIDEO_FORMAT_H264 0x0001
-
-// Passed to DecoderRendererSetup to indicate that the following video stream will be
-// in H.265 Main profile. This will only be passed if supportsHevc is true.
-#define VIDEO_FORMAT_H265 0x0100
-
-// Passed to DecoderRendererSetup to indicate that the following video stream will be
-// in H.265 Main10 (HDR10) profile. This will only be passed if enableHdr is true.
-#define VIDEO_FORMAT_H265_MAIN10 0x0200
+// Passed in StreamConfiguration.supportedVideoFormats to specify supported codecs
+// and to DecoderRendererSetup() to specify selected codec.
+#define VIDEO_FORMAT_H264        0x0001 // H.264 High Profile
+#define VIDEO_FORMAT_H265        0x0100 // HEVC Main Profile
+#define VIDEO_FORMAT_H265_MAIN10 0x0200 // HEVC Main10 Profile (requires enableHdr)
+#define VIDEO_FORMAT_AV1_MAIN8   0x1000 // AV1 Main 8-bit profile
+#define VIDEO_FORMAT_AV1_MAIN10  0x2000 // AV1 Main 10-bit profile (requires enableHdr)
 
 // Masks for clients to use to match video codecs without profile-specific details.
-#define VIDEO_FORMAT_MASK_H264  0x00FF
-#define VIDEO_FORMAT_MASK_H265  0xFF00
-#define VIDEO_FORMAT_MASK_10BIT 0x0200
+#define VIDEO_FORMAT_MASK_H264  0x000F
+#define VIDEO_FORMAT_MASK_H265  0x0F00
+#define VIDEO_FORMAT_MASK_AV1   0xF000
+#define VIDEO_FORMAT_MASK_10BIT 0x2200
 
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the
@@ -267,6 +274,10 @@ typedef struct _DECODE_UNIT {
 // LiCompleteVideoFrame(), and similar) to receive A/V data. Setting this capability while
 // also providing a sample callback is not allowed.
 #define CAPABILITY_PULL_RENDERER 0x20
+
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// supports reference frame invalidation for AV1 streams. This flag is only valid on video renderers.
+#define CAPABILITY_REFERENCE_FRAME_INVALIDATION_AV1 0x40
 
 // If set in the video renderer capabilities field, this macro specifies that the renderer
 // supports slicing to increase decoding performance. The parameter specifies the desired

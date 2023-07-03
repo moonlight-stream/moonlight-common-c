@@ -347,7 +347,20 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         sprintf(payloadStr, "%d", slicesPerFrame);
         err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
 
-        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "2");
+
+            if (AppVersionQuad[0] >= 7) {
+                // Enable HDR if requested
+                if (StreamConfig.enableHdr) {
+                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
+                }
+                else {
+                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
+                }
+            }
+        }
+        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
 
