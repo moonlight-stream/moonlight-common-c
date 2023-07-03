@@ -87,16 +87,17 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
         }
 #endif
         size_t encryptedLength = 0;
+        unsigned char tagTemp[16];
         unsigned char * encryptedData = tag;
+        memcpy(tagTemp, tag, tagLength);
         size_t encryptedCapacity = outLength + tagLength;
-        memcpy(encryptedData + inputDataLength, tag, tagLength);
+        memcpy(encryptedData + inputDataLength, tagTemp, tagLength);
         if (mbedtls_cipher_auth_encrypt_ext(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, encryptedData,
                                             encryptedCapacity, &encryptedLength, tagLength) != 0) {
             return false;
         }
         outLength = encryptedLength - tagLength;
 
-        unsigned char tagTemp[16];
         // Copy the tag to temp buffer
         memcpy(tagTemp, encryptedData + outLength, tagLength);
         // Move ciphertext to the end
