@@ -904,8 +904,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             goto Exit;
         }
         
-        if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "a=rtpmap:200 AV1/90000")) {
-            if (StreamConfig.enableHdr) {
+        if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "AV1/90000")) {
+            if (StreamConfig.serverCodecModeSupport & SCM_AV1_MAIN10) {
                 NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN10;
             }
             else {
@@ -925,7 +925,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             // server can support HEVC. For some reason, they still set the MIME type of the HEVC
             // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
             // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
-            if (StreamConfig.enableHdr) {
+            if (StreamConfig.serverCodecModeSupport & SCM_HEVC_MAIN10) {
                 NegotiatedVideoFormat = VIDEO_FORMAT_H265_MAIN10;
             }
             else {

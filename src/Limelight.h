@@ -65,15 +65,8 @@ typedef struct _STREAM_CONFIGURATION {
     // See VIDEO_FORMAT constants below.
     int supportedVideoFormats;
 
-    // Specifies that the client is requesting an HDR video stream.
-    //
-    // This should only be set if:
-    // 1) The client decoder supports a 10-bit format (as set in supportedVideoFormats)
-    // 2) The server has support for HDR as indicated by ServerCodecModeSupport in /serverinfo
-    //
-    // See ConnListenerSetHdrMode() for a callback to indicate when to set
-    // the client display into HDR mode.
-    bool enableHdr;
+    // Specifies the 'ServerCodecModeSupport' from the /serverinfo response.
+    int serverCodecModeSupport;
 
     // Specifies the percentage that the specified bitrate will be adjusted
     // when an HEVC stream will be delivered. This allows clients to opt to

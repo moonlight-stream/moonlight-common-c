@@ -45,6 +45,13 @@ extern SS_PING VideoPingPayload;
 #define SS_FF_CONTROLLER_TOUCH_EVENTS 0x02
 extern uint32_t SunshineFeatureFlags;
 
+// ServerCodecModeSupport values
+#define SCM_H264        0x00001
+#define SCM_HEVC        0x00100
+#define SCM_HEVC_MAIN10 0x00200
+#define SCM_AV1_MAIN8   0x10000 // Sunshine extension
+#define SCM_AV1_MAIN10  0x20000 // Sunshine extension
+
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
 #endif

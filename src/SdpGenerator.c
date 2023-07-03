@@ -349,30 +349,10 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
         if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "2");
-
-            if (AppVersionQuad[0] >= 7) {
-                // Enable HDR if requested
-                if (StreamConfig.enableHdr) {
-                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
-                }
-                else {
-                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
-                }
-            }
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "1");
-
-            if (AppVersionQuad[0] >= 7) {
-                // Enable HDR if requested
-                if (StreamConfig.enableHdr) {
-                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
-                }
-                else {
-                    err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
-                }
-            }
 
             if (!APP_VERSION_AT_LEAST(7, 1, 408)) {
                 // This disables split frame encode on GFE 3.10 which seems to produce broken
@@ -383,22 +363,19 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             }
         }
         else {
-            
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
             err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "0");
-
-            if (AppVersionQuad[0] >= 7) {
-                // HDR is not supported on H.264
-                err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
-            }
-
-            // We shouldn't be able to reach this path with enableHdr set. If we did, that means
-            // the server or client doesn't support HEVC and the client didn't do the correct checks
-            // before requesting HDR streaming.
-            LC_ASSERT(!StreamConfig.enableHdr);
         }
 
         if (AppVersionQuad[0] >= 7) {
+            // Enable HDR if requested
+            if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_10BIT) {
+                err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "1");
+            }
+            else {
+                err |= addAttributeString(&optionHead, "x-nv-video[0].dynamicRangeMode", "0");
+            }
+
             // If the decoder supports reference frame invalidation, that indicates it also supports
             // the maximum number of reference frames allowed by the codec. Even if we can't use RFI
             // due to lack of host support, we can still allow the host to pick a number of reference
