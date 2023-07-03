@@ -65,9 +65,6 @@ typedef struct _STREAM_CONFIGURATION {
     // See VIDEO_FORMAT constants below.
     int supportedVideoFormats;
 
-    // Specifies the 'ServerCodecModeSupport' from the /serverinfo response.
-    int serverCodecModeSupport;
-
     // Specifies the percentage that the specified bitrate will be adjusted
     // when an HEVC stream will be delivered. This allows clients to opt to
     // reduce bandwidth when HEVC is chosen as the video codec rather than
@@ -490,7 +487,6 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 // Use this function to zero the connection callbacks when allocated on the stack or heap
 void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 
-
 typedef struct _SERVER_INFORMATION {
     // Server host name or IP address in text form
     const char* address;
@@ -503,6 +499,9 @@ typedef struct _SERVER_INFORMATION {
 
     // Text inside 'sessionUrl0' tag in /resume and /launch (if present)
     const char* rtspSessionUrl;
+
+    // Specifies the 'ServerCodecModeSupport' from the /serverinfo response.
+    int serverCodecModeSupport;
 } SERVER_INFORMATION, *PSERVER_INFORMATION;
 
 // Use this function to zero the server information when allocated on the stack or heap
