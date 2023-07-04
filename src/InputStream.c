@@ -15,6 +15,9 @@ static PLT_THREAD inputSendThread;
 static float absCurrentPosX;
 static float absCurrentPosY;
 
+// Limited by number of bits in activeGamepadMask
+#define MAX_GAMEPADS 16
+
 #define CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
 
 #define MAX_INPUT_PACKET_SIZE 128
@@ -938,6 +941,16 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         return -2;
     }
 
+    // GFE only supports a maximum of 4 controllers
+    if (!IS_SUNSHINE()) {
+        controllerNumber %= 4;
+        activeGamepadMask &= 0xF;
+    }
+    else {
+        // Sunshine supports up to 16 (max number of bits in activeGamepadMask)
+        controllerNumber %= MAX_GAMEPADS;
+    }
+
     holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
@@ -969,12 +982,6 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         }
         else {
             holder->packet.multiController.header.magic = LE32(MULTI_CONTROLLER_MAGIC);
-        }
-
-        // GFE only supports a maximum of 4 controllers
-        if (!IS_SUNSHINE()) {
-            controllerNumber %= 4;
-            activeGamepadMask &= 0xF;
         }
 
         holder->packet.multiController.headerB = LE16(MC_HEADER_B);
@@ -1245,6 +1252,9 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
         return -2;
     }
 
+    // Sunshine supports up to 16 controllers
+    controllerNumber %= MAX_GAMEPADS;
+
     // The arrival event is only supported by Sunshine
     if (IS_SUNSHINE()) {
         holder = allocatePacketHolder(0);
@@ -1285,6 +1295,9 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
         return LI_ERR_UNSUPPORTED;
     }
 
+    // Sunshine supports up to 16 controllers
+    controllerNumber %= MAX_GAMEPADS;
+
     holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
@@ -1323,6 +1336,9 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
         return LI_ERR_UNSUPPORTED;
     }
 
+    // Sunshine supports up to 16 controllers
+    controllerNumber %= MAX_GAMEPADS;
+
     holder = allocatePacketHolder(0);
     if (holder == NULL) {
         return -1;
@@ -1358,6 +1374,9 @@ int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState,
     if (!IS_SUNSHINE()) {
         return LI_ERR_UNSUPPORTED;
     }
+
+    // Sunshine supports up to 16 controllers
+    controllerNumber %= MAX_GAMEPADS;
 
     holder = allocatePacketHolder(0);
     if (holder == NULL) {
