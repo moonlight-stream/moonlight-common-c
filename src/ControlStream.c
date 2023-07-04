@@ -1137,7 +1137,7 @@ static void lossStatsThreadFunc(void* context) {
                                       sizeof(periodicPingPayload),
                                       periodicPingPayload,
                                       CTRL_CHANNEL_GENERIC,
-                                      ENET_PACKET_FLAG_RELIABLE)) {
+                                      0)) {
                 Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
                 ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
