@@ -1347,6 +1347,7 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     holder->packet.controllerMotion.header.size = BE32(sizeof(SS_CONTROLLER_MOTION_PACKET) - sizeof(uint32_t));
     holder->packet.controllerMotion.header.magic = LE32(SS_CONTROLLER_MOTION_MAGIC);
     holder->packet.controllerMotion.controllerNumber = controllerNumber;
+    holder->packet.controllerMotion.motionType = motionType;
     memset(holder->packet.controllerMotion.zero, 0, sizeof(holder->packet.controllerMotion.zero));
     floatToNetfloat(x, holder->packet.controllerMotion.x);
     floatToNetfloat(y, holder->packet.controllerMotion.y);
