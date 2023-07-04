@@ -18,6 +18,10 @@ static float absCurrentPosY;
 // Limited by number of bits in activeGamepadMask
 #define MAX_GAMEPADS 16
 
+static uint8_t currentPenButtonState;
+static uint16_t currentActiveGamepadMask;
+static int currentControllerButtonState[MAX_GAMEPADS];
+
 #define CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
 
 #define MAX_INPUT_PACKET_SIZE 128
@@ -46,6 +50,8 @@ static float absCurrentPosY;
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
+    uint32_t enetPacketFlags;
+    uint8_t channelId;
 
     // The union must be the last member since we abuse the NV_UNICODE_PACKET
     // text field to store variable length data which gets split before being
@@ -91,6 +97,10 @@ int initializeInputStream(void) {
     // Sunshine also uses SendInput() so it's not affected either.
     needsBatchedScroll = APP_VERSION_AT_LEAST(7, 1, 409) && !IS_SUNSHINE();
     batchedScrollDelta = 0;
+
+    currentPenButtonState = 0;
+    currentActiveGamepadMask = 0;
+    memset(currentControllerButtonState, 0, sizeof(currentControllerButtonState));
 
     // Start with the virtual mouse centered
     absCurrentPosX = absCurrentPosY = 0.5f;
@@ -208,7 +218,10 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
     // has been removed. We send the plaintext packet through and the control stream code will do
     // the encryption.
     if (encryptedControlStream) {
-        err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet, PACKET_SIZE(holder));
+        err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet,
+                                                        PACKET_SIZE(holder),
+                                                        holder->channelId,
+                                                        holder->enetPacketFlags);
         if (err < 0) {
             Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
             ListenerCallbacks.connectionTerminated(err);
@@ -256,7 +269,9 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
             }
 
             err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
-                (int) (encryptedSize + sizeof(encryptedLengthPrefix)));
+                                                            (int)(encryptedSize + sizeof(encryptedLengthPrefix)),
+                                                            holder->channelId,
+                                                            holder->enetPacketFlags);
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(err);
@@ -614,6 +629,8 @@ static int sendEnableHaptics(void) {
         return -1;
     }
 
+    holder->channelId = CTRL_CHANNEL_GENERIC;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
     holder->packet.haptics.header.size = BE32(sizeof(NV_HAPTICS_PACKET) - sizeof(uint32_t));
     holder->packet.haptics.header.magic = LE32(ENABLE_HAPTICS_MAGIC);
     holder->packet.haptics.enable = LE16(1);
@@ -716,6 +733,11 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         return -1;
     }
 
+    holder->channelId = CTRL_CHANNEL_MOUSE;
+
+    // These deltas are cumulative, so allow them to be processed out of order
+    holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+
     holder->packet.mouseMoveRel.header.size = BE32(sizeof(NV_REL_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     if (AppVersionQuad[0] >= 5) {
         holder->packet.mouseMoveRel.header.magic = LE32(MOUSE_MOVE_REL_MAGIC_GEN5);
@@ -749,6 +771,11 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
     if (holder == NULL) {
         return -1;
     }
+
+    holder->channelId = CTRL_CHANNEL_MOUSE;
+
+    // The latest packet always contains the latest data, so discard older packets upon reordering
+    holder->enetPacketFlags = 0;
 
     holder->packet.mouseMoveAbs.header.size = BE32(sizeof(NV_ABS_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     holder->packet.mouseMoveAbs.header.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
@@ -806,6 +833,8 @@ int LiSendMouseButtonEvent(char action, int button) {
         return -1;
     }
 
+    holder->channelId = CTRL_CHANNEL_MOUSE;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
     holder->packet.mouseButton.header.size = BE32(sizeof(NV_MOUSE_BUTTON_PACKET) - sizeof(uint32_t));
     holder->packet.mouseButton.header.magic = (uint8_t)action;
     if (AppVersionQuad[0] >= 5) {
@@ -837,6 +866,9 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     if (holder == NULL) {
         return -1;
     }
+
+    holder->channelId = CTRL_CHANNEL_KEYBOARD;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     // For proper behavior, the MODIFIER flag must not be set on the modifier key down event itself
     // for the extended modifiers on the right side of the keyboard. If the MODIFIER flag is set,
@@ -915,6 +947,10 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     if (holder == NULL) {
         return -1;
     }
+
+    holder->channelId = CTRL_CHANNEL_UTF8;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
+
     // Magic + string length
     holder->packet.unicode.header.size = BE32(sizeof(uint32_t) + length);
     holder->packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
@@ -955,6 +991,16 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     if (holder == NULL) {
         return -1;
     }
+
+    // Send each controller on a separate channel
+    holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+
+    // If the active gamepad mask or button state changes, send a reliable event to ensure delivery.
+    // For axis-only updates, we use sequenced unreliable packets to only process the latest updates.
+    holder->enetPacketFlags = (activeGamepadMask != currentActiveGamepadMask || buttonFlags != currentControllerButtonState[controllerNumber]) ?
+                                  ENET_PACKET_FLAG_RELIABLE : 0;
+    currentActiveGamepadMask = activeGamepadMask;
+    currentControllerButtonState[controllerNumber] = buttonFlags;
 
     if (AppVersionQuad[0] == 3) {
         // Generation 3 servers don't support multiple controllers so we send
@@ -1065,6 +1111,11 @@ int LiSendHighResScrollEvent(short scrollAmount) {
                 return -1;
             }
 
+            holder->channelId = CTRL_CHANNEL_MOUSE;
+
+            // These deltas are cumulative, so allow them to be processed out of order
+            holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+
             holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
             if (AppVersionQuad[0] >= 5) {
                 holder->packet.scroll.header.magic = LE32(SCROLL_MAGIC_GEN5);
@@ -1094,6 +1145,11 @@ int LiSendHighResScrollEvent(short scrollAmount) {
         if (holder == NULL) {
             return -1;
         }
+
+        holder->channelId = CTRL_CHANNEL_MOUSE;
+
+        // These deltas are cumulative, so allow them to be processed out of order
+        holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
 
         holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
         if (AppVersionQuad[0] >= 5) {
@@ -1145,6 +1201,11 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
         return -1;
     }
 
+    holder->channelId = CTRL_CHANNEL_MOUSE;
+
+    // These deltas are cumulative, so allow them to be processed out of order
+    holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+
     holder->packet.hscroll.header.size = BE32(sizeof(SS_HSCROLL_PACKET) - sizeof(uint32_t));
     holder->packet.hscroll.header.magic = LE32(SS_HSCROLL_MAGIC);
     holder->packet.hscroll.scrollAmount = BE16(scrollAmount);
@@ -1180,6 +1241,12 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
     if (holder == NULL) {
         return -1;
     }
+
+    holder->channelId = CTRL_CHANNEL_TOUCH;
+
+    // Allow move and hover events to be dropped if a newer one arrives, but don't allow
+    // state changing events like up/down/leave events to be dropped.
+    holder->enetPacketFlags = TOUCH_EVENT_IS_BATCHABLE(eventType) ? 0 : ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.touch.header.size = BE32(sizeof(SS_TOUCH_PACKET) - sizeof(uint32_t));
     holder->packet.touch.header.magic = LE32(SS_TOUCH_MAGIC);
@@ -1219,6 +1286,13 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     if (holder == NULL) {
         return -1;
     }
+
+    holder->channelId = CTRL_CHANNEL_PEN;
+
+    // Allow move and hover events to be dropped if a newer one arrives (if no buttons changed),
+    // but don't allow state changing events like up/down/leave events to be dropped.
+    holder->enetPacketFlags = (TOUCH_EVENT_IS_BATCHABLE(eventType) && !(penButtons ^ currentPenButtonState)) ? 0 : ENET_PACKET_FLAG_RELIABLE;
+    currentPenButtonState = penButtons;
 
     holder->packet.pen.header.size = BE32(sizeof(SS_PEN_PACKET) - sizeof(uint32_t));
     holder->packet.pen.header.magic = LE32(SS_PEN_MAGIC);
@@ -1262,6 +1336,10 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
             return -1;
         }
 
+        // Send each controller on a separate channel
+        holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+        holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
+
         holder->packet.controllerArrival.header.size = BE32(sizeof(SS_CONTROLLER_ARRIVAL_PACKET) - sizeof(uint32_t));
         holder->packet.controllerArrival.header.magic = LE32(SS_CONTROLLER_ARRIVAL_MAGIC);
         holder->packet.controllerArrival.controllerNumber = controllerNumber;
@@ -1302,6 +1380,13 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
     if (holder == NULL) {
         return -1;
     }
+
+    // Send each controller on a separate channel
+    holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+
+    // Allow move and hover events to be dropped if a newer one arrives, but don't allow
+    // state changing events like up/down/leave events to be dropped.
+    holder->enetPacketFlags = TOUCH_EVENT_IS_BATCHABLE(eventType) ? 0 : ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.controllerTouch.header.size = BE32(sizeof(SS_CONTROLLER_TOUCH_PACKET) - sizeof(uint32_t));
     holder->packet.controllerTouch.header.magic = LE32(SS_CONTROLLER_TOUCH_MAGIC);
@@ -1344,6 +1429,12 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
         return -1;
     }
 
+    // Send each controller on a separate channel
+    holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+
+    // Motion events are so rapid that we can just drop any events that are lost in transit
+    holder->enetPacketFlags = 0;
+
     holder->packet.controllerMotion.header.size = BE32(sizeof(SS_CONTROLLER_MOTION_PACKET) - sizeof(uint32_t));
     holder->packet.controllerMotion.header.magic = LE32(SS_CONTROLLER_MOTION_MAGIC);
     holder->packet.controllerMotion.controllerNumber = controllerNumber;
@@ -1383,6 +1474,10 @@ int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState,
     if (holder == NULL) {
         return -1;
     }
+
+    // Send each controller on a separate channel
+    holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.controllerBattery.header.size = BE32(sizeof(SS_CONTROLLER_BATTERY_PACKET) - sizeof(uint32_t));
     holder->packet.controllerBattery.header.magic = LE32(SS_CONTROLLER_BATTERY_MAGIC);

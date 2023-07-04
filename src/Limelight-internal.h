@@ -52,6 +52,17 @@ extern uint32_t SunshineFeatureFlags;
 #define SCM_AV1_MAIN8   0x10000 // Sunshine extension
 #define SCM_AV1_MAIN10  0x20000 // Sunshine extension
 
+// ENet channel ID values
+#define CTRL_CHANNEL_GENERIC      0x00
+#define CTRL_CHANNEL_URGENT       0x01 // IDR and reference frame invalidation requests
+#define CTRL_CHANNEL_KEYBOARD     0x02
+#define CTRL_CHANNEL_MOUSE        0x03
+#define CTRL_CHANNEL_PEN          0x04
+#define CTRL_CHANNEL_TOUCH        0x05
+#define CTRL_CHANNEL_UTF8         0x06
+#define CTRL_CHANNEL_GAMEPAD_BASE 0x10 // 0x10 to 0x20 by controller index
+#define CTRL_CHANNEL_MAX          0x20
+
 #ifndef UINT24_MAX
 #define UINT24_MAX 0xFFFFFF
 #endif
@@ -106,7 +117,7 @@ void connectionReceivedCompleteFrame(int frameIndex);
 void connectionSawFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
-int sendInputPacketOnControlStream(unsigned char* data, int length);
+int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags);
 bool isControlDataInTransit(void);
 
 int performRtspHandshake(PSERVER_INFORMATION serverInfo);
