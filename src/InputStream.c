@@ -1421,8 +1421,8 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
         return -1;
     }
 
-    // Send each controller on a separate channel
-    holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
+    // Send each controller on a separate channel specific to motion sensors
+    holder->channelId = CTRL_CHANNEL_SENSOR_BASE + controllerNumber;
 
     // Motion events are so rapid that we can just drop any events that are lost in transit
     holder->enetPacketFlags = 0;

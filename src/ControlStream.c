@@ -1422,7 +1422,7 @@ int startControlStream(void) {
         enet_address_set_port(&address, ControlPortNumber);
 
         // Create a client
-        client = enet_host_create(address.address.ss_family, NULL, 1, CTRL_CHANNEL_MAX + 1, 0, 0);
+        client = enet_host_create(address.address.ss_family, NULL, 1, CTRL_CHANNEL_COUNT, 0, 0);
         if (client == NULL) {
             stopping = true;
             return -1;
@@ -1431,7 +1431,7 @@ int startControlStream(void) {
         client->intercept = ignoreDisconnectIntercept;
 
         // Connect to the host
-        peer = enet_host_connect(client, &address, CTRL_CHANNEL_MAX + 1, 0);
+        peer = enet_host_connect(client, &address, CTRL_CHANNEL_COUNT, 0);
         if (peer == NULL) {
             stopping = true;
             enet_host_destroy(client);
