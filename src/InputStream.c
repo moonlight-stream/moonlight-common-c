@@ -734,9 +734,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     }
 
     holder->channelId = CTRL_CHANNEL_MOUSE;
-
-    // These deltas are cumulative, so allow them to be processed out of order
-    holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.mouseMoveRel.header.size = BE32(sizeof(NV_REL_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     if (AppVersionQuad[0] >= 5) {
@@ -1112,9 +1110,7 @@ int LiSendHighResScrollEvent(short scrollAmount) {
             }
 
             holder->channelId = CTRL_CHANNEL_MOUSE;
-
-            // These deltas are cumulative, so allow them to be processed out of order
-            holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+            holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
             holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
             if (AppVersionQuad[0] >= 5) {
@@ -1147,9 +1143,7 @@ int LiSendHighResScrollEvent(short scrollAmount) {
         }
 
         holder->channelId = CTRL_CHANNEL_MOUSE;
-
-        // These deltas are cumulative, so allow them to be processed out of order
-        holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+        holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
         holder->packet.scroll.header.size = BE32(sizeof(NV_SCROLL_PACKET) - sizeof(uint32_t));
         if (AppVersionQuad[0] >= 5) {
@@ -1202,9 +1196,7 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
     }
 
     holder->channelId = CTRL_CHANNEL_MOUSE;
-
-    // These deltas are cumulative, so allow them to be processed out of order
-    holder->enetPacketFlags = ENET_PACKET_FLAG_UNSEQUENCED;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.hscroll.header.size = BE32(sizeof(SS_HSCROLL_PACKET) - sizeof(uint32_t));
     holder->packet.hscroll.header.magic = LE32(SS_HSCROLL_MAGIC);
