@@ -630,17 +630,10 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     enetPacket->userData = (void*)&packetFreed;
     enetPacket->freeCallback = enetPacketFreeCb;
 
-    // channelCount == 0 is possible if the peer is disconnected,
-    // so we need to assign channel ID under the enetMutex to prevent
-    // racing updates the peer.
-    if (!IS_SUNSHINE() || peer->channelCount == 0) {
-        // We always use a single channel for GFE.
+    // Always use channel 0 for GFE and if the requested channel exceeds
+    // the peer's supported channel count.
+    if (!IS_SUNSHINE() || channelId >= peer->channelCount) {
         channelId = 0;
-    }
-    else if (channelId >= peer->channelCount) {
-        // If this peer doesn't support enough channels, distribute the remaining channels onto the ones
-        // the peer does support. We don't use the channel to distinguish traffic types, so this is safe.
-        channelId %= peer->channelCount;
     }
 
     // Queue the packet to be sent
