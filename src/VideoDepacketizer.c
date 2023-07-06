@@ -817,6 +817,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
+    uint8_t frameHeaderSize;
     if (firstPacket) {
         // Parse the frame type from the header
         if (APP_VERSION_AT_LEAST(7, 1, 350)) {
@@ -880,13 +881,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // 0x01 indicates an 8 byte header
             // 0x81 indicates a 44 byte header
             if (currentPos.data[0] == 0x01) {
-                currentPos.offset += 8;
-                currentPos.length -= 8;
+                frameHeaderSize = 8;
             }
             else {
                 LC_ASSERT(currentPos.data[0] == (char)0x81);
-                currentPos.offset += 44;
-                currentPos.length -= 44;
+                frameHeaderSize = 44;
             }
         }
         else if (APP_VERSION_AT_LEAST(7, 1, 446)) {
@@ -894,13 +893,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // 0x01 indicates an 8 byte header
             // 0x81 indicates a 41 byte header
             if (currentPos.data[0] == 0x01) {
-                currentPos.offset += 8;
-                currentPos.length -= 8;
+                frameHeaderSize = 8;
             }
             else {
                 LC_ASSERT(currentPos.data[0] == (char)0x81);
-                currentPos.offset += 41;
-                currentPos.length -= 41;
+                frameHeaderSize = 41;
             }
         }
         else if (APP_VERSION_AT_LEAST(7, 1, 415)) {
@@ -908,33 +905,33 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // 0x01 indicates an 8 byte header
             // 0x81 indicates a 24 byte header
             if (currentPos.data[0] == 0x01) {
-                currentPos.offset += 8;
-                currentPos.length -= 8;
+                frameHeaderSize = 8;
             }
             else {
                 LC_ASSERT(currentPos.data[0] == (char)0x81);
-                currentPos.offset += 24;
-                currentPos.length -= 24;
+                frameHeaderSize = 24;
             }
         }
         else if (APP_VERSION_AT_LEAST(7, 1, 350)) {
             // [7.1.350, 7.1.415) should use the 8 byte header again
-            currentPos.offset += 8;
-            currentPos.length -= 8;
+            frameHeaderSize = 8;
         }
         else if (APP_VERSION_AT_LEAST(7, 1, 320)) {
             // [7.1.320, 7.1.350) should use the 12 byte frame header
-            currentPos.offset += 12;
-            currentPos.length -= 12;
+            frameHeaderSize = 12;
         }
         else if (APP_VERSION_AT_LEAST(5, 0, 0)) {
             // [5.x, 7.1.320) should use the 8 byte header
-            currentPos.offset += 8;
-            currentPos.length -= 8;
+            frameHeaderSize = 8;
         }
         else {
             // Other versions don't have a frame header at all
+            frameHeaderSize = 0;
         }
+
+        // Skip past the frame header
+        currentPos.offset += frameHeaderSize;
+        currentPos.length -= frameHeaderSize;
 
         // We only parse H.264 and HEVC at the NALU level
         if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
@@ -962,6 +959,10 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             }
         }
     }
+    else {
+        // There is no frame header on later packets
+        frameHeaderSize = 0;
+    }
 
     if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
         if (firstPacket && isIdrFrameStart(&currentPos)) {
@@ -988,7 +989,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     else {
         // Other codecs are just passed through as is.
         queueFragment(existingEntry, currentPos.data, currentPos.offset,
-                      lastPacket ? lastPacketPayloadLength : currentPos.length);
+                      lastPacket ? (lastPacketPayloadLength - frameHeaderSize) : currentPos.length);
     }
 
     if (lastPacket) {
