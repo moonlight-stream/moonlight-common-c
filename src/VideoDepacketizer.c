@@ -15,6 +15,7 @@ static bool waitingForRefInvalFrame;
 static unsigned int lastPacketInStream;
 static bool decodingFrame;
 static int frameType;
+static uint16_t lastPacketPayloadLength;
 static bool strictIdrFrameWait;
 static uint64_t syntheticPtsBase;
 static uint16_t frameHostProcessingLatency;
@@ -69,6 +70,7 @@ void initializeVideoDepacketizer(int pktSize) {
     frameHostProcessingLatency = 0;
     firstPacketReceiveTime = 0;
     firstPacketPresentationTime = 0;
+    lastPacketPayloadLength = 0;
     dropStatePending = false;
     idrFrameProcessed = false;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
@@ -702,7 +704,7 @@ void requestDecoderRefresh(void) {
 }
 
 // Return 1 if packet is the first one in the frame
-static int isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
+static bool isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
     // Clear the picture data flag
     flags &= ~FLAG_CONTAINS_PIC_DATA;
 
@@ -718,7 +720,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     BUFFER_DESC currentPos;
     uint32_t frameIndex;
     uint8_t flags;
-    uint32_t firstPacket;
+    bool firstPacket, lastPacket;
     uint32_t streamPacketIndex;
     uint8_t fecCurrentBlockNumber;
     uint8_t fecLastBlockNumber;
@@ -736,6 +738,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     frameIndex = videoPacket->frameIndex;
     flags = videoPacket->flags;
     firstPacket = isFirstPacket(flags, fecCurrentBlockNumber);
+    lastPacket = (flags & FLAG_EOF) && fecCurrentBlockNumber == fecLastBlockNumber;
 
     LC_ASSERT((flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
 
@@ -864,6 +867,14 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             BbGet16(&bb, &frameHostProcessingLatency);
         }
 
+        // Codecs like H.264 and HEVC handle the FEC trailing zero padding just fine, but other
+        // codecs need the exact length encoded separately.
+        if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
+            BYTE_BUFFER bb;
+            BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 4, 2, BYTE_ORDER_LITTLE);
+            BbGet16(&bb, &lastPacketPayloadLength);
+        }
+
         if (APP_VERSION_AT_LEAST(7, 1, 450)) {
             // >= 7.1.450 uses 2 different header lengths based on the first byte:
             // 0x01 indicates an 8 byte header
@@ -976,10 +987,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     }
     else {
         // Other codecs are just passed through as is.
-        queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
+        queueFragment(existingEntry, currentPos.data, currentPos.offset,
+                      lastPacket ? lastPacketPayloadLength : currentPos.length);
     }
 
-    if ((flags & FLAG_EOF) && fecCurrentBlockNumber == fecLastBlockNumber) {
+    if (lastPacket) {
         // Move on to the next frame
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
