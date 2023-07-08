@@ -987,9 +987,47 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
     }
     else {
+        // We fixup the length of the last packet for other codecs since they may not be tolerant
+        // of trailing zero padding like H.264/HEVC Annex B bitstream parsers are.
+        if (lastPacket) {
+            // The payload length includes the frame header, so it cannot be smaller than that
+            LC_ASSERT(lastPacketPayloadLength > frameHeaderSize);
+
+            // The payload length cannot be smaller than the actual received payload
+            // NB: currentPos.length is already adjusted to exclude the frameHeaderSize from above
+            LC_ASSERT(lastPacketPayloadLength - frameHeaderSize <= currentPos.length);
+
+            // If the payload length is valid, truncate the packet. If not, discard this frame.
+            if (lastPacketPayloadLength > frameHeaderSize && lastPacketPayloadLength - frameHeaderSize <= currentPos.length) {
+                currentPos.length = lastPacketPayloadLength - frameHeaderSize;
+            }
+            else {
+                if (lastPacketPayloadLength <= frameHeaderSize) {
+                    Limelog("Invalid last payload length for header on frame %u: %u <= %u",
+                            frameIndex, lastPacketPayloadLength, frameHeaderSize);
+                }
+                else {
+                    Limelog("Invalid last payload length for packet size on frame %u: %u > %u",
+                            frameIndex, lastPacketPayloadLength - frameHeaderSize, currentPos.length);
+                }
+
+                // Skip to the next frame and tell the host we lost this one
+                decodingFrame = false;
+                nextFrameNumber = frameIndex + 1;
+                dropFrameState();
+                if (waitingForIdrFrame) {
+                    LiRequestIdrFrame();
+                }
+                else {
+                    connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+                }
+
+                return;
+            }
+        }
+
         // Other codecs are just passed through as is.
-        queueFragment(existingEntry, currentPos.data, currentPos.offset,
-                      lastPacket ? (lastPacketPayloadLength - frameHeaderSize) : currentPos.length);
+        queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
     }
 
     if (lastPacket) {
