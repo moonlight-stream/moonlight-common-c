@@ -817,7 +817,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     lastPacketInStream = streamPacketIndex;
 
     // If this is the first packet, skip the frame header (if one exists)
-    uint8_t frameHeaderSize;
+    uint32_t frameHeaderSize;
     if (firstPacket) {
         // Parse the frame type from the header
         if (APP_VERSION_AT_LEAST(7, 1, 350)) {
