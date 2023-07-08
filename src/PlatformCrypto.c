@@ -89,7 +89,6 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
         size_t encryptedLength = 0;
         unsigned char * encryptedData = tag;
         size_t encryptedCapacity = outLength + tagLength;
-        memcpy(encryptedData + inputDataLength, tag, tagLength);
         if (mbedtls_cipher_auth_encrypt_ext(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, encryptedData,
                                             encryptedCapacity, &encryptedLength, tagLength) != 0) {
             return false;
