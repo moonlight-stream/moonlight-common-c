@@ -682,6 +682,14 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 //
 // The activeGamepadMask parameter is a bitfield with bits set for each controller present.
 // On GFE, activeGamepadMask is limited to a maximum of 4 (0xF). On Sunshine, it is limited to 16 (0xFFFF).
+//
+// To indicate arrival of a gamepad, you may send an empty event with the controller number
+// set to the new controller and the bit of the new controller set in the active gamepad mask.
+// However, you should prefer LiSendControllerArrivalEvent() instead of this function for
+// that purpose, because it allows the host to make a better choice of emulated controller.
+//
+// To indicate removal of a gamepad, send an empty event with the controller number set to the
+// removed controller and the bit of the removed controller cleared in the active gamepad mask.
 int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
     int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
