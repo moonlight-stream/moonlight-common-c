@@ -1424,8 +1424,16 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     // Send each controller on a separate channel specific to motion sensors
     holder->channelId = CTRL_CHANNEL_SENSOR_BASE + controllerNumber;
 
-    // Motion events are so rapid that we can just drop any events that are lost in transit
-    holder->enetPacketFlags = 0;
+    // Motion events are so rapid that we can just drop any events that are lost in transit,
+    // but we will treat (0, 0, 0) as a special value for gyro events to allow clients to
+    // reliably set the gyro to a null state when sensor events are halted due to focus loss
+    // or similar client-side constraints.
+    if (motionType == LI_MOTION_TYPE_GYRO && x == 0.0f && y == 0.0f && z == 0.0f) {
+        holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
+    }
+    else {
+        holder->enetPacketFlags = 0;
+    }
 
     holder->packet.controllerMotion.header.size = BE32(sizeof(SS_CONTROLLER_MOTION_PACKET) - sizeof(uint32_t));
     holder->packet.controllerMotion.header.magic = LE32(SS_CONTROLLER_MOTION_MAGIC);
