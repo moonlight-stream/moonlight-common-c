@@ -487,6 +487,19 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 // Use this function to zero the connection callbacks when allocated on the stack or heap
 void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 
+// ServerCodecModeSupport values
+#define SCM_H264        0x00001
+#define SCM_HEVC        0x00100
+#define SCM_HEVC_MAIN10 0x00200
+#define SCM_AV1_MAIN8   0x10000 // Sunshine extension
+#define SCM_AV1_MAIN10  0x20000 // Sunshine extension
+
+// SCM masks to identify various codec capabilities
+#define SCM_MASK_H264   SCM_H264
+#define SCM_MASK_HEVC   (SCM_HEVC | SCM_HEVC_MAIN10)
+#define SCM_MASK_AV1    (SCM_AV1_MAIN8 | SCM_AV1_MAIN10)
+#define SCM_MASK_10BIT  (SCM_HEVC_MAIN10 | SCM_AV1_MAIN10)
+
 typedef struct _SERVER_INFORMATION {
     // Server host name or IP address in text form
     const char* address;
