@@ -634,6 +634,14 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     // the peer's supported channel count.
     if (!IS_SUNSHINE() || channelId >= peer->channelCount) {
         channelId = 0;
+
+        // Send unreliable traffic as reliable if we only have one channel.
+        // This avoids unwanted sequencing between reliable and unreliable
+        // traffic that can lead to delays.
+        if (flags == 0) {
+            flags |= ENET_PACKET_FLAG_RELIABLE;
+            enetPacket->flags |= ENET_PACKET_FLAG_RELIABLE;
+        }
     }
 
     // Queue the packet to be sent
