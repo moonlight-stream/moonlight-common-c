@@ -228,6 +228,14 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         goto Cleanup;
     }
 
+    // Extract the appversion from the supplied string
+    if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
+                                     AppVersionQuad) < 0) {
+        Limelog("Invalid appversion string: %s\n", serverInfo->serverInfoAppVersion);
+        err = -1;
+        goto Cleanup;
+    }
+
     // Replace missing callbacks with placeholders
     fixupMissingCallbacks(&drCallbacks, &arCallbacks, &clCallbacks);
     memcpy(&VideoCallbacks, drCallbacks, sizeof(VideoCallbacks));
@@ -311,19 +319,12 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     // resolutions will work and which won't, but we can at least exclude
     // 4K from RFI to avoid significant persistent artifacts after frame loss.
     if (StreamConfig.width == 3840 && StreamConfig.height == 2160 &&
-            (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC)) {
-        Limelog("Disabling reference frame invalidation for 4K streaming\n");
+            (VideoCallbacks.capabilities & CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC) &&
+            !IS_SUNSHINE()) {
+        Limelog("Disabling reference frame invalidation for 4K streaming with GFE\n");
         VideoCallbacks.capabilities &= ~CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC;
     }
     
-    // Extract the appversion from the supplied string
-    if (extractVersionQuadFromString(serverInfo->serverInfoAppVersion,
-                                     AppVersionQuad) < 0) {
-        Limelog("Invalid appversion string: %s\n", serverInfo->serverInfoAppVersion);
-        err = -1;
-        goto Cleanup;
-    }
-
     Limelog("Initializing platform...");
     ListenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
     err = initializePlatform();
