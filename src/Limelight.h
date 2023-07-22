@@ -595,6 +595,11 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 //
 // Sending a down/move event with a pressure of 0.0 indicates the actual pressure is unknown.
 //
+// For hover events, the pressure value is treated as a 1.0 to 0.0 range of distance from the touch
+// surface where 1.0 is the farthest measurable distance and 0.0 is actually touching the display
+// (which is invalid for a hover event). Reporting distance 0.0 for a hover event indicates the
+// actual distance is unknown.
+//
 // Pointer ID is an opaque ID that must uniquely identify each active touch on screen. It must
 // remain constant through any down/up/move/cancel events involved in a single touch interaction.
 //
@@ -607,7 +612,7 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 #define LI_TOUCH_EVENT_CANCEL      0x04
 #define LI_TOUCH_EVENT_BUTTON_ONLY 0x05
 #define LI_TOUCH_EVENT_HOVER_LEAVE 0x06
-int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
+int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance);
 
 // This function is similar to LiSendTouchEvent() but allows additional parameters relevant for pen
 // input, including rotation, tilt, and buttons. Rotation is in degrees from vertical in Y dimension
@@ -625,7 +630,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 #define LI_ROT_UNKNOWN 0xFFFF
 #define LI_TILT_UNKNOWN 0xFF
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
-                   float x, float y, float pressure,
+                   float x, float y, float pressureOrDistance,
                    uint16_t rotation, uint8_t tilt);
 
 // This function queues a mouse button event to be sent to the remote server.

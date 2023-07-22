@@ -131,7 +131,7 @@ typedef struct _SS_TOUCH_PACKET {
     uint32_t pointerId;
     netfloat x;
     netfloat y;
-    netfloat pressure;
+    netfloat pressureOrDistance;
 } SS_TOUCH_PACKET, *PSS_TOUCH_PACKET;
 
 #define SS_PEN_MAGIC 0x55000003
@@ -143,7 +143,7 @@ typedef struct _SS_PEN_PACKET {
     uint8_t zero[1]; // Alignment/reserved
     netfloat x;
     netfloat y;
-    netfloat pressure;
+    netfloat pressureOrDistance;
     uint16_t rotation;
     uint8_t tilt;
     uint8_t zero2[1];
