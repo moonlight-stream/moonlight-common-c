@@ -20,7 +20,7 @@ extern "C" {
 #define STREAM_CFG_AUTO    2
 
 // Values for the 'colorSpace' field below.
-// Rec. 2020 is only supported with HEVC video streams.
+// Rec. 2020 is not supported with H.264 video streams on GFE hosts.
 #define COLORSPACE_REC_601  0
 #define COLORSPACE_REC_709  1
 #define COLORSPACE_REC_2020 2
@@ -556,8 +556,10 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY);
 // may not position the mouse correctly.
 //
 // Absolute mouse motion doesn't work in many games, so this mode should not be the default
-// for mice when streaming. It may be desirable as the default touchscreen behavior if the
-// touchscreen is not the primary input method.
+// for mice when streaming. It may be desirable as the default touchscreen behavior when
+// LiSendTouchEvent() is not supported and the touchscreen is not the primary input method.
+// In the latter case, a touchscreen-as-trackpad mode using LiSendMouseMoveEvent() is likely
+// to be better for gaming use cases.
 //
 // The x and y values are transformed to host coordinates as if they are from a plane which
 // is referenceWidth by referenceHeight in size. This allows you to provide coordinates that
@@ -695,11 +697,12 @@ int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned
 
 // This function queues a controller event to be sent to the remote server. The controllerNumber
 // parameter is a zero-based index of which controller this event corresponds to. The largest legal
-// controller number is 3 (for a total of 4 controllers, the Xinput maximum). On generation 3 servers (GFE 2.1.x),
+// controller number is 3 for GFE hosts and 15 for Sunshine hosts. On generation 3 servers (GFE 2.1.x),
 // these will be sent as controller 0 regardless of the controllerNumber parameter.
 //
 // The activeGamepadMask parameter is a bitfield with bits set for each controller present.
-// On GFE, activeGamepadMask is limited to a maximum of 4 (0xF). On Sunshine, it is limited to 16 (0xFFFF).
+// On GFE, activeGamepadMask is limited to a maximum of 4 bits (0xF).
+// On Sunshine, it is limited to 16 bits (0xFFFF).
 //
 // To indicate arrival of a gamepad, you may send an empty event with the controller number
 // set to the new controller and the bit of the new controller set in the active gamepad mask.
@@ -713,8 +716,7 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function provides a method of informing the host of the available buttons and capabilities
-// on a new controller. This can be used as an alternative to calling LiSendMultiControllerEvent()
-// to indicate the arrival of a new controller.
+// on a new controller. This is the recommended approach for indicating the arrival of a new controller.
 //
 // This can allow the host to make better decisions about what type of controller to emulate and what
 // capabilities to advertise to the OS on the virtual controller.
@@ -748,8 +750,11 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
 // For power and performance reasons, motion sensors should not be enabled unless the host has
 // explicitly asked for motion event reports via ConnListenerSetMotionEventState().
 //
-// LI_MOTION_TYPE_ACCEL should report data in m/s^2.
+// LI_MOTION_TYPE_ACCEL should report data in m/s^2 (inclusive of gravitational acceleration).
 // LI_MOTION_TYPE_GYRO should report data in deg/s.
+//
+// The x/y/z axis assignments follow SDL's convention documented here:
+// https://github.com/libsdl-org/SDL/blob/96720f335002bef62115e39327940df454d78f6c/include/SDL3/SDL_sensor.h#L80-L124
 #define LI_MOTION_TYPE_ACCEL 0x01
 #define LI_MOTION_TYPE_GYRO  0x02
 int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z);
