@@ -1216,7 +1216,8 @@ int LiSendHScrollEvent(signed char scrollClicks) {
     return LiSendHighResHScrollEvent(scrollClicks * LI_WHEEL_DELTA);
 }
 
-int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance) {
+int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance,
+                     float contactAreaMajor, float contactAreaMinor, uint16_t rotation) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -1244,10 +1245,13 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
     holder->packet.touch.header.magic = LE32(SS_TOUCH_MAGIC);
     holder->packet.touch.eventType = eventType;
     holder->packet.touch.pointerId = LE32(pointerId);
+    holder->packet.touch.rotation = LE16(rotation);
     memset(holder->packet.touch.zero, 0, sizeof(holder->packet.touch.zero));
     floatToNetfloat(x, holder->packet.touch.x);
     floatToNetfloat(y, holder->packet.touch.y);
     floatToNetfloat(pressureOrDistance, holder->packet.touch.pressureOrDistance);
+    floatToNetfloat(contactAreaMajor, holder->packet.touch.contactAreaMajor);
+    floatToNetfloat(contactAreaMinor, holder->packet.touch.contactAreaMinor);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
@@ -1261,6 +1265,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 
 int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float x, float y, float pressureOrDistance,
+                   float contactAreaMajor, float contactAreaMinor,
                    uint16_t rotation, uint8_t tilt) {
     PPACKET_HOLDER holder;
     int err;
@@ -1298,6 +1303,8 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     holder->packet.pen.rotation = LE16(rotation);
     holder->packet.pen.tilt = tilt;
     memset(holder->packet.pen.zero2, 0, sizeof(holder->packet.pen.zero2));
+    floatToNetfloat(contactAreaMajor, holder->packet.pen.contactAreaMajor);
+    floatToNetfloat(contactAreaMinor, holder->packet.pen.contactAreaMinor);
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {

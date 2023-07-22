@@ -127,11 +127,14 @@ typedef struct _SS_HSCROLL_PACKET {
 typedef struct _SS_TOUCH_PACKET {
     NV_INPUT_HEADER header;
     uint8_t eventType;
-    uint8_t zero[3]; // Alignment/reserved
+    uint8_t zero[1]; // Alignment/reserved
+    uint16_t rotation;
     uint32_t pointerId;
     netfloat x;
     netfloat y;
     netfloat pressureOrDistance;
+    netfloat contactAreaMajor;
+    netfloat contactAreaMinor;
 } SS_TOUCH_PACKET, *PSS_TOUCH_PACKET;
 
 #define SS_PEN_MAGIC 0x55000003
@@ -147,6 +150,8 @@ typedef struct _SS_PEN_PACKET {
     uint16_t rotation;
     uint8_t tilt;
     uint8_t zero2[1];
+    netfloat contactAreaMajor;
+    netfloat contactAreaMinor;
 } SS_PEN_PACKET, *PSS_PEN_PACKET;
 
 #define SS_CONTROLLER_ARRIVAL_MAGIC 0x55000004
