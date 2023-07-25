@@ -5,8 +5,6 @@
 
 #define FIRST_FRAME_PORT 47996
 
-#define RTP_RECV_BUFFER (512 * 1024)
-
 static RTP_VIDEO_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
@@ -25,6 +23,14 @@ static bool receivedFullFrame;
 // the RTP queue will wait for missing/reordered packets.
 #define RTP_QUEUE_DELAY 10
 
+// This is the desired number of video packets that can be
+// stored in the socket's receive buffer. 2048 is chosen
+// because it should be large enough for all reasonable
+// frame sizes (probably 2 or 3 frames) without using too
+// much kernel memory with larger packet sizes. It also
+// can smooth over transient pauses in network traffic
+// and subsequent packet/frame bursts that follow.
+#define RTP_RECV_PACKETS_BUFFERED 2048
 
 // Initialize the video stream
 void initializeVideoStream(void) {
@@ -254,7 +260,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
         return err;
     }
 
-    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
+    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_PACKETS_BUFFERED * (StreamConfig.packetSize + MAX_RTP_HEADER_SIZE));
     if (rtpSocket == INVALID_SOCKET) {
         VideoCallbacks.cleanup();
         return LastSocketError();

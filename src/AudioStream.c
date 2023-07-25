@@ -25,11 +25,6 @@ static uint8_t opusHeaderByte;
 
 #define MAX_PACKET_SIZE 1400
 
-// This is much larger than we should typically have buffered, but
-// it needs to be. We need a cushion in case our thread gets blocked
-// for longer than normal.
-#define RTP_RECV_BUFFER (64 * 1024)
-
 typedef struct _QUEUE_AUDIO_PACKET_HEADER {
     LINKED_BLOCKING_QUEUE_ENTRY lentry;
     int size;
@@ -88,7 +83,7 @@ int initializeAudioStream(void) {
 
     // For GFE 3.22 compatibility, we must start the audio ping thread before the RTSP handshake.
     // It will not reply to our RTSP PLAY request until the audio ping has been received.
-    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_BUFFER);
+    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, 0);
     if (rtpSocket == INVALID_SOCKET) {
         return LastSocketFail();
     }

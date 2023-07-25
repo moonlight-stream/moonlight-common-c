@@ -73,7 +73,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         goto Exit;
     }
 
-    sock = bindUdpSocket(hints.ai_family, 2048);
+    sock = bindUdpSocket(hints.ai_family, 0);
     if (sock == INVALID_SOCKET) {
         err = LastSocketFail();
         Limelog("Failed to connect to STUN server: %d\n", err);
