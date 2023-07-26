@@ -634,24 +634,16 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     // the peer's supported channel count.
     if (!IS_SUNSHINE() || channelId >= peer->channelCount) {
         channelId = 0;
-
-        // Send unreliable traffic as reliable if we only have one channel.
-        // This avoids unwanted sequencing between reliable and unreliable
-        // traffic that can lead to delays.
-        if (flags == 0) {
-            flags |= ENET_PACKET_FLAG_RELIABLE;
-            enetPacket->flags |= ENET_PACKET_FLAG_RELIABLE;
-        }
     }
 
     // Queue the packet to be sent
     err = enet_peer_send(peer, channelId, enetPacket);
 
+    // Try to send the packet
+    enet_host_service(client, NULL, 0);
+
     // Wait until the packet is actually sent to provide backpressure on senders
     if (err == 0 && (flags & ENET_PACKET_FLAG_RELIABLE)) {
-        // Try to send the packet
-        enet_host_service(client, NULL, 0);
-
         // Don't wait longer than 10 milliseconds to avoid blocking callers for too long
         for (int i = 0; i < 10; i++) {
             // Break on disconnected, acked/freed, or sent (pending ack).
@@ -1134,11 +1126,16 @@ static void lossStatsThreadFunc(void* context) {
             }
 
             // Send the message (and don't expect a response)
+            //
+            // NB: We send this periodic message as reliable to ensure the RTT is recomputed
+            // regularly. This only happens when an ACK is received to a reliable packet.
+            // Since the other traffic on this channel is unsequenced, it doesn't really
+            // cause any negative HOL blocking side-effects.
             if (!sendMessageAndForget(0x0200,
                                       sizeof(periodicPingPayload),
                                       periodicPingPayload,
                                       CTRL_CHANNEL_GENERIC,
-                                      0)) {
+                                      ENET_PACKET_FLAG_RELIABLE)) {
                 Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
                 ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
