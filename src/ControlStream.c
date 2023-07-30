@@ -1428,6 +1428,12 @@ int startControlStream(void) {
 
         client->intercept = ignoreDisconnectIntercept;
 
+        // Enable high priority QoS marking on control stream traffic
+        //
+        // NB: It is important to do this before connecting because there's logic in the connect
+        // retransmission code to detect QoS-intolerant routes and disable QoS marking for those.
+        enet_socket_set_option (client->socket, ENET_SOCKOPT_QOS, 1);
+
         // Connect to the host
         peer = enet_host_connect(client, &address, CTRL_CHANNEL_COUNT, 0);
         if (peer == NULL) {
