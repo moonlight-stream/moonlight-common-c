@@ -618,6 +618,10 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 // For hover events, the "contact area" is the size of the hovering finger/tool. If unavailable,
 // pass 0.0 for both contact area parameters.
 //
+// Touches can be cancelled using LI_TOUCH_EVENT_CANCEL or LI_TOUCH_EVENT_CANCEL_ALL. When using
+// LI_TOUCH_EVENT_CANCEL, only the pointerId parameter is valid. All other parameters are ignored.
+// To cancel all active touches (on focus loss, for example), use LI_TOUCH_EVENT_CANCEL_ALL.
+//
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // falling back to other functions to send this input (such as LiSendMousePositionEvent()).
 #define LI_TOUCH_EVENT_HOVER       0x00
@@ -627,6 +631,7 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 #define LI_TOUCH_EVENT_CANCEL      0x04
 #define LI_TOUCH_EVENT_BUTTON_ONLY 0x05
 #define LI_TOUCH_EVENT_HOVER_LEAVE 0x06
+#define LI_TOUCH_EVENT_CANCEL_ALL  0x07
 #define LI_ROT_UNKNOWN 0xFFFF
 int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance,
                      float contactAreaMajor, float contactAreaMinor, uint16_t rotation);
