@@ -1226,7 +1226,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
     }
 
     // This is a protocol extension only supported with Sunshine
-    if (!(SunshineFeatureFlags & SS_FF_PEN_TOUCH_EVENTS)) {
+    if (!(SunshineFeatureFlags & LI_FF_PEN_TOUCH_EVENTS)) {
         return LI_ERR_UNSUPPORTED;
     }
 
@@ -1275,7 +1275,7 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     }
 
     // This is a protocol extension only supported with Sunshine
-    if (!(SunshineFeatureFlags & SS_FF_PEN_TOUCH_EVENTS)) {
+    if (!(SunshineFeatureFlags & LI_FF_PEN_TOUCH_EVENTS)) {
         return LI_ERR_UNSUPPORTED;
     }
 
@@ -1368,7 +1368,7 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
     }
 
     // This is a protocol extension only supported with Sunshine
-    if (!(SunshineFeatureFlags & SS_FF_CONTROLLER_TOUCH_EVENTS)) {
+    if (!(SunshineFeatureFlags & LI_FF_CONTROLLER_TOUCH_EVENTS)) {
         return LI_ERR_UNSUPPORTED;
     }
 
@@ -1416,7 +1416,7 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     }
 
     // This is a protocol extension only supported with Sunshine
-    if (!(SunshineFeatureFlags & SS_FF_CONTROLLER_TOUCH_EVENTS)) {
+    if (!(SunshineFeatureFlags & LI_FF_CONTROLLER_TOUCH_EVENTS)) {
         return LI_ERR_UNSUPPORTED;
     }
 

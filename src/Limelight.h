@@ -624,6 +624,9 @@ int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short refere
 //
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // falling back to other functions to send this input (such as LiSendMousePositionEvent()).
+//
+// To determine if LiSendTouchEvent() is supported without calling it, call LiGetHostFeatureFlags()
+// and check for the LI_FF_PEN_TOUCH_EVENTS flag.
 #define LI_TOUCH_EVENT_HOVER       0x00
 #define LI_TOUCH_EVENT_DOWN        0x01
 #define LI_TOUCH_EVENT_UP          0x02
@@ -642,6 +645,9 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
 //
 // x, y, pressure, rotation, contact area, and tilt are ignored for LI_TOUCH_EVENT_BUTTON_ONLY events.
 // If one of those changes, send LI_TOUCH_EVENT_MOVE or LI_TOUCH_EVENT_HOVER instead.
+//
+// To determine if LiSendPenEvent() is supported without calling it, call LiGetHostFeatureFlags()
+// and check for the LI_FF_PEN_TOUCH_EVENTS flag.
 #define LI_TOOL_TYPE_UNKNOWN 0x00
 #define LI_TOOL_TYPE_PEN     0x01
 #define LI_TOOL_TYPE_ERASER  0x02
@@ -762,6 +768,9 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
 //
 // If unsupported by the host, this will return LI_ERR_UNSUPPORTED and the caller should consider
 // using this touch input to simulate trackpad input.
+//
+// To determine if LiSendControllerTouchEvent() is supported without calling it, call LiGetHostFeatureFlags()
+// and check for the LI_FF_CONTROLLER_TOUCH_EVENTS flag.
 int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
 
 // This function allows clients to send controller-associated motion events to a supported host.
@@ -933,6 +942,11 @@ bool LiGetHdrMetadata(PSS_HDR_METADATA metadata);
 // call this API instead. Note that this function does not guarantee that the *next* frame will be an IDR
 // frame, just that an IDR frame will arrive soon.
 void LiRequestIdrFrame(void);
+
+// This function returns any extended feature flags supported by the host.
+#define LI_FF_PEN_TOUCH_EVENTS        0x01 // LiSendTouchEvent()/LiSendPenEvent() supported
+#define LI_FF_CONTROLLER_TOUCH_EVENTS 0x02 // LiSendControllerTouchEvent() supported
+uint32_t LiGetHostFeatureFlags(void);
 
 #ifdef __cplusplus
 }

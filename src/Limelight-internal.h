@@ -41,8 +41,6 @@ extern uint16_t VideoPortNumber;
 extern SS_PING AudioPingPayload;
 extern SS_PING VideoPingPayload;
 
-#define SS_FF_PEN_TOUCH_EVENTS 0x01
-#define SS_FF_CONTROLLER_TOUCH_EVENTS 0x02
 extern uint32_t SunshineFeatureFlags;
 
 // ENet channel ID values

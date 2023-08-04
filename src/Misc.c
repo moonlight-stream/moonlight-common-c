@@ -155,3 +155,7 @@ void LiInitializeServerInformation(PSERVER_INFORMATION serverInfo) {
 uint64_t LiGetMillis(void) {
     return PltGetMillis();
 }
+
+uint32_t LiGetHostFeatureFlags(void) {
+    return SunshineFeatureFlags;
+}
