@@ -377,6 +377,7 @@ static bool isSeiNal(PBUFFER_DESC buffer) {
     }
 }
 
+#ifdef LC_DEBUG
 static bool isFillerDataNal(PBUFFER_DESC buffer) {
     BUFFER_DESC startSeq;
 
@@ -395,6 +396,7 @@ static bool isFillerDataNal(PBUFFER_DESC buffer) {
         return false;
     }
 }
+#endif
 
 static bool isPictureParameterSetNal(PBUFFER_DESC buffer) {
     BUFFER_DESC startSeq;
