@@ -49,10 +49,12 @@ typedef struct _LENTRY_INTERNAL {
 #define H264_NAL_TYPE_SPS 7
 #define H264_NAL_TYPE_PPS 8
 #define H264_NAL_TYPE_AUD 9
+#define H264_NAL_TYPE_FILLER 12
 #define HEVC_NAL_TYPE_VPS 32
 #define HEVC_NAL_TYPE_SPS 33
 #define HEVC_NAL_TYPE_PPS 34
 #define HEVC_NAL_TYPE_AUD 35
+#define HEVC_NAL_TYPE_FILLER 38
 #define HEVC_NAL_TYPE_SEI 39
 
 // Init
@@ -375,6 +377,25 @@ static bool isSeiNal(PBUFFER_DESC buffer) {
     }
 }
 
+static bool isFillerDataNal(PBUFFER_DESC buffer) {
+    BUFFER_DESC startSeq;
+
+    if (!getAnnexBStartSequence(buffer, &startSeq)) {
+        return false;
+    }
+
+    if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
+        return H264_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == H264_NAL_TYPE_FILLER;
+    }
+    else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
+        return HEVC_NAL_TYPE(startSeq.data[startSeq.offset + startSeq.length]) == HEVC_NAL_TYPE_FILLER;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
+}
+
 static bool isPictureParameterSetNal(PBUFFER_DESC buffer) {
     BUFFER_DESC startSeq;
 
@@ -671,8 +692,9 @@ static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERN
         // If this is the picture data, we expect it to extend to the end of the packet
         if (containsPicData) {
             while (currentPos->length != 0) {
-                // Any NALUs we encounter on the way to the end of the packet must be reference frame slices
-                LC_ASSERT(isSeqReferenceFrameStart(currentPos));
+                // Any NALUs we encounter on the way to the end of the packet must be
+                // reference frame slices or filler data.
+                LC_ASSERT(isSeqReferenceFrameStart(currentPos) || isFillerDataNal(currentPos));
                 skipToNextNalOrEnd(currentPos);
             }
         }
