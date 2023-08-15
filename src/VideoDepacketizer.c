@@ -853,7 +853,6 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 // to determine if a given frame is an IDR frame.
                 if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
                     waitingForIdrFrame = false;
-                    waitingForRefInvalFrame = false;
                     waitingForNextSuccessfulFrame = false;
                     frameType = FRAME_TYPE_IDR;
                 }
