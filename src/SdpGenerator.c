@@ -233,6 +233,13 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     optionHead = NULL;
     err = 0;
 
+    // Send client feature flags to Sunshine hosts
+    if (IS_SUNSHINE()) {
+        uint32_t moonlightFeatureFlags = ML_FF_FEC_STATUS;
+        sprintf(payloadStr, "%u", moonlightFeatureFlags);
+        err |= addAttributeString(&optionHead, "x-ml-general.featureFlags", payloadStr);
+    }
+
     sprintf(payloadStr, "%d", StreamConfig.width);
     err |= addAttributeString(&optionHead, "x-nv-video[0].clientViewportWd", payloadStr);
     sprintf(payloadStr, "%d", StreamConfig.height);

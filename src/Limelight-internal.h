@@ -74,6 +74,9 @@ extern uint32_t SunshineFeatureFlags;
 
 #define IS_SUNSHINE() (AppVersionQuad[3] < 0)
 
+// Client feature flags for x-ml-general.featureFlags SDP attribute
+#define ML_FF_FEC_STATUS 0x01 // Client sends SS_FRAME_FEC_STATUS for frame losses
+
 #define UDP_RECV_POLL_TIMEOUT_MS 100
 
 // At this value or above, we will request high quality audio unless CAPABILITY_SLOW_OPUS_DECODER
