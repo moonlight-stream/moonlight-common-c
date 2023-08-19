@@ -242,7 +242,7 @@ static char**preconstructedPayloads;
 static bool supportsIdrFrameRequest;
 
 #define LOSS_REPORT_INTERVAL_MS 50
-#define PERIODIC_PING_INTERVAL_MS 250
+#define PERIODIC_PING_INTERVAL_MS 100
 
 // Initializes the control stream
 int initializeControlStream(void) {
