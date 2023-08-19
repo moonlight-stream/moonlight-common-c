@@ -112,7 +112,8 @@ void connectionReceivedCompleteFrame(int frameIndex);
 void connectionSawFrame(int frameIndex);
 void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
-int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags);
+int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
+void flushInputOnControlStream();
 bool isControlDataInTransit(void);
 
 int performRtspHandshake(PSERVER_INFORMATION serverInfo);

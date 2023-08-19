@@ -221,7 +221,8 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
         err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*)&holder->packet,
                                                         PACKET_SIZE(holder),
                                                         holder->channelId,
-                                                        holder->enetPacketFlags);
+                                                        holder->enetPacketFlags,
+                                                        LbqGetItemCount(&packetQueue) > 0);
         if (err < 0) {
             Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
             ListenerCallbacks.connectionTerminated(err);
@@ -271,7 +272,8 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
             err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
                                                             (int)(encryptedSize + sizeof(encryptedLengthPrefix)),
                                                             holder->channelId,
-                                                            holder->enetPacketFlags);
+                                                            holder->enetPacketFlags,
+                                                            LbqGetItemCount(&packetQueue) > 0);
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(err);
@@ -318,6 +320,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS) {
+                flushInputOnControlStream();
                 PltSleepMs((int)(lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
@@ -378,6 +381,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
+                flushInputOnControlStream();
                 PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
@@ -432,6 +436,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
+                flushInputOnControlStream();
                 PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
@@ -467,6 +472,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastPenPacketTime + PEN_BATCHING_INTERVAL_MS) {
+                flushInputOnControlStream();
                 PltSleepMs((int)(lastPenPacketTime + PEN_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
@@ -508,6 +514,7 @@ static void inputSendThreadProc(void* context) {
 
             // Delay for batching if required
             if (now < lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS) {
+                flushInputOnControlStream();
                 PltSleepMs((int)(lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
@@ -553,6 +560,7 @@ static void inputSendThreadProc(void* context) {
             // and UTF-8 text events with each other. We need to make sure any previous keyboard events
             // have been processed prior to sending these UTF-8 events to avoid interference between
             // the two (especially with modifier keys).
+            flushInputOnControlStream();
             while (!PltIsThreadInterrupted(&inputSendThread) && isControlDataInTransit()) {
                 PltSleepMs(10);
             }
