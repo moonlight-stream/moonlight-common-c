@@ -63,6 +63,7 @@ static uint64_t intervalStartTimeMs;
 static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
 static int currentEnetSequenceNumber;
+static uint64_t firstFrameTimeMs;
 
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 static LINKED_BLOCKING_QUEUE frameFecStatusQueue;
@@ -296,6 +297,7 @@ int initializeControlStream(void) {
     intervalStartTimeMs = 0;
     lastIntervalLossPercentage = 0;
     lastConnectionStatusUpdate = CONN_STATUS_OKAY;
+    firstFrameTimeMs = 0;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
     encryptionCtx = PltCreateCryptoContext();
@@ -394,6 +396,19 @@ void connectionSawFrame(int frameIndex) {
     LC_ASSERT(!isBefore16(frameIndex, lastSeenFrame));
 
     uint64_t now = PltGetMillis();
+
+    // Suppress connection status warnings for the first sampling period
+    // to allow the network and host to settle.
+    if (lastSeenFrame == 0) {
+        lastSeenFrame = frameIndex;
+        firstFrameTimeMs = now;
+        return;
+    }
+    else if (now - firstFrameTimeMs < CONN_STATUS_SAMPLE_PERIOD) {
+        lastSeenFrame = frameIndex;
+        return;
+    }
+
     if (now - intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
         if (intervalTotalFrameCount != 0) {
             // Notify the client of connection status changes based on frame loss rate
