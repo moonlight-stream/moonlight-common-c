@@ -37,12 +37,6 @@ typedef struct _QUEUED_AUDIO_PACKET {
 
 static void AudioPingThreadProc(void* context) {
     char legacyPingData[] = { 0x50, 0x49, 0x4E, 0x47 };
-    LC_SOCKADDR saddr;
-
-    LC_ASSERT(AudioPortNumber != 0);
-
-    memcpy(&saddr, &RemoteAddr, sizeof(saddr));
-    SET_PORT(&saddr, AudioPortNumber);
 
     // We do not check for errors here. Socket errors will be handled
     // on the read-side in ReceiveThreadProc(). This avoids potential
@@ -54,10 +48,10 @@ static void AudioPingThreadProc(void* context) {
             pingCount++;
             AudioPingPayload.sequenceNumber = BE32(pingCount);
 
-            sendto(rtpSocket, (char*)&AudioPingPayload, sizeof(AudioPingPayload), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
+            send(rtpSocket, (char*)&AudioPingPayload, sizeof(AudioPingPayload), 0);
         }
         else {
-            sendto(rtpSocket, legacyPingData, sizeof(legacyPingData), 0, (struct sockaddr*)&saddr, RemoteAddrLen);
+            send(rtpSocket, legacyPingData, sizeof(legacyPingData), 0);
         }
 
         PltSleepMsInterruptible(&udpPingThread, 500);
@@ -98,9 +92,15 @@ int notifyAudioPortNegotiationComplete(void) {
     LC_ASSERT(!pingThreadStarted);
     LC_ASSERT(AudioPortNumber != 0);
 
+    // Connect our audio socket to the target address and port
+    int err = connectUdpSocket(rtpSocket, &RemoteAddr, RemoteAddrLen, AudioPortNumber);
+    if (err != 0) {
+        return err;
+    }
+
     // We may receive audio before our threads are started, but that's okay. We'll
     // drop the first 1 second of audio packets to catch up with the backlog.
-    int err = PltCreateThread("AudioPing", AudioPingThreadProc, NULL, &udpPingThread);
+    err = PltCreateThread("AudioPing", AudioPingThreadProc, NULL, &udpPingThread);
     if (err != 0) {
         return err;
     }

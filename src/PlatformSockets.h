@@ -86,6 +86,7 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
 
 SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
+int connectUdpSocket(SOCKET s, struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
 int sendMtuSafe(SOCKET s, char* buffer, int size);
 SOCKET bindUdpSocket(int addrfamily, int bufferSize);
 int enableNoDelay(SOCKET s);
