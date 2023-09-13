@@ -151,6 +151,11 @@ static void VideoReceiveThreadProc(void* context) {
             }
         }
 
+        if (err < (int)sizeof(RTP_PACKET)) {
+            // Runt packet
+            continue;
+        }
+
         // Convert fields to host byte-order
         packet = (PRTP_PACKET)&buffer[0];
         packet->sequenceNumber = BE16(packet->sequenceNumber);

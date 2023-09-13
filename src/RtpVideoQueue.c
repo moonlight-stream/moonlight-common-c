@@ -539,6 +539,11 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         dataOffset += 4; // 2 additional fields
     }
 
+    if (length < dataOffset + (int)sizeof(NV_VIDEO_PACKET)) {
+        // Reject packets that are too small to fit a NV_VIDEO_PACKET header
+        return RTPF_RET_REJECTED;
+    }
+
     PNV_VIDEO_PACKET nvPacket = (PNV_VIDEO_PACKET)(((char*)packet) + dataOffset);
 
     nvPacket->streamPacketIndex = LE32(nvPacket->streamPacketIndex);

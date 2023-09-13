@@ -152,18 +152,19 @@ void destroyVideoDepacketizer(void) {
     cleanupFrameState();
 }
 
+// NB: This function also ensures an additional byte for the NALU type exists after the start sequence
 static bool getAnnexBStartSequence(PBUFFER_DESC current, PBUFFER_DESC startSeq) {
     // We must not get called for other codecs
     LC_ASSERT(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265));
 
-    if (current->length < 3) {
+    if (current->length <= 3) {
         return false;
     }
 
     if (current->data[current->offset] == 0 &&
         current->data[current->offset + 1] == 0) {
         if (current->data[current->offset + 2] == 0) {
-            if (current->length >= 4 && current->data[current->offset + 3] == 1) {
+            if (current->length > 4 && current->data[current->offset + 3] == 1) {
                 // Frame start
                 if (startSeq != NULL) {
                     startSeq->data = current->data;
@@ -842,9 +843,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     // If this is the first packet, skip the frame header (if one exists)
     uint32_t frameHeaderSize;
-    if (firstPacket) {
+    LC_ASSERT(currentPos.length > 0);
+    if (firstPacket && currentPos.length > 0) {
         // Parse the frame type from the header
-        if (APP_VERSION_AT_LEAST(7, 1, 350)) {
+        LC_ASSERT(currentPos.length >= 4);
+        if (APP_VERSION_AT_LEAST(7, 1, 350) && currentPos.length >= 4) {
             switch (currentPos.data[currentPos.offset + 3]) {
             case 1: // Normal P-frame
                 break;
@@ -885,7 +888,8 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         // Sunshine can provide host processing latency of the frame
-        if (IS_SUNSHINE()) {
+        LC_ASSERT(currentPos.length >= 3);
+        if (IS_SUNSHINE() && currentPos.length >= 3) {
             BYTE_BUFFER bb;
             BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 1, 2, BYTE_ORDER_LITTLE);
             BbGet16(&bb, &frameHostProcessingLatency);
@@ -893,7 +897,8 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
         // Codecs like H.264 and HEVC handle the FEC trailing zero padding just fine, but other
         // codecs need the exact length encoded separately.
-        if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
+        LC_ASSERT(currentPos.length >= 6);
+        if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) && currentPos.length >= 6) {
             BYTE_BUFFER bb;
             BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 4, 2, BYTE_ORDER_LITTLE);
             BbGet16(&bb, &lastPacketPayloadLength);
@@ -952,9 +957,12 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             frameHeaderSize = 0;
         }
 
-        // Skip past the frame header
-        currentPos.offset += frameHeaderSize;
-        currentPos.length -= frameHeaderSize;
+        LC_ASSERT(currentPos.length >= frameHeaderSize);
+        if (currentPos.length >= frameHeaderSize) {
+            // Skip past the frame header
+            currentPos.offset += frameHeaderSize;
+            currentPos.length -= frameHeaderSize;
+        }
 
         // We only parse H.264 and HEVC at the NALU level
         if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
@@ -1152,6 +1160,9 @@ void queueRtpPacket(PRTPV_QUEUE_ENTRY queueEntryPtr) {
     if (queueEntry.packet->header & FLAG_EXTENSION) {
         dataOffset += 4; // 2 additional fields
     }
+
+    // The packet length was validated by the RtpVideoQueue
+    LC_ASSERT(queueEntry.length >= dataOffset + (int)sizeof(NV_VIDEO_PACKET));
 
     // Reuse the memory reserved for the RTPFEC_QUEUE_ENTRY to store the LENTRY_INTERNAL
     // now that we're in the depacketizer. We saved a copy of the real FEC queue entry
