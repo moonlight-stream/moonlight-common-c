@@ -972,6 +972,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         char* sessionId;
         char* pingPayload;
         int error = -1;
+        char* strtokCtx;
 
         if (!setupStream(&response,
                          AppVersionQuad[0] >= 5 ? "streamid=audio/0/0" : "streamid=audio",
@@ -1025,7 +1026,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         // resolves any 454 session not found errors on
         // standard RTSP server implementations.
         // (i.e - sessionId = "DEADBEEFCAFE;timeout = 90") 
-        sessionIdString = strdup(strtok(sessionId, ";"));
+        sessionIdString = strdup(strtok_r(sessionId, ";", &strtokCtx));
         if (sessionIdString == NULL) {
             Limelog("Failed to duplicate session ID string\n");
             ret = -1;

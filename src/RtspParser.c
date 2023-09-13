@@ -63,6 +63,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     char flag;
     bool messageEnded = false;
 
+    char* strtokCtx = NULL;
     char* payload = NULL;
     char* opt = NULL;
     int statusCode = 0;
@@ -89,7 +90,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     messageBuffer[length] = 0;
 
     // Get the first token of the message
-    token = strtok(messageBuffer, delim);
+    token = strtok_r(messageBuffer, delim, &strtokCtx);
     if (token == NULL) {
         exitCode = RTSP_ERROR_MALFORMED;
         goto ExitFailure;
@@ -102,7 +103,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         protocol = token;
 
         // Get the status code
-        token = strtok(NULL, delim);
+        token = strtok_r(NULL, delim, &strtokCtx);
         statusCode = atoi(token);
         if (token == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
@@ -110,7 +111,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
         }
 
         // Get the status string
-        statusStr = strtok(NULL, end);
+        statusStr = strtok_r(NULL, end, &strtokCtx);
         if (statusStr == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
@@ -125,12 +126,12 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     else {
         flag = TYPE_REQUEST;
         command = token;
-        target = strtok(NULL, delim);
+        target = strtok_r(NULL, delim, &strtokCtx);
         if (target == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
-        protocol = strtok(NULL, delim);
+        protocol = strtok_r(NULL, delim, &strtokCtx);
         if (protocol == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
@@ -145,7 +146,7 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     // Parse remaining options
     while (token != NULL)
     {
-        token = strtok(NULL, typeFlag == TOKEN_OPTION ? optDelim : end);
+        token = strtok_r(NULL, typeFlag == TOKEN_OPTION ? optDelim : end, &strtokCtx);
         if (token != NULL) {
             if (typeFlag == TOKEN_OPTION) {
                 opt = token;

@@ -52,6 +52,12 @@
 # endif
 #endif
 
+#ifdef LC_WINDOWS
+// Windows doesn't have strtok_r() but it has the same
+// function named strtok_s().
+#define strtok_r strtok_s
+#endif
+
 #include <stdio.h>
 #include "Limelight.h"
 
