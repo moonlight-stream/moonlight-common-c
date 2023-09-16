@@ -459,7 +459,7 @@ static void stageCompleteFecBlock(PRTP_VIDEO_QUEUE queue) {
 
         unsigned int lowestRtpSequenceNumber = entry->packet->sequenceNumber;
 
-        while (entry != NULL) {
+        do {
             // We should never encounter a packet that's lower than our next seq num
             LC_ASSERT(!isBefore16(entry->packet->sequenceNumber, nextSeqNum));
 
@@ -499,7 +499,7 @@ static void stageCompleteFecBlock(PRTP_VIDEO_QUEUE queue) {
             }
 
             entry = entry->next;
-        }
+        } while (entry != NULL);
 
         if (entry == NULL) {
             // Start at the lowest we found last enumeration

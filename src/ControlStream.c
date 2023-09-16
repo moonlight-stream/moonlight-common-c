@@ -1233,7 +1233,7 @@ static void requestIdrFrame(void) {
 
         // Send the reference frame invalidation request and read the response
         if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
-                                        payloadLengths[IDX_INVALIDATE_REF_FRAMES],
+                                        sizeof(payload),
                                         payload,
                                         CTRL_CHANNEL_URGENT,
                                         ENET_PACKET_FLAG_RELIABLE,
@@ -1272,7 +1272,7 @@ static void requestInvalidateReferenceFrames(int startFrame, int endFrame) {
 
     // Send the reference frame invalidation request and read the response
     if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
-                                    payloadLengths[IDX_INVALIDATE_REF_FRAMES],
+                                    sizeof(payload),
                                     payload, CTRL_CHANNEL_URGENT,
                                     ENET_PACKET_FLAG_RELIABLE,
                                     false)) {

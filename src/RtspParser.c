@@ -104,11 +104,11 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
 
         // Get the status code
         token = strtok_r(NULL, delim, &strtokCtx);
-        statusCode = atoi(token);
         if (token == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
+        statusCode = atoi(token);
 
         // Get the status string
         statusStr = strtok_r(NULL, end, &strtokCtx);
