@@ -15,6 +15,7 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: gcc
       CXX: g++
+      CMAKE_ARGS: -DCODE_ANALYSIS=ON
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: clang
       CXX: clang++
@@ -23,7 +24,7 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
       CC: gcc
       CXX: g++
-      CMAKE_ARGS: -DUSE_MBEDTLS=ON
+      CMAKE_ARGS: -DUSE_MBEDTLS=ON -DCODE_ANALYSIS=ON
       PREBUILD_CMD: sudo apt install -y libmbedtls-dev
 
 before_build:
