@@ -543,6 +543,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSdpHeader(payload, MAX_SDP_HEADER_LEN, rtspClientVersion, urlSafeAddr);
     if (written < 0 || written >= MAX_SDP_HEADER_LEN) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
@@ -552,6 +553,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSerializedAttributeList(&payload[offset], attributeListSize, attributeList);
     if (written < 0 || written >= attributeListSize) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
@@ -561,6 +563,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSdpTail(&payload[offset], MAX_SDP_TAIL_LEN);
     if (written < 0 || written >= MAX_SDP_TAIL_LEN) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
