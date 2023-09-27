@@ -972,7 +972,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         char* sessionId;
         char* pingPayload;
         int error = -1;
-        char* strtokCtx;
+        char* strtokCtx = NULL;
 
         if (!setupStream(&response,
                          AppVersionQuad[0] >= 5 ? "streamid=audio/0/0" : "streamid=audio",
