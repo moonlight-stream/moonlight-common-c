@@ -91,10 +91,13 @@ static int addAttributeBinary(PSDP_OPTION* head, char* name, const void* payload
         return -1;
     }
 
+    if (!PltSafeStrcpy(option->name, sizeof(option->name), name)) {
+        free(option);
+        return -1;
+    }
+
     option->next = NULL;
     option->payloadLen = payloadLen;
-    strncpy(option->name, name, sizeof(option->name));
-    option->name[sizeof(option->name) - 1] = '\0';
     option->payload = (void*)(option + 1);
     memcpy(option->payload, payload, payloadLen);
 
@@ -525,7 +528,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     char* payload;
     char urlSafeAddr[URLSAFESTRING_LEN];
 
-    addrToUrlSafeString(&RemoteAddr, urlSafeAddr);
+    addrToUrlSafeString(&RemoteAddr, urlSafeAddr, sizeof(urlSafeAddr));
 
     attributeList = getAttributesList(urlSafeAddr);
     if (attributeList == NULL) {

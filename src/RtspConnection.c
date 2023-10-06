@@ -72,8 +72,8 @@ static bool initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target
     createRtspRequest(msg, NULL, 0, command, target, "RTSP/1.0",
         0, NULL, NULL, 0);
 
-    sprintf(sequenceNumberStr, "%d", currentSeqNumber++);
-    sprintf(clientVersionStr, "%d", rtspClientVersion);
+    snprintf(sequenceNumberStr, sizeof(sequenceNumberStr), "%d", currentSeqNumber++);
+    snprintf(clientVersionStr, sizeof(clientVersionStr), "%d", rtspClientVersion);
     if (!addOption(msg, "CSeq", sequenceNumberStr) ||
         !addOption(msg, "X-GS-ClientVersion", clientVersionStr) ||
         (!useEnet && !addOption(msg, "Host", urlAddr))) {
@@ -478,7 +478,7 @@ static bool sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
         request.flags |= FLAG_ALLOCATED_PAYLOAD;
         request.payloadLength = payloadLength;
 
-        sprintf(payloadLengthStr, "%d", payloadLength);
+        snprintf(payloadLengthStr, sizeof(payloadLengthStr), "%d", payloadLength);
         if (!addOption(&request, "Content-length", payloadLengthStr)) {
             goto FreeMessage;
         }
@@ -582,7 +582,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
         channelCount = CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration);
 
         // Find the correct audio parameter value
-        sprintf(paramsPrefix, "a=fmtp:97 surround-params=%d", channelCount);
+        snprintf(paramsPrefix, sizeof(paramsPrefix), "a=fmtp:97 surround-params=%d", channelCount);
         paramStart = strstr(response->payload, paramsPrefix);
         if (paramStart) {
             // Skip the prefix
@@ -801,12 +801,12 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             // NB: If the remote address is not a LAN address, the host will likely not enable high quality
             // audio since it only does that for local streaming normally. We can avoid this limitation,
             // but only if the caller gave us the RTSP session URL that it received from the host during launch.
-            addrToUrlSafeString(&RemoteAddr, urlAddr);
+            addrToUrlSafeString(&RemoteAddr, urlAddr, sizeof(urlAddr));
             sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
         }
     }
     else {
-        strcpy(urlAddr, "0.0.0.0");
+        PltSafeStrcpy(urlAddr, sizeof(urlAddr), "0.0.0.0");
         sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
     }
 

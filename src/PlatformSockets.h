@@ -82,7 +82,7 @@ typedef struct sockaddr_in LC_SOCKADDR;
 #else
 #define URLSAFESTRING_LEN INET_ADDRSTRLEN
 #endif
-void addrToUrlSafeString(struct sockaddr_storage* addr, char* string);
+void addrToUrlSafeString(struct sockaddr_storage* addr, char* string, size_t stringLength);
 
 SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
