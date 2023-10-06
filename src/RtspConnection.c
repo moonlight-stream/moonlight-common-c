@@ -722,17 +722,8 @@ bool parseSdpAttributeToUInt(const char* payload, const char* name, unsigned int
         return false;
     }
 
-    // Locate the end of the value
-    char* valend;
-    if (!(valend = strstr(valst, "\r")) && !(valend = strstr(valst, "\n"))) {
-        return false;
-    }
-
-    // Swap the end character for a null terminator, read the integer, then swap it back
-    char valendchar = *valend;
-    *valend = 0;
+    // Read the integer up to the newline at the end of the SDP attribute
     *val = strtoul(valst + 1, NULL, 0);
-    *valend = valendchar;
 
     return true;
 }
@@ -750,17 +741,8 @@ bool parseSdpAttributeToInt(const char* payload, const char* name, int* val) {
         return false;
     }
 
-    // Locate the end of the value
-    char* valend;
-    if (!(valend = strstr(valst, "\r")) && !(valend = strstr(valst, "\n"))) {
-        return false;
-    }
-
-    // Swap the end character for a null terminator, read the integer, then swap it back
-    char valendchar = *valend;
-    *valend = 0;
+    // Read the integer up to the newline at the end of the SDP attribute
     *val = strtol(valst + 1, NULL, 0);
-    *valend = valendchar;
 
     return true;
 }
