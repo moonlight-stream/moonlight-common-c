@@ -218,17 +218,23 @@ typedef struct _DECODE_UNIT {
 
 // Passed in StreamConfiguration.supportedVideoFormats to specify supported codecs
 // and to DecoderRendererSetup() to specify selected codec.
-#define VIDEO_FORMAT_H264        0x0001 // H.264 High Profile
-#define VIDEO_FORMAT_H265        0x0100 // HEVC Main Profile
-#define VIDEO_FORMAT_H265_MAIN10 0x0200 // HEVC Main10 Profile
-#define VIDEO_FORMAT_AV1_MAIN8   0x1000 // AV1 Main 8-bit profile
-#define VIDEO_FORMAT_AV1_MAIN10  0x2000 // AV1 Main 10-bit profile
+#define VIDEO_FORMAT_H264            0x0001 // H.264 High Profile
+#define VIDEO_FORMAT_H264_HIGH8_444  0x0004 // H.264 High 4:4:4 8-bit Profile
+#define VIDEO_FORMAT_H265            0x0100 // HEVC Main Profile
+#define VIDEO_FORMAT_H265_MAIN10     0x0200 // HEVC Main10 Profile
+#define VIDEO_FORMAT_H265_REXT8_444  0x0400 // HEVC RExt 4:4:4 8-bit Profile
+#define VIDEO_FORMAT_H265_REXT10_444 0x0800 // HEVC RExt 4:4:4 10-bit Profile
+#define VIDEO_FORMAT_AV1_MAIN8       0x1000 // AV1 Main 8-bit profile
+#define VIDEO_FORMAT_AV1_MAIN10      0x2000 // AV1 Main 10-bit profile
+#define VIDEO_FORMAT_AV1_HIGH8_444   0x4000 // AV1 High 4:4:4 8-bit profile
+#define VIDEO_FORMAT_AV1_HIGH10_444  0x8000 // AV1 High 4:4:4 10-bit profile
 
 // Masks for clients to use to match video codecs without profile-specific details.
-#define VIDEO_FORMAT_MASK_H264  0x000F
-#define VIDEO_FORMAT_MASK_H265  0x0F00
-#define VIDEO_FORMAT_MASK_AV1   0xF000
-#define VIDEO_FORMAT_MASK_10BIT 0x2200
+#define VIDEO_FORMAT_MASK_H264   0x000F
+#define VIDEO_FORMAT_MASK_H265   0x0F00
+#define VIDEO_FORMAT_MASK_AV1    0xF000
+#define VIDEO_FORMAT_MASK_10BIT  0xAA00
+#define VIDEO_FORMAT_MASK_YUV444 0xCC04
 
 // If set in the renderer capabilities field, this flag will cause audio/video data to
 // be submitted directly from the receive thread. This should only be specified if the
@@ -485,17 +491,23 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
 void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks);
 
 // ServerCodecModeSupport values
-#define SCM_H264        0x00001
-#define SCM_HEVC        0x00100
-#define SCM_HEVC_MAIN10 0x00200
-#define SCM_AV1_MAIN8   0x10000 // Sunshine extension
-#define SCM_AV1_MAIN10  0x20000 // Sunshine extension
+#define SCM_H264            0x00000001
+#define SCM_HEVC            0x00000100
+#define SCM_HEVC_MAIN10     0x00000200
+#define SCM_AV1_MAIN8       0x00010000 // Sunshine extension
+#define SCM_AV1_MAIN10      0x00020000 // Sunshine extension
+#define SCM_H264_HIGH8_444  0x00040000 // Sunshine extension
+#define SCM_HEVC_REXT8_444  0x00080000 // Sunshine extension
+#define SCM_HEVC_REXT10_444 0x00100000 // Sunshine extension
+#define SCM_AV1_HIGH8_444   0x00200000 // Sunshine extension
+#define SCM_AV1_HIGH10_444  0x00400000 // Sunshine extension
 
 // SCM masks to identify various codec capabilities
-#define SCM_MASK_H264   SCM_H264
-#define SCM_MASK_HEVC   (SCM_HEVC | SCM_HEVC_MAIN10)
-#define SCM_MASK_AV1    (SCM_AV1_MAIN8 | SCM_AV1_MAIN10)
-#define SCM_MASK_10BIT  (SCM_HEVC_MAIN10 | SCM_AV1_MAIN10)
+#define SCM_MASK_H264   (SCM_H264 | SCM_H264_HIGH8_444)
+#define SCM_MASK_HEVC   (SCM_HEVC | SCM_HEVC_MAIN10 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444)
+#define SCM_MASK_AV1    (SCM_AV1_MAIN8 | SCM_AV1_MAIN10 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
+#define SCM_MASK_10BIT  (SCM_HEVC_MAIN10 | SCM_HEVC_REXT10_444 | SCM_AV1_MAIN10 | SCM_AV1_HIGH10_444)
+#define SCM_MASK_YUV444 (SCM_H264_HIGH8_444 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
 
 typedef struct _SERVER_INFORMATION {
     // Server host name or IP address in text form
