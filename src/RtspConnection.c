@@ -701,8 +701,10 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
         *urlPathSeparator = 0;
     }
 
-    PltSafeStrcpy(destination, destinationLength, rtspUrlScratchBuffer + prefixLen);
-    destination[destinationLength - 1] = '\0';
+    if (!PltSafeStrcpy(destination, destinationLength, rtspUrlScratchBuffer + prefixLen)) {
+        free(rtspUrlScratchBuffer);
+        return false;
+    }
 
     free(rtspUrlScratchBuffer);
     return true;
@@ -774,24 +776,22 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
             (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0 &&
             (StreamConfig.streamingRemotely != STREAM_CFG_REMOTE || CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) <= 2)) {
-        // If we have an RTSP URL string and it was successfully parsed, use that string
-        if (serverInfo->rtspSessionUrl != NULL && parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr, sizeof(urlAddr))) {
-            PltSafeStrcpy(rtspTargetUrl, sizeof(rtspTargetUrl), serverInfo->rtspSessionUrl);
-            rtspTargetUrl[sizeof(rtspTargetUrl) - 1] = '\0';
-        }
-        else {
+        // If we have an RTSP URL string and it was successfully parsed and copied, use that string
+        if (serverInfo->rtspSessionUrl == NULL ||
+                !parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr, sizeof(urlAddr)) ||
+                !PltSafeStrcpy(rtspTargetUrl, sizeof(rtspTargetUrl), serverInfo->rtspSessionUrl)) {
             // If an RTSP URL string was not provided or failed to parse, we will construct one now as best we can.
             //
             // NB: If the remote address is not a LAN address, the host will likely not enable high quality
             // audio since it only does that for local streaming normally. We can avoid this limitation,
             // but only if the caller gave us the RTSP session URL that it received from the host during launch.
             addrToUrlSafeString(&RemoteAddr, urlAddr, sizeof(urlAddr));
-			snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+            snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
         }
     }
     else {
         PltSafeStrcpy(urlAddr, sizeof(urlAddr), "0.0.0.0");
-		snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+        snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
     }
 
     switch (AppVersionQuad[0]) {
