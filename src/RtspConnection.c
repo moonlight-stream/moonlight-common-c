@@ -657,7 +657,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
     return 0;
 }
 
-static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* destination) {
+static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* destination, size_t destinationLength) {
     char* rtspUrlScratchBuffer;
     char* portSeparator;
     char* v6EscapeEndChar;
@@ -701,7 +701,8 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
         *urlPathSeparator = 0;
     }
 
-    strcpy(destination, rtspUrlScratchBuffer + prefixLen);
+    PltSafeStrcpy(destination, destinationLength, rtspUrlScratchBuffer + prefixLen);
+    destination[destinationLength - 1] = '\0';
 
     free(rtspUrlScratchBuffer);
     return true;
@@ -774,7 +775,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0 &&
             (StreamConfig.streamingRemotely != STREAM_CFG_REMOTE || CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) <= 2)) {
         // If we have an RTSP URL string and it was successfully parsed, use that string
-        if (serverInfo->rtspSessionUrl != NULL && parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr)) {
+        if (serverInfo->rtspSessionUrl != NULL && parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr, sizeof(urlAddr))) {
             strcpy(rtspTargetUrl, serverInfo->rtspSessionUrl);
         }
         else {
@@ -784,12 +785,12 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             // audio since it only does that for local streaming normally. We can avoid this limitation,
             // but only if the caller gave us the RTSP session URL that it received from the host during launch.
             addrToUrlSafeString(&RemoteAddr, urlAddr, sizeof(urlAddr));
-            sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+			snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
         }
     }
     else {
         PltSafeStrcpy(urlAddr, sizeof(urlAddr), "0.0.0.0");
-        sprintf(rtspTargetUrl, "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
+		snprintf(rtspTargetUrl, sizeof(rtspTargetUrl), "rtsp%s://%s:%u", useEnet ? "ru" : "", urlAddr, RtspPortNumber);
     }
 
     switch (AppVersionQuad[0]) {
