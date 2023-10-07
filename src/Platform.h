@@ -5,8 +5,7 @@
 // that are incompatible with Winsock errors.
 #define _CRT_NO_POSIX_ERROR_CODES
 
-// Ignore CRT warnings about sprintf(), memcpy(), etc.
-#define _CRT_SECURE_NO_WARNINGS 1
+// Ignore CRT warnings about POSIX names
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #endif
 
