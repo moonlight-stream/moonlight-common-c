@@ -776,7 +776,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             (StreamConfig.streamingRemotely != STREAM_CFG_REMOTE || CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) <= 2)) {
         // If we have an RTSP URL string and it was successfully parsed, use that string
         if (serverInfo->rtspSessionUrl != NULL && parseUrlAddrFromRtspUrlString(serverInfo->rtspSessionUrl, urlAddr, sizeof(urlAddr))) {
-            strcpy(rtspTargetUrl, serverInfo->rtspSessionUrl);
+            PltSafeStrcpy(rtspTargetUrl, sizeof(rtspTargetUrl), serverInfo->rtspSessionUrl);
+            rtspTargetUrl[sizeof(rtspTargetUrl) - 1] = '\0';
         }
         else {
             // If an RTSP URL string was not provided or failed to parse, we will construct one now as best we can.
