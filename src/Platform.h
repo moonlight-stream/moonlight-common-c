@@ -5,8 +5,7 @@
 // that are incompatible with Winsock errors.
 #define _CRT_NO_POSIX_ERROR_CODES
 
-// Ignore CRT warnings about sprintf(), memcpy(), etc.
-#define _CRT_SECURE_NO_WARNINGS 1
+// Ignore CRT warnings about POSIX names
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #endif
 
@@ -131,3 +130,4 @@ int initializePlatform(void);
 void cleanupPlatform(void);
 
 uint64_t PltGetMillis(void);
+bool PltSafeStrcpy(char* dest, size_t dest_size, const char* src);

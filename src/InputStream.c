@@ -983,10 +983,19 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         return -2;
     }
 
-    // GFE only supports a maximum of 4 controllers
     if (!IS_SUNSHINE()) {
+        // GFE only supports a maximum of 4 controllers
         controllerNumber %= 4;
         activeGamepadMask &= 0xF;
+
+        // GFE doesn't support buttons that aren't present on an Xbox 360 controller,
+        // so the extended button flags won't even be sent. For convenience, let's
+        // map the MISC button to the SPECIAL (Guide) button. Some platforms reserve
+        // the Guide button for OS functionality (Game Bar, Home button, etc.), so
+        // this allows otherwise unused buttons to activate that functionality.
+        if (buttonFlags & MISC_FLAG) {
+            buttonFlags |= SPECIAL_FLAG;
+        }
     }
     else {
         // Sunshine supports up to 16 (max number of bits in activeGamepadMask)

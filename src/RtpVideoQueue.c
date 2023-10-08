@@ -118,13 +118,14 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
     // If the packet is in order, we can take the fast path and avoid having
     // to loop through the whole list. If we get an out of order or missing
     // packet, the fast path will stop working and we'll use the loop instead.
-    if (packet->sequenceNumber == queue->nextContiguousSequenceNumber) {
+    //
+    // NB: It's not enough to just check next contiguous sequence number because
+    // it's possible that we hit the OOS path earlier which doesn't update the
+    // next contiguous sequence number. If that happens, we need to use the slow
+    // path for this entire frame to avoid possibly mishandling a duplicate packet.
+    if (queue->useFastQueuePath && packet->sequenceNumber == queue->nextContiguousSequenceNumber) {
         queue->nextContiguousSequenceNumber = U16(packet->sequenceNumber + 1);
-
-        // If we received the next contiguous sequence number but already have missing
-        // packets, that means we received some later packets before falling back into
-        // sequence with this one. By definition, that's OOS data so let's tag it.
-        outOfSequence = queue->missingPackets != 0;
+        outOfSequence = false;
     }
     else {
         outOfSequence = false;
@@ -141,6 +142,11 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
 
             entry = entry->next;
         }
+
+        // If we make it here, we cannot use the fast queue path for this frame because
+        // we're about to queue a non-duplicate packet out of order. This will not update
+        // nextContiguousSequenceNumber which the fast path relies on.
+        queue->useFastQueuePath = false;
     }
 
     newEntry->packet = packet;
@@ -294,6 +300,10 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
             continue;
         }
 #endif
+
+        // We should never have duplicate packets enqueued
+        LC_ASSERT(packets[index] == NULL);
+        LC_ASSERT(marks[index] != 0);
 
         packets[index] = (unsigned char*) entry->packet;
         marks[index] = 0;
@@ -459,7 +469,7 @@ static void stageCompleteFecBlock(PRTP_VIDEO_QUEUE queue) {
 
         unsigned int lowestRtpSequenceNumber = entry->packet->sequenceNumber;
 
-        while (entry != NULL) {
+        do {
             // We should never encounter a packet that's lower than our next seq num
             LC_ASSERT(!isBefore16(entry->packet->sequenceNumber, nextSeqNum));
 
@@ -499,7 +509,7 @@ static void stageCompleteFecBlock(PRTP_VIDEO_QUEUE queue) {
             }
 
             entry = entry->next;
-        }
+        } while (entry != NULL);
 
         if (entry == NULL) {
             // Start at the lowest we found last enumeration
@@ -681,6 +691,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->receivedParityPackets = 0;
         queue->receivedHighestSequenceNumber = 0;
         queue->missingPackets = 0;
+        queue->useFastQueuePath = true;
         queue->reportedLostFrame = false;
         queue->bufferDataPackets = (nvPacket->fecInfo & 0xFFC00000) >> 22;
         queue->fecPercentage = (nvPacket->fecInfo & 0xFF0) >> 4;

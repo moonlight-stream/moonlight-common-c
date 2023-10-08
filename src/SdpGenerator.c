@@ -91,10 +91,13 @@ static int addAttributeBinary(PSDP_OPTION* head, char* name, const void* payload
         return -1;
     }
 
+    if (!PltSafeStrcpy(option->name, sizeof(option->name), name)) {
+        free(option);
+        return -1;
+    }
+
     option->next = NULL;
     option->payloadLen = payloadLen;
-    strncpy(option->name, name, sizeof(option->name));
-    option->name[sizeof(option->name) - 1] = '\0';
     option->payload = (void*)(option + 1);
     memcpy(option->payload, payload, payloadLen);
 
@@ -525,7 +528,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     char* payload;
     char urlSafeAddr[URLSAFESTRING_LEN];
 
-    addrToUrlSafeString(&RemoteAddr, urlSafeAddr);
+    addrToUrlSafeString(&RemoteAddr, urlSafeAddr, sizeof(urlSafeAddr));
 
     attributeList = getAttributesList(urlSafeAddr);
     if (attributeList == NULL) {
@@ -543,6 +546,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSdpHeader(payload, MAX_SDP_HEADER_LEN, rtspClientVersion, urlSafeAddr);
     if (written < 0 || written >= MAX_SDP_HEADER_LEN) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
@@ -552,6 +556,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSerializedAttributeList(&payload[offset], attributeListSize, attributeList);
     if (written < 0 || written >= attributeListSize) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
@@ -561,6 +566,7 @@ char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length) {
     written = fillSdpTail(&payload[offset], MAX_SDP_TAIL_LEN);
     if (written < 0 || written >= MAX_SDP_TAIL_LEN) {
         LC_ASSERT(false);
+        free(payload);
         freeAttributeList(attributeList);
         return NULL;
     }
