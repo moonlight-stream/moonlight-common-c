@@ -983,6 +983,17 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         return -2;
     }
 
+    // HACK: We previously used a short for the buttonFlags argument, but we switched to an
+    // int to support additional buttons with Sunshine. Unfortunately, some clients still pass
+    // a short, which gets sign extended to an int. This causes all the new button flags to be
+    // set any time the user presses the Y button on their gamepad (since Y is 0x8000). To deal
+    // with these clients, we will detect this condition by checking if the sign bit is set.
+    // Since we know there's no valid button flag that uses the 31st bit, any case where the
+    // input value is negative is an instance of bug so only the botton 16 bits are valid.
+    if (buttonFlags < 0) {
+        buttonFlags &= 0xFFFF;
+    }
+
     if (!IS_SUNSHINE()) {
         // GFE only supports a maximum of 4 controllers
         controllerNumber %= 4;
