@@ -1072,7 +1072,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
 }
 
 // Send a controller event to the streaming machine
-int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+int LiSendControllerEvent(int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
     return sendControllerEventInternal(0, 0x1, buttonFlags, leftTrigger, rightTrigger,

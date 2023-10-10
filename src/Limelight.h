@@ -717,7 +717,7 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length);
 
 // This function queues a controller event to be sent to the remote server. It will
 // be seen by the computer as the first controller.
-int LiSendControllerEvent(short buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
+int LiSendControllerEvent(int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY);
 
 // This function queues a controller event to be sent to the remote server. The controllerNumber
