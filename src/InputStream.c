@@ -211,7 +211,7 @@ static PPACKET_HOLDER allocatePacketHolder(int extraLength) {
     }
 }
 
-static bool sendInputPacket(PPACKET_HOLDER holder) {
+static bool sendInputPacket(PPACKET_HOLDER holder, bool moreData) {
     SOCK_RET err;
 
     // On GFE 3.22, the entire control stream is encrypted (and support for separate RI encrypted)
@@ -222,7 +222,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
                                                         PACKET_SIZE(holder),
                                                         holder->channelId,
                                                         holder->enetPacketFlags,
-                                                        LbqGetItemCount(&packetQueue) > 0);
+                                                        moreData);
         if (err < 0) {
             Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
             ListenerCallbacks.connectionTerminated(err);
@@ -273,7 +273,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder) {
                                                             (int)(encryptedSize + sizeof(encryptedLengthPrefix)),
                                                             holder->channelId,
                                                             holder->enetPacketFlags,
-                                                            LbqGetItemCount(&packetQueue) > 0);
+                                                            moreData);
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(err);
@@ -600,7 +600,7 @@ static void inputSendThreadProc(void* context) {
                 memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], codePointLength);
 
                 // Encrypt and send the split packet
-                if (!sendInputPacket(&splitPacket)) {
+                if (!sendInputPacket(&splitPacket, i + 1 < totalLength)) {
                     freePacketHolder(holder);
                     return;
                 }
@@ -613,7 +613,7 @@ static void inputSendThreadProc(void* context) {
         }
 
         // Encrypt and send the input packet
-        if (!sendInputPacket(holder)) {
+        if (!sendInputPacket(holder, LbqGetItemCount(&packetQueue) > 0)) {
             freePacketHolder(holder);
             return;
         }
