@@ -700,9 +700,10 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets - 1);
         queue->multiFecCurrentBlockNumber = fecCurrentBlockNumber;
         queue->multiFecLastBlockNumber = (nvPacket->multiFecBlocks >> 6) & 0x3;
-    } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
-        // In rare cases, we get extra parity packets. It's rare enough that it's probably
-        // not worth handling, so we'll just drop them.
+    }
+
+    // Reject packets above our FEC queue valid sequence number range
+    if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         return RTPF_RET_REJECTED;
     }
 
