@@ -570,7 +570,7 @@ static void inputSendThreadProc(void* context) {
 
             // We send each Unicode code point individually. This way we can always ensure they will
             // never straddle a packet boundary (which will cause a parsing error on the host).
-            while (i < totalLength) {
+            while (i < totalLength && !PltIsThreadInterrupted(&inputSendThread)) {
                 uint32_t codePointLength;
                 uint8_t firstByte = (uint8_t)holder->packet.unicode.text[i];
                 if ((firstByte & 0x80) == 0x00) {
