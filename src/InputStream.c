@@ -594,8 +594,9 @@ static void inputSendThreadProc(void* context) {
                     break;
                 }
 
+                // Use the original packet as a template and fixup to send one code point at a time
+                splitPacket = *holder;
                 splitPacket.packet.unicode.header.size = BE32(sizeof(uint32_t) + codePointLength);
-                splitPacket.packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
                 memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], codePointLength);
 
                 // Encrypt and send the split packet
