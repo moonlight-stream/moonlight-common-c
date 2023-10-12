@@ -28,8 +28,8 @@ typedef struct _NVCTL_ENCRYPTED_PACKET_HEADER {
 } NVCTL_ENCRYPTED_PACKET_HEADER, *PNVCTL_ENCRYPTED_PACKET_HEADER;
 
 typedef struct _QUEUED_FRAME_INVALIDATION_TUPLE {
-    int startFrame;
-    int endFrame;
+    uint32_t startFrame;
+    uint32_t endFrame;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_FRAME_INVALIDATION_TUPLE, *PQUEUED_FRAME_INVALIDATION_TUPLE;
 
@@ -77,9 +77,8 @@ static PLT_THREAD invalidateRefFramesThread;
 static PLT_THREAD requestIdrFrameThread;
 static PLT_THREAD controlReceiveThread;
 static PLT_THREAD asyncCallbackThread;
-static int lossCountSinceLastReport;
-static int lastGoodFrame;
-static int lastSeenFrame;
+static uint32_t lastGoodFrame;
+static uint32_t lastSeenFrame;
 static bool stopping;
 static bool disconnectPending;
 static bool encryptedControlStream;
@@ -321,7 +320,6 @@ int initializeControlStream(void) {
 
     lastGoodFrame = 0;
     lastSeenFrame = 0;
-    lossCountSinceLastReport = 0;
     disconnectPending = false;
     intervalGoodFrameCount = 0;
     intervalTotalFrameCount = 0;
@@ -362,7 +360,7 @@ void destroyControlStream(void) {
     PltDeleteMutex(&enetMutex);
 }
 
-void queueFrameInvalidationTuple(int startFrame, int endFrame) {
+static void queueFrameInvalidationTuple(uint32_t startFrame, uint32_t endFrame) {
     LC_ASSERT(startFrame <= endFrame);
     
     if (isReferenceFrameInvalidationEnabled()) {
@@ -398,12 +396,12 @@ void LiRequestIdrFrame(void) {
 }
 
 // Invalidate reference frames lost by the network
-void connectionDetectedFrameLoss(int startFrame, int endFrame) {
+void connectionDetectedFrameLoss(uint32_t startFrame, uint32_t endFrame) {
     queueFrameInvalidationTuple(startFrame, endFrame);
 }
 
 // When we receive a frame, update the number of our current frame
-void connectionReceivedCompleteFrame(int frameIndex) {
+void connectionReceivedCompleteFrame(uint32_t frameIndex) {
     lastGoodFrame = frameIndex;
     intervalGoodFrameCount++;
 }
@@ -424,7 +422,7 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
     }
 }
 
-void connectionSawFrame(int frameIndex) {
+void connectionSawFrame(uint32_t frameIndex) {
     LC_ASSERT_VT(!isBefore16(frameIndex, lastSeenFrame));
 
     uint64_t now = PltGetMillis();
@@ -468,11 +466,6 @@ void connectionSawFrame(int frameIndex) {
 
     intervalTotalFrameCount += frameIndex - lastSeenFrame;
     lastSeenFrame = frameIndex;
-}
-
-// When we lose packets, update our packet loss count
-void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket) {
-    lossCountSinceLastReport += (nextReceivedPacket - lastReceivedPacket) - 1;
 }
 
 // Reads an NV control stream packet from the TCP connection
@@ -1335,7 +1328,7 @@ static void lossStatsThreadFunc(void* context) {
         while (!PltIsThreadInterrupted(&lossStatsThread)) {
             // Construct the payload
             BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
-            BbPut32(&byteBuffer, lossCountSinceLastReport);
+            BbPut32(&byteBuffer, 0);
             BbPut32(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
             BbPut32(&byteBuffer, 1000);
             BbPut64(&byteBuffer, lastGoodFrame);
@@ -1355,9 +1348,6 @@ static void lossStatsThreadFunc(void* context) {
                 ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
             }
-
-            // Clear the transient state
-            lossCountSinceLastReport = 0;
 
             // Wait a bit
             PltSleepMsInterruptible(&lossStatsThread, LOSS_REPORT_INTERVAL_MS);
@@ -1415,7 +1405,7 @@ static void requestIdrFrame(void) {
     Limelog("IDR frame request sent\n");
 }
 
-static void requestInvalidateReferenceFrames(int startFrame, int endFrame) {
+static void requestInvalidateReferenceFrames(uint32_t startFrame, uint32_t endFrame) {
     int64_t payload[3];
 
     LC_ASSERT(startFrame <= endFrame);
@@ -1444,8 +1434,8 @@ static void invalidateRefFramesFunc(void* context) {
 
     while (!PltIsThreadInterrupted(&invalidateRefFramesThread)) {
         PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
-        int startFrame;
-        int endFrame;
+        uint32_t startFrame;
+        uint32_t endFrame;
 
         // Wait for a reference frame invalidation request or a request to shutdown
         if (LbqWaitForQueueElement(&invalidReferenceFrameTuples, (void**)&qfit) != LBQ_SUCCESS) {
