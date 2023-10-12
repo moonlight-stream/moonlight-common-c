@@ -198,27 +198,27 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
         // IDR frames always start with codec configuration data
         if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) {
             // H.264 IDR frames should have an SPS, PPS, then picture data
-            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_SPS);
-            LC_ASSERT(decodeUnit->bufferList->next != NULL);
-            LC_ASSERT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_PPS);
-            LC_ASSERT(decodeUnit->bufferList->next->next != NULL);
-            LC_ASSERT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PICDATA);
+            LC_ASSERT_VT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_SPS);
+            LC_ASSERT_VT(decodeUnit->bufferList->next != NULL);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_PPS);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->next != NULL);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PICDATA);
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             // HEVC IDR frames should have an VPS, SPS, PPS, then picture data
-            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_VPS);
-            LC_ASSERT(decodeUnit->bufferList->next != NULL);
-            LC_ASSERT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_SPS);
-            LC_ASSERT(decodeUnit->bufferList->next->next != NULL);
-            LC_ASSERT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
-            LC_ASSERT(decodeUnit->bufferList->next->next->next != NULL);
+            LC_ASSERT_VT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_VPS);
+            LC_ASSERT_VT(decodeUnit->bufferList->next != NULL);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_SPS);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->next != NULL);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
+            LC_ASSERT_VT(decodeUnit->bufferList->next->next->next != NULL);
 
             // We get 2 sets of VPS, SPS, and PPS NALUs in HDR mode.
             // FIXME: Should we normalize this or something for clients?
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
             // We don't parse the AV1 bitstream
-            LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
+            LC_ASSERT_VT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
         }
         else {
             LC_ASSERT(false);
@@ -697,7 +697,7 @@ static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERN
             while (currentPos->length != 0) {
                 // Any NALUs we encounter on the way to the end of the packet must be
                 // reference frame slices or filler data.
-                LC_ASSERT(isSeqReferenceFrameStart(currentPos) || isFillerDataNal(currentPos));
+                LC_ASSERT_VT(isSeqReferenceFrameStart(currentPos) || isFillerDataNal(currentPos));
                 skipToNextNalOrEnd(currentPos);
             }
         }
@@ -765,7 +765,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     firstPacket = isFirstPacket(flags, fecCurrentBlockNumber);
     lastPacket = (flags & FLAG_EOF) && fecCurrentBlockNumber == fecLastBlockNumber;
 
-    LC_ASSERT((flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
+    LC_ASSERT_VT((flags & ~(FLAG_SOF | FLAG_EOF | FLAG_CONTAINS_PIC_DATA)) == 0);
 
     streamPacketIndex = videoPacket->streamPacketIndex;
     
@@ -843,10 +843,10 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
     // If this is the first packet, skip the frame header (if one exists)
     uint32_t frameHeaderSize;
-    LC_ASSERT(currentPos.length > 0);
+    LC_ASSERT_VT(currentPos.length > 0);
     if (firstPacket && currentPos.length > 0) {
         // Parse the frame type from the header
-        LC_ASSERT(currentPos.length >= 4);
+        LC_ASSERT_VT(currentPos.length >= 4);
         if (APP_VERSION_AT_LEAST(7, 1, 350) && currentPos.length >= 4) {
             switch (currentPos.data[currentPos.offset + 3]) {
             case 1: // Normal P-frame
@@ -874,7 +874,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 break;
             default:
                 Limelog("Unrecognized frame type: %d", currentPos.data[currentPos.offset + 3]);
-                LC_ASSERT(false);
+                LC_ASSERT_VT(false);
                 break;
             }
         }
@@ -888,7 +888,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         // Sunshine can provide host processing latency of the frame
-        LC_ASSERT(currentPos.length >= 3);
+        LC_ASSERT_VT(currentPos.length >= 3);
         if (IS_SUNSHINE() && currentPos.length >= 3) {
             BYTE_BUFFER bb;
             BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 1, 2, BYTE_ORDER_LITTLE);
@@ -897,7 +897,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
         // Codecs like H.264 and HEVC handle the FEC trailing zero padding just fine, but other
         // codecs need the exact length encoded separately.
-        LC_ASSERT(currentPos.length >= 6);
+        LC_ASSERT_VT(currentPos.length >= 6);
         if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) && currentPos.length >= 6) {
             BYTE_BUFFER bb;
             BbInitializeWrappedBuffer(&bb, currentPos.data, currentPos.offset + 4, 2, BYTE_ORDER_LITTLE);
@@ -912,7 +912,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 frameHeaderSize = 8;
             }
             else {
-                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                LC_ASSERT_VT(currentPos.data[0] == (char)0x81);
                 frameHeaderSize = 44;
             }
         }
@@ -924,7 +924,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 frameHeaderSize = 8;
             }
             else {
-                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                LC_ASSERT_VT(currentPos.data[0] == (char)0x81);
                 frameHeaderSize = 41;
             }
         }
@@ -936,7 +936,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 frameHeaderSize = 8;
             }
             else {
-                LC_ASSERT(currentPos.data[0] == (char)0x81);
+                LC_ASSERT_VT(currentPos.data[0] == (char)0x81);
                 frameHeaderSize = 24;
             }
         }
@@ -957,7 +957,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             frameHeaderSize = 0;
         }
 
-        LC_ASSERT(currentPos.length >= frameHeaderSize);
+        LC_ASSERT_VT(currentPos.length >= frameHeaderSize);
         if (currentPos.length >= frameHeaderSize) {
             // Skip past the frame header
             currentPos.offset += frameHeaderSize;
@@ -969,7 +969,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             // The Annex B NALU start prefix must be next
             if (!getAnnexBStartSequence(&currentPos, NULL)) {
                 // If we aren't starting on a start prefix, something went wrong.
-                LC_ASSERT(false);
+                LC_ASSERT_VT(false);
 
                 // For release builds, we will try to recover by searching for one.
                 // This mimics the way most decoders handle this situation.
@@ -1022,11 +1022,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         // of trailing zero padding like H.264/HEVC Annex B bitstream parsers are.
         if (lastPacket) {
             // The payload length includes the frame header, so it cannot be smaller than that
-            LC_ASSERT(lastPacketPayloadLength > frameHeaderSize);
+            LC_ASSERT_VT(lastPacketPayloadLength > frameHeaderSize);
 
             // The payload length cannot be smaller than the actual received payload
             // NB: currentPos.length is already adjusted to exclude the frameHeaderSize from above
-            LC_ASSERT(lastPacketPayloadLength - frameHeaderSize <= currentPos.length);
+            LC_ASSERT_VT(lastPacketPayloadLength - frameHeaderSize <= currentPos.length);
 
             // If the payload length is valid, truncate the packet. If not, discard this frame.
             if (lastPacketPayloadLength > frameHeaderSize && lastPacketPayloadLength - frameHeaderSize <= currentPos.length) {

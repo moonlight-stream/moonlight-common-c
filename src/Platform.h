@@ -86,6 +86,17 @@
 #define LC_ASSERT(x) assert(x)
 #endif
 
+// If we're fuzzing, we don't want to enable asserts that can be affected by
+// bad input from the remote host. LC_ASSERT_VT() is used for assertions that
+// check data that comes from the host. These checks are enabled for normal
+// debug builds, since they indicate an error in Moonlight or on the host.
+// These are disabled when fuzzing, since the traffic is intentionally invalid.
+#ifdef LC_FUZZING
+#define LC_ASSERT_VT(x)
+#else
+#define LC_ASSERT_VT(x) LC_ASSERT(x)
+#endif
+
 #ifdef _MSC_VER
 #pragma intrinsic(_byteswap_ushort)
 #define BSWAP16(x) _byteswap_ushort(x)

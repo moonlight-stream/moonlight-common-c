@@ -425,7 +425,7 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
 }
 
 void connectionSawFrame(int frameIndex) {
-    LC_ASSERT(!isBefore16(frameIndex, lastSeenFrame));
+    LC_ASSERT_VT(!isBefore16(frameIndex, lastSeenFrame));
 
     uint64_t now = PltGetMillis();
 
@@ -1123,7 +1123,7 @@ static void controlReceiveThreadFunc(void* context) {
                 }
                 else {
                     // What do we do here???
-                    LC_ASSERT(false);
+                    LC_ASSERT_VT(false);
                     packetLength = (int)event.packet->dataLength;
                     event.packet->data = NULL;
                 }

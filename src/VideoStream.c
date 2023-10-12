@@ -135,6 +135,7 @@ static void VideoReceiveThreadProc(void* context) {
             firstDataTimeMs = PltGetMillis();
         }
 
+#ifndef LC_FUZZING
         if (!receivedFullFrame) {
             uint64_t now = PltGetMillis();
 
@@ -144,6 +145,7 @@ static void VideoReceiveThreadProc(void* context) {
                 break;
             }
         }
+#endif
 
         if (err < (int)sizeof(RTP_PACKET)) {
             // Runt packet
