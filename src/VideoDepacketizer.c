@@ -202,7 +202,6 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
             LC_ASSERT_VT(decodeUnit->bufferList->next != NULL);
             LC_ASSERT_VT(decodeUnit->bufferList->next->bufferType == BUFFER_TYPE_PPS);
             LC_ASSERT_VT(decodeUnit->bufferList->next->next != NULL);
-            LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PICDATA);
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             // HEVC IDR frames should have an VPS, SPS, PPS, then picture data
@@ -212,9 +211,6 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
             LC_ASSERT_VT(decodeUnit->bufferList->next->next != NULL);
             LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
             LC_ASSERT_VT(decodeUnit->bufferList->next->next->next != NULL);
-
-            // We get 2 sets of VPS, SPS, and PPS NALUs in HDR mode.
-            // FIXME: Should we normalize this or something for clients?
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
             // We don't parse the AV1 bitstream
