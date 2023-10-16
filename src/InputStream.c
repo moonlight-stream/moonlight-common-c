@@ -1444,6 +1444,13 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
         return LI_ERR_UNSUPPORTED;
     }
 
+    // Since these events can be sent incredibly frequently, let's avoid queuing more if
+    // we already have more than half of our max input queue full of other events.
+    if (LbqGetItemCount(&packetQueue) > MAX_QUEUED_INPUT_PACKETS / 2) {
+        Limelog("Dropping motion event due to high input queue length\n");
+        return -1;
+    }
+
     // Sunshine supports up to 16 controllers
     controllerNumber %= MAX_GAMEPADS;
 
