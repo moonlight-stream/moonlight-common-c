@@ -19,8 +19,6 @@ static float absCurrentPosY;
 #define MAX_GAMEPADS 16
 
 static uint8_t currentPenButtonState;
-static uint16_t currentActiveGamepadMask;
-static int currentControllerButtonState[MAX_GAMEPADS];
 
 #define CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
 
@@ -99,8 +97,6 @@ int initializeInputStream(void) {
     batchedScrollDelta = 0;
 
     currentPenButtonState = 0;
-    currentActiveGamepadMask = 0;
-    memset(currentControllerButtonState, 0, sizeof(currentControllerButtonState));
 
     // Start with the virtual mouse centered
     absCurrentPosX = absCurrentPosY = 0.5f;
@@ -743,6 +739,9 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     }
 
     holder->channelId = CTRL_CHANNEL_MOUSE;
+
+    // TODO: Send this as unreliable sequenced when we have a delayed reliable retransmission thread
+    // and protocol updates to allow us to determine which unreliable messages were dropped.
     holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.mouseMoveRel.header.size = BE32(sizeof(NV_REL_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
@@ -781,8 +780,8 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 
     holder->channelId = CTRL_CHANNEL_MOUSE;
 
-    // The latest packet always contains the latest data, so discard older packets upon reordering
-    holder->enetPacketFlags = 0;
+    // TODO: Send this as unreliable sequenced when we have a delayed reliable retransmission thread
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     holder->packet.mouseMoveAbs.header.size = BE32(sizeof(NV_ABS_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
     holder->packet.mouseMoveAbs.header.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
@@ -1022,12 +1021,8 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     // Send each controller on a separate channel
     holder->channelId = CTRL_CHANNEL_GAMEPAD_BASE + controllerNumber;
 
-    // If the active gamepad mask or button state changes, send a reliable event to ensure delivery.
-    // For axis-only updates, we use sequenced unreliable packets to only process the latest updates.
-    holder->enetPacketFlags = (activeGamepadMask != currentActiveGamepadMask || buttonFlags != currentControllerButtonState[controllerNumber]) ?
-                                  ENET_PACKET_FLAG_RELIABLE : 0;
-    currentActiveGamepadMask = activeGamepadMask;
-    currentControllerButtonState[controllerNumber] = buttonFlags;
+    // TODO: Send this as unreliable sequenced when we have a delayed reliable retransmission thread
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     if (AppVersionQuad[0] == 3) {
         // Generation 3 servers don't support multiple controllers so we send
