@@ -58,7 +58,6 @@ static struct {
 #define CONTROLLER_BATCHING_INTERVAL_MS 1
 #define MOUSE_BATCHING_INTERVAL_MS 1
 #define PEN_BATCHING_INTERVAL_MS 1
-#define MOTION_BATCHING_INTERVAL_MS 1
 
 // Don't batch up/down/cancel events
 #define TOUCH_EVENT_IS_BATCHABLE(x) ((x) == LI_TOUCH_EVENT_HOVER || (x) == LI_TOUCH_EVENT_MOVE)
@@ -339,7 +338,6 @@ static void inputSendThreadProc(void* context) {
     uint64_t lastControllerPacketTime[MAX_GAMEPADS] = { 0 };
     uint64_t lastMousePacketTime = 0;
     uint64_t lastPenPacketTime = 0;
-    uint64_t lastMotionPacketTime = 0;
 
     while (!PltIsThreadInterrupted(&inputSendThread)) {
         err = LbqWaitForQueueElement(&packetQueue, (void**)&holder);
@@ -353,6 +351,8 @@ static void inputSendThreadProc(void* context) {
             PNV_MULTI_CONTROLLER_PACKET origPkt;
             short controllerNumber = LE16(holder->packet.multiController.controllerNumber);
             uint64_t now = PltGetMillis();
+
+            LC_ASSERT(controllerNumber < MAX_GAMEPADS);
 
             // Delay for batching if required
             if (now < lastControllerPacketTime[controllerNumber] + CONTROLLER_BATCHING_INTERVAL_MS) {
@@ -555,27 +555,24 @@ static void inputSendThreadProc(void* context) {
         }
         // If it's a motion packet, only send the latest for each sensor type
         else if (holder->packet.header.magic == LE32(SS_CONTROLLER_MOTION_MAGIC)) {
-            uint64_t now = PltGetMillis();
+            uint8_t controllerNumber = holder->packet.controllerMotion.controllerNumber;
+            uint8_t motionType = holder->packet.controllerMotion.motionType;
 
-            // Delay for batching if required
-            if (now < lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS) {
-                flushInputOnControlStream();
-                PltSleepMs((int)(lastMotionPacketTime + MOTION_BATCHING_INTERVAL_MS - now));
-                now = PltGetMillis();
-            }
+            LC_ASSERT(controllerNumber < MAX_GAMEPADS);
+            LC_ASSERT(motionType - 1 < MAX_MOTION_EVENTS);
 
             PltLockMutex(&batchedInputMutex);
 
             // LI_MOTION_TYPE_* values are 1-based, so we have to subtract 1 to index into our state array
-            float x = currentGamepadSensorState[holder->packet.controllerMotion.controllerNumber][holder->packet.controllerMotion.motionType - 1].x;
-            float y = currentGamepadSensorState[holder->packet.controllerMotion.controllerNumber][holder->packet.controllerMotion.motionType - 1].y;
-            float z = currentGamepadSensorState[holder->packet.controllerMotion.controllerNumber][holder->packet.controllerMotion.motionType - 1].z;
+            float x = currentGamepadSensorState[controllerNumber][motionType - 1].x;
+            float y = currentGamepadSensorState[controllerNumber][motionType - 1].y;
+            float z = currentGamepadSensorState[controllerNumber][motionType - 1].z;
 
             // Motion events are so rapid that we can just drop any events that are lost in transit,
             // but we will treat (0, 0, 0) as a special value for gyro events to allow clients to
             // reliably set the gyro to a null state when sensor events are halted due to focus loss
             // or similar client-side constraints.
-            if (holder->packet.controllerMotion.motionType == LI_MOTION_TYPE_GYRO && x == 0.0f && y == 0.0f && z == 0.0f) {
+            if (motionType == LI_MOTION_TYPE_GYRO && x == 0.0f && y == 0.0f && z == 0.0f) {
                 holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
             }
             else {
@@ -588,11 +585,9 @@ static void inputSendThreadProc(void* context) {
             floatToNetfloat(z, holder->packet.controllerMotion.z);
 
             // The state change is no longer pending
-            currentGamepadSensorState[holder->packet.controllerMotion.controllerNumber][holder->packet.controllerMotion.motionType - 1].dirty = false;
+            currentGamepadSensorState[controllerNumber][motionType - 1].dirty = false;
 
             PltUnlockMutex(&batchedInputMutex);
-
-            lastMotionPacketTime = now;
         }
         // If it's a UTF-8 text packet, we may need to split it into a several packets to send
         else if (holder->packet.header.magic == LE32(UTF8_TEXT_EVENT_MAGIC)) {
