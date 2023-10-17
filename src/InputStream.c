@@ -336,7 +336,7 @@ static void inputSendThreadProc(void* context) {
         relMouseMagicLE = LE32(MOUSE_MOVE_REL_MAGIC);
     }
 
-    uint64_t lastControllerPacketTime = 0;
+    uint64_t lastControllerPacketTime[MAX_GAMEPADS] = { 0 };
     uint64_t lastMousePacketTime = 0;
     uint64_t lastPenPacketTime = 0;
     uint64_t lastMotionPacketTime = 0;
@@ -351,12 +351,13 @@ static void inputSendThreadProc(void* context) {
         if (holder->packet.header.magic == multiControllerMagicLE) {
             PPACKET_HOLDER controllerBatchHolder;
             PNV_MULTI_CONTROLLER_PACKET origPkt;
+            short controllerNumber = LE16(holder->packet.multiController.controllerNumber);
             uint64_t now = PltGetMillis();
 
             // Delay for batching if required
-            if (now < lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS) {
+            if (now < lastControllerPacketTime[controllerNumber] + CONTROLLER_BATCHING_INTERVAL_MS) {
                 flushInputOnControlStream();
-                PltSleepMs((int)(lastControllerPacketTime + CONTROLLER_BATCHING_INTERVAL_MS - now));
+                PltSleepMs((int)(lastControllerPacketTime[controllerNumber] + CONTROLLER_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
@@ -405,7 +406,7 @@ static void inputSendThreadProc(void* context) {
                 freePacketHolder(controllerBatchHolder);
             }
 
-            lastControllerPacketTime = now;
+            lastControllerPacketTime[controllerNumber] = now;
         }
         // If it's a relative mouse move packet, we can also do batching
         else if (holder->packet.header.magic == relMouseMagicLE) {
