@@ -16,7 +16,8 @@
 // Common globals
 extern char* RemoteAddrString;
 extern struct sockaddr_storage RemoteAddr;
-extern SOCKADDR_LEN RemoteAddrLen;
+extern struct sockaddr_storage LocalAddr;
+extern SOCKADDR_LEN AddrLen;
 extern int AppVersionQuad[4];
 extern STREAM_CONFIGURATION StreamConfig;
 extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;

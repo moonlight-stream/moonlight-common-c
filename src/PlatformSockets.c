@@ -220,28 +220,36 @@ void closeSocket(SOCKET s) {
 #endif
 }
 
-SOCKET bindUdpSocket(int addrfamily, int bufferSize) {
+SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize) {
     SOCKET s;
-    struct sockaddr_storage addr;
+    LC_SOCKADDR bindAddr;
     int err;
-    SOCKADDR_LEN addrLen;
 
-#ifdef AF_INET6
-    LC_ASSERT(addrfamily == AF_INET || addrfamily == AF_INET6);
-    addrLen = (addrfamily == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
-#else
-    LC_ASSERT(addrfamily == AF_INET);
-    addrLen = sizeof(struct sockaddr_in);
-#endif
-
-    s = createSocket(addrfamily, SOCK_DGRAM, IPPROTO_UDP, false);
+    s = createSocket(addressFamily, SOCK_DGRAM, IPPROTO_UDP, false);
     if (s == INVALID_SOCKET) {
         return INVALID_SOCKET;
     }
 
-    memset(&addr, 0, sizeof(addr));
-    addr.ss_family = addrfamily;
-    if (bind(s, (struct sockaddr*) &addr, addrLen) == SOCKET_ERROR) {
+    // Use localAddr to bind if it was provided
+    if (localAddr && localAddr->ss_family != 0) {
+        memcpy(&bindAddr, localAddr, addrLen);
+        SET_PORT(&bindAddr, 0);
+    }
+    else {
+        // Otherwise wildcard bind to the specified address family
+        memset(&bindAddr, 0, sizeof(bindAddr));
+        SET_FAMILY(&bindAddr, addressFamily);
+
+#ifdef AF_INET6
+        LC_ASSERT(addressFamily == AF_INET || addressFamily == AF_INET6);
+        addrLen = (addressFamily == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6));
+#else
+        LC_ASSERT(addressFamily == AF_INET);
+        addrLen = sizeof(struct sockaddr_in);
+#endif
+    }
+
+    if (bind(s, (struct sockaddr*) &bindAddr, addrLen) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("bind() failed: %d\n", err);
         closeSocket(s);

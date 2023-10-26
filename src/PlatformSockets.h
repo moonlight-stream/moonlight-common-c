@@ -68,9 +68,11 @@ typedef socklen_t SOCKADDR_LEN;
 
 #ifdef AF_INET6
 typedef struct sockaddr_in6 LC_SOCKADDR;
+#define SET_FAMILY(addr, family) ((addr)->sin6_family = (family))
 #define SET_PORT(addr, port) ((addr)->sin6_port = htons(port))
 #else
 typedef struct sockaddr_in LC_SOCKADDR;
+#define SET_FAMILY(addr, family) ((addr)->sin_family = (family))
 #define SET_PORT(addr, port) ((addr)->sin_port = htons(port))
 #endif
 
@@ -88,7 +90,7 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlo
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 int connectUdpSocket(SOCKET s, struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port);
 int sendMtuSafe(SOCKET s, char* buffer, int size);
-SOCKET bindUdpSocket(int addrfamily, int bufferSize);
+SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize);
 int enableNoDelay(SOCKET s);
 int setSocketNonBlocking(SOCKET s, bool enabled);
 int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect);

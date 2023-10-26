@@ -1597,7 +1597,7 @@ int startControlStream(void) {
         
         LC_ASSERT(ControlPortNumber != 0);
 
-        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, RemoteAddrLen);
+        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, AddrLen);
         enet_address_set_port(&address, ControlPortNumber);
 
         // Create a client
@@ -1665,7 +1665,7 @@ int startControlStream(void) {
     else {
         // NB: Do NOT use ControlPortNumber here. 47995 is correct for these old versions.
         LC_ASSERT(ControlPortNumber == 0);
-        ctlSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+        ctlSock = connectTcpSocket(&RemoteAddr, AddrLen,
             47995, CONTROL_STREAM_TIMEOUT_SEC);
         if (ctlSock == INVALID_SOCKET) {
             stopping = true;

@@ -699,7 +699,7 @@ int startInputStream(void) {
 
     // After Gen 5, we send input on the control stream
     if (AppVersionQuad[0] < 5) {
-        inputSock = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+        inputSock = connectTcpSocket(&RemoteAddr, AddrLen,
             35043, INPUT_STREAM_TIMEOUT_SEC);
         if (inputSock == INVALID_SOCKET) {
             return LastSocketFail();
