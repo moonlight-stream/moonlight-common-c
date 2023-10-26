@@ -1592,16 +1592,21 @@ int startControlStream(void) {
     int err;
 
     if (AppVersionQuad[0] >= 5) {
-        ENetAddress address;
+        ENetAddress remoteAddress, localAddress;
         ENetEvent event;
         
         LC_ASSERT(ControlPortNumber != 0);
 
-        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, AddrLen);
-        enet_address_set_port(&address, ControlPortNumber);
+        enet_address_set_address(&localAddress, (struct sockaddr *)&LocalAddr, AddrLen);
+        enet_address_set_port(&localAddress, 0); // Wildcard port
+
+        enet_address_set_address(&remoteAddress, (struct sockaddr *)&RemoteAddr, AddrLen);
+        enet_address_set_port(&remoteAddress, ControlPortNumber);
 
         // Create a client
-        client = enet_host_create(address.address.ss_family, NULL, 1, CTRL_CHANNEL_COUNT, 0, 0);
+        client = enet_host_create(RemoteAddr.ss_family,
+                                  LocalAddr.ss_family != 0 ? &localAddress : NULL,
+                                  1, CTRL_CHANNEL_COUNT, 0, 0);
         if (client == NULL) {
             stopping = true;
             return -1;
@@ -1616,7 +1621,7 @@ int startControlStream(void) {
         enet_socket_set_option (client->socket, ENET_SOCKOPT_QOS, 1);
 
         // Connect to the host
-        peer = enet_host_connect(client, &address, CTRL_CHANNEL_COUNT, 0);
+        peer = enet_host_connect(client, &remoteAddress, CTRL_CHANNEL_COUNT, 0);
         if (peer == NULL) {
             stopping = true;
             enet_host_destroy(client);
