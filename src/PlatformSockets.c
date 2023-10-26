@@ -317,23 +317,6 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
     return s;
 }
 
-int connectUdpSocket(SOCKET s, struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port) {
-    int err;
-    LC_SOCKADDR saddr;
-
-    LC_ASSERT(port != 0);
-
-    memcpy(&saddr, dstaddr, addrlen);
-    SET_PORT(&saddr, port);
-    err = connect(s, (struct sockaddr*)&saddr, addrlen);
-    if (err < 0) {
-        Limelog("connect() failed for UDP socket: %d\n", (int)LastSocketError());
-        return LastSocketFail();
-    }
-
-    return 0;
-}
-
 int setSocketNonBlocking(SOCKET s, bool enabled) {
 #if defined(__vita__)
     int val = enabled ? 1 : 0;
