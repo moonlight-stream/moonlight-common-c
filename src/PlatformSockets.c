@@ -72,7 +72,7 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
     // losing some data in a very rare case is fine, especially because we get to
     // halve the number of syscalls per packet by avoiding select().
     return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeoutMs, sizeof(timeoutMs));
-#elif defined(__WIIU__)
+#elif defined(__WIIU__) || defined(__3DS__) 
     // timeouts aren't supported on Wii U
     return -1;
 #else
@@ -364,8 +364,9 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     LC_SOCKADDR addr;
     struct pollfd pfd;
     int err;
+#if defined(LC_WINDOWS) || defined(TCP_NOOPT) || defined(TCP_MAXSEG)
     int val;
-
+#endif
     // Create a non-blocking TCP socket
     s = createSocket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP, true);
     if (s == INVALID_SOCKET) {

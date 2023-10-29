@@ -724,7 +724,7 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
 
 // SDP attributes are in the form:
 // a=x-nv-bwe.bwuSafeZoneLowLimit:70\r\n
-bool parseSdpAttributeToUInt(const char* payload, const char* name, unsigned int* val) {
+bool parseSdpAttributeToUInt(const char* payload, const char* name, uint32_t* val) {
     // Find the entry for the specified attribute name
     char* attribute = strstr(payload, name);
     if (!attribute) {

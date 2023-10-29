@@ -6,3 +6,9 @@ limelight-common/Release/
 *.sdf
 *.suo
 limelight-common/limelight-common.vcxproj.user
+.vscode/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.a
+Makefile
