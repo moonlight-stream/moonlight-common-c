@@ -16,7 +16,8 @@
 // Common globals
 extern char* RemoteAddrString;
 extern struct sockaddr_storage RemoteAddr;
-extern SOCKADDR_LEN RemoteAddrLen;
+extern struct sockaddr_storage LocalAddr;
+extern SOCKADDR_LEN AddrLen;
 extern int AppVersionQuad[4];
 extern STREAM_CONFIGURATION StreamConfig;
 extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
@@ -107,10 +108,9 @@ int initializeControlStream(void);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
-void connectionDetectedFrameLoss(int startFrame, int endFrame);
-void connectionReceivedCompleteFrame(int frameIndex);
-void connectionSawFrame(int frameIndex);
-void connectionLostPackets(int lastReceivedPacket, int nextReceivedPacket);
+void connectionDetectedFrameLoss(uint32_t startFrame, uint32_t endFrame);
+void connectionReceivedCompleteFrame(uint32_t frameIndex);
+void connectionSawFrame(uint32_t frameIndex);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
 int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
 void flushInputOnControlStream(void);

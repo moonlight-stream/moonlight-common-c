@@ -50,6 +50,12 @@ void destroyVideoStream(void) {
 // UDP Ping proc
 static void VideoPingThreadProc(void* context) {
     char legacyPingData[] = { 0x50, 0x49, 0x4E, 0x47 };
+    LC_SOCKADDR saddr;
+
+    LC_ASSERT(VideoPortNumber != 0);
+
+    memcpy(&saddr, &RemoteAddr, sizeof(saddr));
+    SET_PORT(&saddr, VideoPortNumber);
 
     // We do not check for errors here. Socket errors will be handled
     // on the read-side in ReceiveThreadProc(). This avoids potential
@@ -61,10 +67,10 @@ static void VideoPingThreadProc(void* context) {
             pingCount++;
             VideoPingPayload.sequenceNumber = BE32(pingCount);
 
-            send(rtpSocket, (char*)&VideoPingPayload, sizeof(VideoPingPayload), 0);
+            sendto(rtpSocket, (char*)&VideoPingPayload, sizeof(VideoPingPayload), 0, (struct sockaddr*)&saddr, AddrLen);
         }
         else {
-            send(rtpSocket, legacyPingData, sizeof(legacyPingData), 0);
+            sendto(rtpSocket, legacyPingData, sizeof(legacyPingData), 0, (struct sockaddr*)&saddr, AddrLen);
         }
 
         PltSleepMsInterruptible(&udpPingThread, 500);
@@ -135,6 +141,7 @@ static void VideoReceiveThreadProc(void* context) {
             firstDataTimeMs = PltGetMillis();
         }
 
+#ifndef LC_FUZZING
         if (!receivedFullFrame) {
             uint64_t now = PltGetMillis();
 
@@ -144,6 +151,7 @@ static void VideoReceiveThreadProc(void* context) {
                 break;
             }
         }
+#endif
 
         if (err < (int)sizeof(RTP_PACKET)) {
             // Runt packet
@@ -259,19 +267,11 @@ int startVideoStream(void* rendererContext, int drFlags) {
         return err;
     }
 
-    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, RTP_RECV_PACKETS_BUFFERED * (StreamConfig.packetSize + MAX_RTP_HEADER_SIZE));
+    rtpSocket = bindUdpSocket(RemoteAddr.ss_family, &LocalAddr, AddrLen,
+                              RTP_RECV_PACKETS_BUFFERED * (StreamConfig.packetSize + MAX_RTP_HEADER_SIZE));
     if (rtpSocket == INVALID_SOCKET) {
         VideoCallbacks.cleanup();
         return LastSocketError();
-    }
-
-    // Connect our video socket to the target address and port
-    LC_ASSERT(VideoPortNumber != 0);
-    err = connectUdpSocket(rtpSocket, &RemoteAddr, RemoteAddrLen, VideoPortNumber);
-    if (err != 0) {
-        VideoCallbacks.cleanup();
-        closeSocket(rtpSocket);
-        return err;
     }
 
     VideoCallbacks.start();
@@ -299,7 +299,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
 
     if (AppVersionQuad[0] == 3) {
         // Connect this socket to open port 47998 for our ping thread
-        firstFrameSocket = connectTcpSocket(&RemoteAddr, RemoteAddrLen,
+        firstFrameSocket = connectTcpSocket(&RemoteAddr, AddrLen,
                                             FIRST_FRAME_PORT, FIRST_FRAME_TIMEOUT_SEC);
         if (firstFrameSocket == INVALID_SOCKET) {
             VideoCallbacks.stop();

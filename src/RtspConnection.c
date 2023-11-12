@@ -229,7 +229,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // returns HTTP 200 OK for the /launch request before the RTSP handshake port
     // is listening.
     do {
-        sock = connectTcpSocket(&RemoteAddr, RemoteAddrLen, RtspPortNumber, RTSP_CONNECT_TIMEOUT_SEC);
+        sock = connectTcpSocket(&RemoteAddr, AddrLen, RtspPortNumber, RTSP_CONNECT_TIMEOUT_SEC);
         if (sock == INVALID_SOCKET) {
             *error = LastSocketError();
             if (*error == ECONNREFUSED) {
@@ -318,6 +318,18 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     }
     else {
         Limelog("Failed to parse RTSP response\n");
+    }
+
+    // Fetch the local address for this socket if it's not populated yet
+    if (LocalAddr.ss_family == 0) {
+        SOCKADDR_LEN addrLen = (SOCKADDR_LEN)sizeof(LocalAddr);
+        if (getsockname(sock, (struct sockaddr*)&LocalAddr, &addrLen) < 0) {
+            Limelog("Failed to get local address: %d\n", LastSocketError());
+            memset(&LocalAddr, 0, sizeof(LocalAddr));
+        }
+        else {
+            LC_ASSERT(addrLen == AddrLen);
+        }
     }
 
 Exit:
@@ -819,7 +831,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         ENetAddress address;
         ENetEvent event;
         
-        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, RemoteAddrLen);
+        enet_address_set_address(&address, (struct sockaddr *)&RemoteAddr, AddrLen);
         enet_address_set_port(&address, RtspPortNumber);
         
         // Create a client that can use 1 outgoing connection and 1 channel

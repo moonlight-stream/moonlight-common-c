@@ -1,7 +1,7 @@
 #include "Limelight-internal.h"
 #include "rs.h"
 
-#ifdef LC_DEBUG
+#if defined(LC_DEBUG) && !defined(LC_FUZZING)
 // This enables FEC validation mode with a synthetic drop
 // and recovered packet checks vs the original input. It
 // is on by default for debug builds.
@@ -376,15 +376,15 @@ cleanup_packets:
                     int j;
                     int recoveryErrors = 0;
 
-                    LC_ASSERT(droppedDataLength <= recoveredDataLength);
-                    LC_ASSERT(droppedDataLength == recoveredDataLength || (nvPacket->flags & FLAG_EOF));
+                    LC_ASSERT_VT(droppedDataLength <= recoveredDataLength);
+                    LC_ASSERT_VT(droppedDataLength == recoveredDataLength || (nvPacket->flags & FLAG_EOF));
 
                     // Check all NV_VIDEO_PACKET fields except FEC stuff which differs in the recovered packet
-                    LC_ASSERT(nvPacket->flags == droppedNvPacket->flags);
-                    LC_ASSERT(nvPacket->frameIndex == droppedNvPacket->frameIndex);
-                    LC_ASSERT(nvPacket->streamPacketIndex == droppedNvPacket->streamPacketIndex);
-                    LC_ASSERT(nvPacket->reserved == droppedNvPacket->reserved);
-                    LC_ASSERT(!queue->multiFecCapable || nvPacket->multiFecBlocks == droppedNvPacket->multiFecBlocks);
+                    LC_ASSERT_VT(nvPacket->flags == droppedNvPacket->flags);
+                    LC_ASSERT_VT(nvPacket->frameIndex == droppedNvPacket->frameIndex);
+                    LC_ASSERT_VT(nvPacket->streamPacketIndex == droppedNvPacket->streamPacketIndex);
+                    LC_ASSERT_VT(nvPacket->reserved == droppedNvPacket->reserved);
+                    LC_ASSERT_VT(!queue->multiFecCapable || nvPacket->multiFecBlocks == droppedNvPacket->multiFecBlocks);
 
                     // Check the data itself - use memcmp() and only loop if an error is detected
                     if (memcmp(nvPacket + 1, droppedNvPacket + 1, droppedDataLength)) {
@@ -409,7 +409,7 @@ cleanup_packets:
                         }
                     }
 
-                    LC_ASSERT(recoveryErrors == 0);
+                    LC_ASSERT_VT(recoveryErrors == 0);
 
                     // This drop was fake, so we don't want to actually submit it to the depacketizer.
                     // It will get confused because it's already seen this packet before.
@@ -542,7 +542,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
     }
 
     // FLAG_EXTENSION is required for all supported versions of GFE.
-    LC_ASSERT(packet->header & FLAG_EXTENSION);
+    LC_ASSERT_VT(packet->header & FLAG_EXTENSION);
 
     int dataOffset = sizeof(*packet);
     if (packet->header & FLAG_EXTENSION) {
@@ -567,11 +567,13 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         nvPacket->multiFecFlags = 0x10;
         nvPacket->multiFecBlocks = 0x00;
     }
-    
+
+#ifndef LC_FUZZING
     if (isBefore16(nvPacket->frameIndex, queue->currentFrameNumber)) {
         // Reject frames behind our current frame number
         return RTPF_RET_REJECTED;
     }
+#endif
 
     uint32_t fecIndex = (nvPacket->fecInfo & 0x3FF000) >> 12;
     uint8_t fecCurrentBlockNumber = (nvPacket->multiFecBlocks >> 4) & 0x3;
@@ -666,7 +668,7 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         // The check here looks weird, but that's because we increment the frame number
         // after successfully processing a frame.
         if (queue->currentFrameNumber != nvPacket->frameIndex) {
-            LC_ASSERT(queue->currentFrameNumber < nvPacket->frameIndex);
+            LC_ASSERT_VT(queue->currentFrameNumber < nvPacket->frameIndex);
 
             // If the frame immediately preceding this one was lost, we may have already
             // reported it using our speculative RFI logic. Don't report it again.
@@ -700,25 +702,26 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->bufferHighestSequenceNumber = U16(queue->bufferFirstParitySequenceNumber + queue->bufferParityPackets - 1);
         queue->multiFecCurrentBlockNumber = fecCurrentBlockNumber;
         queue->multiFecLastBlockNumber = (nvPacket->multiFecBlocks >> 6) & 0x3;
-    } else if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
-        // In rare cases, we get extra parity packets. It's rare enough that it's probably
-        // not worth handling, so we'll just drop them.
+    }
+
+    // Reject packets above our FEC queue valid sequence number range
+    if (isBefore16(queue->bufferHighestSequenceNumber, packet->sequenceNumber)) {
         return RTPF_RET_REJECTED;
     }
 
-    LC_ASSERT(!queue->fecPercentage || U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
-    LC_ASSERT((nvPacket->fecInfo & 0xFF0) >> 4 == queue->fecPercentage);
-    LC_ASSERT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
+    LC_ASSERT_VT(!queue->fecPercentage || U16(packet->sequenceNumber - fecIndex) == queue->bufferLowestSequenceNumber);
+    LC_ASSERT_VT((nvPacket->fecInfo & 0xFF0) >> 4 == queue->fecPercentage);
+    LC_ASSERT_VT((nvPacket->fecInfo & 0xFFC00000) >> 22 == queue->bufferDataPackets);
 
     // Verify that the legacy non-multi-FEC compatibility code works
-    LC_ASSERT(queue->multiFecCapable || fecCurrentBlockNumber == 0);
-    LC_ASSERT(queue->multiFecCapable || queue->multiFecLastBlockNumber == 0);
+    LC_ASSERT_VT(queue->multiFecCapable || fecCurrentBlockNumber == 0);
+    LC_ASSERT_VT(queue->multiFecCapable || queue->multiFecLastBlockNumber == 0);
 
     // Multi-block FEC details must remain the same within a single frame
-    LC_ASSERT(fecCurrentBlockNumber == queue->multiFecCurrentBlockNumber);
-    LC_ASSERT(((nvPacket->multiFecBlocks >> 6) & 0x3) == queue->multiFecLastBlockNumber);
+    LC_ASSERT_VT(fecCurrentBlockNumber == queue->multiFecCurrentBlockNumber);
+    LC_ASSERT_VT(((nvPacket->multiFecBlocks >> 6) & 0x3) == queue->multiFecLastBlockNumber);
 
-    LC_ASSERT((nvPacket->flags & FLAG_EOF) || length - dataOffset == StreamConfig.packetSize);
+    LC_ASSERT_VT((nvPacket->flags & FLAG_EOF) || length - dataOffset == StreamConfig.packetSize);
     if (!queuePacket(queue, packetEntry, packet, length, !isBefore16(packet->sequenceNumber, queue->bufferFirstParitySequenceNumber), false)) {
         return RTPF_RET_REJECTED;
     }
