@@ -42,7 +42,9 @@ typedef struct _STREAM_CONFIGURATION {
     // FPS of the desired video stream
     int fps;
 
-    // Bitrate of the desired video stream (audio adds another ~1 Mbps)
+    // Bitrate of the desired video stream (audio adds another ~1 Mbps). This
+    // includes error correction data, so the actual encoder bitrate will be
+    // about 20% lower when using the standard 20% FEC configuration.
     int bitrate;
 
     // Max video packet size in bytes (use 1024 if unsure). If STREAM_CFG_AUTO
@@ -64,18 +66,6 @@ typedef struct _STREAM_CONFIGURATION {
     // Specifies the mask of supported video formats.
     // See VIDEO_FORMAT constants below.
     int supportedVideoFormats;
-
-    // Specifies the percentage that the specified bitrate will be adjusted
-    // when an HEVC stream will be delivered. This allows clients to opt to
-    // reduce bandwidth when HEVC is chosen as the video codec rather than
-    // (or in addition to) improving image quality.
-    int hevcBitratePercentageMultiplier;
-
-    // Specifies the percentage that the specified bitrate will be adjusted
-    // when an AV1 stream will be delivered. This allows clients to opt to
-    // reduce bandwidth when AV1 is chosen as the video codec rather than
-    // (or in addition to) improving image quality.
-    int av1BitratePercentageMultiplier;
 
     // If specified, the client's display refresh rate x 100. For example,
     // 59.94 Hz would be specified as 5994. This is used by recent versions

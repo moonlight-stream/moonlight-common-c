@@ -29,7 +29,6 @@ extern bool HighQualitySurroundSupported;
 extern bool HighQualitySurroundEnabled;
 extern OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
 extern OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
-extern int OriginalVideoBitrate;
 extern int AudioPacketDuration;
 extern bool AudioEncryptionEnabled;
 extern bool ReferenceFrameInvalidationSupported;

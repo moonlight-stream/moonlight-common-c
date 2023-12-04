@@ -22,7 +22,6 @@ bool HighQualitySurroundSupported;
 bool HighQualitySurroundEnabled;
 OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
 OPUS_MULTISTREAM_CONFIGURATION HighQualityOpusConfig;
-int OriginalVideoBitrate;
 int AudioPacketDuration;
 bool AudioEncryptionEnabled;
 bool ReferenceFrameInvalidationSupported;
@@ -258,7 +257,6 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     memset(&LocalAddr, 0, sizeof(LocalAddr));
     NegotiatedVideoFormat = 0;
     memcpy(&StreamConfig, streamConfig, sizeof(StreamConfig));
-    OriginalVideoBitrate = streamConfig->bitrate;
     RemoteAddrString = strdup(serverInfo->address);
 
     // The values in RTSP SETUP will be used to populate these.

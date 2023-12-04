@@ -785,7 +785,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     // 2. The audio decoder has not declared that it is slow
     // 3. The stream is either local or not surround sound (to prevent MTU issues over the Internet)
     LC_ASSERT(StreamConfig.streamingRemotely != STREAM_CFG_AUTO);
-    if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
+    if (StreamConfig.bitrate >= HIGH_AUDIO_BITRATE_THRESHOLD &&
             (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0 &&
             (StreamConfig.streamingRemotely != STREAM_CFG_REMOTE || CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) <= 2)) {
         // If we have an RTSP URL string and it was successfully parsed and copied, use that string
@@ -906,12 +906,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             }
             else {
                 NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN8;
-
-                // Apply bitrate adjustment for SDR AV1 if the client requested one
-                if (StreamConfig.av1BitratePercentageMultiplier != 0) {
-                    StreamConfig.bitrate *= StreamConfig.av1BitratePercentageMultiplier;
-                    StreamConfig.bitrate /= 100;
-                }
             }
         }
         else if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_H265) && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
@@ -926,12 +920,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             }
             else {
                 NegotiatedVideoFormat = VIDEO_FORMAT_H265;
-
-                // Apply bitrate adjustment for SDR HEVC if the client requested one
-                if (StreamConfig.hevcBitratePercentageMultiplier != 0) {
-                    StreamConfig.bitrate *= StreamConfig.hevcBitratePercentageMultiplier;
-                    StreamConfig.bitrate /= 100;
-                }
             }
         }
         else {

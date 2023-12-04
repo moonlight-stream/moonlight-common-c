@@ -258,7 +258,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     int audioChannelCount;
     int audioChannelMask;
     int err;
-    int bitrate;
+    int adjustedBitrate;
 
     // This must have been resolved to either local or remote by now
     LC_ASSERT(StreamConfig.streamingRemotely != STREAM_CFG_AUTO);
@@ -289,44 +289,43 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     err |= addAttributeString(&optionHead, "x-nv-video[0].timeoutLengthMs", "7000");
     err |= addAttributeString(&optionHead, "x-nv-video[0].framesWithInvalidRefThreshold", "0");
 
+    // 20% of the video bitrate will added to the user-specified bitrate for FEC
+    adjustedBitrate = (int)(StreamConfig.bitrate * 0.80);
+
     // Use more strict bitrate logic when streaming remotely. The theory here is that remote
     // streaming is much more bandwidth sensitive. Someone might select 5 Mbps because that's
     // really all they have, so we need to be careful not to exceed the cap, even counting
     // things like audio and control data.
     if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
-        // 20% of the video bitrate will added to the user-specified bitrate for FEC
-        bitrate = (int)(OriginalVideoBitrate * 0.80);
-
         // Subtract 500 Kbps to leave room for audio and control. On remote streams,
         // GFE will use 96Kbps stereo audio. For local streams, it will choose 512Kbps.
-        if (bitrate > 500) {
-            bitrate -= 500;
+        if (adjustedBitrate > 500) {
+            adjustedBitrate -= 500;
         }
     }
-    else {
-        bitrate = StreamConfig.bitrate;
-    }
-
-    // If the calculated bitrate (with the HEVC multiplier in effect) is less than this,
-    // use the lower of the two bitrate values.
-    bitrate = StreamConfig.bitrate < bitrate ? StreamConfig.bitrate : bitrate;
 
     // GFE currently imposes a limit of 100 Mbps for the video bitrate. It will automatically
     // impose that on maximumBitrateKbps but not on initialBitrateKbps. We will impose the cap
     // ourselves so initialBitrateKbps does not exceed maximumBitrateKbps.
-    bitrate = bitrate > 100000 ? 100000 : bitrate;
+    adjustedBitrate = adjustedBitrate > 100000 ? 100000 : adjustedBitrate;
 
     // We don't support dynamic bitrate scaling properly (it tends to bounce between min and max and never
     // settle on the optimal bitrate if it's somewhere in the middle), so we'll just latch the bitrate
     // to the requested value.
     if (AppVersionQuad[0] >= 5) {
-        snprintf(payloadStr, sizeof(payloadStr), "%d", bitrate);
+        snprintf(payloadStr, sizeof(payloadStr), "%d", adjustedBitrate);
 
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-video[0].initialPeakBitrateKbps", payloadStr);
 
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrateKbps", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrateKbps", payloadStr);
+
+        // Send the configured bitrate to Sunshine hosts, so they can adjust for dynamic FEC percentage
+        if (IS_SUNSHINE()) {
+            snprintf(payloadStr, sizeof(payloadStr), "%u", StreamConfig.bitrate);
+            err |= addAttributeString(&optionHead, "x-ml-video.configuredBitrateKbps", payloadStr);
+        }
     }
     else {
         if (StreamConfig.streamingRemotely == STREAM_CFG_REMOTE) {
@@ -334,7 +333,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             err |= addAttributeString(&optionHead, "x-nv-video[0].peakBitrate", "4");
         }
 
-        snprintf(payloadStr, sizeof(payloadStr), "%d", bitrate);
+        snprintf(payloadStr, sizeof(payloadStr), "%d", adjustedBitrate);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.minimumBitrate", payloadStr);
         err |= addAttributeString(&optionHead, "x-nv-vqos[0].bw.maximumBitrate", payloadStr);
     }
@@ -447,8 +446,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     }
 
     if (AppVersionQuad[0] >= 7) {
-        // Decide to use HQ audio based on the original video bitrate, not the HEVC-adjusted value
-        if (OriginalVideoBitrate >= HIGH_AUDIO_BITRATE_THRESHOLD && audioChannelCount > 2 &&
+        if (StreamConfig.bitrate >= HIGH_AUDIO_BITRATE_THRESHOLD && audioChannelCount > 2 &&
                 HighQualitySurroundSupported && (AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) == 0) {
             // Enable high quality mode for surround sound
             err |= addAttributeString(&optionHead, "x-nv-audio.surround.AudioQuality", "1");
@@ -466,7 +464,7 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
 
             if ((AudioCallbacks.capabilities & CAPABILITY_SLOW_OPUS_DECODER) ||
                      ((AudioCallbacks.capabilities & CAPABILITY_SUPPORTS_ARBITRARY_AUDIO_DURATION) != 0 &&
-                       OriginalVideoBitrate < LOW_AUDIO_BITRATE_TRESHOLD)) {
+                       StreamConfig.bitrate < LOW_AUDIO_BITRATE_TRESHOLD)) {
                 // Use 10 ms packets for slow devices and networks to balance latency and bandwidth usage
                 AudioPacketDuration = 10;
             }
