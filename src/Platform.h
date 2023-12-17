@@ -44,9 +44,6 @@
 
 #ifdef _WIN32
 # define LC_WINDOWS
-# if defined(WINAPI_FAMILY) && WINAPI_FAMILY==WINAPI_FAMILY_APP
-#  define LC_UWP
-# endif 
 #else
 # define LC_POSIX
 # if defined(__APPLE__)

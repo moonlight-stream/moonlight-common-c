@@ -14,6 +14,12 @@
 
 #if defined(LC_WINDOWS)
 
+# if defined(WINAPI_FAMILY) && WINAPI_FAMILY==WINAPI_FAMILY_APP
+# define LC_UWP
+# else 
+# define LC_WINDOWS_DESKTOP
+#endif
+
 #ifndef SIO_UDP_CONNRESET
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
 #endif
@@ -21,7 +27,7 @@
 static HMODULE WlanApiLibraryHandle;
 static HANDLE WlanHandle;
 
-#if defined(LC_WINDOWS) && !defined(LC_UWP)
+#if defined(LC_WINDOWS_DESKTOP)
 DWORD (WINAPI *pfnWlanOpenHandle)(DWORD dwClientVersion, PVOID pReserved, PDWORD pdwNegotiatedVersion, PHANDLE phClientHandle);
 DWORD (WINAPI *pfnWlanCloseHandle)(HANDLE hClientHandle, PVOID pReserved);
 DWORD (WINAPI *pfnWlanEnumInterfaces)(HANDLE hClientHandle, PVOID pReserved, PWLAN_INTERFACE_INFO_LIST *ppInterfaceList);
@@ -620,7 +626,7 @@ bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
 // Enable platform-specific low latency options (best-effort)
 void enterLowLatencyMode(void) {
-#if defined(LC_WINDOWS) && !defined(LC_UWP)
+#if defined(LC_WINDOWS_DESKTOP)
     DWORD negotiatedVersion;
     PWLAN_INTERFACE_INFO_LIST wlanInterfaceList;
     DWORD i;
@@ -694,7 +700,7 @@ void enterLowLatencyMode(void) {
 }
 
 void exitLowLatencyMode(void) {
-#if defined(LC_WINDOWS) && !defined(LC_UWP)
+#if defined(LC_WINDOWS_DESKTOP)
     // Closing our WLAN client handle will undo our optimizations
     if (WlanHandle != NULL) {
         pfnWlanCloseHandle(WlanHandle, NULL);
