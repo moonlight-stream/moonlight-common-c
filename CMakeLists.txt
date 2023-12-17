@@ -35,10 +35,7 @@ target_link_libraries(moonlight-common-c PRIVATE enet)
 
 if(MSVC)
   target_compile_options(moonlight-common-c PRIVATE /W3 /wd4100 /wd4232 /wd5105)
-  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-  if(TARGET_UWP)
-	
-  else()
+  if(NOT TARGET_UWP)
 	target_compile_options(moonlight-common-c PRIVATE /WX)
   endif()
   target_link_libraries(moonlight-common-c PRIVATE ws2_32.lib winmm.lib)
