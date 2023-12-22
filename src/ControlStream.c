@@ -1068,6 +1068,10 @@ static void controlReceiveThreadFunc(void* context) {
         }
 
         if (err < 0) {
+            // The error from serviceEnetHost() should be propagated via LastSocketError()
+            LC_ASSERT(err == -1);
+
+            err = LastSocketFail();
             Limelog("Control stream connection failed: %d\n", err);
             ListenerCallbacks.connectionTerminated(err);
             return;
