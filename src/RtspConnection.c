@@ -1067,6 +1067,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     if (AppVersionQuad[0] >= 5) {
         RTSP_MESSAGE response;
         int error = -1;
+        char* connectData;
 
         if (!setupStream(&response,
                          controlStreamId,
@@ -1081,6 +1082,15 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
             goto Exit;
+        }
+
+        // Parse the Sunshine control connect data extension if present
+        connectData = getOptionContent(response.options, "X-SS-Connect-Data");
+        if (connectData != NULL) {
+            ControlConnectData = (uint32_t)strtoul(connectData, NULL, 0);
+        }
+        else {
+            ControlConnectData = 0;
         }
 
         // Parse the control port out of the RTSP SETUP response

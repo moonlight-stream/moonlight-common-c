@@ -1625,7 +1625,7 @@ int startControlStream(void) {
         enet_socket_set_option (client->socket, ENET_SOCKOPT_QOS, 1);
 
         // Connect to the host
-        peer = enet_host_connect(client, &remoteAddress, CTRL_CHANNEL_COUNT, 0);
+        peer = enet_host_connect(client, &remoteAddress, CTRL_CHANNEL_COUNT, ControlConnectData);
         if (peer == NULL) {
             stopping = true;
             enet_host_destroy(client);
