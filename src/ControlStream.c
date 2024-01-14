@@ -90,7 +90,7 @@ static int intervalTotalFrameCount;
 static uint64_t intervalStartTimeMs;
 static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
-static int currentEnetSequenceNumber;
+static uint32_t currentEnetSequenceNumber;
 static uint64_t firstFrameTimeMs;
 
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
@@ -503,9 +503,18 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     unsigned char iv[16] = { 0 };
     int encryptedSize = sizeof(*packet) + packet->payloadLength;
 
-    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
     // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
-    iv[0] = (unsigned char)encPacket->seq;
+    if (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) {
+        // Populate the IV in little endian byte order
+        iv[3] = (unsigned char)(encPacket->seq >> 24);
+        iv[2] = (unsigned char)(encPacket->seq >> 16);
+        iv[1] = (unsigned char)(encPacket->seq >> 8);
+        iv[0] = (unsigned char)(encPacket->seq >> 0);
+    }
+    else {
+        // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+        iv[0] = (unsigned char)encPacket->seq;
+    }
 
     encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
     encPacket->length = LE16(encPacket->length);
@@ -545,8 +554,17 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         return false;
     }
 
-    // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-    iv[0] = (unsigned char)encPacket->seq;
+    if (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) {
+        // Populate the IV in little endian byte order
+        iv[3] = (unsigned char)(encPacket->seq >> 24);
+        iv[2] = (unsigned char)(encPacket->seq >> 16);
+        iv[1] = (unsigned char)(encPacket->seq >> 8);
+        iv[0] = (unsigned char)(encPacket->seq >> 0);
+    }
+    else {
+        // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+        iv[0] = (unsigned char)encPacket->seq;
+    }
 
     int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
     *packet = malloc(plaintextLength);
