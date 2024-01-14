@@ -520,3 +520,7 @@ Cleanup:
     }
     return err;
 }
+
+const char* LiGetLaunchUrlQueryParameters() {
+    return "&corever=0";
+}

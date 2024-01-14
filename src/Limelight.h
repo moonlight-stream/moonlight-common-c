@@ -34,6 +34,12 @@ extern "C" {
 #define ENCFLG_AUDIO 0x00000001
 #define ENCFLG_ALL   0xFFFFFFFF
 
+// This function returns a string that you SHOULD append to the /launch and /resume
+// query parameter string. This is used to enable certain extended functionality
+// with Sunshine hosts. The returned string is owned by moonlight-common-c and
+// should not be freed by the caller.
+const char* LiGetLaunchUrlQueryParameters(void);
+
 typedef struct _STREAM_CONFIGURATION {
     // Dimensions in pixels of the desired video stream
     int width;
