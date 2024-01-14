@@ -942,6 +942,15 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             SunshineFeatureFlags = 0;
         }
 
+        // Look for the Sunshine encryption flags in the SDP attributes
+        if (!parseSdpAttributeToUInt(response.payload, "x-ss-general.encryptionSupported", &EncryptionFeaturesSupported)) {
+            EncryptionFeaturesSupported = 0;
+        }
+        if (!parseSdpAttributeToUInt(response.payload, "x-ss-general.encryptionRequested", &EncryptionFeaturesRequested)) {
+            EncryptionFeaturesRequested = 0;
+        }
+        EncryptionFeaturesEnabled = 0;
+
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
         ret = parseOpusConfigurations(&response);
         if (ret != 0) {

@@ -44,6 +44,14 @@ extern uint32_t ControlConnectData;
 
 extern uint32_t SunshineFeatureFlags;
 
+// Encryption flags shared by Sunshine and Moonlight in RTSP
+#define SS_ENC_CONTROL_V2 0x01
+#define SS_ENC_VIDEO 0x02
+
+extern uint32_t EncryptionFeaturesSupported;
+extern uint32_t EncryptionFeaturesRequested;
+extern uint32_t EncryptionFeaturesEnabled;
+
 // ENet channel ID values
 #define CTRL_CHANNEL_GENERIC      0x00
 #define CTRL_CHANNEL_URGENT       0x01 // IDR and reference frame invalidation requests
