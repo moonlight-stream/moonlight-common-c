@@ -1119,10 +1119,10 @@ static void controlReceiveThreadFunc(void* context) {
                     ctlHdr->type = LE16(ctlHdr->type);
                 }
                 else {
-                    // What do we do here???
                     LC_ASSERT_VT(false);
-                    packetLength = (int)event.packet->dataLength;
-                    event.packet->data = NULL;
+                    Limelog("Discarding unencrypted packet on encrypted control stream: %04x\n", ctlHdr->type);
+                    enet_packet_destroy(event.packet);
+                    continue;
                 }
             }
             else {
