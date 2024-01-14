@@ -190,8 +190,8 @@ static int addGen5Options(PSDP_OPTION* head) {
         // RI encryption is always enabled
         featureFlags = NVFF_BASE | NVFF_RI_ENCRYPTION;
 
-        // Enable audio encryption if the client opted in
-        if (StreamConfig.encryptionFlags & ENCFLG_AUDIO) {
+        // Enable audio encryption if the client opted in or the host required it
+        if ((StreamConfig.encryptionFlags & ENCFLG_AUDIO) || (EncryptionFeaturesEnabled & SS_ENC_AUDIO)) {
             featureFlags |= NVFF_AUDIO_ENCRYPTION;
             AudioEncryptionEnabled = true;
         }
@@ -286,6 +286,17 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             // we'll encrypt anyway (since we are capable of doing so) and print a warning.
             Limelog("Enabling video encryption by host request despite client opt-out. Performance may suffer!");
             EncryptionFeaturesEnabled |= SS_ENC_VIDEO;
+        }
+
+        // If audio encryption is supported by the host and desired by the client, use it
+        if ((EncryptionFeaturesSupported & SS_ENC_AUDIO) && (StreamConfig.encryptionFlags & ENCFLG_AUDIO)) {
+            EncryptionFeaturesEnabled |= SS_ENC_AUDIO;
+        }
+        else if ((EncryptionFeaturesRequested & SS_ENC_AUDIO) && !(StreamConfig.encryptionFlags & ENCFLG_AUDIO)) {
+            // If audio encryption is explicitly requested by the host but *not* by the client,
+            // we'll encrypt anyway (since we are capable of doing so) and print a warning.
+            Limelog("Enabling audio encryption by host request despite client opt-out. Audio quality may suffer!");
+            EncryptionFeaturesEnabled |= SS_ENC_AUDIO;
         }
 
         snprintf(payloadStr, sizeof(payloadStr), "%u", EncryptionFeaturesEnabled);
