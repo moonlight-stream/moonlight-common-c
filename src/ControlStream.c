@@ -510,6 +510,10 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
         iv[2] = (unsigned char)(encPacket->seq >> 16);
         iv[1] = (unsigned char)(encPacket->seq >> 8);
         iv[0] = (unsigned char)(encPacket->seq >> 0);
+
+        // Set high bytes to something unique to ensure no IV collisions
+        iv[14] = (unsigned char)'C'; // Client originated
+        iv[15] = (unsigned char)'C'; // Control stream
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
@@ -560,6 +564,10 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         iv[2] = (unsigned char)(encPacket->seq >> 16);
         iv[1] = (unsigned char)(encPacket->seq >> 8);
         iv[0] = (unsigned char)(encPacket->seq >> 0);
+
+        // Set high bytes to something unique to ensure no IV collisions
+        iv[14] = (unsigned char)'H'; // Host originated
+        iv[15] = (unsigned char)'C'; // Control stream
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
