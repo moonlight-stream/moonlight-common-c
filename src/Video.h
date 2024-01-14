@@ -9,6 +9,11 @@ typedef struct _QUEUED_DECODE_UNIT {
 
 #pragma pack(push, 1)
 
+typedef struct _ENC_VIDEO_HEADER {
+    uint8_t iv[16];
+    uint8_t tag[16];
+} ENC_VIDEO_HEADER, *PENC_VIDEO_HEADER;
+
 #define FLAG_CONTAINS_PIC_DATA 0x1
 #define FLAG_EOF 0x2
 #define FLAG_SOF 0x4

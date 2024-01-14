@@ -276,6 +276,18 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         if (EncryptionFeaturesSupported & SS_ENC_CONTROL_V2) {
             EncryptionFeaturesEnabled |= SS_ENC_CONTROL_V2;
         }
+
+        // If video encryption is supported by the host and desired by the client, use it
+        if ((EncryptionFeaturesSupported & SS_ENC_VIDEO) && (StreamConfig.encryptionFlags & ENCFLG_VIDEO)) {
+            EncryptionFeaturesEnabled |= SS_ENC_VIDEO;
+        }
+        else if ((EncryptionFeaturesRequested & SS_ENC_VIDEO) && !(StreamConfig.encryptionFlags & ENCFLG_VIDEO)) {
+            // If video encryption is explicitly requested by the host but *not* by the client,
+            // we'll encrypt anyway (since we are capable of doing so) and print a warning.
+            Limelog("Enabling video encryption by host request despite client opt-out. Performance may suffer!");
+            EncryptionFeaturesEnabled |= SS_ENC_VIDEO;
+        }
+
         snprintf(payloadStr, sizeof(payloadStr), "%u", EncryptionFeaturesEnabled);
         err |= addAttributeString(&optionHead, "x-ss-general.encryptionEnabled", payloadStr);
     }

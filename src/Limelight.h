@@ -32,6 +32,7 @@ extern "C" {
 // Values for 'encryptionFlags' field below
 #define ENCFLG_NONE  0x00000000
 #define ENCFLG_AUDIO 0x00000001
+#define ENCFLG_VIDEO 0x00000002
 #define ENCFLG_ALL   0xFFFFFFFF
 
 // This function returns a string that you SHOULD append to the /launch and /resume
