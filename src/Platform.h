@@ -62,7 +62,6 @@
 # define LC_WINDOWS_DESKTOP
 #endif
 
-
 #endif
 
 #include <stdio.h>

@@ -14,7 +14,6 @@
 
 #if defined(LC_WINDOWS)
 
-
 #ifndef SIO_UDP_CONNRESET
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
 #endif
