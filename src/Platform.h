@@ -55,6 +55,14 @@
 // Windows doesn't have strtok_r() but it has the same
 // function named strtok_s().
 #define strtok_r strtok_s
+
+# if defined(WINAPI_FAMILY) && WINAPI_FAMILY==WINAPI_FAMILY_APP
+# define LC_UWP
+# else 
+# define LC_WINDOWS_DESKTOP
+#endif
+
+
 #endif
 
 #include <stdio.h>

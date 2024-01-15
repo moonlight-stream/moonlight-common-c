@@ -14,11 +14,6 @@
 
 #if defined(LC_WINDOWS)
 
-# if defined(WINAPI_FAMILY) && WINAPI_FAMILY==WINAPI_FAMILY_APP
-# define LC_UWP
-# else 
-# define LC_WINDOWS_DESKTOP
-#endif
 
 #ifndef SIO_UDP_CONNRESET
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
