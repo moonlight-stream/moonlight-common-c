@@ -311,6 +311,12 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
     snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.fps);
     err |= addAttributeString(&optionHead, "x-nv-video[0].maxFPS", payloadStr);
 
+    // Adjust the video packet size to account for encryption overhead
+    if (EncryptionFeaturesEnabled & SS_ENC_VIDEO) {
+        LC_ASSERT(StreamConfig.packetSize % 16 == 0);
+        StreamConfig.packetSize -= sizeof(ENC_VIDEO_HEADER);
+        LC_ASSERT(StreamConfig.packetSize % 16 == 0);
+    }
     snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.packetSize);
     err |= addAttributeString(&optionHead, "x-nv-video[0].packetSize", payloadStr);
 
