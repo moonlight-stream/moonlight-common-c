@@ -35,6 +35,10 @@ DWORD (WINAPI *pfnWlanSetInterface)(HANDLE hClientHandle, CONST GUID *pInterface
 
 #endif
 
+#ifdef __3DS__
+in_port_t n3ds_udp_port = 47998;
+#endif
+
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string, size_t stringLength)
 {
     char addrstr[URLSAFESTRING_LEN];
@@ -74,8 +78,8 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
     // losing some data in a very rare case is fine, especially because we get to
     // halve the number of syscalls per packet by avoiding select().
     return setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeoutMs, sizeof(timeoutMs));
-#elif defined(__WIIU__)
-    // timeouts aren't supported on Wii U
+#elif defined(__WIIU__) || defined(__3DS__)
+    // timeouts aren't supported on Wii U or 3DS
     return -1;
 #else
     struct timeval val;
@@ -143,6 +147,15 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
     }
 
     return err;
+#elif defined(__3DS__)
+    int err;
+    for (int i = 0; i < timeoutMs; i++) {
+        err = poll(pollFds, pollFdsCount, 1); // need to do this on 3ds since poll will block even if socket is ready before
+        if (err) {
+            break;
+        }
+    }
+    return err;
 #else
     return poll(pollFds, pollFdsCount, timeoutMs);
 #endif
@@ -164,7 +177,7 @@ bool isSocketReadable(SOCKET s) {
 
 int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
     int err;
-    
+
     do {
         if (useSelect) {
             struct pollfd pfd;
@@ -251,6 +264,11 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
 #endif
     }
 
+#ifdef __3DS__
+    // binding to wildcard port is broken on the 3DS, so we need to define a port manually
+    struct sockaddr_in *n3ds_addr = &bindAddr;
+    n3ds_addr->sin_port = htons(n3ds_udp_port++);
+#endif
     if (bind(s, (struct sockaddr*) &bindAddr, addrLen) == SOCKET_ERROR) {
         err = LastSocketError();
         Limelog("bind() failed: %d\n", err);
@@ -353,6 +371,9 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlo
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
     }
 #endif
+#ifdef __3DS__
+    SOCU_AddGlobalSocket(s);
+#endif
 
     if (nonBlocking) {
         setSocketNonBlocking(s, true);
@@ -426,7 +447,7 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
             goto Exit;
         }
     }
-    
+
     // Wait for the connection to complete or the timeout to elapse
     pfd.fd = s;
     pfd.events = POLLOUT;
@@ -446,6 +467,17 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
         SetLastSocketError(ETIMEDOUT);
         return INVALID_SOCKET;
     }
+#ifdef __3DS__ //SO_ERROR is unreliable on 3DS
+    else {
+        char test_buffer[1];
+        err = (int)recv(s, test_buffer, 1, MSG_PEEK);
+        if (err < 0 &&
+            (LastSocketError() == EWOULDBLOCK ||
+            LastSocketError() == EAGAIN)) {
+            err = 0;
+        }
+    }
+#else
     else {
         // The socket was signalled
         SOCKADDR_LEN len = sizeof(err);
@@ -455,10 +487,11 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
             err = (err != 0) ? err : LastSocketFail();
         }
     }
+#endif
 
     // Disable non-blocking I/O now that the connection is established
     setSocketNonBlocking(s, false);
-    
+
 Exit:
     if (err != 0) {
         Limelog("connect() failed: %d\n", err);
@@ -521,7 +554,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
         Limelog("getaddrinfo(%s) returned success without addresses\n", host);
         return -1;
     }
-    
+
     for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
         // Use the test port to ensure this address is working if:
         // a) We have multiple addresses
@@ -539,10 +572,10 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
                 closeSocket(testSocket);
             }
         }
-        
+
         memcpy(addr, currentAddr->ai_addr, currentAddr->ai_addrlen);
         *addrLen = (SOCKADDR_LEN)currentAddr->ai_addrlen;
-        
+
         freeaddrinfo(res);
         return 0;
     }
@@ -555,14 +588,14 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
 #ifdef AF_INET6
 bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLength) {
     int i;
-    
+
     for (i = 0; i < prefixLength; i++) {
         unsigned char mask = 1 << (i % 8);
         if ((sin6->sin6_addr.s6_addr[i / 8] & mask) != (subnet[i / 8] & mask)) {
             return false;
         }
     }
-    
+
     return true;
 }
 #endif
@@ -575,7 +608,7 @@ bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
 
         memcpy(&addr, &((struct sockaddr_in*)address)->sin_addr, sizeof(addr));
         addr = htonl(addr);
-        
+
         // 10.0.0.0/8
         if ((addr & 0xFF000000) == 0x0A000000) {
             return true;
@@ -723,7 +756,7 @@ int initializePlatformSockets(void) {
 #if defined(LC_WINDOWS)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
-#elif defined(__vita__) || defined(__WIIU__)
+#elif defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
     return 0; // already initialized
 #elif defined(LC_POSIX) && !defined(LC_CHROME)
     // Disable SIGPIPE signals to avoid us getting
