@@ -362,7 +362,7 @@ void destroyControlStream(void) {
 
 static void queueFrameInvalidationTuple(uint32_t startFrame, uint32_t endFrame) {
     LC_ASSERT(startFrame <= endFrame);
-    
+
     if (isReferenceFrameInvalidationEnabled()) {
         PQUEUED_FRAME_INVALIDATION_TUPLE qfit;
         qfit = malloc(sizeof(*qfit));
@@ -411,7 +411,7 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
     if (!IS_SUNSHINE()) {
         return;
     }
-    
+
     // Queue a frame FEC status message. This is best-effort only.
     PQUEUED_FRAME_FEC_STATUS queuedFecStatus = malloc(sizeof(*queuedFecStatus));
     if (queuedFecStatus != NULL) {
@@ -1290,7 +1290,7 @@ static void lossStatsThreadFunc(void* context) {
                         free(queuedFrameStatus);
                         return;
                     }
-                    
+
                     free(queuedFrameStatus);
                 }
             }
@@ -1318,7 +1318,7 @@ static void lossStatsThreadFunc(void* context) {
     }
     else {
         char* lossStatsPayload;
-        
+
         // Sunshine should use the newer codepath above
         LC_ASSERT(!IS_SUNSHINE());
 
@@ -1494,7 +1494,7 @@ int stopControlStream(void) {
     if (ctlSock != INVALID_SOCKET) {
         shutdownTcpSocket(ctlSock);
     }
-    
+
     PltInterruptThread(&lossStatsThread);
     PltInterruptThread(&requestIdrFrameThread);
     PltInterruptThread(&controlReceiveThread);
@@ -1527,7 +1527,7 @@ int stopControlStream(void) {
         enet_host_destroy(client);
         client = NULL;
     }
-    
+
     if (ctlSock != INVALID_SOCKET) {
         closeSocket(ctlSock);
         ctlSock = INVALID_SOCKET;
@@ -1598,11 +1598,16 @@ int startControlStream(void) {
     if (AppVersionQuad[0] >= 5) {
         ENetAddress remoteAddress, localAddress;
         ENetEvent event;
-        
+
         LC_ASSERT(ControlPortNumber != 0);
 
         enet_address_set_address(&localAddress, (struct sockaddr *)&LocalAddr, AddrLen);
+#ifdef __3DS__
+        // binding to wildcard port is broken on the 3DS, so we need to define a port manually
+        enet_address_set_port(&localAddress, htons(n3ds_udp_port++));
+#else
         enet_address_set_port(&localAddress, 0); // Wildcard port
+#endif
 
         enet_address_set_address(&remoteAddress, (struct sockaddr *)&RemoteAddr, AddrLen);
         enet_address_set_port(&remoteAddress, ControlPortNumber);
@@ -1667,9 +1672,15 @@ int startControlStream(void) {
 
         // Ensure the connect verify ACK is sent immediately
         enet_host_flush(client);
-        
+
+#ifdef __3DS__
+        // Set the peer timeout to 1 minute and limit backoff to 2x RTT
+        // The 3DS can take a bit longer to set up when starting fresh
+        enet_peer_timeout(peer, 2, 60000, 60000);
+#else
         // Set the peer timeout to 10 seconds and limit backoff to 2x RTT
         enet_peer_timeout(peer, 2, 10000, 10000);
+#endif
     }
     else {
         // NB: Do NOT use ControlPortNumber here. 47995 is correct for these old versions.

@@ -93,7 +93,7 @@ void* ThreadProc(void* context) {
     free(ctx);
 #endif
 
-#if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__)
+#if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
     return 0;
 #else
     return NULL;
@@ -105,6 +105,9 @@ void PltSleepMs(int ms) {
     SleepEx(ms, FALSE);
 #elif defined(__vita__)
     sceKernelDelayThread(ms * 1000);
+#elif defined(__3DS__)
+    s64 nsecs = ms * 1000000;
+    svcSleepThread(nsecs);
 #else
     useconds_t usecs = ms * 1000;
     usleep(usecs);
@@ -129,6 +132,8 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
     }
 #elif defined(__WIIU__)
     OSFastMutex_Init(mutex, "");
+#elif defined(__3DS__)
+    LightLock_Init(mutex);
 #else
     int err = pthread_mutex_init(mutex, NULL);
     if (err != 0) {
@@ -145,7 +150,7 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
     // No-op to destroy a SRWLOCK
 #elif defined(__vita__)
     sceKernelDeleteMutex(*mutex);
-#elif defined(__WIIU__)
+#elif defined(__WIIU__) || defined(__3DS__)
 
 #else
     pthread_mutex_destroy(mutex);
@@ -159,6 +164,8 @@ void PltLockMutex(PLT_MUTEX* mutex) {
     sceKernelLockMutex(*mutex, 1, NULL);
 #elif defined(__WIIU__)
     OSFastMutex_Lock(mutex);
+#elif defined(__3DS__)
+    LightLock_Lock(mutex);
 #else
     pthread_mutex_lock(mutex);
 #endif
@@ -171,6 +178,8 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
     sceKernelUnlockMutex(*mutex, 1);
 #elif defined(__WIIU__)
     OSFastMutex_Unlock(mutex);
+#elif defined(__3DS__)
+    LightLock_Unlock(mutex);
 #else
     pthread_mutex_unlock(mutex);
 #endif
@@ -187,6 +196,9 @@ void PltJoinThread(PLT_THREAD* thread) {
         free(thread->context);
 #elif defined(__WIIU__)
     OSJoinThread(&thread->thread, NULL);
+#elif defined(__3DS__)
+    threadJoin(thread->thread, U64_MAX);
+    threadFree(thread->thread);
 #else
     pthread_join(thread->thread, NULL);
 #endif
@@ -226,7 +238,7 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     ctx->entry = entry;
     ctx->context = context;
     ctx->name = name;
-    
+
     thread->cancelled = false;
 
 #if defined(LC_WINDOWS)
@@ -265,6 +277,22 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
 
     OSSetThreadDeallocator(&thread->thread, thread_deallocator);
     OSResumeThread(&thread->thread);
+#elif defined(__3DS__)
+    {
+        s32 priority = 0x30;
+        size_t stack_size = 1024 * 1024;
+        svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+        thread->thread = threadCreate(ThreadProc,
+                                    ctx,
+                                    stack_size,
+                                    priority,
+                                    -1,
+                                    false);
+        if (thread->thread == NULL) {
+            free(ctx);
+            return -1;
+        }
+    }
 #else
     {
         int err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
@@ -351,6 +379,8 @@ int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
     }
 #elif defined(__WIIU__)
     OSFastCond_Init(cond, "");
+#elif defined(__3DS__)
+    CondVar_Init(cond);
 #else
     pthread_cond_init(cond, NULL);
 #endif
@@ -364,6 +394,8 @@ void PltDeleteConditionVariable(PLT_COND* cond) {
     sceKernelDeleteCond(*cond);
 #elif defined(__WIIU__)
     // No-op to delete an OSFastCondition
+#elif defined(__3DS__)
+    // No-op to delete CondVar
 #else
     pthread_cond_destroy(cond);
 #endif
@@ -376,6 +408,8 @@ void PltSignalConditionVariable(PLT_COND* cond) {
     sceKernelSignalCond(*cond);
 #elif defined(__WIIU__)
     OSFastCond_Signal(cond);
+#elif defined(__3DS__)
+    CondVar_Signal(cond);
 #else
     pthread_cond_signal(cond);
 #endif
@@ -388,6 +422,8 @@ void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
     sceKernelWaitCond(*cond, NULL);
 #elif defined(__WIIU__)
     OSFastCond_Wait(cond, mutex);
+#elif defined(__3DS__)
+    CondVar_Wait(cond, mutex);
 #else
     pthread_cond_wait(cond, mutex);
 #endif
@@ -452,7 +488,7 @@ int initializePlatform(void) {
     if (err != 0) {
         return err;
     }
-    
+
     err = enet_initialize();
     if (err != 0) {
         return err;
@@ -460,14 +496,14 @@ int initializePlatform(void) {
 
     enterLowLatencyMode();
 
-	return 0;
+    return 0;
 }
 
 void cleanupPlatform(void) {
     exitLowLatencyMode();
 
     cleanupPlatformSockets();
-    
+
     enet_deinitialize();
 
     LC_ASSERT(activeThreads == 0);

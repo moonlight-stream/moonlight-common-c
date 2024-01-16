@@ -28,6 +28,13 @@ typedef struct _PLT_THREAD {
     OSThread thread;
     int cancelled;
 } PLT_THREAD;
+#elif defined(__3DS__)
+typedef LightLock PLT_MUTEX;
+typedef CondVar PLT_COND;
+typedef struct _PLT_THREAD {
+    Thread thread;
+    bool cancelled;
+} PLT_THREAD;
 #elif defined (LC_POSIX)
 typedef pthread_mutex_t PLT_MUTEX;
 typedef pthread_cond_t PLT_COND;
