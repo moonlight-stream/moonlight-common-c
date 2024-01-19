@@ -534,7 +534,7 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     packet->type = LE16(packet->type);
     packet->payloadLength = LE16(packet->payloadLength);
 
-    LC_ASSERT(ivSize <= sizeof(iv));
+    LC_ASSERT(ivSize <= (int)sizeof(iv));
     LC_ASSERT(ivSize == 12 || ivSize == 16);
     return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
                              (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
@@ -596,7 +596,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         return false;
     }
 
-    LC_ASSERT(ivSize <= sizeof(iv));
+    LC_ASSERT(ivSize <= (int)sizeof(iv));
     LC_ASSERT(ivSize == 12 || ivSize == 16);
     if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
                            (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
