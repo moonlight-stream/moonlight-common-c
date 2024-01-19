@@ -501,6 +501,7 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
 
 static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
     unsigned char iv[16] = { 0 };
+    int ivSize;
     int encryptedSize = sizeof(*packet) + packet->payloadLength;
 
     // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
@@ -512,12 +513,18 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
         iv[0] = (unsigned char)(encPacket->seq >> 0);
 
         // Set high bytes to something unique to ensure no IV collisions
-        iv[14] = (unsigned char)'C'; // Client originated
-        iv[15] = (unsigned char)'C'; // Control stream
+        iv[10] = (unsigned char)'C'; // Client originated
+        iv[11] = (unsigned char)'C'; // Control stream
+
+        // Use 12-byte IV which is ideal for AES-GCM
+        ivSize = 12;
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
         iv[0] = (unsigned char)encPacket->seq;
+
+        // Nvidia's old style encryption uses a 16-byte IV
+        ivSize = 16;
     }
 
     encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
@@ -527,9 +534,11 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
     packet->type = LE16(packet->type);
     packet->payloadLength = LE16(packet->payloadLength);
 
+    LC_ASSERT(ivSize <= sizeof(iv));
+    LC_ASSERT(ivSize == 12 || ivSize == 16);
     return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
                              (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
-                             iv, sizeof(iv),
+                             iv, ivSize,
                              (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // Write tag into the space after the encrypted header
                              (unsigned char*)packet, encryptedSize,
                              ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, &encryptedSize); // Write ciphertext after the GCM tag
@@ -538,6 +547,7 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
 // Caller must free() *packet on success!!!
 static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
     unsigned char iv[16] = { 0 };
+    int ivSize;
 
     *packet = NULL;
 
@@ -566,12 +576,18 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         iv[0] = (unsigned char)(encPacket->seq >> 0);
 
         // Set high bytes to something unique to ensure no IV collisions
-        iv[14] = (unsigned char)'H'; // Host originated
-        iv[15] = (unsigned char)'C'; // Control stream
+        iv[10] = (unsigned char)'H'; // Host originated
+        iv[11] = (unsigned char)'C'; // Control stream
+
+        // Use 12-byte IV which is ideal for AES-GCM
+        ivSize = 12;
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
         iv[0] = (unsigned char)encPacket->seq;
+
+        // Nvidia's old style encryption uses a 16-byte IV
+        ivSize = 16;
     }
 
     int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
@@ -580,9 +596,11 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         return false;
     }
 
+    LC_ASSERT(ivSize <= sizeof(iv));
+    LC_ASSERT(ivSize == 12 || ivSize == 16);
     if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
                            (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
-                           iv, sizeof(iv),
+                           iv, ivSize,
                            (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header
                            ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength, // The ciphertext is after the tag
                            (unsigned char*)*packet, &plaintextLength)) {
