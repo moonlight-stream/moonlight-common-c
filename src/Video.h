@@ -14,7 +14,7 @@ typedef struct _QUEUED_DECODE_UNIT {
 // for FEC stays a multiple of 16 too.
 typedef struct _ENC_VIDEO_HEADER {
     uint8_t iv[12];
-    uint32_t unused;
+    uint32_t frameNumber;
     uint8_t tag[16];
 } ENC_VIDEO_HEADER, *PENC_VIDEO_HEADER;
 

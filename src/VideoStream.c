@@ -187,6 +187,31 @@ static void VideoReceiveThreadProc(void* context) {
         if (encrypted) {
             PENC_VIDEO_HEADER encHeader = (PENC_VIDEO_HEADER)encryptedBuffer;
 
+            // If this frame is below our current frame number, discard it before decryption
+            // to save CPU cycles decrypting FEC shards for a frame we already reassembled.
+            //
+            // Since this is happening _before_ decryption, this packet is not trusted yet.
+            // It's imperative that we do not mutate any state based on this packet until
+            // after it has been decrypted successfully!
+            //
+            // It's possible for an attacker to inject a fake packet that has any value of
+            // header fields they want, however this provides them no benefit because we will
+            // simply drop said packet here (if it's below the current frame number) or it
+            // will pass this check and be dropped during decryption (if contents is tampered)
+            // or after decryption in the RTP queue (if it's a replay of a previous authentic
+            // packet from the host).
+            //
+            // In short, an attacker spoofing this value via MITM or sending malicious values
+            // impersonating the host from off-link doesn't gain them anything. If they have
+            // a true MITM, they can DoS our connection by just dropping all our traffic, so
+            // tampering with packets to fail this check doesn't accomplish anything they
+            // couldn't already do. If they're not on-link, we just throw their malicious
+            // traffic away (as mentioned in the paragraph above) and continue accepting
+            // legitmate video traffic.
+            if (encHeader->frameNumber && LE32(encHeader->frameNumber) < RtpvGetCurrentFrameNumber(&rtpQueue)) {
+                continue;
+            }
+
             if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
                                    (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                    encHeader->iv, sizeof(encHeader->iv),
