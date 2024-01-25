@@ -722,15 +722,16 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
 
     // Queue the packet to be sent
     err = enet_peer_send(peer, channelId, enetPacket);
+    bool packetQueued = (err == 0);
 
     // If there is no more data coming soon, send the packet now
-    if (!moreData) {
-        enet_host_service(client, NULL, 0);
+    if (!moreData && packetQueued) {
+        err = enet_host_service(client, NULL, 0);
 
         // Wait until the packet is actually sent to provide backpressure on senders
-        if (err == 0 && (flags & ENET_PACKET_FLAG_RELIABLE)) {
+        if (flags & ENET_PACKET_FLAG_RELIABLE) {
             // Don't wait longer than 10 milliseconds to avoid blocking callers for too long
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; err >= 0 && i < 10; i++) {
                 // Break on disconnected, acked/freed, or sent (pending ack).
                 if (peer->state != ENET_PEER_STATE_CONNECTED || packetFreed || isPacketSentWaitingForAck(enetPacket)) {
                     break;
@@ -742,10 +743,10 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
                 PltLockMutex(&enetMutex);
 
                 // Try to send the packet again
-                enet_host_service(client, NULL, 0);
+                err = enet_host_service(client, NULL, 0);
             }
 
-            if (peer->state == ENET_PEER_STATE_CONNECTED && !packetFreed && !isPacketSentWaitingForAck(enetPacket)) {
+            if (err >= 0 && peer->state == ENET_PEER_STATE_CONNECTED && !packetFreed && !isPacketSentWaitingForAck(enetPacket)) {
                 Limelog("Control message took over 10 ms to send (net latency: %u ms | packet loss: %f%%)\n",
                         peer->roundTripTime, peer->packetLoss / (float)ENET_PEER_PACKET_LOSS_SCALE);
             }
@@ -762,7 +763,9 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
 
     if (err < 0) {
         Limelog("Failed to send ENet control packet\n");
-        enet_packet_destroy(enetPacket);
+        if (!packetQueued) {
+            enet_packet_destroy(enetPacket);
+        }
         return false;
     }
 
