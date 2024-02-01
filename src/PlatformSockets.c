@@ -235,7 +235,56 @@ void closeSocket(SOCKET s) {
 #endif
 }
 
-SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize) {
+// These set "safe" host or link-local QoS options that we can unconditionally
+// set without having to worry about routers blockholing the traffic.
+static void setSocketQos(SOCKET s, int socketQosType) {
+#ifdef SO_NET_SERVICE_TYPE
+    int value;
+    switch (socketQosType) {
+    case SOCK_QOS_TYPE_BEST_EFFORT:
+        value = NET_SERVICE_TYPE_BE;
+        break;
+    case SOCK_QOS_TYPE_AUDIO:
+        value = NET_SERVICE_TYPE_VO;
+        break;
+    case SOCK_QOS_TYPE_VIDEO:
+        value = NET_SERVICE_TYPE_VI;
+        break;
+    default:
+        Limelog("Unknown QoS type: %d\n", socketQosType);
+        return;
+    }
+
+    // iOS/macOS
+    if (setsockopt(s, SOL_SOCKET, SO_NET_SERVICE_TYPE, (char*)&value, sizeof(value)) < 0) {
+        Limelog("setsockopt(SO_NET_SERVICE_TYPE, %d) failed: %d\n", value, (int)LastSocketError());
+    }
+#endif
+#ifdef SO_PRIORITY
+    int value;
+    switch (socketQosType) {
+    case SOCK_QOS_TYPE_BEST_EFFORT:
+        value = 0;
+        break;
+    case SOCK_QOS_TYPE_AUDIO:
+        value = 6;
+        break;
+    case SOCK_QOS_TYPE_VIDEO:
+        value = 5;
+        break;
+    default:
+        Limelog("Unknown QoS type: %d\n", socketQosType);
+        return;
+    }
+
+    // Linux
+    if (setsockopt(s, SOL_SOCKET, SO_PRIORITY, (char*)&value, sizeof(value)) < 0) {
+        Limelog("setsockopt(SO_PRIORITY, %d) failed: %d\n", value, (int)LastSocketError());
+    }
+#endif
+}
+
+SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize, int socketQosType) {
     SOCKET s;
     LC_SOCKADDR bindAddr;
     int err;
@@ -293,6 +342,11 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
         }
     }
 #endif
+
+    // Enable QOS for the socket (best effort)
+    if (socketQosType != SOCK_QOS_TYPE_BEST_EFFORT) {
+        setSocketQos(s, socketQosType);
+    }
 
     if (bufferSize != 0) {
         // We start at the requested recv buffer value and step down until we find

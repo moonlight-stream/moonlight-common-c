@@ -95,10 +95,14 @@ typedef struct sockaddr_in LC_SOCKADDR;
 #endif
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string, size_t stringLength);
 
+#define SOCK_QOS_TYPE_BEST_EFFORT 0
+#define SOCK_QOS_TYPE_AUDIO 1
+#define SOCK_QOS_TYPE_VIDEO 2
+
 SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
 int sendMtuSafe(SOCKET s, char* buffer, int size);
-SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize);
+SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize, int socketQosType);
 int enableNoDelay(SOCKET s);
 int setSocketNonBlocking(SOCKET s, bool enabled);
 int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect);
