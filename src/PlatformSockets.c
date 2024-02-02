@@ -37,6 +37,7 @@ DWORD (WINAPI *pfnWlanSetInterface)(HANDLE hClientHandle, CONST GUID *pInterface
 
 #ifdef __3DS__
 in_port_t n3ds_udp_port = 47998;
+static const int n3ds_max_buf_size = 0x20000;
 #endif
 
 void addrToUrlSafeString(struct sockaddr_storage* addr, char* string, size_t stringLength)
@@ -149,11 +150,13 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
     return err;
 #elif defined(__3DS__)
     int err;
-    for (int i = 0; i < timeoutMs; i++) {
-        err = poll(pollFds, pollFdsCount, 1); // need to do this on 3ds since poll will block even if socket is ready before
+    u64 poll_start = osGetTime();
+    for (u64 i = poll_start; (i - poll_start) < timeoutMs; i = osGetTime()) {
+        err = poll(pollFds, pollFdsCount, 0); // This is running for 14ms
         if (err) {
             break;
         }
+        svcSleepThread(1000);
     }
     return err;
 #else
@@ -348,6 +351,10 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
         setSocketQos(s, socketQosType);
     }
 
+#ifdef __3DS__
+    if (bufferSize == 0 || bufferSize > n3ds_max_buf_size)
+        bufferSize = n3ds_max_buf_size;
+#endif
     if (bufferSize != 0) {
         // We start at the requested recv buffer value and step down until we find
         // a value that the OS will accept.
@@ -359,6 +366,7 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
             }
             else if (bufferSize <= RCV_BUFFER_SIZE_MIN) {
                 // Failed to set a buffer size within the allowable range
+                Limelog("Set rcv buffer size failed: %d\n", LastSocketError());
                 break;
             }
             else if (bufferSize - RCV_BUFFER_SIZE_STEP <= RCV_BUFFER_SIZE_MIN) {
@@ -424,9 +432,6 @@ SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlo
         int val = 1;
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
     }
-#endif
-#ifdef __3DS__
-    SOCU_AddGlobalSocket(s);
 #endif
 
     if (nonBlocking) {

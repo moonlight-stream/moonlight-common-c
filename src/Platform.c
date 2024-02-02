@@ -14,6 +14,10 @@ struct thread_context {
 #endif
 };
 
+#ifdef __3DS__
+static int n3ds_thread_priority = 0x30;
+#endif
+
 static int activeThreads = 0;
 static int activeMutexes = 0;
 static int activeEvents = 0;
@@ -279,13 +283,11 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     OSResumeThread(&thread->thread);
 #elif defined(__3DS__)
     {
-        s32 priority = 0x30;
-        size_t stack_size = 1024 * 1024;
-        svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+        size_t stack_size = 0x40000;
         thread->thread = threadCreate(ThreadProc,
                                     ctx,
                                     stack_size,
-                                    priority,
+                                    n3ds_thread_priority,
                                     -1,
                                     false);
         if (thread->thread == NULL) {
@@ -494,6 +496,9 @@ int initializePlatform(void) {
         return err;
     }
 
+#ifdef __3DS__
+    svcGetThreadPriority(&n3ds_thread_priority, CUR_THREAD_HANDLE);
+#endif
     enterLowLatencyMode();
 
     return 0;
