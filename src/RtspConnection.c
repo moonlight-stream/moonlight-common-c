@@ -184,11 +184,11 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
         }
 
         len = typeAndLen & ~ENCRYPTED_RTSP_BIT;
-        if (len + sizeof(ENC_RTSP_HEADER) > rawMessageLen) {
+        if (len + sizeof(ENC_RTSP_HEADER) > (uint32_t)rawMessageLen) {
             Limelog("Rejecting partial encrypted RTSP message\n");
             return false;
         }
-        else if (len + sizeof(ENC_RTSP_HEADER) < rawMessageLen) {
+        else if (len + sizeof(ENC_RTSP_HEADER) < (uint32_t)rawMessageLen) {
             Limelog("Rejecting encrypted RTSP message with excess data\n");
             return false;
         }
