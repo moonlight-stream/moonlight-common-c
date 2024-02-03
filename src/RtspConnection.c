@@ -13,6 +13,11 @@ static int rtspClientVersion;
 static char urlAddr[URLSAFESTRING_LEN];
 static bool useEnet;
 static char* controlStreamId;
+static bool encryptedRtspEnabled;
+
+static PPLT_CRYPTO_CONTEXT encryptionCtx;
+static PPLT_CRYPTO_CONTEXT decryptionCtx;
+static uint32_t encryptionSequenceNumber;
 
 static SOCKET sock = INVALID_SOCKET;
 static ENetHost* client;
@@ -84,6 +89,134 @@ static bool initializeRtspRequest(PRTSP_MESSAGE msg, char* command, char* target
     return true;
 }
 
+#define ENCRYPTED_RTSP_BIT 0x80000000
+
+typedef struct _ENC_RTSP_HEADER {
+    uint32_t typeAndLength; // BE
+    uint32_t sequenceNumber; // BE
+    uint8_t tag[16];
+} ENC_RTSP_HEADER, *PENC_RTSP_HEADER;
+
+static char* sealRtspMessage(PRTSP_MESSAGE request, int* messageLen) {
+    char* serializedMessage;
+    PENC_RTSP_HEADER encryptedMessage;
+    int plaintextLen;
+    bool success;
+    uint8_t iv[12] = { 0 };
+
+    serializedMessage = serializeRtspMessage(request, &plaintextLen);
+    if (serializedMessage == NULL) {
+        return NULL;
+    }
+    else if (!encryptedRtspEnabled) {
+        *messageLen = plaintextLen;
+        return serializedMessage;
+    }
+
+    encryptedMessage = (PENC_RTSP_HEADER)malloc(sizeof(ENC_RTSP_HEADER) + plaintextLen);
+    if (encryptedMessage == NULL) {
+        free(serializedMessage);
+        return NULL;
+    }
+
+    // Populate the IV in little endian byte order
+    encryptionSequenceNumber++;
+    iv[3] = (uint8_t)(encryptionSequenceNumber >> 24);
+    iv[2] = (uint8_t)(encryptionSequenceNumber >> 16);
+    iv[1] = (uint8_t)(encryptionSequenceNumber >> 8);
+    iv[0] = (uint8_t)(encryptionSequenceNumber >> 0);
+
+    // Set high bytes to something unique to ensure no IV collisions
+    iv[10] = (uint8_t)'C'; // Client originated
+    iv[11] = (uint8_t)'R'; // RTSP stream
+
+    encryptedMessage->typeAndLength = BE32(ENCRYPTED_RTSP_BIT | plaintextLen);
+    encryptedMessage->sequenceNumber = BE32(encryptionSequenceNumber);
+
+    success = PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
+                                (uint8_t*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                                iv, sizeof(iv),
+                                encryptedMessage->tag, sizeof(encryptedMessage->tag),
+                                (uint8_t*)serializedMessage, plaintextLen,
+                                (uint8_t*)(encryptedMessage + 1), messageLen);
+    free(serializedMessage);
+
+    if (!success) {
+        free(encryptedMessage);
+        return NULL;
+    }
+
+    // The size returned from PltEncryptMessage() is the payload only
+    *messageLen += sizeof(ENC_RTSP_HEADER);
+
+    return (char*)encryptedMessage;
+}
+
+static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE response) {
+    char* decryptedMessage;
+    int decryptedMessageLen;
+    bool success;
+
+    if (encryptedRtspEnabled) {
+        PENC_RTSP_HEADER encryptedMessage;
+        uint32_t seq;
+        uint8_t iv[12] = { 0 };
+
+        if (rawMessageLen <= (int)sizeof(ENC_RTSP_HEADER)) {
+            return false;
+        }
+
+        encryptedMessage = (PENC_RTSP_HEADER)rawMessage;
+        seq = BE32(encryptedMessage->sequenceNumber);
+
+        // Populate the IV in little endian byte order
+        iv[3] = (uint8_t)(seq >> 24);
+        iv[2] = (uint8_t)(seq >> 16);
+        iv[1] = (uint8_t)(seq >> 8);
+        iv[0] = (uint8_t)(seq >> 0);
+
+        // Set high bytes to something unique to ensure no IV collisions
+        iv[10] = (uint8_t)'H'; // Host originated
+        iv[11] = (uint8_t)'R'; // RTSP stream
+
+        decryptedMessageLen = rawMessageLen - sizeof(ENC_RTSP_HEADER);
+        decryptedMessage = (char*)malloc(decryptedMessageLen);
+        if (decryptedMessage == NULL) {
+            return false;
+        }
+
+        success = PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+                                    (uint8_t*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                                    iv, sizeof(iv),
+                                    encryptedMessage->tag, sizeof(encryptedMessage->tag),
+                                    (uint8_t*)(encryptedMessage + 1), decryptedMessageLen,
+                                    (uint8_t*)decryptedMessage, &decryptedMessageLen);
+        if (!success) {
+            Limelog("Failed to decrypt RTSP response\n");
+            free(decryptedMessage);
+            return false;
+        }
+    }
+    else {
+        decryptedMessage = rawMessage;
+        decryptedMessageLen = rawMessageLen;
+    }
+
+    if (parseRtspMessage(response, decryptedMessage, decryptedMessageLen) == RTSP_ERROR_SUCCESS) {
+        success = true;
+    }
+    else {
+        Limelog("Failed to parse RTSP response\n");
+        success = false;
+    }
+
+    if (decryptedMessage != rawMessage) {
+        free(decryptedMessage);
+    }
+
+    return success;
+}
+
 // Send RTSP message and get response over ENet
 static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE response, bool expectingPayload, int* error) {
     ENetEvent event;
@@ -95,6 +228,10 @@ static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE respons
     int payloadLength;
     bool ret;
     char* responseBuffer;
+
+    // RTSP encryption is not supported using ENet due to our special handling
+    // of the payload below. Modern versions of Sunshine use TCP for RTSP.
+    LC_ASSERT(!encryptedRtspEnabled);
 
     *error = -1;
     ret = false;
@@ -250,7 +387,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         return ret;
     }
 
-    serializedMessage = serializeRtspMessage(request, &messageLen);
+    serializedMessage = sealRtspMessage(request, &messageLen);
     if (serializedMessage == NULL) {
         closeSocket(sock);
         sock = INVALID_SOCKET;
@@ -312,13 +449,8 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         }
     }
 
-    if (parseRtspMessage(response, responseBuffer, offset) == RTSP_ERROR_SUCCESS) {
-        // Successfully parsed response
-        ret = true;
-    }
-    else {
-        Limelog("Failed to parse RTSP response\n");
-    }
+    // Decrypt (if necessary) and deserialize the RTSP response
+    ret = unsealRtspMessage(responseBuffer, offset, response);
 
     // Fetch the local address for this socket if it's not populated yet
     if (LocalAddr.ss_family == 0) {
@@ -774,6 +906,9 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     hasSessionId = false;
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
     AudioEncryptionEnabled = false;
+    encryptedRtspEnabled = serverInfo->rtspSessionUrl && strstr(serverInfo->rtspSessionUrl, "rtspenc://");
+    encryptionCtx = PltCreateCryptoContext();
+    decryptionCtx = PltCreateCryptoContext();
 
     // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
     // fake our target address so it doesn't match any of the PC's local interfaces. It seems
@@ -1220,6 +1355,10 @@ Exit:
         free(sessionIdString);
         sessionIdString = NULL;
     }
+
+    PltDestroyCryptoContext(encryptionCtx);
+    PltDestroyCryptoContext(decryptionCtx);
+    decryptionCtx = encryptionCtx = NULL;
 
     return ret;
 }

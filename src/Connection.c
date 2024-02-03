@@ -525,5 +525,7 @@ Cleanup:
 }
 
 const char* LiGetLaunchUrlQueryParameters() {
-    return "&corever=0";
+    // v0 = Video encryption and control stream encryption v2
+    // v1 = RTSP encryption
+    return "&corever=1";
 }
