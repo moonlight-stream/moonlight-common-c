@@ -157,19 +157,44 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
     int decryptedMessageLen;
     bool success;
 
+    // If the server just closed the connection without responding with anything,
+    // there's no point in proceeding any further trying to parse it.
+    if (rawMessageLen == 0) {
+        return false;
+    }
+
     if (encryptedRtspEnabled) {
         PENC_RTSP_HEADER encryptedMessage;
         uint32_t seq;
+        uint32_t typeAndLen;
+        uint32_t len;
         uint8_t iv[12] = { 0 };
 
         if (rawMessageLen <= (int)sizeof(ENC_RTSP_HEADER)) {
+            Limelog("RTSP encrypted header too small\n");
             return false;
         }
 
         encryptedMessage = (PENC_RTSP_HEADER)rawMessage;
-        seq = BE32(encryptedMessage->sequenceNumber);
+        typeAndLen = BE32(encryptedMessage->typeAndLength);
+
+        if (!(typeAndLen & ENCRYPTED_RTSP_BIT)) {
+            Limelog("Rejecting unencrypted RTSP message\n");
+            return false;
+        }
+
+        len = typeAndLen & ~ENCRYPTED_RTSP_BIT;
+        if (len + sizeof(ENC_RTSP_HEADER) > rawMessageLen) {
+            Limelog("Rejecting partial encrypted RTSP message\n");
+            return false;
+        }
+        else if (len + sizeof(ENC_RTSP_HEADER) < rawMessageLen) {
+            Limelog("Rejecting encrypted RTSP message with excess data\n");
+            return false;
+        }
 
         // Populate the IV in little endian byte order
+        seq = BE32(encryptedMessage->sequenceNumber);
         iv[3] = (uint8_t)(seq >> 24);
         iv[2] = (uint8_t)(seq >> 16);
         iv[1] = (uint8_t)(seq >> 8);
