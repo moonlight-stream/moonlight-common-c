@@ -287,19 +287,29 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
         sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
     }
 #elif defined(__WIIU__)
-    int stack_size = 4 * 1024 * 1024;
-    void* stack_addr = (uint8_t *)memalign(8, stack_size) + stack_size;
+    memset(&thread->thread, 0, sizeof(thread->thread));
 
-    if (!OSCreateThread(&thread->thread,
-                        ThreadProc,
-                        0, (char*)ctx,
-                        stack_addr, stack_size,
-                        0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
-    {
+    // Allocate stack
+    const int stack_size = 4 * 1024 * 1024;
+    uint8_t* stack = (uint8_t*)memalign(16, stack_size);
+    if (stack == NULL) {
         free(ctx);
         return -1;
     }
 
+    // Create thread
+    if (!OSCreateThread(&thread->thread,
+                        ThreadProc,
+                        0, (char*)ctx,
+                        stack + stack_size, stack_size,
+                        0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
+    {
+        free(ctx);
+        free(stack);
+        return -1;
+    }
+
+    OSSetThreadName(&thread->thread, name);
     OSSetThreadDeallocator(&thread->thread, thread_deallocator);
     OSResumeThread(&thread->thread);
 #elif defined(__3DS__)
