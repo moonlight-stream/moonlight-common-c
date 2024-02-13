@@ -204,6 +204,26 @@ void PltJoinThread(PLT_THREAD* thread) {
 #endif
 }
 
+void PltDetachThread(PLT_THREAD* thread)
+{
+    // Assume detached threads are no longer active
+    activeThreads--;
+
+#if defined(LC_WINDOWS)
+    // According MSDN:
+    // "Closing a thread handle does not terminate the associated thread or remove the thread object."
+    CloseHandle(thread->handle);
+#elif defined(__vita__)
+    sceKernelDeleteThread(thread->handle);
+#elif defined(__WIIU__)
+    OSDetachThread(&thread->thread);
+#elif defined(__3DS__)
+    threadDetach(thread->thread);
+#else
+    pthread_detach(thread->thread);
+#endif
+}
+
 void PltCloseThread(PLT_THREAD* thread) {
     activeThreads--;
 #if defined(LC_WINDOWS)
