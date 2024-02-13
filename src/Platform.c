@@ -198,7 +198,6 @@ void PltJoinThread(PLT_THREAD* thread) {
     OSJoinThread(&thread->thread, NULL);
 #elif defined(__3DS__)
     threadJoin(thread->thread, U64_MAX);
-    threadFree(thread->thread);
 #else
     pthread_join(thread->thread, NULL);
 #endif
@@ -230,6 +229,12 @@ void PltCloseThread(PLT_THREAD* thread) {
     CloseHandle(thread->handle);
 #elif defined(__vita__)
     sceKernelDeleteThread(thread->handle);
+#elif defined(__WIIU__)
+    // Thread is automatically closed after join
+#elif defined(__3DS__)
+    threadFree(thread->thread);
+#else
+    // Thread is automatically closed after join
 #endif
 }
 
