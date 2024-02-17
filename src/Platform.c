@@ -198,9 +198,28 @@ void PltJoinThread(PLT_THREAD* thread) {
     OSJoinThread(&thread->thread, NULL);
 #elif defined(__3DS__)
     threadJoin(thread->thread, U64_MAX);
-    threadFree(thread->thread);
 #else
     pthread_join(thread->thread, NULL);
+#endif
+}
+
+void PltDetachThread(PLT_THREAD* thread)
+{
+    // Assume detached threads are no longer active
+    activeThreads--;
+
+#if defined(LC_WINDOWS)
+    // According MSDN:
+    // "Closing a thread handle does not terminate the associated thread or remove the thread object."
+    CloseHandle(thread->handle);
+#elif defined(__vita__)
+    sceKernelDeleteThread(thread->handle);
+#elif defined(__WIIU__)
+    OSDetachThread(&thread->thread);
+#elif defined(__3DS__)
+    threadDetach(thread->thread);
+#else
+    pthread_detach(thread->thread);
 #endif
 }
 
@@ -210,6 +229,12 @@ void PltCloseThread(PLT_THREAD* thread) {
     CloseHandle(thread->handle);
 #elif defined(__vita__)
     sceKernelDeleteThread(thread->handle);
+#elif defined(__WIIU__)
+    // Thread is automatically closed after join
+#elif defined(__3DS__)
+    threadFree(thread->thread);
+#else
+    // Thread is automatically closed after join
 #endif
 }
 
@@ -262,19 +287,29 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
         sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
     }
 #elif defined(__WIIU__)
-    int stack_size = 4 * 1024 * 1024;
-    void* stack_addr = (uint8_t *)memalign(8, stack_size) + stack_size;
+    memset(&thread->thread, 0, sizeof(thread->thread));
 
-    if (!OSCreateThread(&thread->thread,
-                        ThreadProc,
-                        0, (char*)ctx,
-                        stack_addr, stack_size,
-                        0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
-    {
+    // Allocate stack
+    const int stack_size = 4 * 1024 * 1024;
+    uint8_t* stack = (uint8_t*)memalign(16, stack_size);
+    if (stack == NULL) {
         free(ctx);
         return -1;
     }
 
+    // Create thread
+    if (!OSCreateThread(&thread->thread,
+                        ThreadProc,
+                        0, (char*)ctx,
+                        stack + stack_size, stack_size,
+                        0x10, OS_THREAD_ATTRIB_AFFINITY_ANY))
+    {
+        free(ctx);
+        free(stack);
+        return -1;
+    }
+
+    OSSetThreadName(&thread->thread, name);
     OSSetThreadDeallocator(&thread->thread, thread_deallocator);
     OSResumeThread(&thread->thread);
 #elif defined(__3DS__)

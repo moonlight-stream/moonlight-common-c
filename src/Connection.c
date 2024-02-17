@@ -175,8 +175,8 @@ static void ClInternalConnectionTerminated(int errorCode)
         LC_ASSERT(err == 0);
     }
 
-    // Close the thread handle since we can never wait on it
-    PltCloseThread(&terminationCallbackThread);
+    // Detach the thread since we never wait on it
+    PltDetachThread(&terminationCallbackThread);
 }
 
 static bool parseRtspPortNumberFromUrl(const char* rtspSessionUrl, uint16_t* port)

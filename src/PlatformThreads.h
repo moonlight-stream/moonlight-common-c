@@ -66,6 +66,7 @@ void PltCloseThread(PLT_THREAD* thread);
 void PltInterruptThread(PLT_THREAD* thread);
 bool PltIsThreadInterrupted(PLT_THREAD* thread);
 void PltJoinThread(PLT_THREAD* thread);
+void PltDetachThread(PLT_THREAD* thread);
 
 int PltCreateEvent(PLT_EVENT* event);
 void PltCloseEvent(PLT_EVENT* event);
