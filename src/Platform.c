@@ -17,6 +17,7 @@ struct thread_context {
 static int activeThreads = 0;
 static int activeMutexes = 0;
 static int activeEvents = 0;
+static int activeCondVars = 0;
 
 #if defined(LC_WINDOWS)
 
@@ -151,6 +152,7 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
 }
 
 void PltDeleteMutex(PLT_MUTEX* mutex) {
+    LC_ASSERT(activeMutexes > 0);
     activeMutexes--;
 #if defined(LC_WINDOWS)
     // No-op to destroy a SRWLOCK
@@ -192,6 +194,7 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltJoinThread(PLT_THREAD* thread) {
+    LC_ASSERT(activeThreads > 0);
     activeThreads--;
 
 #if defined(LC_WINDOWS)
@@ -212,7 +215,7 @@ void PltJoinThread(PLT_THREAD* thread) {
 }
 
 void PltDetachThread(PLT_THREAD* thread) {
-    // Assume detached threads are no longer active
+    LC_ASSERT(activeThreads > 0);
     activeThreads--;
 
 #if defined(LC_WINDOWS)
@@ -357,6 +360,7 @@ int PltCreateEvent(PLT_EVENT* event) {
 }
 
 void PltCloseEvent(PLT_EVENT* event) {
+    LC_ASSERT(activeEvents > 0);
     activeEvents--;
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
@@ -412,10 +416,13 @@ int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 #else
     pthread_cond_init(cond, NULL);
 #endif
+    activeCondVars++;
     return 0;
 }
 
 void PltDeleteConditionVariable(PLT_COND* cond) {
+    LC_ASSERT(activeCondVars > 0);
+    activeCondVars--;
 #if defined(LC_WINDOWS)
     // No-op to delete a CONDITION_VARIABLE
 #elif defined(__vita__)
@@ -537,4 +544,5 @@ void cleanupPlatform(void) {
     LC_ASSERT(activeThreads == 0);
     LC_ASSERT(activeMutexes == 0);
     LC_ASSERT(activeEvents == 0);
+    LC_ASSERT(activeCondVars == 0);
 }
