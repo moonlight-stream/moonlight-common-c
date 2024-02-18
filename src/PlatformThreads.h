@@ -62,7 +62,6 @@ void PltLockMutex(PLT_MUTEX* mutex);
 void PltUnlockMutex(PLT_MUTEX* mutex);
 
 int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THREAD* thread);
-void PltCloseThread(PLT_THREAD* thread);
 void PltInterruptThread(PLT_THREAD* thread);
 bool PltIsThreadInterrupted(PLT_THREAD* thread);
 void PltJoinThread(PLT_THREAD* thread);

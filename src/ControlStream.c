@@ -1552,16 +1552,10 @@ int stopControlStream(void) {
     PltJoinThread(&controlReceiveThread);
     PltJoinThread(&asyncCallbackThread);
 
-    PltCloseThread(&lossStatsThread);
-    PltCloseThread(&requestIdrFrameThread);
-    PltCloseThread(&controlReceiveThread);
-    PltCloseThread(&asyncCallbackThread);
-
     // We will only have an RFI thread if RFI is enabled
     if (isReferenceFrameInvalidationEnabled()) {
         PltInterruptThread(&invalidateRefFramesThread);
         PltJoinThread(&invalidateRefFramesThread);
-        PltCloseThread(&invalidateRefFramesThread);
     }
 
     if (peer != NULL) {
@@ -1778,7 +1772,6 @@ int startControlStream(void) {
 
         PltInterruptThread(&controlReceiveThread);
         PltJoinThread(&controlReceiveThread);
-        PltCloseThread(&controlReceiveThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
@@ -1813,7 +1806,6 @@ int startControlStream(void) {
 
         PltInterruptThread(&controlReceiveThread);
         PltJoinThread(&controlReceiveThread);
-        PltCloseThread(&controlReceiveThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
@@ -1841,7 +1833,6 @@ int startControlStream(void) {
 
         PltInterruptThread(&controlReceiveThread);
         PltJoinThread(&controlReceiveThread);
-        PltCloseThread(&controlReceiveThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
@@ -1869,11 +1860,9 @@ int startControlStream(void) {
 
         PltInterruptThread(&lossStatsThread);
         PltJoinThread(&lossStatsThread);
-        PltCloseThread(&lossStatsThread);
 
         PltInterruptThread(&controlReceiveThread);
         PltJoinThread(&controlReceiveThread);
-        PltCloseThread(&controlReceiveThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
@@ -1903,15 +1892,12 @@ int startControlStream(void) {
 
         PltInterruptThread(&lossStatsThread);
         PltJoinThread(&lossStatsThread);
-        PltCloseThread(&lossStatsThread);
 
         PltInterruptThread(&controlReceiveThread);
         PltJoinThread(&controlReceiveThread);
-        PltCloseThread(&controlReceiveThread);
 
         PltInterruptThread(&requestIdrFrameThread);
         PltJoinThread(&requestIdrFrameThread);
-        PltCloseThread(&requestIdrFrameThread);
 
         if (ctlSock != INVALID_SOCKET) {
             closeSocket(ctlSock);
@@ -1944,19 +1930,15 @@ int startControlStream(void) {
 
             PltInterruptThread(&lossStatsThread);
             PltJoinThread(&lossStatsThread);
-            PltCloseThread(&lossStatsThread);
 
             PltInterruptThread(&controlReceiveThread);
             PltJoinThread(&controlReceiveThread);
-            PltCloseThread(&controlReceiveThread);
 
             PltInterruptThread(&requestIdrFrameThread);
             PltJoinThread(&requestIdrFrameThread);
-            PltCloseThread(&requestIdrFrameThread);
 
             PltInterruptThread(&asyncCallbackThread);
             PltJoinThread(&asyncCallbackThread);
-            PltCloseThread(&asyncCallbackThread);
 
             if (ctlSock != INVALID_SOCKET) {
                 closeSocket(ctlSock);

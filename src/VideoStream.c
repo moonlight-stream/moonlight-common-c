@@ -302,12 +302,6 @@ void stopVideoStream(void) {
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltJoinThread(&decoderThread);
     }
-
-    PltCloseThread(&udpPingThread);
-    PltCloseThread(&receiveThread);
-    if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
-        PltCloseThread(&decoderThread);
-    }
     
     if (firstFrameSocket != INVALID_SOCKET) {
         closeSocket(firstFrameSocket);
@@ -360,7 +354,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
             VideoCallbacks.stop();
             PltInterruptThread(&receiveThread);
             PltJoinThread(&receiveThread);
-            PltCloseThread(&receiveThread);
             closeSocket(rtpSocket);
             VideoCallbacks.cleanup();
             return err;
@@ -382,10 +375,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
             if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
                 PltJoinThread(&decoderThread);
             }
-            PltCloseThread(&receiveThread);
-            if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
-                PltCloseThread(&decoderThread);
-            }
             closeSocket(rtpSocket);
             VideoCallbacks.cleanup();
             return LastSocketError();
@@ -405,10 +394,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
         PltJoinThread(&receiveThread);
         if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
             PltJoinThread(&decoderThread);
-        }
-        PltCloseThread(&receiveThread);
-        if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
-            PltCloseThread(&decoderThread);
         }
         closeSocket(rtpSocket);
         if (firstFrameSocket != INVALID_SOCKET) {

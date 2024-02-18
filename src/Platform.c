@@ -186,25 +186,25 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltJoinThread(PLT_THREAD* thread) {
+    activeThreads--;
+
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
+    CloseHandle(thread->handle);
 #elif defined(__vita__)
-    while(thread->alive) {
-        PltSleepMs(10);
-    }
-    if (thread->context != NULL)
-        free(thread->context);
+    sceKernelWaitThreadEnd(thread->handle, NULL, NULL);
+    sceKernelDeleteThread(thread->handle);
 #elif defined(__WIIU__)
     OSJoinThread(&thread->thread, NULL);
 #elif defined(__3DS__)
     threadJoin(thread->thread, U64_MAX);
+    threadFree(thread->thread);
 #else
     pthread_join(thread->thread, NULL);
 #endif
 }
 
-void PltDetachThread(PLT_THREAD* thread)
-{
+void PltDetachThread(PLT_THREAD* thread) {
     // Assume detached threads are no longer active
     activeThreads--;
 
@@ -220,21 +220,6 @@ void PltDetachThread(PLT_THREAD* thread)
     threadDetach(thread->thread);
 #else
     pthread_detach(thread->thread);
-#endif
-}
-
-void PltCloseThread(PLT_THREAD* thread) {
-    activeThreads--;
-#if defined(LC_WINDOWS)
-    CloseHandle(thread->handle);
-#elif defined(__vita__)
-    sceKernelDeleteThread(thread->handle);
-#elif defined(__WIIU__)
-    // Thread is automatically closed after join
-#elif defined(__3DS__)
-    threadFree(thread->thread);
-#else
-    // Thread is automatically closed after join
 #endif
 }
 

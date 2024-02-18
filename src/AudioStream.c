@@ -128,7 +128,6 @@ void destroyAudioStream(void) {
         if (pingThreadStarted) {
             PltInterruptThread(&udpPingThread);
             PltJoinThread(&udpPingThread);
-            PltCloseThread(&udpPingThread);
         }
 
         closeSocket(rtpSocket);
@@ -416,11 +415,6 @@ void stopAudioStream(void) {
         PltJoinThread(&decoderThread);
     }
 
-    PltCloseThread(&receiveThread);
-    if ((AudioCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-        PltCloseThread(&decoderThread);
-    }
-
     AudioCallbacks.cleanup();
 }
 
@@ -463,7 +457,6 @@ int startAudioStream(void* audioContext, int arFlags) {
             AudioCallbacks.stop();
             PltInterruptThread(&receiveThread);
             PltJoinThread(&receiveThread);
-            PltCloseThread(&receiveThread);
             closeSocket(rtpSocket);
             AudioCallbacks.cleanup();
             return err;
