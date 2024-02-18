@@ -344,6 +344,12 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
             Limelog("WSAIoctl(SIO_UDP_CONNRESET) failed: %d\n", LastSocketError());
         }
     }
+#elif defined(__WIIU__)
+    {
+        // Enable usage of userbuffers on Wii U
+        int val = 1;
+        setsockopt(s, SOL_SOCKET, SO_RUSRBUF, &val, sizeof(val));
+    }
 #endif
 
     // Enable QOS for the socket (best effort)
