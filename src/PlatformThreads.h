@@ -19,7 +19,7 @@ typedef struct _PLT_THREAD {
     int handle;
     int cancelled;
     void *context;
-    bool alive;
+    bool detached;
 } PLT_THREAD;
 #elif defined(__WIIU__)
 typedef OSFastMutex PLT_MUTEX;

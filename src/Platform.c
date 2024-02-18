@@ -88,7 +88,13 @@ void* ThreadProc(void* context) {
     ctx->entry(ctx->context);
 
 #if defined(__vita__)
-    ctx->thread->alive = false;
+    if (ctx->thread->detached) {
+        free(ctx);
+        sceKernelExitDeleteThread(0);
+    }
+    else {
+        free(ctx);
+    }
 #else
     free(ctx);
 #endif
@@ -192,6 +198,7 @@ void PltJoinThread(PLT_THREAD* thread) {
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
     CloseHandle(thread->handle);
 #elif defined(__vita__)
+    LC_ASSERT(!thread->detached);
     sceKernelWaitThreadEnd(thread->handle, NULL, NULL);
     sceKernelDeleteThread(thread->handle);
 #elif defined(__WIIU__)
@@ -213,7 +220,8 @@ void PltDetachThread(PLT_THREAD* thread) {
     // "Closing a thread handle does not terminate the associated thread or remove the thread object."
     CloseHandle(thread->handle);
 #elif defined(__vita__)
-    sceKernelDeleteThread(thread->handle);
+    LC_ASSERT(!thread->detached);
+    thread->detached = true;
 #elif defined(__WIIU__)
     OSDetachThread(&thread->thread);
 #elif defined(__3DS__)
@@ -261,7 +269,7 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     }
 #elif defined(__vita__)
     {
-        thread->alive = true;
+        thread->detached = false;
         thread->context = ctx;
         ctx->thread = thread;
         thread->handle = sceKernelCreateThread(name, ThreadProc, 0, 0x40000, 0, 0, NULL);
