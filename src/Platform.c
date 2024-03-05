@@ -287,6 +287,8 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
 
         pthread_attr_setstacksize(&attr, 0x100000);
 
+        ctx->name = name;
+
         int err = pthread_create(&thread->thread, &attr, ThreadProc, ctx);
         if (err != 0) {
             free(ctx);
