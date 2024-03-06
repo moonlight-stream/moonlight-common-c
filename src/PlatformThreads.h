@@ -12,15 +12,6 @@ typedef struct _PLT_THREAD {
     HANDLE handle;
     bool cancelled;
 } PLT_THREAD;
-#elif defined(__vita__)
-typedef int PLT_MUTEX;
-typedef int PLT_COND;
-typedef struct _PLT_THREAD {
-    int handle;
-    int cancelled;
-    void *context;
-    bool detached;
-} PLT_THREAD;
 #elif defined(__WIIU__)
 typedef OSFastMutex PLT_MUTEX;
 typedef OSFastCondition PLT_COND;
