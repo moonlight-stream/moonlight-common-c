@@ -716,6 +716,119 @@ bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
     return false;
 }
 
+bool isNat64SynthesizedAddress(struct sockaddr_storage* address) {
+#ifdef AF_INET6
+    if (address->ss_family == AF_INET6) {
+        struct sockaddr_in6* sin6 = (struct sockaddr_in6*)address;
+        struct addrinfo hints, *res, *currentAddr;
+        int err;
+
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET6;
+        hints.ai_flags = AI_ADDRCONFIG;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        err = getaddrinfo("ipv4only.arpa.", NULL, &hints, &res);
+        if (err != 0) {
+            Limelog("Client is not running in NAT64 environment (%d)\n", err);
+            return false;
+        }
+        else if (res == NULL) {
+            Limelog("getaddrinfo(ipv4only.arpa.) returned success without addresses\n");
+            return false;
+        }
+
+        for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
+            struct sockaddr_in6* candidate6 = (struct sockaddr_in6*)currentAddr->ai_addr;
+            static const unsigned char wellKnownAddresses[2][4] = {
+                { 0xC0, 0x00, 0x00, 0xAA }, // 192.0.0.170
+                { 0xC0, 0x00, 0x00, 0xAB }, // 192.0.0.171
+            };
+
+            if (candidate6->sin6_family != AF_INET6) {
+                // This shouldn't be possible but check anyway
+                continue;
+            }
+
+            for (int i = 0; i < 2; i++) {
+                int foundCount = 0;
+                int prefixLen = 0;
+                int suffixStart = 0;
+
+                // Search for each well-known IPv4 address at all locations specified by
+                // https://datatracker.ietf.org/doc/html/rfc6052#section-2.2
+                if (memcmp(&candidate6->sin6_addr.s6_addr[4], wellKnownAddresses[i], 4) == 0) {
+                    foundCount++;
+
+                    prefixLen = 4;
+                    suffixStart = 9;
+                }
+                if (memcmp(&candidate6->sin6_addr.s6_addr[5], &wellKnownAddresses[i][0], 3) == 0 &&
+                    memcmp(&candidate6->sin6_addr.s6_addr[9], &wellKnownAddresses[i][3], 1) == 0) {
+                    foundCount++;
+
+                    prefixLen = 5;
+                    suffixStart = 10;
+                }
+                if (memcmp(&candidate6->sin6_addr.s6_addr[6], &wellKnownAddresses[i][0], 2) == 0 &&
+                    memcmp(&candidate6->sin6_addr.s6_addr[9], &wellKnownAddresses[i][2], 2) == 0) {
+                    foundCount++;
+
+                    prefixLen = 6;
+                    suffixStart = 11;
+                }
+                if (memcmp(&candidate6->sin6_addr.s6_addr[7], &wellKnownAddresses[i][0], 1) == 0 &&
+                    memcmp(&candidate6->sin6_addr.s6_addr[9], &wellKnownAddresses[i][1], 3) == 0) {
+                    foundCount++;
+
+                    prefixLen = 7;
+                    suffixStart = 12;
+                }
+                if (memcmp(&candidate6->sin6_addr.s6_addr[9], &wellKnownAddresses[i], 4) == 0) {
+                    foundCount++;
+
+                    prefixLen = 8;
+                    suffixStart = 13;
+                }
+                if (memcmp(&candidate6->sin6_addr.s6_addr[12], &wellKnownAddresses[i], 4) == 0) {
+                    foundCount++;
+
+                    prefixLen = 12;
+                    suffixStart = 16;
+                }
+
+                // We must find the well-known address exactly once. If we find it zero or multiple
+                // times, we must try the second well-known address or other AAAA records.
+                if (foundCount != 1) {
+                    continue;
+                }
+
+                // We have a valid NAT64 address identified, so we know we're running in an NAT64 environment.
+                //
+                // Now we must check to see if the address we resolved for the remote host actually falls
+                // within the NAT64 range to see if we must restrict ourselves to the IPv4 MTU.
+                if (memcmp(&sin6->sin6_addr.s6_addr[0], &candidate6->sin6_addr.s6_addr[0], prefixLen) == 0 &&
+                    (suffixStart == 16 || memcmp(&sin6->sin6_addr.s6_addr[suffixStart],
+                                                 &candidate6->sin6_addr.s6_addr[suffixStart],
+                                                 16 - suffixStart) == 0)) {
+                    freeaddrinfo(res);
+                    return true;
+                }
+                else {
+                    // This one didn't match, so let's break out of the loop and try the next AAAA record.
+                    break;
+                }
+            }
+        }
+
+        freeaddrinfo(res);
+        return false;
+    }
+#endif
+
+    return false;
+}
+
 // Enable platform-specific low latency options (best-effort)
 void enterLowLatencyMode(void) {
 #if defined(LC_WINDOWS_DESKTOP)
