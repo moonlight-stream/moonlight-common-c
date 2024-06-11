@@ -406,7 +406,7 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
 }
 
 int setSocketNonBlocking(SOCKET s, bool enabled) {
-#if defined(__vita__)
+#if defined(__vita__) || defined(__HAIKU__)
     int val = enabled ? 1 : 0;
     return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
 #elif defined(O_NONBLOCK)
