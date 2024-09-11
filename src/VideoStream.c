@@ -1,7 +1,7 @@
 #include "Limelight-internal.h"
 
 #define FIRST_FRAME_MAX 1500
-#define FIRST_FRAME_TIMEOUT_SEC 10
+#define FIRST_FRAME_TIMEOUT_SEC 60
 
 #define FIRST_FRAME_PORT 47996
 
