@@ -18,6 +18,15 @@
 #include <Windows.h>
 #include <Winsock2.h>
 #include <ws2tcpip.h>
+#elif defined(__APPLE__)
+#include <mach/mach_time.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <fcntl.h>
 #elif defined(__vita__)
 #include <unistd.h>
 #include <sys/time.h>
@@ -146,6 +155,11 @@
 
 int initializePlatform(void);
 void cleanupPlatform(void);
+bool PltSafeStrcpy(char* dest, size_t dest_size, const char* src);
+
+void PltTicksInit(void);
+
+uint64_t PltGetMicroseconds(void);
 
 uint64_t PltGetMillis(void);
-bool PltSafeStrcpy(char* dest, size_t dest_size, const char* src);
+
