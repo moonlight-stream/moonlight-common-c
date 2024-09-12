@@ -154,7 +154,7 @@ static void VideoReceiveThreadProc(void* context) {
                     break;
                 }
             }
-            
+
             // Receive timed out; try again
             continue;
         }
@@ -168,9 +168,7 @@ static void VideoReceiveThreadProc(void* context) {
 
 #ifndef LC_FUZZING
         if (!receivedFullFrame) {
-            uint64_t now = PltGetMillis();
-
-            if (now - firstDataTimeMs >= FIRST_FRAME_TIMEOUT_SEC * 1000) {
+            if (PltGetMillis() - firstDataTimeMs >= FIRST_FRAME_TIMEOUT_SEC * 1000) {
                 Limelog("Terminating connection due to lack of a successful video frame\n");
                 ListenerCallbacks.connectionTerminated(ML_ERROR_NO_VIDEO_FRAME);
                 break;
@@ -286,7 +284,7 @@ void stopVideoStream(void) {
 
     // Wake up client code that may be waiting on the decode unit queue
     stopVideoDepacketizer();
-    
+
     PltInterruptThread(&udpPingThread);
     PltInterruptThread(&receiveThread);
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
@@ -302,7 +300,7 @@ void stopVideoStream(void) {
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltJoinThread(&decoderThread);
     }
-    
+
     if (firstFrameSocket != INVALID_SOCKET) {
         closeSocket(firstFrameSocket);
         firstFrameSocket = INVALID_SOCKET;
@@ -414,4 +412,8 @@ int startVideoStream(void* rendererContext, int drFlags) {
     }
 
     return 0;
+}
+
+const RTP_VIDEO_STATS* LiGetRTPVideoStats(void) {
+    return &rtpQueue.stats;
 }

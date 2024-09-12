@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.1...4.0)
 project(moonlight-common-c LANGUAGES C)
 
+string(TOUPPER "x${CMAKE_BUILD_TYPE}" BUILD_TYPE)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(USE_MBEDTLS "Use MbedTLS instead of OpenSSL" OFF)
@@ -61,7 +62,6 @@ else()
   target_include_directories(moonlight-common-c SYSTEM PRIVATE ${OPENSSL_INCLUDE_DIR})
 endif()
 
-string(TOUPPER "x${CMAKE_BUILD_TYPE}" BUILD_TYPE)
 if("${BUILD_TYPE}" STREQUAL "XDEBUG")
   target_compile_definitions(moonlight-common-c PRIVATE LC_DEBUG)
 else()
@@ -72,6 +72,36 @@ else()
   if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     target_compile_options(moonlight-common-c PRIVATE -Wno-maybe-uninitialized)
   endif()
+endif()
+
+if (NOT(MSVC OR APPLE))
+  include(CheckLibraryExists)
+  CHECK_LIBRARY_EXISTS(rt clock_gettime "" HAVE_CLOCK_GETTIME)
+
+  if (NOT HAVE_CLOCK_GETTIME)
+    set(CMAKE_EXTRA_INCLUDE_FILES time.h)
+    CHECK_FUNCTION_EXISTS(clock_gettime HAVE_CLOCK_GETTIME)
+    SET(CMAKE_EXTRA_INCLUDE_FILES)
+  endif()
+
+  foreach(clock CLOCK_MONOTONIC CLOCK_MONOTONIC_RAW)
+    message(STATUS "Testing whether ${clock} can be used")
+    CHECK_CXX_SOURCE_COMPILES(
+"#define _POSIX_C_SOURCE 200112L
+#include <time.h>
+int main ()
+{
+  struct timespec ts[1];
+  clock_gettime (${clock}, ts);
+  return 0;
+}" HAVE_${clock})
+    if(HAVE_${clock})
+    message(STATUS "Testing whether ${clock} can be used -- Success")
+    else()
+    message(STATUS "Testing whether ${clock} can be used -- Failed")
+    endif()
+  endforeach()
+
 endif()
 
 target_include_directories(moonlight-common-c SYSTEM PUBLIC src)
