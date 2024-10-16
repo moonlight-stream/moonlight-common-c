@@ -664,6 +664,11 @@ static bool sendVideoAnnounce(PRTSP_MESSAGE response, int* error) {
 static int parseOpusConfigFromParamString(char* paramStr, int channelCount, POPUS_MULTISTREAM_CONFIGURATION opusConfig) {
     int i;
 
+    if (channelCount > AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT) {
+        Limelog("Invalid channel count: %d\n", channelCount);
+        return -1;
+    }
+
     // Set channel count (included in the prefix, so not parsed below)
     opusConfig->channelCount = channelCount;
 
@@ -760,6 +765,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
             // Parse the normal quality Opus config
             err = parseOpusConfigFromParamString(paramStart, channelCount, &NormalQualityOpusConfig);
             if (err != 0) {
+                LC_ASSERT(err == 0);
                 return err;
             }
 
@@ -788,6 +794,7 @@ static int parseOpusConfigurations(PRTSP_MESSAGE response) {
                 // Parse the high quality Opus config
                 err = parseOpusConfigFromParamString(paramStart, channelCount, &HighQualityOpusConfig);
                 if (err != 0) {
+                    LC_ASSERT(err == 0);
                     return err;
                 }
 
