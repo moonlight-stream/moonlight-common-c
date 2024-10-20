@@ -423,7 +423,6 @@ void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 
 // These functions return a number of microseconds or milliseconds since an opaque start time.
 
-static bool has_monotonic_time = false;
 static bool ticks_started = false;
 
 #if defined(LC_WINDOWS)
@@ -451,25 +450,22 @@ uint64_t PltGetMicroseconds(void) {
 
 #elif defined(LC_DARWIN)
 
-static mach_timebase_info_data_t mach_base_info;
-static uint64_t start;
+static uint64_t start_ns;
 
 void PltTicksInit(void) {
     if (ticks_started) {
         return;
     }
     ticks_started = true;
-    mach_timebase_info(&mach_base_info);
-    has_monotonic_time = true;
-    start = mach_absolute_time();
+    start_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
 }
 
 uint64_t PltGetMicroseconds(void) {
     if (!ticks_started) {
         PltTicksInit();
     }
-    const uint64_t now = mach_absolute_time();
-    return (((now - start) * mach_base_info.numer) / mach_base_info.denom) / 1000;
+    const uint64_t now_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+    return (now_ns - start_ns) / 1000;
 }
 
 #elif defined(__vita__)
@@ -524,6 +520,7 @@ static struct timespec start_ts;
 # endif
 #endif
 
+static bool has_monotonic_time = false;
 static struct timeval start_tv;
 
 void PltTicksInit(void) {
