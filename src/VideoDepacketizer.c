@@ -20,7 +20,7 @@ static bool strictIdrFrameWait;
 static uint64_t syntheticPtsBaseUs;
 static uint16_t frameHostProcessingLatency;
 static uint64_t firstPacketReceiveTimeUs;
-static unsigned int firstPacketPresentationTime;
+static uint64_t firstPacketPresentationTime;
 static bool dropStatePending;
 static bool idrFrameProcessed;
 
@@ -832,10 +832,10 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         if (!presentationTimeMs && frameIndex > 0) {
-            firstPacketPresentationTime = (unsigned int)((receiveTimeUs - syntheticPtsBaseUs) / 1000);
+            firstPacketPresentationTime = (receiveTimeUs - syntheticPtsBaseUs) / 1000;
         }
         else {
-            firstPacketPresentationTime = (unsigned int)presentationTimeMs;
+            firstPacketPresentationTime = presentationTimeMs;
         }
     }
 

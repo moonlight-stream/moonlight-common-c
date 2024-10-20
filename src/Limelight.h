@@ -167,7 +167,7 @@ typedef struct _DECODE_UNIT {
     // Presentation time in milliseconds with the epoch at the first captured frame.
     // This can be used to aid frame pacing or to drop old frames that were queued too
     // long prior to display.
-    unsigned int presentationTimeMs;
+    uint64_t presentationTimeMs;
 
     // Length of the entire buffer chain in bytes
     int fullLength;
