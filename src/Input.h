@@ -195,4 +195,19 @@ typedef struct _SS_CONTROLLER_BATTERY_PACKET {
     uint8_t zero[1]; // Alignment/reserved
 } SS_CONTROLLER_BATTERY_PACKET, *PSS_CONTROLLER_BATTERY_PACKET;
 
+#define SS_TRACKPAD_MAGIC 0x55000008
+typedef struct _SS_TRACKPAD_PACKET {
+    NV_INPUT_HEADER header;
+    uint8_t eventType;
+    uint8_t zero[1]; // Alignment/reserved
+    uint16_t rotation;
+    uint32_t pointerId;
+    netfloat x;
+    netfloat y;
+    netfloat pressureOrDistance;
+    netfloat contactAreaMajor;
+    netfloat contactAreaMinor;
+} SS_TRACKPAD_PACKET, *PSS_TRACKPAD_PACKET;
+
+
 #pragma pack(pop)
