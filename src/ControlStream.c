@@ -3,6 +3,10 @@
 // This is a private header, but it just contains some time macros
 #include <enet/time.h>
 
+#ifndef MIN
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+#endif
+
 // NV control stream packet header for TCP
 typedef struct _NVCTL_TCP_PACKET_HEADER {
     unsigned short type;
@@ -1084,9 +1088,23 @@ static void controlReceiveThreadFunc(void* context) {
                 // We add 1 ms just to ensure we're unlikely to undershoot the sleep() and have to
                 // do a tiny sleep for another iteration before the timeout is ready to be serviced.
                 waitTimeMs = ENET_TIME_DIFFERENCE(peer->nextTimeout, client->serviceTime) + 1;
-                if (waitTimeMs > peer->pingInterval) {
-                    waitTimeMs = peer->pingInterval;
+            }
+
+            // Ensure we don't sleep through a ping
+            if (peer->lastReceiveTime && peer->lastSendTime) {
+                enet_uint32 timeSinceLastRecv = ENET_TIME_DIFFERENCE(client->serviceTime, peer->lastReceiveTime);
+                enet_uint32 timeSinceLastSend = ENET_TIME_DIFFERENCE(client->serviceTime, peer->lastSendTime);
+                enet_uint32 timeSinceLastComm = MIN(timeSinceLastSend, timeSinceLastRecv);
+
+                if (timeSinceLastComm >= peer->pingInterval) {
+                    // Ping is due now for this peer
+                    waitTimeMs = 0;
+                } else {
+                    waitTimeMs = MIN(waitTimeMs, peer->pingInterval - timeSinceLastComm);
                 }
+            }
+            else {
+                waitTimeMs = MIN(waitTimeMs, peer->pingInterval);
             }
         }
 
