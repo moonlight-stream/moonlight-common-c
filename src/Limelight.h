@@ -277,6 +277,10 @@ typedef struct _DECODE_UNIT {
 // number of slices per frame. This capability is only valid on video renderers.
 #define CAPABILITY_SLICES_PER_FRAME(x) (((unsigned char)(x)) << 24)
 
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// needs to opt-in to intra refresh, some clients (like the Xbox client with NVEnc) needs it
+#define CAPABILITY_INTRA_REFRESH 0x40
+
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder.
 // Returns 0 on success, non-zero on failure.
 typedef int(*DecoderRendererSetup)(int videoFormat, int width, int height, int redrawRate, void* context, int drFlags);
