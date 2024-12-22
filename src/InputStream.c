@@ -61,6 +61,9 @@ static struct {
 
 // Don't batch up/down/cancel events
 #define TOUCH_EVENT_IS_BATCHABLE(x) ((x) == LI_TOUCH_EVENT_HOVER || (x) == LI_TOUCH_EVENT_MOVE)
+// Don't batch up/down/cancel/move events for pens
+// Move events are required for graphic programs
+#define PEN_TOUCH_EVENT_IS_BATCHABLE(x) ((x) == LI_TOUCH_EVENT_HOVER)
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -512,7 +515,7 @@ static void inputSendThreadProc(void* context) {
             lastMousePacketTime = now;
         }
         // If it's a pen packet, we should only send the latest move or hover events
-        else if (holder->packet.header.magic == LE32(SS_PEN_MAGIC) && TOUCH_EVENT_IS_BATCHABLE(holder->packet.pen.eventType)) {
+        else if (holder->packet.header.magic == LE32(SS_PEN_MAGIC) && PEN_TOUCH_EVENT_IS_BATCHABLE(holder->packet.pen.eventType)) {
             uint64_t now = PltGetMillis();
 
             // Delay for batching if required
@@ -1373,7 +1376,7 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
 
     // Allow move and hover events to be dropped if a newer one arrives (if no buttons changed),
     // but don't allow state changing events like up/down/leave events to be dropped.
-    holder->enetPacketFlags = (TOUCH_EVENT_IS_BATCHABLE(eventType) && !(penButtons ^ currentPenButtonState)) ? 0 : ENET_PACKET_FLAG_RELIABLE;
+    holder->enetPacketFlags = (PEN_TOUCH_EVENT_IS_BATCHABLE(eventType) && !(penButtons ^ currentPenButtonState)) ? 0 : ENET_PACKET_FLAG_RELIABLE;
     currentPenButtonState = penButtons;
 
     holder->packet.pen.header.size = BE32(sizeof(SS_PEN_PACKET) - sizeof(uint32_t));
