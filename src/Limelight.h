@@ -279,7 +279,7 @@ typedef struct _DECODE_UNIT {
 
 // If set in the video renderer capabilities field, this flag specifies that the renderer
 // needs to opt-in to intra refresh, some clients (like the Xbox client with NVEnc) needs it
-#define CAPABILITY_INTRA_REFRESH 0x40
+#define CAPABILITY_INTRA_REFRESH 0x80
 
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder.
 // Returns 0 on success, non-zero on failure.
