@@ -4,11 +4,11 @@
 #if defined(__AVX2__)
 #define OBLAS_AVX2
 #else
-#if defined(__SSSE3__) || (defined(_MSC_VER) && defined(_M_X64))
-#define OBLAS_SSE3
-#else
-#if defined(__aarch64__)
+#if defined(__aarch64__) // Also used by arm64 Windows
 #define OBLAS_NEON
+#else
+#if defined(__SSSE3__)
+#define OBLAS_SSE3
 #endif
 #endif
 #endif

@@ -1,3 +1,9 @@
+// Note about the frequent use of #undef before most defines in this file: These exist to
+// prevent a lot of (harmless) redefined macro warnings if this file is re-included multiple
+// times in the same build context. Sunshine and Moonlight use this trick to bundle all arch
+// builds into the same binary along with runtime detection. An example can be found at
+// https://github.com/LizardByte/Sunshine/blob/master/src/rswrapper.c
+
 #include "oblas_lite.h"
 
 #if defined(OBLAS_TINY)
@@ -52,7 +58,17 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
     for (unsigned idx = 0, p = 0; idx < k; idx += 8 * sizeof(u32), p++) {
         u32 tmp = b[p];
         while (tmp > 0) {
+#if _MSC_VER
+    #ifdef _M_ARM64
+            unsigned long index = 0;
+            _BitScanForward(&index, tmp);
+            unsigned tz = (unsigned int)index;
+    #else
+            unsigned tz = _tzcnt_u32(tmp);
+    #endif
+#else
             unsigned tz = __builtin_ctz(tmp);
+#endif
             tmp = tmp & (tmp - 1);
             a[tz + idx] ^= u;
         }
@@ -62,8 +78,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
 #if defined(OBLAS_AVX512)
 #include <immintrin.h>
 
+#undef OBLAS_ALIGN
 #define OBLAS_ALIGN 64
 
+#undef OBL_SHUF
 #define OBL_SHUF(op, a, b, f)                                                                                                      \
     do {                                                                                                                           \
         const u8 *u_lo = GF2_8_SHUF_LO + u * 16;                                                                                   \
@@ -86,8 +104,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
         op##_ref((u8 *)ap, (u8 *)bp, u, k % sizeof(__m512i));                                                                      \
     } while (0)
 
+#undef OBL_SHUF_XOR
 #define OBL_SHUF_XOR _mm512_xor_si512
 
+#undef OBL_AXPYB32
 #define OBL_AXPYB32(a, b, u, k)                                                                                                    \
     do {                                                                                                                           \
         __m512i *ap = (__m512i *)a, *ae = (__m512i *)(a + k);                                                                      \
@@ -112,8 +132,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
 #if defined(OBLAS_AVX2)
 #include <immintrin.h>
 
+#undef OBLAS_ALIGN
 #define OBLAS_ALIGN 32
 
+#undef OBL_SHUF
 #define OBL_SHUF(op, a, b, f)                                                                                                      \
     do {                                                                                                                           \
         const u8 *u_lo = GF2_8_SHUF_LO + u * 16;                                                                                   \
@@ -134,8 +156,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
         op##_ref((u8 *)ap, (u8 *)bp, u, k % sizeof(__m256i));                                                                      \
     } while (0)
 
+#undef OBL_SHUF_XOR
 #define OBL_SHUF_XOR _mm256_xor_si256
 
+#undef OBL_AXPYB32
 #define OBL_AXPYB32(a, b, u, k)                                                                                                    \
     do {                                                                                                                           \
         __m256i *ap = (__m256i *)a, *ae = (__m256i *)(a + k);                                                                      \
@@ -162,8 +186,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
 #include <tmmintrin.h>
 #endif
 
+#undef OBLAS_ALIGN
 #define OBLAS_ALIGN 16
 
+#undef OBL_SHUF
 #define OBL_SHUF(op, a, b, f)                                                                                                      \
     do {                                                                                                                           \
         const u8 *u_lo = GF2_8_SHUF_LO + u * 16;                                                                                   \
@@ -184,8 +210,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
         op##_ref((u8 *)ap, (u8 *)bp, u, k % sizeof(__m128i));                                                                      \
     } while (0)
 
+#undef OBL_SHUF_XOR
 #define OBL_SHUF_XOR _mm_xor_si128
 
+#undef OBL_AXPYB32
 #define OBL_AXPYB32(a, b, u, k)                                                                                                    \
     do {                                                                                                                           \
         __m128i *ap = (__m128i *)a, *ae = (__m128i *)(a + k);                                                                      \
@@ -209,14 +237,19 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
 
 #else
 
+#undef OBLAS_ALIGN
 #define OBLAS_ALIGN (sizeof(void *))
+
+#undef OBL_SHUF
 #define OBL_SHUF(op, a, b, f)                                                                                                      \
     do {                                                                                                                           \
         op##_ref(a, b, u, k);                                                                                                      \
     } while (0)
 
+#undef OBL_SHUF_XOR
 #define OBL_SHUF_XOR
 
+#undef OBL_AXPYB32
 #define OBL_AXPYB32 obl_axpyb32_ref
 
 #endif
