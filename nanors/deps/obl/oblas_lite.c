@@ -59,7 +59,7 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
         u32 tmp = b[p];
         while (tmp > 0) {
 #if _MSC_VER
-    #ifdef _M_ARM64
+    #if _M_ARM64
             unsigned long index = 0;
             _BitScanForward(&index, tmp);
             unsigned tz = (unsigned int)index;
