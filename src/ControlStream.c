@@ -66,6 +66,17 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t g;
             uint8_t b;
         } setControllerLed;
+        struct {
+            uint16_t controllerNumber;
+            uint8_t type_left;
+            uint8_t type_right;
+            // arrays of size DS_EFFECT_PAYLOAD_SIZE
+            // this is an opaque payload that will be read directly from the joypad and set as is to the client controller
+            // if you are curious about the actual data, there's some rationale in
+            // https://gist.github.com/Nielk1/6d54cc2c00d2201ccb8c2720ad7538db
+            uint8_t *left;
+            uint8_t *right;
+        } ds_adaptive_trigger;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -122,6 +133,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_RUMBLE_TRIGGER_DATA 9
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
+#define IDX_DS_ADAPTIVE_TRIGGERS 12
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -960,6 +972,16 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.setMotionEventState.motionType,
                                                   queuedCb->data.setMotionEventState.reportRateHz);
             break;
+        case IDX_DS_ADAPTIVE_TRIGGERS:
+            ListenerCallbacks.setAdaptiveTriggers(queuedCb->data.ds_adaptive_trigger.controllerNumber,
+                                                  queuedCb->data.ds_adaptive_trigger.type_left,
+                                                  queuedCb->data.ds_adaptive_trigger.type_right,
+                                                  queuedCb->data.ds_adaptive_trigger.left,
+                                                  queuedCb->data.ds_adaptive_trigger.right);
+            // cleanup arrays
+            free(queuedCb->data.ds_adaptive_trigger.left);
+            free(queuedCb->data.ds_adaptive_trigger.right);
+            break;
         default:
             // Unhandled packet type from queueAsyncCallback()
             LC_ASSERT(false);
@@ -975,7 +997,8 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_RUMBLE_TRIGGER_DATA] ||
            packetType == packetTypes[IDX_SET_MOTION_EVENT] ||
            packetType == packetTypes[IDX_SET_RGB_LED] ||
-           packetType == packetTypes[IDX_HDR_INFO];
+           packetType == packetTypes[IDX_HDR_INFO] ||
+           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS];
 }
 
 static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLength) {
@@ -1026,6 +1049,21 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     else if (ctlHdr->type == packetTypes[IDX_HDR_INFO]) {
         queuedCb->typeIndex = IDX_HDR_INFO;
     }
+    else if (ctlHdr->type == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS]){
+        BbGet16(&bb, &queuedCb->data.ds_adaptive_trigger.controllerNumber);
+        BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.type_left);
+        BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.type_right);
+
+        queuedCb->data.ds_adaptive_trigger.left = malloc(sizeof(uint8_t) * DS_EFFECT_PAYLOAD_SIZE);
+        for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
+            BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.left[i]);
+        }
+        queuedCb->data.ds_adaptive_trigger.right = malloc(sizeof(uint8_t) * DS_EFFECT_PAYLOAD_SIZE);
+        for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
+            BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.right[i]);
+        }
+        queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
+    }
     else {
         // Unhandled packet type from needsAsyncCallback()
         LC_ASSERT(false);
@@ -1037,6 +1075,10 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     if (err != LBQ_SUCCESS) {
         Limelog("Failed to queue async callback: %d\n", err);
         free(queuedCb);
+        if(queuedCb->typeIndex == IDX_DS_ADAPTIVE_TRIGGERS){
+            free(queuedCb->data.ds_adaptive_trigger.left);
+            free(queuedCb->data.ds_adaptive_trigger.right);
+        }
     }
 }
 
