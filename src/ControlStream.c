@@ -207,6 +207,7 @@ static const short packetTypesGen7Enc[] = {
     0x5500, // Rumble triggers (Sunshine protocol extension)
     0x5501, // Set motion event (Sunshine protocol extension)
     0x5502, // Set RGB LED (Sunshine protocol extension)
+    0x5503, // Set Adaptive Triggers (Sunshine protocol extension)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
