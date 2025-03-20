@@ -68,15 +68,20 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
         } setControllerLed;
         struct {
             uint16_t controllerNumber;
+            /**
+             * 0x04 - Right trigger
+             * 0x08 - Left trigger
+             */
+            uint8_t event_flags;
             uint8_t type_left;
             uint8_t type_right;
             // arrays of size DS_EFFECT_PAYLOAD_SIZE
             // this is an opaque payload that will be read directly from the joypad and set as is to the client controller
             // if you are curious about the actual data, there's some rationale in
             // https://gist.github.com/Nielk1/6d54cc2c00d2201ccb8c2720ad7538db
-            uint8_t *left;
-            uint8_t *right;
-        } ds_adaptive_trigger;
+            uint8_t left[DS_EFFECT_PAYLOAD_SIZE];
+            uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
+        } dsAdaptiveTrigger;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -974,14 +979,12 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.setMotionEventState.reportRateHz);
             break;
         case IDX_DS_ADAPTIVE_TRIGGERS:
-            ListenerCallbacks.setAdaptiveTriggers(queuedCb->data.ds_adaptive_trigger.controllerNumber,
-                                                  queuedCb->data.ds_adaptive_trigger.type_left,
-                                                  queuedCb->data.ds_adaptive_trigger.type_right,
-                                                  queuedCb->data.ds_adaptive_trigger.left,
-                                                  queuedCb->data.ds_adaptive_trigger.right);
-            // cleanup arrays
-            free(queuedCb->data.ds_adaptive_trigger.left);
-            free(queuedCb->data.ds_adaptive_trigger.right);
+            ListenerCallbacks.setAdaptiveTriggers(queuedCb->data.dsAdaptiveTrigger.controllerNumber,
+                                                  queuedCb->data.dsAdaptiveTrigger.event_flags,
+                                                  queuedCb->data.dsAdaptiveTrigger.type_left,
+                                                  queuedCb->data.dsAdaptiveTrigger.type_right,
+                                                  queuedCb->data.dsAdaptiveTrigger.left,
+                                                  queuedCb->data.dsAdaptiveTrigger.right);
             break;
         default:
             // Unhandled packet type from queueAsyncCallback()
@@ -1051,17 +1054,16 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         queuedCb->typeIndex = IDX_HDR_INFO;
     }
     else if (ctlHdr->type == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS]){
-        BbGet16(&bb, &queuedCb->data.ds_adaptive_trigger.controllerNumber);
-        BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.type_left);
-        BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.type_right);
+        BbGet16(&bb, &queuedCb->data.dsAdaptiveTrigger.controllerNumber);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.event_flags);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.type_left);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.type_right);
 
-        queuedCb->data.ds_adaptive_trigger.left = malloc(sizeof(uint8_t) * DS_EFFECT_PAYLOAD_SIZE);
         for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
-            BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.left[i]);
+            BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.left[i]);
         }
-        queuedCb->data.ds_adaptive_trigger.right = malloc(sizeof(uint8_t) * DS_EFFECT_PAYLOAD_SIZE);
         for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
-            BbGet8(&bb, &queuedCb->data.ds_adaptive_trigger.right[i]);
+            BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.right[i]);
         }
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
@@ -1076,10 +1078,6 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     if (err != LBQ_SUCCESS) {
         Limelog("Failed to queue async callback: %d\n", err);
         free(queuedCb);
-        if(queuedCb->typeIndex == IDX_DS_ADAPTIVE_TRIGGERS){
-            free(queuedCb->data.ds_adaptive_trigger.left);
-            free(queuedCb->data.ds_adaptive_trigger.right);
-        }
     }
 }
 

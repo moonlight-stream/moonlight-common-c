@@ -472,7 +472,9 @@ typedef void(*ConnListenerSetMotionEventState)(uint16_t controllerNumber, uint8_
 // This callback is invoked to notify the client of a change in the dualsense
 // adaptive trigger configuration.
 #define DS_EFFECT_PAYLOAD_SIZE 10
-typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_t type_left, uint8_t type_right, uint8_t *left, uint8_t *right);
+#define DS_EFFECT_RIGHT_TRIGGER 0x04
+#define DS_EFFECT_LEFT_TRIGGER 0x08
+typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_t event_flags, uint8_t type_left, uint8_t type_right, uint8_t *left, uint8_t *right);
 
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
