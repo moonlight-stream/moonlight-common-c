@@ -1,0 +1,73 @@
+---
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # TODO: Win32 build cannot find OpenSSL
+          # - os: windows-latest
+          #   cmake_args: -A Win32
+          - os: windows-latest
+            cmake_args: -A x64
+          - os: macos-latest
+            build_target: macos
+            cmake_args: -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
+          - os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+          - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - os: ubuntu-latest
+            cc: clang
+            cxx: clang++
+            cmake_args: -DUSE_MBEDTLS=ON
+            prebuild_cmd: sudo apt install -y libmbedtls-dev
+          - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+            cmake_args: -DUSE_MBEDTLS=ON
+            prebuild_cmd: sudo apt install -y libmbedtls-dev
+    runs-on: ${{ matrix.os }}
+    name: Build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Prebuild
+        if: matrix.prebuild_cmd
+        run: |
+          eval "${{ matrix.prebuild_cmd }}"
+
+      - name: Build Debug
+        run: |
+          mkdir build_debug
+          cmake ${{ matrix.cmake_args }} -DCMAKE_BUILD_TYPE=Debug -B build_debug -S .
+          cmake --build build_debug --config Debug
+
+      - name: Build Release
+        run: |
+          mkdir build_release
+          cmake ${{ matrix.cmake_args }} -DCMAKE_BUILD_TYPE=Release -B build_release -S .
+          cmake --build build_release --config Release
