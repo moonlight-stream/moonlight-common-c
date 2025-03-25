@@ -72,9 +72,9 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
              * 0x04 - Right trigger
              * 0x08 - Left trigger
              */
-            uint8_t event_flags;
-            uint8_t type_left;
-            uint8_t type_right;
+            uint8_t eventFlags;
+            uint8_t typeLeft;
+            uint8_t typeRight;
             // arrays of size DS_EFFECT_PAYLOAD_SIZE
             // this is an opaque payload that will be read directly from the joypad and set as is to the client controller
             // if you are curious about the actual data, there's some rationale in
@@ -980,9 +980,9 @@ static void asyncCallbackThreadFunc(void* context) {
             break;
         case IDX_DS_ADAPTIVE_TRIGGERS:
             ListenerCallbacks.setAdaptiveTriggers(queuedCb->data.dsAdaptiveTrigger.controllerNumber,
-                                                  queuedCb->data.dsAdaptiveTrigger.event_flags,
-                                                  queuedCb->data.dsAdaptiveTrigger.type_left,
-                                                  queuedCb->data.dsAdaptiveTrigger.type_right,
+                                                  queuedCb->data.dsAdaptiveTrigger.eventFlags,
+                                                  queuedCb->data.dsAdaptiveTrigger.typeLeft,
+                                                  queuedCb->data.dsAdaptiveTrigger.typeRight,
                                                   queuedCb->data.dsAdaptiveTrigger.left,
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
@@ -1055,9 +1055,9 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     }
     else if (ctlHdr->type == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS]){
         BbGet16(&bb, &queuedCb->data.dsAdaptiveTrigger.controllerNumber);
-        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.event_flags);
-        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.type_left);
-        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.type_right);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.eventFlags);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.typeLeft);
+        BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.typeRight);
 
         for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
             BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.left[i]);
