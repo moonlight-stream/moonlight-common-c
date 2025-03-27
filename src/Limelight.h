@@ -856,6 +856,15 @@ int LiGetPendingAudioFrames(void);
 // negotiated audio frame duration.
 int LiGetPendingAudioDuration(void);
 
+typedef struct _RTP_VIDEO_STATS {
+    uint32_t packetCountVideo; // total video packets
+    uint32_t packetCountFec;   // total packets of type FEC
+} RTP_VIDEO_STATS, *PRTP_VIDEO_STATS;
+
+// Returns a pointer to a struct containing data used to compute stats about the RTP video stream.
+// The data should be considered read-only and must not be modified.
+const RTP_VIDEO_STATS* LiGetRTPVideoStats(void);
+
 // Port index flags for use with LiGetPortFromPortFlagIndex() and LiGetProtocolFromPortFlagIndex()
 #define ML_PORT_INDEX_TCP_47984 0
 #define ML_PORT_INDEX_TCP_47989 1
@@ -883,7 +892,7 @@ int LiGetPendingAudioDuration(void);
 unsigned int LiGetPortFlagsFromStage(int stage);
 unsigned int LiGetPortFlagsFromTerminationErrorCode(int errorCode);
 
-// Returns the IPPROTO_* value for the specified port index 
+// Returns the IPPROTO_* value for the specified port index
 int LiGetProtocolFromPortFlagIndex(int portFlagIndex);
 
 // Returns the port number for the specified port index
