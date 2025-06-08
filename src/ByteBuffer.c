@@ -55,6 +55,7 @@ void BbRewindBuffer(PBYTE_BUFFER buff) {
 // Get a variable number of bytes from the byte buffer (all or nothing though)
 bool BbGetBytes(PBYTE_BUFFER buff, uint8_t* data, int length) {
     if (buff->position + length > buff->length) {
+        memset(data, 0, length);
         return false;
     }
 
@@ -72,6 +73,7 @@ bool BbGet8(PBYTE_BUFFER buff, uint8_t* c) {
 // Get a short from the byte buffer
 bool BbGet16(PBYTE_BUFFER buff, uint16_t* s) {
     if (buff->position + sizeof(*s) > buff->length) {
+        *s = 0;
         return false;
     }
 
@@ -86,6 +88,7 @@ bool BbGet16(PBYTE_BUFFER buff, uint16_t* s) {
 // Get an int from the byte buffer
 bool BbGet32(PBYTE_BUFFER buff, uint32_t* i) {
     if (buff->position + sizeof(*i) > buff->length) {
+        *i = 0;
         return false;
     }
 
@@ -100,6 +103,7 @@ bool BbGet32(PBYTE_BUFFER buff, uint32_t* i) {
 // Get a long from the byte buffer
 bool BbGet64(PBYTE_BUFFER buff, uint64_t* l) {
     if (buff->position + sizeof(*l) > buff->length) {
+        *l = 0;
         return false;
     }
 
