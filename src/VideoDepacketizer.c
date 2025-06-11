@@ -495,10 +495,14 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.colorspace = (uint8_t)(qdu->decodeUnit.hdrActive ? COLORSPACE_REC_2020 : StreamConfig.colorSpace);
 
             // Invoke the key frame callback if needed
-            if (qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
+            if (nalChainHead->bufferType != BUFFER_TYPE_PICDATA || qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
+                qdu->decodeUnit.frameType = FRAME_TYPE_IDR;
                 notifyKeyFrameReceived();
             }
-
+            else {
+                qdu->decodeUnit.frameType = FRAME_TYPE_PFRAME;
+            }
+            
             nalChainHead = nalChainTail = NULL;
             nalChainDataLength = 0;
 
