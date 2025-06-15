@@ -80,7 +80,7 @@ void* ThreadProc(void* context) {
 
 #if defined(LC_WINDOWS)
     setThreadNameWin32(ctx->name);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__FreeBSD__)
     pthread_setname_np(pthread_self(), ctx->name);
 #elif defined(LC_DARWIN)
     pthread_setname_np(ctx->name);
