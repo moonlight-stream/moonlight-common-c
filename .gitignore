@@ -1,6 +1,8 @@
+.idea/
 limelight-common/ARM/
 limelight-common/Debug/
 Build/
+cmake-*/
 **/xcuserdata/
 limelight-common/Release/
 *.sdf
