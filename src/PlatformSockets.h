@@ -12,6 +12,12 @@
 extern in_port_t n3ds_udp_port;
 #endif
 
+#ifdef __vita__
+#ifdef AF_INET6
+#undef AF_INET6
+#endif
+#endif
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
