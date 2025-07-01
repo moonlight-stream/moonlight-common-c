@@ -85,9 +85,9 @@ void* ThreadProc(void* context) {
 
     ctx->entry(ctx->context);
 
-
+#if defined(__vita__)
 free(ctx);
-
+#endif
 
 #if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
     return 0;
