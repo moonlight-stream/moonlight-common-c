@@ -136,7 +136,7 @@ void LiStopConnection(void) {
         Limelog("done\n");
     }
     LC_ASSERT(stage == STAGE_NONE);
-    
+
     if (RemoteAddrString != NULL) {
         free(RemoteAddrString);
         RemoteAddrString = NULL;
@@ -281,7 +281,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
 
     alreadyTerminated = false;
     ConnectionInterrupted = false;
-    
+
     // Validate the audio configuration
     if (MAGIC_BYTE_FROM_AUDIO_CONFIG(StreamConfig.audioConfiguration) != 0xCA ||
             CHANNEL_COUNT_FROM_AUDIO_CONFIGURATION(StreamConfig.audioConfiguration) > AUDIO_CONFIGURATION_MAX_CHANNEL_COUNT) {
@@ -328,7 +328,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         Limelog("Disabling reference frame invalidation for 4K streaming with GFE\n");
         VideoCallbacks.capabilities &= ~CAPABILITY_REFERENCE_FRAME_INVALIDATION_AVC;
     }
-    
+
     Limelog("Initializing platform...");
     ListenerCallbacks.stageStarting(STAGE_PLATFORM_INIT);
     err = initializePlatform();
@@ -380,7 +380,26 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     stage++;
     LC_ASSERT(stage == STAGE_NAME_RESOLUTION);
     ListenerCallbacks.stageComplete(STAGE_NAME_RESOLUTION);
-    Limelog("done\n");
+
+#ifdef AF_INET6
+    // Handle the special case of wanting to connect to an IPv4 address or IPv4-only domain
+    // while on an IPv6-only network. This is common with mobile providers such as T-Mobile.
+    if (RemoteAddr.ss_family == AF_INET6 && isIPv4Address(serverInfo->address)) {
+        if (is464XLATSynthesizedAddress(&RemoteAddr, serverInfo->address)) {
+            // we must treat this as an IPv4 address so it gets routed correctly
+            logWithSockaddrStorage(&RemoteAddr, "IPv4 address was resolved to synthesized IPv6 address %s, this network might be using 464XLAT\n");
+
+            err = resolveHostName(serverInfo->address, AF_INET, 47984, &RemoteAddr, &AddrLen);
+            if (err != 0) {
+                Limelog("resolveHostName for AF_INET failed: %d\n", err);
+                ListenerCallbacks.stageFailed(STAGE_NAME_RESOLUTION, err);
+                goto Cleanup;
+            }
+
+            logWithSockaddrStorage(&RemoteAddr, "IPv4 address was restored via AF_INET: %s\n");
+        }
+    }
+#endif
 
     // If STREAM_CFG_AUTO was requested, determine the streamingRemotely value
     // now that we have resolved the target address and impose the video packet
@@ -517,7 +536,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     LC_ASSERT(stage == STAGE_INPUT_STREAM_START);
     ListenerCallbacks.stageComplete(STAGE_INPUT_STREAM_START);
     Limelog("done\n");
-    
+
     // Wiggle the mouse a bit to wake the display up
     LiSendMouseMoveEvent(1, 1);
     PltSleepMs(10);
