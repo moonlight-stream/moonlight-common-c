@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include "Limelight-internal.h"
-#include "pthread.h"
+#if defined(__vita__)
+#include <pthread.h>
+#endif
 
 // The maximum amount of time before observing an interrupt
 // in PltSleepMsInterruptible().
