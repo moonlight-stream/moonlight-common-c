@@ -76,7 +76,7 @@ typedef struct _STREAM_CONFIGURATION {
 
     // If specified, the client's display refresh rate x 100. For example,
     // 59.94 Hz would be specified as 5994. This is used by recent versions
-    // of GFE for enhanced frame pacing.
+    // of GFE for enhanced frame pacing. Ignored by Sunshine.
     int clientRefreshRateX100;
 
     // If specified, sets the encoder colorspace to the provided COLORSPACE_*
@@ -100,10 +100,22 @@ typedef struct _STREAM_CONFIGURATION {
     // in /launch and /resume requests.
     char remoteInputAesKey[16];
     char remoteInputAesIv[16];
+
+    // Fractional frame rate of the video stream (in the form of numerator
+    // and denominator). Supported by recent versions of Sunshine.
+    // The non-fractional frame rate still needs to be specified for backward
+    // compatibility. LiConvertFloatingPointFrameRateToFraction() can be used for
+    // converting floating-point frame rates to this representation.
+    int fpsNum;
+    int fpsDen;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
+
+// Use this function to convert floating-point frame rates to fractional frame
+// rates (in the form of numerator and denominator) while trying to maximize precision.
+void LiConvertFloatingPointFrameRateToFraction(double value, int* outNum, int* outDen);
 
 // These identify codec configuration data in the buffer lists
 // of frames identified as IDR frames for H.264 and HEVC formats.
