@@ -309,6 +309,15 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         else {
             err |= addAttributeString(&optionHead, "x-ss-video[0].chromaSamplingType", "0");
         }
+
+        // Specify fractional frame rate if requested
+        if (StreamConfig.fpsNum > 0 && StreamConfig.fpsDen > 0) {
+            snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.fpsNum);
+            err |= addAttributeString(&optionHead, "x-ml-video.targetFrameRateNum", payloadStr);
+
+            snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.fpsDen);
+            err |= addAttributeString(&optionHead, "x-ml-video.targetFrameRateDen", payloadStr);
+        }
     }
 
     snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.width);
