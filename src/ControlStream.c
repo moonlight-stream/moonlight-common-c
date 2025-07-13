@@ -1083,12 +1083,8 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.typeLeft);
         BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.typeRight);
 
-        for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
-            BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.left[i]);
-        }
-        for(int i = 0; i < DS_EFFECT_PAYLOAD_SIZE; i++) {
-            BbGet8(&bb, &queuedCb->data.dsAdaptiveTrigger.right[i]);
-        }
+        BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.left, DS_EFFECT_PAYLOAD_SIZE);
+        BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.right, DS_EFFECT_PAYLOAD_SIZE);
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
     else {

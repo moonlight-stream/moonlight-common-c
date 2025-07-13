@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 #include "Limelight-internal.h"
+#if defined(__vita__)
+#include <pthread.h>
+#endif
 
 // The maximum amount of time before observing an interrupt
 // in PltSleepMsInterruptible().
@@ -9,9 +12,6 @@ struct thread_context {
     ThreadEntry entry;
     void* context;
     const char* name;
-#if defined(__vita__)
-    PLT_THREAD* thread;
-#endif
 };
 
 static int activeThreads = 0;
@@ -67,9 +67,6 @@ void setThreadNameWin32(const char* name) {
 
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     struct thread_context* ctx = (struct thread_context*)lpParameter;
-#elif defined(__vita__)
-int ThreadProc(SceSize args, void *argp) {
-    struct thread_context* ctx = (struct thread_context*)argp;
 #elif defined(__WIIU__)
 int ThreadProc(int argc, const char** argv) {
     struct thread_context* ctx = (struct thread_context*)argv;
@@ -80,7 +77,7 @@ void* ThreadProc(void* context) {
 
 #if defined(LC_WINDOWS)
     setThreadNameWin32(ctx->name);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__FreeBSD__)
     pthread_setname_np(pthread_self(), ctx->name);
 #elif defined(LC_DARWIN)
     pthread_setname_np(ctx->name);
@@ -89,15 +86,7 @@ void* ThreadProc(void* context) {
     ctx->entry(ctx->context);
 
 #if defined(__vita__)
-    if (ctx->thread->detached) {
-        free(ctx);
-        sceKernelExitDeleteThread(0);
-    }
-    else {
-        free(ctx);
-    }
-#else
-    free(ctx);
+free(ctx);
 #endif
 
 #if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
@@ -110,8 +99,6 @@ void* ThreadProc(void* context) {
 void PltSleepMs(int ms) {
 #if defined(LC_WINDOWS)
     SleepEx(ms, FALSE);
-#elif defined(__vita__)
-    sceKernelDelayThread(ms * 1000);
 #elif defined(__3DS__)
     s64 nsecs = ms * 1000000;
     svcSleepThread(nsecs);
@@ -132,11 +119,6 @@ void PltSleepMsInterruptible(PLT_THREAD* thread, int ms) {
 int PltCreateMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     InitializeSRWLock(mutex);
-#elif defined(__vita__)
-    *mutex = sceKernelCreateMutex("", 0, 0, NULL);
-    if (*mutex < 0) {
-        return -1;
-    }
 #elif defined(__WIIU__)
     OSFastMutex_Init(mutex, "");
 #elif defined(__3DS__)
@@ -156,8 +138,6 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
     activeMutexes--;
 #if defined(LC_WINDOWS)
     // No-op to destroy a SRWLOCK
-#elif defined(__vita__)
-    sceKernelDeleteMutex(*mutex);
 #elif defined(__WIIU__) || defined(__3DS__)
 
 #else
@@ -168,8 +148,6 @@ void PltDeleteMutex(PLT_MUTEX* mutex) {
 void PltLockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     AcquireSRWLockExclusive(mutex);
-#elif defined(__vita__)
-    sceKernelLockMutex(*mutex, 1, NULL);
 #elif defined(__WIIU__)
     OSFastMutex_Lock(mutex);
 #elif defined(__3DS__)
@@ -182,8 +160,6 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 void PltUnlockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     ReleaseSRWLockExclusive(mutex);
-#elif defined(__vita__)
-    sceKernelUnlockMutex(*mutex, 1);
 #elif defined(__WIIU__)
     OSFastMutex_Unlock(mutex);
 #elif defined(__3DS__)
@@ -200,10 +176,6 @@ void PltJoinThread(PLT_THREAD* thread) {
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
     CloseHandle(thread->handle);
-#elif defined(__vita__)
-    LC_ASSERT(!thread->detached);
-    sceKernelWaitThreadEnd(thread->handle, NULL, NULL);
-    sceKernelDeleteThread(thread->handle);
 #elif defined(__WIIU__)
     OSJoinThread(&thread->thread, NULL);
 #elif defined(__3DS__)
@@ -222,9 +194,6 @@ void PltDetachThread(PLT_THREAD* thread) {
     // According MSDN:
     // "Closing a thread handle does not terminate the associated thread or remove the thread object."
     CloseHandle(thread->handle);
-#elif defined(__vita__)
-    LC_ASSERT(!thread->detached);
-    thread->detached = true;
 #elif defined(__WIIU__)
     OSDetachThread(&thread->thread);
 #elif defined(__3DS__)
@@ -270,18 +239,6 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
             return -1;
         }
     }
-#elif defined(__vita__)
-    {
-        thread->detached = false;
-        thread->context = ctx;
-        ctx->thread = thread;
-        thread->handle = sceKernelCreateThread(name, ThreadProc, 0, 0x40000, 0, 0, NULL);
-        if (thread->handle < 0) {
-            free(ctx);
-            return -1;
-        }
-        sceKernelStartThread(thread->handle, sizeof(struct thread_context), ctx);
-    }
 #elif defined(__WIIU__)
     memset(&thread->thread, 0, sizeof(thread->thread));
 
@@ -326,11 +283,20 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     }
 #else
     {
-        int err = pthread_create(&thread->thread, NULL, ThreadProc, ctx);
+        pthread_attr_t attr;
+
+        pthread_attr_init(&attr);
+
+        pthread_attr_setstacksize(&attr, 0x100000);
+
+        ctx->name = name;
+
+        int err = pthread_create(&thread->thread, &attr, ThreadProc, ctx);
         if (err != 0) {
             free(ctx);
             return err;
         }
+        
     }
 #endif
 
@@ -404,11 +370,6 @@ void PltWaitForEvent(PLT_EVENT* event) {
 int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     InitializeConditionVariable(cond);
-#elif defined(__vita__)
-    *cond = sceKernelCreateCond("", 0, *mutex, NULL);
-    if (*cond < 0) {
-        return -1;
-    }
 #elif defined(__WIIU__)
     OSFastCond_Init(cond, "");
 #elif defined(__3DS__)
@@ -425,8 +386,6 @@ void PltDeleteConditionVariable(PLT_COND* cond) {
     activeCondVars--;
 #if defined(LC_WINDOWS)
     // No-op to delete a CONDITION_VARIABLE
-#elif defined(__vita__)
-    sceKernelDeleteCond(*cond);
 #elif defined(__WIIU__)
     // No-op to delete an OSFastCondition
 #elif defined(__3DS__)
@@ -439,8 +398,6 @@ void PltDeleteConditionVariable(PLT_COND* cond) {
 void PltSignalConditionVariable(PLT_COND* cond) {
 #if defined(LC_WINDOWS)
     WakeConditionVariable(cond);
-#elif defined(__vita__)
-    sceKernelSignalCond(*cond);
 #elif defined(__WIIU__)
     OSFastCond_Signal(cond);
 #elif defined(__3DS__)
@@ -453,8 +410,6 @@ void PltSignalConditionVariable(PLT_COND* cond) {
 void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     SleepConditionVariableSRW(cond, mutex, INFINITE, 0);
-#elif defined(__vita__)
-    sceKernelWaitCond(*cond, NULL);
 #elif defined(__WIIU__)
     OSFastCond_Wait(cond, mutex);
 #elif defined(__3DS__)

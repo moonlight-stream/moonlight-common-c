@@ -47,21 +47,33 @@ bool BbAdvanceBuffer(PBYTE_BUFFER buff, int offset) {
     return true;
 }
 
-// Get a byte from the byte buffer
-bool BbGet8(PBYTE_BUFFER buff, uint8_t* c) {
-    if (buff->position + sizeof(*c) > buff->length) {
+// Rewind the byte buffer back to the starting position
+void BbRewindBuffer(PBYTE_BUFFER buff) {
+    buff->position = 0;
+}
+
+// Get a variable number of bytes from the byte buffer (all or nothing though)
+bool BbGetBytes(PBYTE_BUFFER buff, uint8_t* data, int length) {
+    if (buff->position + length > buff->length) {
+        memset(data, 0, length);
         return false;
     }
 
-    memcpy(c, &buff->buffer[buff->position], sizeof(*c));
-    buff->position += sizeof(*c);
+    memcpy(data, &buff->buffer[buff->position], length);
+    buff->position += length;
 
     return true;
+}
+
+// Get a byte from the byte buffer
+bool BbGet8(PBYTE_BUFFER buff, uint8_t* c) {
+    return BbGetBytes(buff, c, sizeof(*c));
 }
 
 // Get a short from the byte buffer
 bool BbGet16(PBYTE_BUFFER buff, uint16_t* s) {
     if (buff->position + sizeof(*s) > buff->length) {
+        *s = 0;
         return false;
     }
 
@@ -76,6 +88,7 @@ bool BbGet16(PBYTE_BUFFER buff, uint16_t* s) {
 // Get an int from the byte buffer
 bool BbGet32(PBYTE_BUFFER buff, uint32_t* i) {
     if (buff->position + sizeof(*i) > buff->length) {
+        *i = 0;
         return false;
     }
 
@@ -90,6 +103,7 @@ bool BbGet32(PBYTE_BUFFER buff, uint32_t* i) {
 // Get a long from the byte buffer
 bool BbGet64(PBYTE_BUFFER buff, uint64_t* l) {
     if (buff->position + sizeof(*l) > buff->length) {
+        *l = 0;
         return false;
     }
 
@@ -143,14 +157,19 @@ bool BbPut16(PBYTE_BUFFER buff, uint16_t s) {
     return true;
 }
 
-// Put a byte into the buffer
-bool BbPut8(PBYTE_BUFFER buff, uint8_t c) {
-    if (buff->position + sizeof(c) > buff->length) {
+// Put a variable number of bytes into the byte buffer (all or nothing though)
+bool BbPutBytes(PBYTE_BUFFER buff, const uint8_t* data, int length) {
+    if (buff->position + length > buff->length) {
         return false;
     }
 
-    memcpy(&buff->buffer[buff->position], &c, sizeof(c));
-    buff->position += sizeof(c);
+    memcpy(&buff->buffer[buff->position], data, length);
+    buff->position += length;
 
     return true;
+}
+
+// Put a byte into the buffer
+bool BbPut8(PBYTE_BUFFER buff, uint8_t c) {
+    return BbPutBytes(buff, &c, sizeof(c));
 }
