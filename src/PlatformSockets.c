@@ -600,6 +600,18 @@ int enableNoDelay(SOCKET s) {
     return 0;
 }
 
+static void logWithSockaddr(const char *format, const char *arg, const struct sockaddr *addr, socklen_t len) {
+    char host[NI_MAXHOST], service[NI_MAXSERV];
+    int res = getnameinfo(addr, len, host, sizeof(host), service, sizeof(service),
+                          NI_NUMERICHOST | NI_NUMERICSERV);
+    if (res == 0) {
+        Limelog(format, arg, host, service);
+    }
+    else {
+        Limelog("getnameinfo() failed: %s\n", gai_strerror(res));
+    }
+}
+
 int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
 {
     struct addrinfo hints, *res, *currentAddr;
@@ -621,6 +633,8 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
     }
 
     for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
+        logWithSockaddr("Resolved %s to %s %s\n", host, currentAddr->ai_addr, sizeof(currentAddr->ai_addr));
+
         // Use the test port to ensure this address is working if:
         // a) We have multiple addresses
         // b) The caller asked us to test even with a single address
@@ -634,6 +648,7 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
                 continue;
             }
             else {
+                Limelog("tcp test on port %d is ok\n", tcpTestPort);
                 closeSocket(testSocket);
             }
         }
@@ -829,6 +844,79 @@ bool isNat64SynthesizedAddress(struct sockaddr_storage* address) {
     return false;
 }
 
+static uint32_t ipv4ToHex(const char *ipv4Str) {
+    struct in_addr addr;
+    if (inet_pton(AF_INET, ipv4Str, &addr) != 1) {
+        Limelog("ipv4ToHex: invalid IPv4 address: %s\n", ipv4ToHex);
+        return 0;
+    }
+    return ntohl(addr.s_addr);
+}
+
+// Return true if the given IPv6 sockaddr_storage is a synthesized address that
+// encapsulates an IPv4 address for use on an IPv6-only network.
+// See RFC 7050 and 8880 for more details.
+// input: IPv6 address as a struct sockaddr_storage *, and an IPv4 string
+bool is464XLATSynthesizedAddress(struct sockaddr_storage* ipv6Address, const char *ipv4Str) {
+    bool ret = false;
+
+#ifdef AF_INET6
+    int err;
+    struct addrinfo hints, *res, *currentAddr;
+    memset(&hints, 0, sizeof(hints));
+
+    // perform an AAAA lookup on ipv4only.arpa
+    // If this returns one or more responses, the network has a CLAT that is synthesizing IPv6 addresses
+    hints.ai_family   = AF_INET6; // will query AAAA only
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags    = AI_CANONNAME;
+    err = getaddrinfo("ipv4only.arpa", NULL, &hints, &res);
+    if (err != 0) {
+        Limelog("is464XLATSynthesizedAddress getaddrinfo(ipv4only.arpa) failed: %d\n", err);
+        return false;
+    }
+    else if (res == NULL) {
+        return false;
+    }
+
+    char ipv6AddressStr[INET6_ADDRSTRLEN];
+    memset(&ipv6AddressStr, 0, sizeof(ipv6AddressStr));
+    struct sockaddr_in6 *ipv6Addr = (struct sockaddr_in6 *)ipv6Address;
+    inet_ntop(AF_INET6, &ipv6Addr->sin6_addr, ipv6AddressStr, sizeof(ipv6AddressStr));
+
+    // Look through all responses, we may see the Well Known Prefix 64:ff9b::/96 as well as
+    // Network Specific Prefixes such as T-Mobile's 2607:7700:0:51::*
+    char currentAddrStr[INET6_ADDRSTRLEN];
+    for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
+        memset(&currentAddrStr, 0, sizeof(currentAddrStr));
+        struct sockaddr_in6 *addr = (struct sockaddr_in6 *)currentAddr->ai_addr;
+        inet_ntop(AF_INET6, &addr->sin6_addr, currentAddrStr, sizeof(currentAddrStr));
+
+        // Check first 96 bits of IPv6 for matching prefix
+        if (memcmp(&ipv6Addr->sin6_addr, &addr->sin6_addr, 12) == 0) {
+            // The prefixes match; now compare the IPv4 portion
+            uint32_t ipv6Hex;
+            memcpy(&ipv6Hex, ((uint8_t*)&ipv6Addr->sin6_addr) + 12, sizeof(ipv6Hex));
+            ipv6Hex = ntohl(ipv6Hex);
+
+            if (ipv6Hex == ipv4ToHex(ipv4Str)) {
+                ret = true;
+                break;
+            }
+        }
+    }
+
+    freeaddrinfo(res);
+#endif
+
+    return ret;
+}
+
+bool isIPv4Address(const char *str) {
+    struct in_addr addr;
+    return inet_pton(AF_INET, str, &addr) == 1;
+}
+
 // Enable platform-specific low latency options (best-effort)
 void enterLowLatencyMode(void) {
 #if defined(LC_WINDOWS_DESKTOP)
@@ -958,4 +1046,37 @@ void cleanupPlatformSockets(void) {
     WSACleanup();
 #else
 #endif
+}
+
+void logWithSockaddrStorage(struct sockaddr_storage* addr, const char *format) {
+    void *src = NULL;
+
+#ifdef AF_INET6
+    char ip[INET6_ADDRSTRLEN];
+#else
+    char ip[INET_ADDRSTRLEN];
+#endif
+
+#ifdef AF_INET6
+    if (addr->ss_family == AF_INET6) {
+        struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)addr;
+        src = &(addr_in6->sin6_addr);
+    }
+    else
+#endif
+    if (addr->ss_family == AF_INET) {
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
+        src = &(addr_in->sin_addr);
+    }
+    else {
+        Limelog("Unknown address family: %d\n", addr->ss_family);
+        return;
+    }
+
+    if (inet_ntop(addr->ss_family, src, ip, sizeof(ip)) == NULL) {
+        Limelog("invalid struct sockaddr_storage\n");
+        return;
+    }
+
+    Limelog(format, ip);
 }

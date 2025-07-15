@@ -69,6 +69,7 @@ typedef int SOCKADDR_LEN;
 #include <errno.h>
 #include <signal.h>
 #include <poll.h>
+#include <stdarg.h>
 
 #define ioctlsocket ioctl
 #define LastSocketError() errno
@@ -117,6 +118,8 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
 void closeSocket(SOCKET s);
 bool isPrivateNetworkAddress(struct sockaddr_storage* address);
 bool isNat64SynthesizedAddress(struct sockaddr_storage* address);
+bool is464XLATSynthesizedAddress(struct sockaddr_storage* address, const char *ipv4Str);
+bool isIPv4Address(const char *str);
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs);
 bool isSocketReadable(SOCKET s);
 
@@ -129,3 +132,5 @@ void exitLowLatencyMode(void);
 
 int initializePlatformSockets(void);
 void cleanupPlatformSockets(void);
+
+void logWithSockaddrStorage(struct sockaddr_storage* addr, const char *format);
