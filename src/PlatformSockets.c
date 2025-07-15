@@ -600,10 +600,43 @@ int enableNoDelay(SOCKET s) {
     return 0;
 }
 
+static bool isPrivateNetworkAddressV4(struct sockaddr_in* address, bool matchCGN)
+{
+    unsigned int addr;
+
+    memcpy(&addr, &address->sin_addr, sizeof(addr));
+    addr = htonl(addr);
+
+    // 10.0.0.0/8
+    if ((addr & 0xFF000000) == 0x0A000000) {
+        return true;
+    }
+    // 172.16.0.0/12
+    else if ((addr & 0xFFF00000) == 0xAC100000) {
+        return true;
+    }
+    // 192.168.0.0/16
+    else if ((addr & 0xFFFF0000) == 0xC0A80000) {
+        return true;
+    }
+    // 169.254.0.0/16
+    else if ((addr & 0xFFFF0000) == 0xA9FE0000) {
+        return true;
+    }
+    // 100.64.0.0/10
+    else if (matchCGN && (addr & 0xFFFC0000) == 0x64400000) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
 int resolveHostName(const char* host, int family, int tcpTestPort, struct sockaddr_storage* addr, SOCKADDR_LEN* addrLen)
 {
     struct addrinfo hints, *res, *currentAddr;
     int err;
+    bool needsFallbackV4 = false;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = family;
@@ -620,11 +653,32 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
         return -1;
     }
 
+#ifdef AF_INET6
+    {
+        struct sockaddr_in sin4;
+
+        memset(&sin4, 0, sizeof(sin4));
+        sin4.sin_family = AF_INET;
+
+        // As a workaround for broken 464XLAT on iOS where the CLAT synthesizes IPv6
+        // addresses for on-link IPv4 destinations on other interfaces, we will try
+        // again with an IPv4-only resolution if we detect that getaddrinfo() resolved
+        // a private IPv4 address to a single IPv6 address and that address didn't work.
+        needsFallbackV4 =
+            family == AF_UNSPEC &&
+            res->ai_family == AF_INET6 &&
+            res->ai_next == NULL &&
+            inet_pton(AF_INET, host, &sin4.sin_addr) == 1 &&
+            isPrivateNetworkAddressV4(&sin4, true);
+    }
+#endif
+
     for (currentAddr = res; currentAddr != NULL; currentAddr = currentAddr->ai_next) {
         // Use the test port to ensure this address is working if:
         // a) We have multiple addresses
         // b) The caller asked us to test even with a single address
-        if (tcpTestPort != 0 && (res->ai_next != NULL || (tcpTestPort & TCP_PORT_FLAG_ALWAYS_TEST))) {
+        // c) We got an IPv6 address synthesized from an IPv4 address
+        if (tcpTestPort != 0 && (res->ai_next != NULL || (tcpTestPort & TCP_PORT_FLAG_ALWAYS_TEST) || needsFallbackV4)) {
             SOCKET testSocket = connectTcpSocket((struct sockaddr_storage*)currentAddr->ai_addr,
                                                  (SOCKADDR_LEN)currentAddr->ai_addrlen,
                                                  tcpTestPort & TCP_PORT_MASK,
@@ -645,9 +699,16 @@ int resolveHostName(const char* host, int family, int tcpTestPort, struct sockad
         return 0;
     }
 
-    Limelog("No working addresses found for host: %s\n", host);
     freeaddrinfo(res);
-    return -1;
+
+    if (needsFallbackV4) {
+        // Fallback to IPv4-only if we didn't find a working address (see comment above)
+        return resolveHostName(host, AF_INET, tcpTestPort, addr, addrLen);
+    }
+    else {
+        Limelog("No working addresses found for host: %s\n", host);
+        return -1;
+    }
 }
 
 #ifdef AF_INET6
@@ -666,30 +727,8 @@ bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLe
 #endif
 
 bool isPrivateNetworkAddress(struct sockaddr_storage* address) {
-
-    // We only count IPv4 addresses as possibly private for now
     if (address->ss_family == AF_INET) {
-        unsigned int addr;
-
-        memcpy(&addr, &((struct sockaddr_in*)address)->sin_addr, sizeof(addr));
-        addr = htonl(addr);
-
-        // 10.0.0.0/8
-        if ((addr & 0xFF000000) == 0x0A000000) {
-            return true;
-        }
-        // 172.16.0.0/12
-        else if ((addr & 0xFFF00000) == 0xAC100000) {
-            return true;
-        }
-        // 192.168.0.0/16
-        else if ((addr & 0xFFFF0000) == 0xC0A80000) {
-            return true;
-        }
-        // 169.254.0.0/16
-        else if ((addr & 0xFFFF0000) == 0xA9FE0000) {
-            return true;
-        }
+        return isPrivateNetworkAddressV4((struct sockaddr_in*)address, false);
     }
 #ifdef AF_INET6
     else if (address->ss_family == AF_INET6) {
