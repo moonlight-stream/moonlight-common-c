@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.1...4.0)
 project(moonlight-common-c LANGUAGES C)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
