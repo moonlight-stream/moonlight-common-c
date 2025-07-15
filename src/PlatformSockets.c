@@ -624,7 +624,7 @@ static bool isPrivateNetworkAddressV4(struct sockaddr_in* address, bool matchCGN
         return true;
     }
     // 100.64.0.0/10
-    else if (matchCGN && (addr & 0xFFFC0000) == 0x64400000) {
+    else if (matchCGN && (addr & 0xFFC00000) == 0x64400000) {
         return true;
     }
     else {
