@@ -532,6 +532,9 @@ typedef struct _SERVER_INFORMATION {
 
     // Specifies the 'ServerCodecModeSupport' from the /serverinfo response.
     int serverCodecModeSupport;
+
+    // MAC address string (XX:XX:XX:XX:XX:XX or similar)
+    char mac[18];
 } SERVER_INFORMATION, *PSERVER_INFORMATION;
 
 // Use this function to zero the server information when allocated on the stack or heap
