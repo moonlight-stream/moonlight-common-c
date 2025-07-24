@@ -45,6 +45,8 @@ typedef struct _RTP_VIDEO_QUEUE {
 
     uint32_t lastOosFramePresentationTimestamp;
     bool receivedOosData;
+
+    RTP_VIDEO_STATS stats; // packet counters to determine FEC overhead
 } RTP_VIDEO_QUEUE, *PRTP_VIDEO_QUEUE;
 
 #define RTPF_RET_QUEUED    0
