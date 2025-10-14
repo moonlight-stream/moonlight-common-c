@@ -698,14 +698,13 @@ int LiSendMouseButtonEvent(char action, int button);
 #define MODIFIER_CTRL 0x02
 #define MODIFIER_ALT 0x04
 #define MODIFIER_META 0x08
-int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
+int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers,short displayIndex);
 
 // Similar to LiSendKeyboardEvent() but allows the client to inform the host that
 // the keycode was not mapped to a standard US English scancode and should be
 // interpreted as-is. This is a Sunshine protocol extension.
 #define SS_KBE_FLAG_NON_NORMALIZED 0x01
-int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char flags);
-
+int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char flags,short displayIndex);
 // This function queues an UTF-8 encoded text to be sent to the remote server.
 int LiSendUtf8TextEvent(const char *text, unsigned int length);
 
