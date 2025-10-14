@@ -1002,8 +1002,8 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     return err;
 }
 
-int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
-    return LiSendKeyboardEvent2(keyCode, keyAction, modifiers, 0);
+int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers,short displayIndex) {
+    return LiSendKeyboardEvent2(keyCode, keyAction, modifiers, 0,displayIndex);
 }
 
 int LiSendUtf8TextEvent(const char *text, unsigned int length) {
