@@ -1,9 +1,17 @@
-# Moonlight Streaming Core Library
+## moonlight-common-c   (基于super系列配套)
 
-Moonlight-common-c contains the core GameStream client code shared between [Moonlight](https://moonlight-stream.org) clients, including [Moonlight PC](https://github.com/moonlight-stream/moonlight-qt), [Moonlight Android](https://github.com/moonlight-stream/moonlight-android), [Moonlight iOS](https://github.com/moonlight-stream/moonlight-ios), and [Moonlight Chrome](https://github.com/moonlight-stream/moonlight-chrome).
+### 版本变更日志
+#### 1.0.25.101701
+1. 增加如果首个数据包错误，则丢弃的支持。
 
-If you are implementing your own Moonlight game streaming client that can use a C library, you probably want the code here.
+#### 1.0.25.101401
+1. 升级增加传递键盘在不同显示器的行为，使用zero2传递displayIndex，如果无法确定请传递-1.
 
-## Note to Developers
+#### 1.0.25.093001
+1. 不同轨道独立计算丢包。
 
-Moonlight-common-c requires the _specific_ version of ENet that is bundled as a submodule. This version has changes required for IPv6 compatibility and retransmission reliability, among other things. These are breaking API/ABI changes which make Moonlight-common-c incompatible with other versions of the ENet library. Attempting to runtime link to another libenet library will cause your client to crash when connecting to recent versions of GeForce Experience.
+#### 1.0.25.092601
+1. 串流增加多轨道视频流的支持。
+
+#### 1.0.25.091101
+1. 新增音频的rtp包写入支持。

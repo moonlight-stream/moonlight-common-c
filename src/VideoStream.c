@@ -5,7 +5,9 @@
 
 #define FIRST_FRAME_PORT 47996
 
-static RTP_VIDEO_QUEUE rtpQueue;
+static PRTP_VIDEO_QUEUE rtpQueues;
+static int rtpQueueCount;
+//static RTP_VIDEO_QUEUE rtpQueue;
 
 static SOCKET rtpSocket = INVALID_SOCKET;
 static SOCKET firstFrameSocket = INVALID_SOCKET;
@@ -35,9 +37,16 @@ static bool receivedFullFrame;
 #define RTP_RECV_PACKETS_BUFFERED 2048
 
 // Initialize the video stream
-void initializeVideoStream(void) {
-    initializeVideoDepacketizer(StreamConfig.packetSize);
-    RtpvInitializeQueue(&rtpQueue);
+void initializeVideoStream(int displayCount) {
+    initializeVideoDepacketizer(StreamConfig.packetSize,displayCount);
+    rtpQueueCount=displayCount;
+    rtpQueues=malloc(sizeof(RTP_VIDEO_QUEUE)*rtpQueueCount);
+    for (int i = 0; i < rtpQueueCount; ++i) {
+        RTP_VIDEO_QUEUE rtpQueue;
+        RtpvInitializeQueue(&rtpQueue);
+        rtpQueues[i]=rtpQueue;
+    }
+//    RtpvInitializeQueue(&rtpQueue);
     decryptionCtx = PltCreateCryptoContext();
     receivedDataFromPeer = false;
     firstDataTimeMs = 0;
@@ -45,10 +54,14 @@ void initializeVideoStream(void) {
 }
 
 // Clean up the video stream
-void destroyVideoStream(void) {
+void destroyVideoStream() {
     PltDestroyCryptoContext(decryptionCtx);
     destroyVideoDepacketizer();
-    RtpvCleanupQueue(&rtpQueue);
+//    RtpvCleanupQueue(&rtpQueue);
+    for (int i = 0; i < rtpQueueCount; ++i) {
+        RtpvCleanupQueue(&rtpQueues[i]);
+    }
+    free(rtpQueues);
 }
 
 // UDP Ping proc
@@ -208,7 +221,7 @@ static void VideoReceiveThreadProc(void* context) {
             // couldn't already do. If they're not on-link, we just throw their malicious
             // traffic away (as mentioned in the paragraph above) and continue accepting
             // legitmate video traffic.
-            if (encHeader->frameNumber && LE32(encHeader->frameNumber) < RtpvGetCurrentFrameNumber(&rtpQueue)) {
+            if (encHeader->frameNumber && LE32(encHeader->frameNumber) < RtpvGetCurrentFrameNumber(&rtpQueues[0])) { //先不考虑加密，先都执行到第0个,目前的moonlight加密协议中，没有保留多条流的支持，如果启用加密，则只能暂时支持一个窗口，否则协议不兼容
                 continue;
             }
 
@@ -229,8 +242,8 @@ static void VideoReceiveThreadProc(void* context) {
         packet->timestamp = BE32(packet->timestamp);
         packet->ssrc = BE32(packet->ssrc);
 
-        queueStatus = RtpvAddPacket(&rtpQueue, packet, err, (PRTPV_QUEUE_ENTRY)&buffer[decryptedSize]);
-
+        // Limelog("receive video packet===========================>%d\n",packet->ssrc);
+        queueStatus = RtpvAddPacket(&rtpQueues[packet->ssrc], packet, err, (PRTPV_QUEUE_ENTRY)&buffer[decryptedSize]);
         if (queueStatus == RTPF_RET_QUEUED) {
             // The queue owns the buffer
             buffer = NULL;
@@ -253,15 +266,16 @@ void notifyKeyFrameReceived(void) {
 
 // Decoder thread proc
 static void VideoDecoderThreadProc(void* context) {
+    int trackIndex=0;
     while (!PltIsThreadInterrupted(&decoderThread)) {
         VIDEO_FRAME_HANDLE frameHandle;
         PDECODE_UNIT decodeUnit;
-
-        if (!LiWaitForNextVideoFrame(&frameHandle, &decodeUnit)) {
+        //todo:暂时写死ssrc是0，稍后需要修改成实际的displayIndex
+        if (!LiWaitForNextVideoFrame(&frameHandle, &decodeUnit,trackIndex)) {
             return;
         }
 
-        LiCompleteVideoFrame(frameHandle, VideoCallbacks.submitDecodeUnit(decodeUnit));
+        LiCompleteVideoFrame(frameHandle, VideoCallbacks.submitDecodeUnit(decodeUnit),trackIndex);
     }
 }
 
@@ -349,7 +363,7 @@ int startVideoStream(void* rendererContext, int drFlags) {
     }
 
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
-        err = PltCreateThread("VideoDec", VideoDecoderThreadProc, NULL, &decoderThread);
+        err = PltCreateThread("VideoDec", VideoDecoderThreadProc, NULL, &decoderThread);//todo:这里需要传递正确的上下文进去，以获得displayIndex
         if (err != 0) {
             VideoCallbacks.stop();
             PltInterruptThread(&receiveThread);
@@ -414,4 +428,18 @@ int startVideoStream(void* rendererContext, int drFlags) {
     }
 
     return 0;
+}
+
+// When we receive a frame, update the number of our current frame
+void connectionReceivedCompleteFrame(int trackIndex,uint32_t frameIndex) {
+    rtpQueues[trackIndex].lastGoodFrame = frameIndex;
+    rtpQueues[trackIndex].intervalGoodFrameCount++;
+}
+
+int getLastSeenFrame(int trackIndex){
+    return rtpQueues[trackIndex].lastSeenFrame;
+}
+
+int getLastGoodFrame(int trackIndex){
+    return rtpQueues[trackIndex].lastGoodFrame;
 }

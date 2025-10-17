@@ -86,6 +86,11 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
 
+typedef struct _IDR_EVENT{
+    int trackIndex;
+    bool signal;
+}IDR_EVENT,*P_IDR_EVENT;
+
 static SOCKET ctlSock = INVALID_SOCKET;
 static ENetHost* client;
 static ENetPeer* peer;
@@ -97,21 +102,12 @@ static PLT_THREAD invalidateRefFramesThread;
 static PLT_THREAD requestIdrFrameThread;
 static PLT_THREAD controlReceiveThread;
 static PLT_THREAD asyncCallbackThread;
-static uint32_t lastGoodFrame;
-static uint32_t lastSeenFrame;
 static bool stopping;
 static bool disconnectPending;
 static bool encryptedControlStream;
 static bool hdrEnabled;
 static SS_HDR_METADATA hdrMetadata;
-
-static int intervalGoodFrameCount;
-static int intervalTotalFrameCount;
-static uint64_t intervalStartTimeMs;
-static int lastIntervalLossPercentage;
-static int lastConnectionStatusUpdate;
 static uint32_t currentEnetSequenceNumber;
-static uint64_t firstFrameTimeMs;
 
 static LINKED_BLOCKING_QUEUE invalidReferenceFrameTuples;
 static LINKED_BLOCKING_QUEUE frameFecStatusQueue;
@@ -143,48 +139,6 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
 
-static const short packetTypesGen3[] = {
-    0x1407, // Request IDR frame
-    0x1410, // Start B
-    0x1404, // Invalidate reference frames
-    0x140c, // Loss Stats
-    0x1417, // Frame Stats (unused)
-    -1,     // Input data (unused)
-    -1,     // Rumble data (unused)
-    -1,     // Termination (unused)
-    -1,     // HDR mode (unused)
-    -1,     // Rumble triggers (unused)
-    -1,     // Set motion event (unused)
-    -1,     // Set RGB LED (unused)
-};
-static const short packetTypesGen4[] = {
-    0x0606, // Request IDR frame
-    0x0609, // Start B
-    0x0604, // Invalidate reference frames
-    0x060a, // Loss Stats
-    0x0611, // Frame Stats (unused)
-    -1,     // Input data (unused)
-    -1,     // Rumble data (unused)
-    -1,     // Termination (unused)
-    -1,     // HDR mode (unused)
-    -1,     // Rumble triggers (unused)
-    -1,     // Set motion event (unused)
-    -1,     // Set RGB LED (unused)
-};
-static const short packetTypesGen5[] = {
-    0x0305, // Start A
-    0x0307, // Start B
-    0x0301, // Invalidate reference frames
-    0x0201, // Loss Stats
-    0x0204, // Frame Stats (unused)
-    0x0207, // Input data
-    -1,     // Rumble data (unused)
-    -1,     // Termination (unused)
-    -1,     // HDR mode (unknown)
-    -1,     // Rumble triggers (unused)
-    -1,     // Set motion event (unused)
-    -1,     // Set RGB LED (unused)
-};
 static const short packetTypesGen7[] = {
     0x0305, // Start A
     0x0307, // Start B
@@ -215,41 +169,11 @@ static const short packetTypesGen7Enc[] = {
     0x5503, // Set Adaptive Triggers (Sunshine protocol extension)
 };
 
-static const char requestIdrFrameGen3[] = { 0, 0 };
-static const int startBGen3[] = { 0, 0, 0, 0xa };
-
-static const char requestIdrFrameGen4[] = { 0, 0 };
-static const char startBGen4[] = { 0 };
-
 static const char startAGen5[] = { 0, 0 };
 static const char startBGen5[] = { 0 };
 
 static const char requestIdrFrameGen7Enc[] = { 0, 0 };
 
-static const short payloadLengthsGen3[] = {
-    sizeof(requestIdrFrameGen3), // Request IDR frame
-    sizeof(startBGen3), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
-};
-static const short payloadLengthsGen4[] = {
-    sizeof(requestIdrFrameGen4), // Request IDR frame
-    sizeof(startBGen4), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
-};
-static const short payloadLengthsGen5[] = {
-    sizeof(startAGen5), // Start A
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
-};
 static const short payloadLengthsGen7[] = {
     sizeof(startAGen5), // Start A
     sizeof(startBGen5), // Start B
@@ -267,18 +191,6 @@ static const short payloadLengthsGen7Enc[] = {
     -1, // Input data
 };
 
-static const char* preconstructedPayloadsGen3[] = {
-    requestIdrFrameGen3,
-    (char*)startBGen3
-};
-static const char* preconstructedPayloadsGen4[] = {
-    requestIdrFrameGen4,
-    startBGen4
-};
-static const char* preconstructedPayloadsGen5[] = {
-    startAGen5,
-    startBGen5
-};
 static const char* preconstructedPayloadsGen7[] = {
     startAGen5,
     startBGen5
@@ -296,9 +208,25 @@ static bool supportsIdrFrameRequest;
 #define LOSS_REPORT_INTERVAL_MS 50
 #define PERIODIC_PING_INTERVAL_MS 100
 
+static P_IDR_EVENT idrEvents;
+static int idrEventCount;
+static int trackCount;
 // Initializes the control stream
-int initializeControlStream(void) {
+int initializeControlStream(int videoTrackCount) {
     stopping = false;
+    if(idrEvents!=NULL) {
+        free(idrEvents);
+    }
+    idrEventCount=0;
+    idrEvents= malloc(sizeof(IDR_EVENT)*videoTrackCount);
+    for (int i = 0; i < videoTrackCount; ++i) {
+        IDR_EVENT event;
+        event.trackIndex=i;
+        event.signal=false;
+        idrEvents[i]=event;
+        idrEventCount++;
+    }
+    trackCount=videoTrackCount;
     PltCreateEvent(&idrFrameRequiredEvent);
     LbqInitializeLinkedBlockingQueue(&invalidReferenceFrameTuples, 20);
     LbqInitializeLinkedBlockingQueue(&frameFecStatusQueue, 8); // Limits number of frame status reports per periodic ping interval
@@ -307,48 +235,20 @@ int initializeControlStream(void) {
 
     encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
 
-    if (AppVersionQuad[0] == 3) {
-        packetTypes = (short*)packetTypesGen3;
-        payloadLengths = (short*)payloadLengthsGen3;
-        preconstructedPayloads = (char**)preconstructedPayloadsGen3;
+    if (encryptedControlStream) {
+        packetTypes = (short*)packetTypesGen7Enc;
+        payloadLengths = (short*)payloadLengthsGen7Enc;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen7Enc;
         supportsIdrFrameRequest = true;
-    }
-    else if (AppVersionQuad[0] == 4) {
-        packetTypes = (short*)packetTypesGen4;
-        payloadLengths = (short*)payloadLengthsGen4;
-        preconstructedPayloads = (char**)preconstructedPayloadsGen4;
-        supportsIdrFrameRequest = true;
-    }
-    else if (AppVersionQuad[0] == 5) {
-        packetTypes = (short*)packetTypesGen5;
-        payloadLengths = (short*)payloadLengthsGen5;
-        preconstructedPayloads = (char**)preconstructedPayloadsGen5;
-        supportsIdrFrameRequest = false;
     }
     else {
-        if (encryptedControlStream) {
-            packetTypes = (short*)packetTypesGen7Enc;
-            payloadLengths = (short*)payloadLengthsGen7Enc;
-            preconstructedPayloads = (char**)preconstructedPayloadsGen7Enc;
-            supportsIdrFrameRequest = true;
-        }
-        else {
-            packetTypes = (short*)packetTypesGen7;
-            payloadLengths = (short*)payloadLengthsGen7;
-            preconstructedPayloads = (char**)preconstructedPayloadsGen7;
-            supportsIdrFrameRequest = false;
-        }
+        packetTypes = (short*)packetTypesGen7;
+        payloadLengths = (short*)payloadLengthsGen7;
+        preconstructedPayloads = (char**)preconstructedPayloadsGen7;
+        supportsIdrFrameRequest = false;
     }
 
-    lastGoodFrame = 0;
-    lastSeenFrame = 0;
     disconnectPending = false;
-    intervalGoodFrameCount = 0;
-    intervalTotalFrameCount = 0;
-    intervalStartTimeMs = 0;
-    lastIntervalLossPercentage = 0;
-    lastConnectionStatusUpdate = CONN_STATUS_OKAY;
-    firstFrameTimeMs = 0;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
     encryptionCtx = PltCreateCryptoContext();
@@ -382,7 +282,7 @@ void destroyControlStream(void) {
     PltDeleteMutex(&enetMutex);
 }
 
-static void queueFrameInvalidationTuple(uint32_t startFrame, uint32_t endFrame) {
+static void queueFrameInvalidationTuple(int trackIndex,uint32_t startFrame, uint32_t endFrame) {
     LC_ASSERT(startFrame <= endFrame);
 
     if (isReferenceFrameInvalidationEnabled()) {
@@ -395,37 +295,32 @@ static void queueFrameInvalidationTuple(uint32_t startFrame, uint32_t endFrame) 
                 // Too many invalidation tuples, so we need an IDR frame now
                 Limelog("RFI range list reached maximum size limit\n");
                 free(qfit);
-                LiRequestIdrFrame();
+                LiRequestIdrFrame(trackIndex);
             }
         }
         else {
-            LiRequestIdrFrame();
+            LiRequestIdrFrame(trackIndex);
         }
     }
     else {
-        LiRequestIdrFrame();
+        LiRequestIdrFrame(trackIndex);
     }
 }
 
 // Request an IDR frame on demand by the decoder
-void LiRequestIdrFrame(void) {
+void LiRequestIdrFrame(int trackIndex) {
     // Any reference frame invalidation requests should be dropped now.
     // We require a full IDR frame to recover.
     freeBasicLbqList(LbqFlushQueueItems(&invalidReferenceFrameTuples));
 
+    idrEvents[trackIndex].signal=true;//传递轨道索引
     // Request the IDR frame
     PltSetEvent(&idrFrameRequiredEvent);
 }
 
 // Invalidate reference frames lost by the network
-void connectionDetectedFrameLoss(uint32_t startFrame, uint32_t endFrame) {
-    queueFrameInvalidationTuple(startFrame, endFrame);
-}
-
-// When we receive a frame, update the number of our current frame
-void connectionReceivedCompleteFrame(uint32_t frameIndex) {
-    lastGoodFrame = frameIndex;
-    intervalGoodFrameCount++;
+void connectionDetectedFrameLoss(int trackIndex,uint32_t startFrame, uint32_t endFrame) {
+    queueFrameInvalidationTuple(trackIndex,startFrame, endFrame);
 }
 
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
@@ -444,50 +339,48 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
     }
 }
 
-void connectionSawFrame(uint32_t frameIndex) {
-    LC_ASSERT_VT(!isBefore16(frameIndex, lastSeenFrame));
-
+void connectionSawFrame(PRTP_VIDEO_QUEUE queue) {
+    LC_ASSERT_VT(!isBefore16(queue->currentFrameNumber,queue->lastSeenFrame));
     uint64_t now = PltGetMillis();
-
     // Suppress connection status warnings for the first sampling period
     // to allow the network and host to settle.
-    if (lastSeenFrame == 0) {
-        lastSeenFrame = frameIndex;
-        firstFrameTimeMs = now;
+    if (queue->lastSeenFrame == 0) {
+        queue->lastSeenFrame = queue->currentFrameNumber;
+        queue->firstFrameTimeMs = now;
         return;
     }
-    else if (now - firstFrameTimeMs < CONN_STATUS_SAMPLE_PERIOD) {
-        lastSeenFrame = frameIndex;
+    else if (now -  queue->firstFrameTimeMs < CONN_STATUS_SAMPLE_PERIOD) {
+        queue->lastSeenFrame = queue->currentFrameNumber;
         return;
     }
-
-    if (now - intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
-        if (intervalTotalFrameCount != 0) {
+    uint32_t frameIndex=queue->currentFrameNumber;
+    if (now - queue->intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
+        if (queue->intervalTotalFrameCount != 0) {
             // Notify the client of connection status changes based on frame loss rate
-            int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
-            if (lastConnectionStatusUpdate != CONN_STATUS_POOR &&
+            int frameLossPercent = 100 - (queue->intervalGoodFrameCount * 100) / queue->intervalTotalFrameCount;
+            if (queue->lastConnectionStatusUpdate != CONN_STATUS_POOR &&
                     (frameLossPercent >= CONN_IMMEDIATE_POOR_LOSS_RATE ||
-                     (frameLossPercent >= CONN_CONSECUTIVE_POOR_LOSS_RATE && lastIntervalLossPercentage >= CONN_CONSECUTIVE_POOR_LOSS_RATE))) {
+                     (frameLossPercent >= CONN_CONSECUTIVE_POOR_LOSS_RATE && queue->lastIntervalLossPercentage >= CONN_CONSECUTIVE_POOR_LOSS_RATE))) {
                 // We require 2 consecutive intervals above CONN_CONSECUTIVE_POOR_LOSS_RATE or a single
                 // interval above CONN_IMMEDIATE_POOR_LOSS_RATE to notify of a poor connection.
                 ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_POOR);
-                lastConnectionStatusUpdate = CONN_STATUS_POOR;
+                queue->lastConnectionStatusUpdate = CONN_STATUS_POOR;
             }
-            else if (frameLossPercent <= CONN_OKAY_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_OKAY) {
+            else if (frameLossPercent <= CONN_OKAY_LOSS_RATE && queue->lastConnectionStatusUpdate != CONN_STATUS_OKAY) {
                 ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_OKAY);
-                lastConnectionStatusUpdate = CONN_STATUS_OKAY;
+                queue->lastConnectionStatusUpdate = CONN_STATUS_OKAY;
             }
 
-            lastIntervalLossPercentage = frameLossPercent;
+            queue->lastIntervalLossPercentage = frameLossPercent;
         }
 
         // Reset interval
-        intervalStartTimeMs = now;
-        intervalGoodFrameCount = intervalTotalFrameCount = 0;
+        queue->intervalStartTimeMs = now;
+        queue->intervalGoodFrameCount = queue->intervalTotalFrameCount = 0;
     }
 
-    intervalTotalFrameCount += frameIndex - lastSeenFrame;
-    lastSeenFrame = frameIndex;
+    queue->intervalTotalFrameCount += frameIndex - queue->lastSeenFrame;
+    queue->lastSeenFrame = frameIndex;
 }
 
 // Reads an NV control stream packet from the TCP connection
@@ -669,7 +562,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     ENetPacket* enetPacket;
     int err;
 
-    LC_ASSERT(AppVersionQuad[0] >= 5);
+    LC_ASSERT(AppVersionQuad[0] >= 7);
 
     // Only send reliable packets to GFE
     if (!IS_SUNSHINE()) {
@@ -820,42 +713,13 @@ static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
 }
 
 static bool sendMessageAndForget(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
-    bool ret;
-
-    // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
-    // threads at once. We have to synchronize them with a lock.
-    if (AppVersionQuad[0] >= 5) {
-        ret = sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData);
-    }
-    else {
-        ret = sendMessageTcp(ptype, paylen, payload);
-    }
-
-    return ret;
+    return sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData);
 }
 
 static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
-    if (AppVersionQuad[0] >= 5) {
-        if (!sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData)) {
-            return false;
-        }
+    if (!sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData)) {
+        return false;
     }
-    else {
-        PNVCTL_TCP_PACKET_HEADER reply;
-
-        if (!sendMessageTcp(ptype, paylen, payload)) {
-            return false;
-        }
-
-        // Discard the response
-        reply = readNvctlPacketTcp();
-        if (reply == NULL) {
-            return false;
-        }
-
-        free(reply);
-    }
-
     return true;
 }
 
@@ -1274,10 +1138,8 @@ static void controlReceiveThreadFunc(void* context) {
             }
             else if (ctlHdr->type == packetTypes[IDX_TERMINATION]) {
                 BYTE_BUFFER bb;
-
-
                 uint32_t terminationErrorCode;
-
+                uint32_t lastSeenFrame=getLastSeenFrame(0);//todo:这里需要看看 怎么传递 trackIndex进来，目前还没跟踪到代码执行点
                 if (packetLength >= 6) {
                     // This is the extended termination message which contains a full HRESULT
                     BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_BIG);
@@ -1431,30 +1293,31 @@ static void lossStatsThreadFunc(void* context) {
             return;
         }
 
-        while (!PltIsThreadInterrupted(&lossStatsThread)) {
-            // Construct the payload
-            BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
-            BbPut32(&byteBuffer, 0);
-            BbPut32(&byteBuffer, LOSS_REPORT_INTERVAL_MS);
-            BbPut32(&byteBuffer, 1000);
-            BbPut64(&byteBuffer, lastGoodFrame);
-            BbPut32(&byteBuffer, 0);
-            BbPut32(&byteBuffer, 0);
-            BbPut32(&byteBuffer, 0x14);
+        while (!PltIsThreadInterrupted(&lossStatsThread)) { //丢帧率的包是32个字节
+            for(int i=0;i<trackCount;i++){
+              // Construct the payload
+              BbInitializeWrappedBuffer(&byteBuffer, lossStatsPayload, 0, payloadLengths[IDX_LOSS_STATS], BYTE_ORDER_LITTLE);
+              BbPut32(&byteBuffer, 0); //数量
+              BbPut32(&byteBuffer, LOSS_REPORT_INTERVAL_MS);//时间
+              BbPut32(&byteBuffer, 1000);
+              BbPut64(&byteBuffer, getLastGoodFrame(i));//最后的好帧
+              BbPut32(&byteBuffer, 0);
+              BbPut32(&byteBuffer, i);//暂定这个是第几个display的索引
+              BbPut32(&byteBuffer, 0x14);
 
-            // Send the message (and don't expect a response)
-            if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
-                                      payloadLengths[IDX_LOSS_STATS],
-                                      lossStatsPayload,
-                                      CTRL_CHANNEL_GENERIC,
-                                      0,
-                                      false)) {
-                free(lossStatsPayload);
-                Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
-                ListenerCallbacks.connectionTerminated(LastSocketFail());
-                return;
+              // Send the message (and don't expect a response)
+              if (!sendMessageAndForget(packetTypes[IDX_LOSS_STATS],
+                                        payloadLengths[IDX_LOSS_STATS],
+                                        lossStatsPayload,
+                                        CTRL_CHANNEL_GENERIC,
+                                        0,
+                                        false)) {
+                  free(lossStatsPayload);
+                  Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
+                  ListenerCallbacks.connectionTerminated(LastSocketFail());
+                  return;
+              }
             }
-
             // Wait a bit
             PltSleepMsInterruptible(&lossStatsThread, LOSS_REPORT_INTERVAL_MS);
         }
@@ -1463,13 +1326,13 @@ static void lossStatsThreadFunc(void* context) {
     }
 }
 
-static void requestIdrFrame(void) {
+static void requestIdrFrame(int trackIndex) {//todo:目前这个送得太频繁了，稍后需要控制一下速度
     // If this server does not have a known IDR frame request
     // message, we'll accomplish the same thing by creating a
     // reference frame invalidation request.
     if (!supportsIdrFrameRequest) {
         int64_t payload[3];
-
+        uint32_t lastSeenFrame = getLastSeenFrame(trackIndex);
         // Form the payload
         if (lastSeenFrame < 0x20) {
             payload[0] = 0;
@@ -1480,7 +1343,7 @@ static void requestIdrFrame(void) {
             payload[1] = LE64(lastSeenFrame);
         }
 
-        payload[2] = 0;
+        payload[2] = trackIndex;
 
         // Send the reference frame invalidation request and read the response
         if (!sendMessageAndDiscardReply(packetTypes[IDX_INVALIDATE_REF_FRAMES],
@@ -1495,10 +1358,12 @@ static void requestIdrFrame(void) {
         }
     }
     else {
+        int16_t payload[1];
+        payload[0] =(int16_t)trackIndex;
         // Send IDR frame request and read the response
         if (!sendMessageAndDiscardReply(packetTypes[IDX_REQUEST_IDR_FRAME],
                                         payloadLengths[IDX_REQUEST_IDR_FRAME],
-                                        preconstructedPayloads[IDX_REQUEST_IDR_FRAME],
+                                        payload,//preconstructedPayloads[IDX_REQUEST_IDR_FRAME],//因为我们需要指定哪个轨道需要刷新，这里，我们不再使用默认
                                         CTRL_CHANNEL_URGENT,
                                         ENET_PACKET_FLAG_RELIABLE,
                                         false)) {
@@ -1507,8 +1372,7 @@ static void requestIdrFrame(void) {
             return;
         }
     }
-
-    Limelog("IDR frame request sent\n");
+    Limelog("IDR frame request sent =============> %d\n",trackIndex);
 }
 
 static void requestInvalidateReferenceFrames(uint32_t startFrame, uint32_t endFrame) {
@@ -1576,9 +1440,14 @@ static void requestIdrFrameFunc(void* context) {
 
         // Any pending reference frame invalidation requests are now redundant
         freeBasicLbqList(LbqFlushQueueItems(&invalidReferenceFrameTuples));
-
-        // Request the IDR frame
-        requestIdrFrame();
+        for (int i = 0; i < idrEventCount; ++i) {
+            IDR_EVENT* event=&idrEvents[i];
+            if(event->signal){
+                event->signal=false;
+                // Request the IDR frame
+                requestIdrFrame(event->trackIndex);
+            }
+        }
     }
 }
 
@@ -1634,7 +1503,7 @@ int stopControlStream(void) {
 
 // Called by the input stream to send a packet for Gen 5+ servers
 int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData) {
-    LC_ASSERT(AppVersionQuad[0] >= 5);
+    LC_ASSERT(AppVersionQuad[0] >= 7);
 
     // Send the input data (no reply expected)
     if (sendMessageAndForget(packetTypes[IDX_INPUT_DATA], length, data, channelId, flags, moreData) == 0) {
@@ -1646,11 +1515,9 @@ int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t chan
 
 // Called by the input stream to flush queued packets before a batching wait
 void flushInputOnControlStream(void) {
-    if (AppVersionQuad[0] >= 5) {
-        PltLockMutex(&enetMutex);
-        enet_host_flush(client);
-        PltUnlockMutex(&enetMutex);
-    }
+    PltLockMutex(&enetMutex);
+    enet_host_flush(client);
+    PltUnlockMutex(&enetMutex);
 }
 
 bool isControlDataInTransit(void) {
@@ -1691,105 +1558,92 @@ bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVarianc
 int startControlStream(void) {
     int err;
 
-    if (AppVersionQuad[0] >= 5) {
-        ENetAddress remoteAddress, localAddress;
-        ENetEvent event;
+    ENetAddress remoteAddress, localAddress;
+    ENetEvent event;
 
-        LC_ASSERT(ControlPortNumber != 0);
+    LC_ASSERT(ControlPortNumber != 0);
 
-        enet_address_set_address(&localAddress, (struct sockaddr *)&LocalAddr, AddrLen);
+    enet_address_set_address(&localAddress, (struct sockaddr *)&LocalAddr, AddrLen);
 #ifdef __3DS__
-        // binding to wildcard port is broken on the 3DS, so we need to define a port manually
-        enet_address_set_port(&localAddress, htons(n3ds_udp_port++));
+    // binding to wildcard port is broken on the 3DS, so we need to define a port manually
+    enet_address_set_port(&localAddress, htons(n3ds_udp_port++));
 #else
-        enet_address_set_port(&localAddress, 0); // Wildcard port
+    enet_address_set_port(&localAddress, 0); // Wildcard port
 #endif
 
-        enet_address_set_address(&remoteAddress, (struct sockaddr *)&RemoteAddr, AddrLen);
-        enet_address_set_port(&remoteAddress, ControlPortNumber);
+    enet_address_set_address(&remoteAddress, (struct sockaddr *)&RemoteAddr, AddrLen);
+    enet_address_set_port(&remoteAddress, ControlPortNumber);
 
-        // Create a client
-        client = enet_host_create(RemoteAddr.ss_family,
-                                  LocalAddr.ss_family != 0 ? &localAddress : NULL,
-                                  1, CTRL_CHANNEL_COUNT, 0, 0);
-        if (client == NULL) {
-            stopping = true;
-            return -1;
-        }
-
-        client->intercept = ignoreDisconnectIntercept;
-
-        // Enable high priority QoS marking on control stream traffic
-        //
-        // NB: It is important to do this before connecting because there's logic in the connect
-        // retransmission code to detect QoS-intolerant routes and disable QoS marking for those.
-        enet_socket_set_option (client->socket, ENET_SOCKOPT_QOS, 1);
-
-        // Connect to the host
-        peer = enet_host_connect(client, &remoteAddress, CTRL_CHANNEL_COUNT, ControlConnectData);
-        if (peer == NULL) {
-            stopping = true;
-            enet_host_destroy(client);
-            client = NULL;
-            return -1;
-        }
-
-        // Wait for the connect to complete
-        err = serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000);
-        if (err <= 0 || event.type != ENET_EVENT_TYPE_CONNECT) {
-            if (err < 0) {
-                Limelog("Failed to establish ENet connection on UDP port %u: error %d\n", ControlPortNumber, LastSocketFail());
-            }
-            else if (err == 0) {
-                Limelog("Failed to establish ENet connection on UDP port %u: timed out\n", ControlPortNumber);
-            }
-            else {
-                Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, (int)event.type, LastSocketError());
-            }
-
-            stopping = true;
-            enet_peer_reset(peer);
-            peer = NULL;
-            enet_host_destroy(client);
-            client = NULL;
-
-            if (err == 0) {
-                return ETIMEDOUT;
-            }
-            else if (err > 0 && event.type != ENET_EVENT_TYPE_CONNECT && LastSocketError() == 0) {
-                // If we got an unexpected event type and have no other error to return, return the event type
-                LC_ASSERT(event.type != ENET_EVENT_TYPE_NONE);
-                return event.type != ENET_EVENT_TYPE_NONE ? (int)event.type : LastSocketFail();
-            }
-            else {
-                return LastSocketFail();
-            }
-        }
-
-        // Ensure the connect verify ACK is sent immediately
-        enet_host_flush(client);
-
-#ifdef __3DS__
-        // Set the peer timeout to 1 minute and limit backoff to 2x RTT
-        // The 3DS can take a bit longer to set up when starting fresh
-        enet_peer_timeout(peer, 2, 60000, 60000);
-#else
-        // Set the peer timeout to 10 seconds and limit backoff to 2x RTT
-        enet_peer_timeout(peer, 2, 10000, 10000);
-#endif
+    // Create a client
+    client = enet_host_create(RemoteAddr.ss_family,
+                              LocalAddr.ss_family != 0 ? &localAddress : NULL,
+                              1, CTRL_CHANNEL_COUNT, 0, 0);
+    if (client == NULL) {
+        stopping = true;
+        return -1;
     }
-    else {
-        // NB: Do NOT use ControlPortNumber here. 47995 is correct for these old versions.
-        LC_ASSERT(ControlPortNumber == 0);
-        ctlSock = connectTcpSocket(&RemoteAddr, AddrLen,
-            47995, CONTROL_STREAM_TIMEOUT_SEC);
-        if (ctlSock == INVALID_SOCKET) {
-            stopping = true;
+
+    client->intercept = ignoreDisconnectIntercept;
+
+    // Enable high priority QoS marking on control stream traffic
+    //
+    // NB: It is important to do this before connecting because there's logic in the connect
+    // retransmission code to detect QoS-intolerant routes and disable QoS marking for those.
+    enet_socket_set_option (client->socket, ENET_SOCKOPT_QOS, 1);
+
+    // Connect to the host
+    peer = enet_host_connect(client, &remoteAddress, CTRL_CHANNEL_COUNT, ControlConnectData);
+    if (peer == NULL) {
+        stopping = true;
+        enet_host_destroy(client);
+        client = NULL;
+        return -1;
+    }
+
+    // Wait for the connect to complete
+    err = serviceEnetHost(client, &event, CONTROL_STREAM_TIMEOUT_SEC * 1000);
+    if (err <= 0 || event.type != ENET_EVENT_TYPE_CONNECT) {
+        if (err < 0) {
+            Limelog("Failed to establish ENet connection on UDP port %u: error %d\n", ControlPortNumber, LastSocketFail());
+        }
+        else if (err == 0) {
+            Limelog("Failed to establish ENet connection on UDP port %u: timed out\n", ControlPortNumber);
+        }
+        else {
+            Limelog("Failed to establish ENet connection on UDP port %u: unexpected event %d (error: %d)\n", ControlPortNumber, (int)event.type, LastSocketError());
+        }
+
+        stopping = true;
+        enet_peer_reset(peer);
+        peer = NULL;
+        enet_host_destroy(client);
+        client = NULL;
+
+        if (err == 0) {
+            return ETIMEDOUT;
+        }
+        else if (err > 0 && event.type != ENET_EVENT_TYPE_CONNECT && LastSocketError() == 0) {
+            // If we got an unexpected event type and have no other error to return, return the event type
+            LC_ASSERT(event.type != ENET_EVENT_TYPE_NONE);
+            return event.type != ENET_EVENT_TYPE_NONE ? (int)event.type : LastSocketFail();
+        }
+        else {
             return LastSocketFail();
         }
-
-        enableNoDelay(ctlSock);
     }
+
+    // Ensure the connect verify ACK is sent immediately
+    enet_host_flush(client);
+
+#ifdef __3DS__
+    // Set the peer timeout to 1 minute and limit backoff to 2x RTT
+    // The 3DS can take a bit longer to set up when starting fresh
+    enet_peer_timeout(peer, 2, 60000, 60000);
+#else
+    // Set the peer timeout to 10 seconds and limit backoff to 2x RTT
+    enet_peer_timeout(peer, 2, 10000, 10000);
+#endif
+
 
     err = PltCreateThread("ControlRecv", controlReceiveThreadFunc, NULL, &controlReceiveThread);
     if (err != 0) {

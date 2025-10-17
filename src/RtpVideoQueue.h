@@ -38,6 +38,14 @@ typedef struct _RTP_VIDEO_QUEUE {
     bool reportedLostFrame;
 
     uint32_t currentFrameNumber;
+    uint32_t lastSeenFrame;
+    uint32_t lastGoodFrame;
+    uint64_t firstFrameTimeMs;
+    int intervalGoodFrameCount;
+    int intervalTotalFrameCount;
+    uint64_t intervalStartTimeMs;
+    int lastIntervalLossPercentage;
+    int lastConnectionStatusUpdate;
 
     bool multiFecCapable;
     uint8_t multiFecCurrentBlockNumber;

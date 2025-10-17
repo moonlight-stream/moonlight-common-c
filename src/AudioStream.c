@@ -474,3 +474,25 @@ int LiGetPendingAudioFrames(void) {
 int LiGetPendingAudioDuration(void) {
     return LiGetPendingAudioFrames() * AudioPacketDuration;
 }
+
+int sequenceNumber=0;
+int LiSendAudioStreamEvent(const char* data, unsigned int length,unsigned  int packetType,unsigned int ssrc){
+    LC_SOCKADDR saddr;
+    memcpy(&saddr, &RemoteAddr, sizeof(saddr));
+    SET_PORT(&saddr, AudioPortNumber);
+
+    RTP_PACKET packet;
+    packet.header= 0x00; // flags (1 byte)
+    packet.packetType=  packetType; // packetType (1 byte) eg. custom OPUS encoder type
+    packet.sequenceNumber=(short) (sequenceNumber++ & 0xFFFF); // sequenceNumber (2 bytes)
+    uint64_t currentTime = PltGetMillis();
+    packet.timestamp=(int)(currentTime & 0xFFFFFFFF);// timestamp (4 bytes)
+    packet.ssrc=ssrc;  // ssrc (4 bytes) - Synchronization Source Identifier
+
+    int size=sizeof(packet);
+    char* buffer=(char*)malloc(size+length);
+    memcpy(buffer,&packet,size);
+    memcpy(buffer+size,data,length);
+    sendto(rtpSocket, buffer, size+length, 0, (struct sockaddr*)&saddr, AddrLen);
+    return 0;
+}

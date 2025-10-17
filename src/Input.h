@@ -51,7 +51,7 @@ typedef struct _NV_ABS_MOUSE_MOVE_PACKET {
     short x;
     short y;
 
-    short unused;
+    short displayIndex;
 
     // Used on the server-side as a reference to scale x and y
     // to screen coordinates.

@@ -33,8 +33,9 @@ static struct {
     bool dirty; // Update ready to send (queued packet holder in packetQueue)
 } currentRelativeMouseState;
 static struct {
-    int x, y;
-    int width, height;
+    short displayIndex;
+    short x, y;
+    short width, height;
     bool dirty; // Update ready to send (queued packet holder in packetQueue)
 } currentAbsoluteMouseState;
 
@@ -493,6 +494,8 @@ static void inputSendThreadProc(void* context) {
             PltLockMutex(&batchedInputMutex);
 
             // Populate the packet with the latest state
+            holder->packet.mouseMoveAbs.displayIndex = BE16(currentAbsoluteMouseState.displayIndex);
+
             holder->packet.mouseMoveAbs.x = BE16(currentAbsoluteMouseState.x);
             holder->packet.mouseMoveAbs.y = BE16(currentAbsoluteMouseState.y);
 
@@ -813,7 +816,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 }
 
 // Send a mouse position update to the streaming machine
-int LiSendMousePositionEvent(short x, short y, short referenceWidth, short referenceHeight) {
+int LiSendMousePositionEvent(short displayIndex, short x, short y, short referenceWidth, short referenceHeight) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -824,6 +827,7 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
     PltLockMutex(&batchedInputMutex);
 
     // Overwrite the previous mouse location with the new one
+    currentAbsoluteMouseState.displayIndex=displayIndex;
     currentAbsoluteMouseState.x = x;
     currentAbsoluteMouseState.y = y;
     currentAbsoluteMouseState.width = referenceWidth;
@@ -844,7 +848,7 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 
         holder->packet.mouseMoveAbs.header.size = BE32(sizeof(NV_ABS_MOUSE_MOVE_PACKET) - sizeof(uint32_t));
         holder->packet.mouseMoveAbs.header.magic = LE32(MOUSE_MOVE_ABS_MAGIC);
-        holder->packet.mouseMoveAbs.unused = 0;
+        holder->packet.mouseMoveAbs.displayIndex=displayIndex;
 
         // Remaining fields are set in the input thread based on the latest currentAbsoluteMouseState values
 
@@ -876,12 +880,12 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 }
 
 // Send a relative motion event using absolute position to the streaming machine
-int LiSendMouseMoveAsMousePositionEvent(short deltaX, short deltaY, short referenceWidth, short referenceHeight) {
+int LiSendMouseMoveAsMousePositionEvent(short displayIndex, short deltaX, short deltaY, short referenceWidth, short referenceHeight) {
     // Convert the current position to be relative to the provided reference dimensions
     short oldPositionX = (short)(absCurrentPosX * referenceWidth);
     short oldPositionY = (short)(absCurrentPosY * referenceHeight);
 
-    return LiSendMousePositionEvent(CLAMP(oldPositionX + deltaX, 0, referenceWidth),
+    return LiSendMousePositionEvent(displayIndex, CLAMP(oldPositionX + deltaX, 0, referenceWidth),
                                     CLAMP(oldPositionY + deltaY, 0, referenceHeight),
                                     referenceWidth, referenceHeight);
 }
@@ -921,7 +925,7 @@ int LiSendMouseButtonEvent(char action, int button) {
 }
 
 // Send a key press event to the streaming machine
-int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char flags) {
+int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char flags,short displayIndex) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -986,7 +990,7 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     holder->packet.keyboard.flags = IS_SUNSHINE() ? flags : 0;
     holder->packet.keyboard.keyCode = LE16(keyCode);
     holder->packet.keyboard.modifiers = modifiers;
-    holder->packet.keyboard.zero2 = 0;
+    holder->packet.keyboard.zero2 = displayIndex; //目前zero2 没有被应用，我们利用这个传递显示索引
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
@@ -998,8 +1002,8 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     return err;
 }
 
-int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers) {
-    return LiSendKeyboardEvent2(keyCode, keyAction, modifiers, 0);
+int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers,short displayIndex) {
+    return LiSendKeyboardEvent2(keyCode, keyAction, modifiers, 0,displayIndex);
 }
 
 int LiSendUtf8TextEvent(const char *text, unsigned int length) {

@@ -114,28 +114,31 @@ void setRecorderCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks, PAUDIO_RENDER
 
 char* getSdpPayloadForStreamConfig(int rtspClientVersion, int* length);
 
-int initializeControlStream(void);
+int initializeControlStream(int videoTrackCount);
 int startControlStream(void);
 int stopControlStream(void);
 void destroyControlStream(void);
-void connectionDetectedFrameLoss(uint32_t startFrame, uint32_t endFrame);
-void connectionReceivedCompleteFrame(uint32_t frameIndex);
-void connectionSawFrame(uint32_t frameIndex);
+int getLastSeenFrame(int trackIndex);
+int getLastGoodFrame(int trackIndex);
+void connectionDetectedFrameLoss(int trackIndex, uint32_t startFrame, uint32_t endFrame);
+void connectionReceivedCompleteFrame(int trackIndex,uint32_t frameIndex);
+void connectionSawFrame(PRTP_VIDEO_QUEUE queue);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
 int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
 void flushInputOnControlStream(void);
 bool isControlDataInTransit(void);
 
 int performRtspHandshake(PSERVER_INFORMATION serverInfo);
-
-void initializeVideoDepacketizer(int pktSize);
+//初始化解包器
+void initializeVideoDepacketizer(int pktSize,int trackCount);
+//销毁解包器
 void destroyVideoDepacketizer(void);
-void queueRtpPacket(PRTPV_QUEUE_ENTRY queueEntry);
+void queueRtpPacket(int trackIndex,PRTPV_QUEUE_ENTRY queueEntry);
 void stopVideoDepacketizer(void);
-void requestDecoderRefresh(void);
-void notifyFrameLost(unsigned int frameNumber, bool speculative);
+void requestDecoderRefresh(int trackIndex);
+void notifyFrameLost(int trackIndex,unsigned int frameNumber, bool speculative);
 
-void initializeVideoStream(void);
+void initializeVideoStream(int displayCount);
 void destroyVideoStream(void);
 void notifyKeyFrameReceived(void);
 int startVideoStream(void* rendererContext, int drFlags);
