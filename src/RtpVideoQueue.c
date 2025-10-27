@@ -11,7 +11,7 @@
 
 // Don't try speculative RFI for 5 minutes after seeing
 // an out of order packet or incorrect prediction
-#define SPECULATIVE_RFI_COOLDOWN_PERIOD_MS 300000
+#define SPECULATIVE_RFI_COOLDOWN_PERIOD_US 300000000
 
 // RTP packets use a 90 KHz presentation timestamp clock
 #define PTS_DIVISOR 90
@@ -154,21 +154,22 @@ static bool queuePacket(PRTP_VIDEO_QUEUE queue, PRTPV_QUEUE_ENTRY newEntry, PRTP
     newEntry->isParity = isParity;
     newEntry->prev = NULL;
     newEntry->next = NULL;
-    newEntry->presentationTimeMs = packet->timestamp / PTS_DIVISOR;
+    newEntry->presentationTimeUs = ((uint64_t)packet->timestamp * 1000) / PTS_DIVISOR;
+    newEntry->rtpTimestamp = packet->timestamp;
 
     // FEC recovery packets are synthesized by us, so don't use them to determine OOS data
     if (!isFecRecovery) {
         if (outOfSequence) {
             // This packet was received after a higher sequence number packet, so note that we
             // received an out of order packet to disable our speculative RFI recovery logic.
-            queue->lastOosFramePresentationTimestamp = newEntry->presentationTimeMs;
+            queue->lastOosFramePresentationTimestamp = newEntry->presentationTimeUs;
             if (!queue->receivedOosData) {
                 Limelog("Leaving speculative RFI mode after OOS video data at frame %u\n",
                         queue->currentFrameNumber);
                 queue->receivedOosData = true;
             }
         }
-        else if (queue->receivedOosData && newEntry->presentationTimeMs > queue->lastOosFramePresentationTimestamp + SPECULATIVE_RFI_COOLDOWN_PERIOD_MS) {
+        else if (queue->receivedOosData && newEntry->presentationTimeUs > queue->lastOosFramePresentationTimestamp + SPECULATIVE_RFI_COOLDOWN_PERIOD_US) {
             Limelog("Entering speculative RFI mode after sequenced video data at frame %u\n",
                     queue->currentFrameNumber);
             queue->receivedOosData = false;
@@ -234,7 +235,7 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
     if (queue->reportedLostFrame && !queue->receivedOosData) {
         // If it turns out that we lied to the host, stop further speculative RFI requests for a while.
         queue->receivedOosData = true;
-        queue->lastOosFramePresentationTimestamp = queue->pendingFecBlockList.head->presentationTimeMs;
+        queue->lastOosFramePresentationTimestamp = queue->pendingFecBlockList.head->presentationTimeUs;
         Limelog("Leaving speculative RFI mode due to incorrect loss prediction of frame %u\n", queue->currentFrameNumber);
     }
 
