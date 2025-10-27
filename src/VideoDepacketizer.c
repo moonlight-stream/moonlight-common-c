@@ -21,6 +21,7 @@ static uint64_t syntheticPtsBaseUs;
 static uint16_t frameHostProcessingLatency;
 static uint64_t firstPacketReceiveTimeUs;
 static uint64_t firstPacketPresentationTime;
+static uint32_t firstPacketRtpTimestamp;
 static bool dropStatePending;
 static bool idrFrameProcessed;
 
@@ -72,6 +73,7 @@ void initializeVideoDepacketizer(int pktSize) {
     frameHostProcessingLatency = 0;
     firstPacketReceiveTimeUs = 0;
     firstPacketPresentationTime = 0;
+    firstPacketRtpTimestamp = 0;
     lastPacketPayloadLength = 0;
     dropStatePending = false;
     idrFrameProcessed = false;
@@ -484,7 +486,8 @@ static void reassembleFrame(int frameNumber) {
             qdu->decodeUnit.frameNumber = frameNumber;
             qdu->decodeUnit.frameHostProcessingLatency = frameHostProcessingLatency;
             qdu->decodeUnit.receiveTimeUs = firstPacketReceiveTimeUs;
-            qdu->decodeUnit.presentationTimeMs = firstPacketPresentationTime;
+            qdu->decodeUnit.presentationTimeUs = firstPacketPresentationTime;
+            qdu->decodeUnit.rtpTimestamp = firstPacketRtpTimestamp;
             qdu->decodeUnit.enqueueTimeUs = PltGetMicroseconds();
 
             // These might be wrong for a few frames during a transition between SDR and HDR,
@@ -502,7 +505,7 @@ static void reassembleFrame(int frameNumber) {
             else {
                 qdu->decodeUnit.frameType = FRAME_TYPE_PFRAME;
             }
-            
+
             nalChainHead = nalChainTail = NULL;
             nalChainDataLength = 0;
 
@@ -740,7 +743,7 @@ static bool isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
 // Process an RTP Payload
 // The caller will free *existingEntry unless we NULL it
 static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
-                       uint64_t receiveTimeUs, uint64_t presentationTimeMs,
+                       uint64_t receiveTimeUs, uint64_t presentationTimeUs, uint32_t rtpTimestamp,
                        PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
     uint32_t frameIndex;
@@ -831,12 +834,14 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             syntheticPtsBaseUs = receiveTimeUs;
         }
 
-        if (!presentationTimeMs && frameIndex > 0) {
-            firstPacketPresentationTime = (receiveTimeUs - syntheticPtsBaseUs) / 1000;
+        if (!presentationTimeUs && frameIndex > 0) {
+            firstPacketPresentationTime = receiveTimeUs - syntheticPtsBaseUs;
         }
         else {
-            firstPacketPresentationTime = presentationTimeMs;
+            firstPacketPresentationTime = presentationTimeUs;
         }
+
+        firstPacketRtpTimestamp = rtpTimestamp;
     }
 
     lastPacketInStream = streamPacketIndex;
@@ -1174,7 +1179,8 @@ void queueRtpPacket(PRTPV_QUEUE_ENTRY queueEntryPtr) {
     processRtpPayload((PNV_VIDEO_PACKET)(((char*)queueEntry.packet) + dataOffset),
                       queueEntry.length - dataOffset,
                       queueEntry.receiveTimeUs,
-                      queueEntry.presentationTimeMs,
+                      queueEntry.presentationTimeUs,
+                      queueEntry.rtpTimestamp,
                       &existingEntry);
 
     if (existingEntry != NULL) {
