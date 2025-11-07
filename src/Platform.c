@@ -2,6 +2,7 @@
 #include "Limelight-internal.h"
 #if defined(__vita__)
 #include <pthread.h>
+#include <psp2/kernel/processmgr.h>
 #endif
 
 // The maximum amount of time before observing an interrupt
