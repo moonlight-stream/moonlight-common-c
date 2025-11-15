@@ -174,6 +174,11 @@ typedef struct _DECODE_UNIT {
     // CMTimeMake((int64_t)du->rtpTimestamp, 90000);
     uint32_t rtpTimestamp;
 
+    // Original RTP timestamp in 90kHz units. Useful when using APIs that deal with integer
+    // time such as Apple's CMTime. To exactly recover the RTP timestamp, use something like
+    // CMTimeMake((int64_t)du->rtpTimestamp, 90000);
+    uint32_t rtpTimestamp;
+
     // Length of the entire buffer chain in bytes
     int fullLength;
 
@@ -280,6 +285,10 @@ typedef struct _DECODE_UNIT {
 // supports slicing to increase decoding performance. The parameter specifies the desired
 // number of slices per frame. This capability is only valid on video renderers.
 #define CAPABILITY_SLICES_PER_FRAME(x) (((unsigned char)(x)) << 24)
+
+// If set in the video renderer capabilities field, this flag specifies that the renderer
+// needs to opt-in to intra refresh, some clients (like the Xbox client with NVEnc) needs it
+#define CAPABILITY_INTRA_REFRESH 0x80
 
 // This callback is invoked to provide details about the video stream and allow configuration of the decoder.
 // Returns 0 on success, non-zero on failure.

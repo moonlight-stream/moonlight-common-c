@@ -75,6 +75,7 @@ void initializeVideoDepacketizer(int pktSize) {
     firstPacketPresentationTime = 0;
     firstPacketRtpTimestamp = 0;
     lastPacketPayloadLength = 0;
+    firstPacketRtpTimestamp = 0;
     dropStatePending = false;
     idrFrameProcessed = false;
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
@@ -678,6 +679,9 @@ static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERN
 
         if (isSeqReferenceFrameStart(currentPos)) {
             // No longer waiting for an IDR frame
+            if (waitingForIdrFrame) {
+                Limelog("IDR frame received\n");
+            }
             waitingForIdrFrame = false;
             waitingForRefInvalFrame = false;
 
@@ -860,6 +864,9 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
                 // For other codecs, we trust the frame header rather than parsing the bitstream
                 // to determine if a given frame is an IDR frame.
                 if (!(NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265))) {
+                    if (waitingForIdrFrame) {
+                        Limelog("IDR frame received\n");
+                    }
                     waitingForIdrFrame = false;
                     waitingForNextSuccessfulFrame = false;
                     frameType = FRAME_TYPE_IDR;
