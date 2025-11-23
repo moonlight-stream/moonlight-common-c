@@ -1633,8 +1633,16 @@ static void lossStatsThreadFunc(void* context) {
                 ab_payload.interval_ms = LE32((uint32_t)intervalMs);
                 ab_payload.last_good_frame = LE64(lastGoodFrame);
                 ab_payload.client_max_bitrate_kbps = LE32(StreamConfig.bitrate);
-                ab_payload.conn_status_hint = (uint8_t)((lastConnectionStatusUpdate == CONN_STATUS_POOR) ? 1 :
-                                                        (lastConnectionStatusUpdate == CONN_STATUS_OKAY) ? 0 : 2);
+
+                int statusHint = 2; // unknown
+                if (connectionStatusFromHost && hostConnectionStatus != -1) {
+                    statusHint = (hostConnectionStatus == CONN_STATUS_POOR) ? 1 : 0;
+                } else if (lastConnectionStatusUpdate == CONN_STATUS_POOR) {
+                    statusHint = 1;
+                } else if (lastConnectionStatusUpdate == CONN_STATUS_OKAY) {
+                    statusHint = 0;
+                }
+                ab_payload.conn_status_hint = (uint8_t)statusHint;
 
                 if (!sendMessageAndForget(packetTypes[IDX_AUTO_BITRATE_STATS_V2],
                                           sizeof(ab_payload),
