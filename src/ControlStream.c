@@ -113,6 +113,9 @@ static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
 static uint32_t currentEnetSequenceNumber;
 static uint64_t firstFrameTimeMs;
+static uint64_t abTelemetryStartTimeMs;
+static uint32_t abTelemetryTotalFrameCount;
+static uint32_t abTelemetryGoodFrameCount;
 
 // Host-provided connection status tracking
 static int hostConnectionStatus = -1;  // -1 = unknown, CONN_STATUS_OKAY, or CONN_STATUS_POOR
@@ -419,6 +422,9 @@ int initializeControlStream(void) {
     decryptionCtx = PltCreateCryptoContext();
     hdrEnabled = false;
     memset(&hdrMetadata, 0, sizeof(hdrMetadata));
+    abTelemetryStartTimeMs = 0;
+    abTelemetryTotalFrameCount = 0;
+    abTelemetryGoodFrameCount = 0;
 
     // Reset host-provided connection status tracking for new session
     hostConnectionStatus = -1;  // -1 = unknown
@@ -1567,18 +1573,27 @@ static void lossStatsThreadFunc(void* context) {
                 AUTO_BITRATE_STATS_V2_PAYLOAD ab_payload = {0};
 
                 uint64_t nowMs = PltGetMillis();
-                uint64_t intervalMs = (intervalStartTimeMs != 0) ? (nowMs - intervalStartTimeMs) : LOSS_REPORT_INTERVAL_MS;
-                if (intervalMs == 0) {
-                    intervalMs = LOSS_REPORT_INTERVAL_MS;
+                if (abTelemetryStartTimeMs == 0) {
+                    abTelemetryStartTimeMs = intervalStartTimeMs ? intervalStartTimeMs : nowMs;
+                    abTelemetryTotalFrameCount = 0;
+                    abTelemetryGoodFrameCount = 0;
                 }
 
                 uint32_t totalFrames = (uint32_t)intervalTotalFrameCount;
                 uint32_t goodFrames = (uint32_t)intervalGoodFrameCount;
-                uint32_t lostFrames = totalFrames > goodFrames ? (totalFrames - goodFrames) : 0;
+
+                uint32_t deltaTotal = totalFrames - abTelemetryTotalFrameCount;
+                uint32_t deltaGood = goodFrames - abTelemetryGoodFrameCount;
+                uint32_t lostFrames = deltaTotal > deltaGood ? (deltaTotal - deltaGood) : 0;
+
+                uint64_t intervalMs = nowMs - abTelemetryStartTimeMs;
+                if (intervalMs == 0) {
+                    intervalMs = LOSS_REPORT_INTERVAL_MS;
+                }
 
                 uint32_t lossPctMilli = 0;
-                if (totalFrames != 0) {
-                    lossPctMilli = (uint32_t)((uint64_t)lostFrames * 100000ULL / totalFrames);
+                if (deltaTotal != 0) {
+                    lossPctMilli = (uint32_t)((uint64_t)lostFrames * 100000ULL / deltaTotal);
                 }
 
                 ab_payload.loss_pct_milli = LE32(lossPctMilli);
@@ -1602,10 +1617,10 @@ static void lossStatsThreadFunc(void* context) {
                             lossPctMilli / 1000.0f, lostFrames, (unsigned int)intervalMs, lastGoodFrame, StreamConfig.bitrate, ab_payload.conn_status_hint);
                 }
 
-                // Reset interval tracking after sending
-                intervalStartTimeMs = nowMs;
-                intervalGoodFrameCount = 0;
-                intervalTotalFrameCount = 0;
+                // Advance telemetry window without resetting connection-status counters
+                abTelemetryStartTimeMs = nowMs;
+                abTelemetryTotalFrameCount = totalFrames;
+                abTelemetryGoodFrameCount = goodFrames;
             }
 
             // Wait a bit
