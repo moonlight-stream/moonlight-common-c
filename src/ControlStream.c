@@ -110,6 +110,7 @@ static int intervalTotalFrameCount;
 static uint64_t intervalStartTimeMs;
 static int lastIntervalLossPercentage;
 static int lastConnectionStatusUpdate;
+static int lastSentConnectionStatus = -1;  // Track last sent status to host
 static uint32_t currentEnetSequenceNumber;
 static uint64_t firstFrameTimeMs;
 
@@ -528,25 +529,37 @@ void connectionSawFrame(uint32_t frameIndex) {
 
     if (now - intervalStartTimeMs >= CONN_STATUS_SAMPLE_PERIOD) {
         if (intervalTotalFrameCount != 0) {
-            // Only calculate client-side status if host status is not available
-            if (!connectionStatusFromHost) {
-                // Notify the client of connection status changes based on frame loss rate
-                int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
-                if (lastConnectionStatusUpdate != CONN_STATUS_POOR &&
-                        (frameLossPercent >= CONN_IMMEDIATE_POOR_LOSS_RATE ||
-                         (frameLossPercent >= CONN_CONSECUTIVE_POOR_LOSS_RATE && lastIntervalLossPercentage >= CONN_CONSECUTIVE_POOR_LOSS_RATE))) {
-                    // We require 2 consecutive intervals above CONN_CONSECUTIVE_POOR_LOSS_RATE or a single
-                    // interval above CONN_IMMEDIATE_POOR_LOSS_RATE to notify of a poor connection.
-                    ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_POOR);
-                    lastConnectionStatusUpdate = CONN_STATUS_POOR;
-                }
-                else if (frameLossPercent <= CONN_OKAY_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_OKAY) {
-                    ListenerCallbacks.connectionStatusUpdate(CONN_STATUS_OKAY);
-                    lastConnectionStatusUpdate = CONN_STATUS_OKAY;
-                }
-
-                lastIntervalLossPercentage = frameLossPercent;
+            // Calculate connection status based on frame loss rate
+            int frameLossPercent = 100 - (intervalGoodFrameCount * 100) / intervalTotalFrameCount;
+            int newStatus = -1;
+            
+            // Determine new status based on loss thresholds
+            if (lastConnectionStatusUpdate != CONN_STATUS_POOR &&
+                    (frameLossPercent >= CONN_IMMEDIATE_POOR_LOSS_RATE ||
+                     (frameLossPercent >= CONN_CONSECUTIVE_POOR_LOSS_RATE && lastIntervalLossPercentage >= CONN_CONSECUTIVE_POOR_LOSS_RATE))) {
+                // We require 2 consecutive intervals above CONN_CONSECUTIVE_POOR_LOSS_RATE or a single
+                // interval above CONN_IMMEDIATE_POOR_LOSS_RATE to notify of a poor connection.
+                newStatus = CONN_STATUS_POOR;
             }
+            else if (frameLossPercent <= CONN_OKAY_LOSS_RATE && lastConnectionStatusUpdate != CONN_STATUS_OKAY) {
+                newStatus = CONN_STATUS_OKAY;
+            }
+            
+            // Update status and send to host (bidirectional communication)
+            if (newStatus != -1) {
+                // Update local status tracking
+                lastConnectionStatusUpdate = newStatus;
+                
+                // Notify client UI (only if host status is not available)
+                if (!connectionStatusFromHost) {
+                    ListenerCallbacks.connectionStatusUpdate(newStatus);
+                }
+                
+                // Send status to host (always, for bidirectional communication)
+                sendConnectionStatusToHost(newStatus);
+            }
+
+            lastIntervalLossPercentage = frameLossPercent;
         }
 
         // Reset interval
@@ -556,6 +569,32 @@ void connectionSawFrame(uint32_t frameIndex) {
 
     intervalTotalFrameCount += frameIndex - lastSeenFrame;
     lastSeenFrame = frameIndex;
+}
+
+static void sendConnectionStatusToHost(int status) {
+    uint8_t statusByte;
+    
+    // Check if protocol supports connection status packets
+    if (packetTypes[IDX_CONNECTION_STATUS] == -1) {
+        return;
+    }
+    
+    // Only send if status changed
+    if (status == lastSentConnectionStatus) {
+        return;
+    }
+    
+    statusByte = (uint8_t)status;
+    
+    // Send the message (reliable packet)
+    if (sendMessageAndForget(packetTypes[IDX_CONNECTION_STATUS],
+                              1,  // payload length: 1 byte
+                              &statusByte,
+                              CTRL_CHANNEL_GENERIC,
+                              ENET_PACKET_FLAG_RELIABLE,
+                              false)) {
+        lastSentConnectionStatus = status;
+    }
 }
 
 // Reads an NV control stream packet from the TCP connection
