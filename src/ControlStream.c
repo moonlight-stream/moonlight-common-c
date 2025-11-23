@@ -1499,6 +1499,7 @@ static void controlReceiveThreadFunc(void* context) {
 
 static void lossStatsThreadFunc(void* context) {
     BYTE_BUFFER byteBuffer;
+    #pragma pack(push, 1)
     typedef struct _AUTO_BITRATE_STATS_V2_PAYLOAD {
         uint32_t loss_pct_milli;
         uint32_t loss_count;
@@ -1508,6 +1509,8 @@ static void lossStatsThreadFunc(void* context) {
         uint8_t conn_status_hint;
         uint8_t reserved[7];
     } AUTO_BITRATE_STATS_V2_PAYLOAD;
+    #pragma pack(pop)
+    _Static_assert(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32, "AUTO_BITRATE_STATS_V2_PAYLOAD must be 32 bytes");
 
     if (usePeriodicPing) {
         char periodicPingPayload[8];
