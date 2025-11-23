@@ -2,6 +2,7 @@
 
 // This is a private header, but it just contains some time macros
 #include <enet/time.h>
+#include <inttypes.h>
 
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -113,6 +114,9 @@ static int lastConnectionStatusUpdate;
 static int lastSentConnectionStatus = -1;  // Track last sent status to host
 static uint32_t currentEnetSequenceNumber;
 static uint64_t firstFrameTimeMs;
+static uint64_t abTelemetryStartTimeMs;
+static uint32_t abTelemetryTotalFrameCount;
+static uint32_t abTelemetryGoodFrameCount;
 
 // Host-provided connection status tracking
 static int hostConnectionStatus = -1;  // -1 = unknown, CONN_STATUS_OKAY, or CONN_STATUS_POOR
@@ -153,6 +157,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_DS_ADAPTIVE_TRIGGERS 15
 #define IDX_CONNECTION_STATUS 19
 #define IDX_BITRATE_STATS 20
+#define IDX_AUTO_BITRATE_STATS_V2 21
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -179,6 +184,7 @@ static const short packetTypesGen3[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen3) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen3) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen3) - index 21
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -202,6 +208,7 @@ static const short packetTypesGen4[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen4) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen4) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen4) - index 21
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -225,6 +232,7 @@ static const short packetTypesGen5[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen5) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen5) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen5) - index 21
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -248,6 +256,7 @@ static const short packetTypesGen7[] = {
     -1,     // Placeholder for index 18
     0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
     0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
+    0x5505, // Auto Bitrate Stats V2 (Sunshine protocol extension) - index 21 (IDX_AUTO_BITRATE_STATS_V2)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -271,6 +280,7 @@ static const short packetTypesGen7Enc[] = {
     -1,     // Placeholder for index 18
     0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
     0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
+    0x5505, // Auto Bitrate Stats V2 (Sunshine protocol extension) - index 21 (IDX_AUTO_BITRATE_STATS_V2)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -285,44 +295,44 @@ static const char startBGen5[] = { 0 };
 static const char requestIdrFrameGen7Enc[] = { 0, 0 };
 
 static const short payloadLengthsGen3[] = {
-    sizeof(requestIdrFrameGen3), // Request IDR frame
-    sizeof(startBGen3), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen3), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen3), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 64, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen4[] = {
-    sizeof(requestIdrFrameGen4), // Request IDR frame
-    sizeof(startBGen4), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen4), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen4), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 64, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen5[] = {
-    sizeof(startAGen5), // Start A
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_START_A] = sizeof(startAGen5), // Start A
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen7[] = {
-    sizeof(startAGen5), // Start A
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_START_A] = sizeof(startAGen5), // Start A
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = 32, // Auto Bitrate Stats V2
 };
 static const short payloadLengthsGen7Enc[] = {
-    sizeof(requestIdrFrameGen7Enc), // Request IDR frame
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen7Enc), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = 32, // Auto Bitrate Stats V2
 };
 
 static const char* preconstructedPayloadsGen3[] = {
@@ -417,6 +427,9 @@ int initializeControlStream(void) {
     decryptionCtx = PltCreateCryptoContext();
     hdrEnabled = false;
     memset(&hdrMetadata, 0, sizeof(hdrMetadata));
+    abTelemetryStartTimeMs = 0;
+    abTelemetryTotalFrameCount = 0;
+    abTelemetryGoodFrameCount = 0;
 
     // Reset host-provided connection status tracking for new session
     hostConnectionStatus = -1;  // -1 = unknown
@@ -1439,6 +1452,31 @@ static void controlReceiveThreadFunc(void* context) {
                 autoBitrateStats.enabled = true;
                 lastStatsReceiveTimeMs = LiGetMillis();  // Track receive time in milliseconds
             }
+            // Process auto bitrate stats V2 from host (fallback mapping)
+            else if (ctlHdr->type == packetTypes[IDX_AUTO_BITRATE_STATS_V2]) {
+                BYTE_BUFFER bb;
+                uint32_t loss_pct_milli;
+                uint32_t loss_count;
+                uint32_t interval_ms;
+                uint64_t last_good_frame;
+                uint32_t client_max_bitrate_kbps;
+                uint8_t conn_status_hint;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbGet32(&bb, &loss_pct_milli);
+                BbGet32(&bb, &loss_count);
+                BbGet32(&bb, &interval_ms);
+                BbGet64(&bb, &last_good_frame);
+                BbGet32(&bb, &client_max_bitrate_kbps);
+                BbGet8(&bb, &conn_status_hint);
+
+                autoBitrateStats.current_bitrate_kbps = client_max_bitrate_kbps;
+                autoBitrateStats.last_adjustment_time_ms = interval_ms;
+                autoBitrateStats.adjustment_count = loss_count;
+                autoBitrateStats.loss_percentage = (float)loss_pct_milli / 1000.0f;
+                autoBitrateStats.enabled = true;
+                lastStatsReceiveTimeMs = LiGetMillis();
+            }
 
             // Process client callbacks in a separate thread
             if (needsAsyncCallback(ctlHdr->type)) {
@@ -1535,6 +1573,18 @@ static void controlReceiveThreadFunc(void* context) {
 
 static void lossStatsThreadFunc(void* context) {
     BYTE_BUFFER byteBuffer;
+    #pragma pack(push, 1)
+    typedef struct _AUTO_BITRATE_STATS_V2_PAYLOAD {
+        uint32_t loss_pct_milli;
+        uint32_t loss_count;
+        uint32_t interval_ms;
+        uint64_t last_good_frame;
+        uint32_t client_max_bitrate_kbps;
+        uint8_t conn_status_hint;
+        uint8_t reserved[7];
+    } AUTO_BITRATE_STATS_V2_PAYLOAD;
+    #pragma pack(pop)
+    _Static_assert(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32, "AUTO_BITRATE_STATS_V2_PAYLOAD must be 32 bytes");
 
     if (usePeriodicPing) {
         char periodicPingPayload[8];
@@ -1580,10 +1630,80 @@ static void lossStatsThreadFunc(void* context) {
                                       periodicPingPayload,
                                       CTRL_CHANNEL_GENERIC,
                                       ENET_PACKET_FLAG_RELIABLE,
-                                      false)) {
+                                     false)) {
                 Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
                 ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
+            }
+
+            // Send auto bitrate stats V2 (Sunshine extension)
+            if (packetTypes[IDX_AUTO_BITRATE_STATS_V2] != -1) {
+                AUTO_BITRATE_STATS_V2_PAYLOAD ab_payload = {0};
+
+                uint64_t nowMs = PltGetMillis();
+                if (abTelemetryStartTimeMs == 0) {
+                    abTelemetryStartTimeMs = intervalStartTimeMs ? intervalStartTimeMs : nowMs;
+                    abTelemetryTotalFrameCount = 0;
+                    abTelemetryGoodFrameCount = 0;
+                }
+
+                uint32_t totalFrames = (uint32_t)intervalTotalFrameCount;
+                uint32_t goodFrames = (uint32_t)intervalGoodFrameCount;
+
+                // If interval counters reset (e.g., connectionSawFrame sampling window), resync telemetry base
+                if (totalFrames < abTelemetryTotalFrameCount || goodFrames < abTelemetryGoodFrameCount) {
+                    abTelemetryStartTimeMs = intervalStartTimeMs ? intervalStartTimeMs : nowMs;
+                    abTelemetryTotalFrameCount = totalFrames;
+                    abTelemetryGoodFrameCount = goodFrames;
+                }
+
+                uint32_t deltaTotal = totalFrames - abTelemetryTotalFrameCount;
+                uint32_t deltaGood = goodFrames - abTelemetryGoodFrameCount;
+                uint32_t lostFrames = deltaTotal > deltaGood ? (deltaTotal - deltaGood) : 0;
+
+                uint64_t intervalMs = nowMs - abTelemetryStartTimeMs;
+                if (intervalMs == 0) {
+                    intervalMs = LOSS_REPORT_INTERVAL_MS;
+                }
+
+                uint32_t lossPctMilli = 0;
+                if (deltaTotal != 0) {
+                    lossPctMilli = (uint32_t)((uint64_t)lostFrames * 100000ULL / deltaTotal);
+                }
+
+                ab_payload.loss_pct_milli = LE32(lossPctMilli);
+                ab_payload.loss_count = LE32(lostFrames);
+                ab_payload.interval_ms = LE32((uint32_t)intervalMs);
+                ab_payload.last_good_frame = LE64(lastGoodFrame);
+                ab_payload.client_max_bitrate_kbps = LE32(StreamConfig.bitrate);
+
+                int statusHint = 2; // unknown
+                if (connectionStatusFromHost && hostConnectionStatus != -1) {
+                    statusHint = (hostConnectionStatus == CONN_STATUS_POOR) ? 1 : 0;
+                } else if (lastConnectionStatusUpdate == CONN_STATUS_POOR) {
+                    statusHint = 1;
+                } else if (lastConnectionStatusUpdate == CONN_STATUS_OKAY) {
+                    statusHint = 0;
+                }
+                ab_payload.conn_status_hint = (uint8_t)statusHint;
+
+                if (!sendMessageAndForget(packetTypes[IDX_AUTO_BITRATE_STATS_V2],
+                                          sizeof(ab_payload),
+                                          &ab_payload,
+                                          CTRL_CHANNEL_GENERIC,
+                                          ENET_PACKET_FLAG_UNSEQUENCED,
+                                          false)) {
+                    Limelog("AutoBitrate: Sending stats V2 failed: %d\n", (int)LastSocketError());
+                }
+                else {
+                    Limelog("AutoBitrate: Sent stats V2 loss=%.3f%% lost=%u interval=%ums lastGood=%" PRIu64 " clientMax=%u statusHint=%u\n",
+                            lossPctMilli / 1000.0f, lostFrames, (unsigned int)intervalMs, lastGoodFrame, StreamConfig.bitrate, ab_payload.conn_status_hint);
+                }
+
+                // Advance telemetry window without resetting connection-status counters
+                abTelemetryStartTimeMs = nowMs;
+                abTelemetryTotalFrameCount = totalFrames;
+                abTelemetryGoodFrameCount = goodFrames;
             }
 
             // Wait a bit
