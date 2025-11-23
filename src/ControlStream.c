@@ -1367,7 +1367,7 @@ static void controlReceiveThreadFunc(void* context) {
                 autoBitrateStats.adjustment_count = adjustment_count;
                 autoBitrateStats.loss_percentage = loss_percentage;
                 autoBitrateStats.enabled = true;
-                lastStatsReceiveTimeMs = LiGetMicroseconds() / 1000;  // Track receive time
+                lastStatsReceiveTimeMs = LiGetMillis();  // Track receive time in milliseconds
             }
 
             // Process client callbacks in a separate thread
