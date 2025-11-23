@@ -242,7 +242,7 @@ static const short packetTypesGen7[] = {
     -1,     // Set Clipboard (unused)
     -1,     // File transfer nonce request (unused)
     -1,     // Set Adaptive Triggers (unused)
-    0x3003, // Connection status (Apollo protocol extension) - index 16
+    -1,     // Placeholder for index 16
     -1,     // Placeholder for index 17
     -1,     // Placeholder for index 18
     0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
