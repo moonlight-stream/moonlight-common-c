@@ -1409,6 +1409,31 @@ static void controlReceiveThreadFunc(void* context) {
                 autoBitrateStats.enabled = true;
                 lastStatsReceiveTimeMs = LiGetMillis();  // Track receive time in milliseconds
             }
+            // Process auto bitrate stats V2 from host (fallback mapping)
+            else if (ctlHdr->type == packetTypes[IDX_AUTO_BITRATE_STATS_V2]) {
+                BYTE_BUFFER bb;
+                uint32_t loss_pct_milli;
+                uint32_t loss_count;
+                uint32_t interval_ms;
+                uint64_t last_good_frame;
+                uint32_t client_max_bitrate_kbps;
+                uint8_t conn_status_hint;
+
+                BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
+                BbGet32(&bb, &loss_pct_milli);
+                BbGet32(&bb, &loss_count);
+                BbGet32(&bb, &interval_ms);
+                BbGet64(&bb, &last_good_frame);
+                BbGet32(&bb, &client_max_bitrate_kbps);
+                BbGet8(&bb, &conn_status_hint);
+
+                autoBitrateStats.current_bitrate_kbps = client_max_bitrate_kbps;
+                autoBitrateStats.last_adjustment_time_ms = interval_ms;
+                autoBitrateStats.adjustment_count = loss_count;
+                autoBitrateStats.loss_percentage = (float)loss_pct_milli / 1000.0f;
+                autoBitrateStats.enabled = true;
+                lastStatsReceiveTimeMs = LiGetMillis();
+            }
 
             // Process client callbacks in a separate thread
             if (needsAsyncCallback(ctlHdr->type)) {
