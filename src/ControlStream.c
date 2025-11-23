@@ -174,6 +174,10 @@ static const short packetTypesGen3[] = {
     -1,     // File transfer nonce request (unused)
     -1,     // Set Adaptive Triggers (unused)
     -1,     // Connection status (unused in Gen3)
+    -1,     // Placeholder for index 17
+    -1,     // Placeholder for index 18
+    -1,     // Connection status (unused in Gen3) - index 19 (IDX_CONNECTION_STATUS)
+    -1,     // Bitrate Stats (unused in Gen3) - index 20 (IDX_BITRATE_STATS)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -193,6 +197,10 @@ static const short packetTypesGen4[] = {
     -1,     // File transfer nonce request (unused)
     -1,     // Set Adaptive Triggers (unused)
     -1,     // Connection status (unused in Gen4)
+    -1,     // Placeholder for index 17
+    -1,     // Placeholder for index 18
+    -1,     // Connection status (unused in Gen4) - index 19 (IDX_CONNECTION_STATUS)
+    -1,     // Bitrate Stats (unused in Gen4) - index 20 (IDX_BITRATE_STATS)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -212,6 +220,10 @@ static const short packetTypesGen5[] = {
     -1,     // File transfer nonce request (unused)
     -1,     // Set Adaptive Triggers (unused)
     -1,     // Connection status (unused in Gen5)
+    -1,     // Placeholder for index 17
+    -1,     // Placeholder for index 18
+    -1,     // Connection status (unused in Gen5) - index 19 (IDX_CONNECTION_STATUS)
+    -1,     // Bitrate Stats (unused in Gen5) - index 20 (IDX_BITRATE_STATS)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -230,7 +242,11 @@ static const short packetTypesGen7[] = {
     -1,     // Set Clipboard (unused)
     -1,     // File transfer nonce request (unused)
     -1,     // Set Adaptive Triggers (unused)
-    0x3003, // Connection status (Apollo protocol extension)
+    0x3003, // Connection status (Apollo protocol extension) - index 16
+    -1,     // Placeholder for index 17
+    -1,     // Placeholder for index 18
+    0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
+    0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -249,8 +265,11 @@ static const short packetTypesGen7Enc[] = {
     0x3001, // Set Clipboard (Apollo protocol extension)
     0x3002, // File transfer nonce request (Apollo protocol extension)
     0x5503, // Set Adaptive Triggers (Sunshine protocol extension)
-    0x3003, // Connection status (Apollo protocol extension)
-    0x5504, // Bitrate Stats (Sunshine protocol extension)
+    -1,     // Placeholder for index 16
+    -1,     // Placeholder for index 17
+    -1,     // Placeholder for index 18
+    0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
+    0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
