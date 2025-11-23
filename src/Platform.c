@@ -437,6 +437,33 @@ uint64_t PltGetMillis(void) {
 #endif
 }
 
+uint64_t PltGetMicroseconds(void) {
+#if defined(LC_WINDOWS)
+    // Use QueryPerformanceCounter for high-resolution timing on Windows
+    static LARGE_INTEGER frequency = {0};
+    LARGE_INTEGER counter;
+    
+    if (frequency.QuadPart == 0) {
+        QueryPerformanceFrequency(&frequency);
+    }
+    
+    QueryPerformanceCounter(&counter);
+    return (uint64_t)((counter.QuadPart * 1000000) / frequency.QuadPart);
+#elif defined(CLOCK_MONOTONIC) && !defined(NO_CLOCK_GETTIME)
+    struct timespec tv;
+
+    clock_gettime(CLOCK_MONOTONIC, &tv);
+
+    return ((uint64_t)tv.tv_sec * 1000000) + (tv.tv_nsec / 1000);
+#else
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+
+    return ((uint64_t)tv.tv_sec * 1000000) + tv.tv_usec;
+#endif
+}
+
 bool PltSafeStrcpy(char* dest, size_t dest_size, const char* src) {
     LC_ASSERT(dest_size > 0);
 

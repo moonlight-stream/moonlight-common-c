@@ -847,6 +847,9 @@ int LiSendHighResHScrollEvent(short scrollAmount);
 // This function returns a time in milliseconds with an implementation-defined epoch.
 uint64_t LiGetMillis(void);
 
+// This function returns a time in microseconds with an implementation-defined epoch.
+uint64_t LiGetMicroseconds(void);
+
 // This is a simplistic STUN function that can assist clients in getting the WAN address
 // for machines they find using mDNS over IPv4. This can be used to pre-populate the external
 // address for streaming after GFE stopped sending it a while back. wanAddr is returned in
