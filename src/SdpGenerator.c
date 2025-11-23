@@ -369,6 +369,13 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         if (IS_SUNSHINE()) {
             snprintf(payloadStr, sizeof(payloadStr), "%u", StreamConfig.bitrate);
             err |= addAttributeString(&optionHead, "x-ml-video.configuredBitrateKbps", payloadStr);
+
+            // Send auto bitrate flag ONLY when checkbox is checked (enabled)
+            if (StreamConfig.autoBitrateEnabled) {
+                snprintf(payloadStr, sizeof(payloadStr), "1");
+                err |= addAttributeString(&optionHead, "x-ml-video.autoBitrateEnabled", payloadStr);
+            }
+            // When checkbox is unchecked, flag is NOT sent (existing static bitrate flow)
         }
     }
     else {

@@ -100,6 +100,10 @@ typedef struct _STREAM_CONFIGURATION {
     // in /launch and /resume requests.
     char remoteInputAesKey[16];
     char remoteInputAesIv[16];
+
+    // Enable automatic bitrate adjustment based on network conditions
+    // Set to 1 when client checkbox is checked, 0 otherwise
+    int autoBitrateEnabled;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
@@ -892,6 +896,19 @@ unsigned int LiGetPortFlagsFromTerminationErrorCode(int errorCode);
 
 // Returns the IPPROTO_* value for the specified port index 
 int LiGetProtocolFromPortFlagIndex(int portFlagIndex);
+
+// Auto bitrate statistics structure
+typedef struct _AUTO_BITRATE_STATS {
+    uint32_t current_bitrate_kbps;
+    uint64_t last_adjustment_time_ms;
+    uint32_t adjustment_count;
+    float loss_percentage;
+    bool enabled;
+} AUTO_BITRATE_STATS, *PAUTO_BITRATE_STATS;
+
+// Get current auto bitrate statistics
+// Returns NULL if auto bitrate is not enabled or stats are not available
+const AUTO_BITRATE_STATS* LiGetAutoBitrateStats(void);
 
 // Returns the port number for the specified port index
 unsigned short LiGetPortFromPortFlagIndex(int portFlagIndex);
