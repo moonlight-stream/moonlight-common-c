@@ -2,6 +2,7 @@
 
 // This is a private header, but it just contains some time macros
 #include <enet/time.h>
+#include <inttypes.h>
 
 #ifndef MIN
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -152,6 +153,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_DS_ADAPTIVE_TRIGGERS 15
 #define IDX_CONNECTION_STATUS 19
 #define IDX_BITRATE_STATS 20
+#define IDX_AUTO_BITRATE_STATS_V2 21
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -178,6 +180,7 @@ static const short packetTypesGen3[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen3) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen3) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen3) - index 21
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -201,6 +204,7 @@ static const short packetTypesGen4[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen4) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen4) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen4) - index 21
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -224,6 +228,7 @@ static const short packetTypesGen5[] = {
     -1,     // Placeholder for index 18
     -1,     // Connection status (unused in Gen5) - index 19 (IDX_CONNECTION_STATUS)
     -1,     // Bitrate Stats (unused in Gen5) - index 20 (IDX_BITRATE_STATS)
+    -1,     // Auto Bitrate Stats V2 (unused in Gen5) - index 21
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -247,6 +252,7 @@ static const short packetTypesGen7[] = {
     -1,     // Placeholder for index 18
     0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
     0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
+    0x5505, // Auto Bitrate Stats V2 (Sunshine protocol extension) - index 21 (IDX_AUTO_BITRATE_STATS_V2)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -270,6 +276,7 @@ static const short packetTypesGen7Enc[] = {
     -1,     // Placeholder for index 18
     0x3003, // Connection status (Apollo protocol extension) - index 19 (IDX_CONNECTION_STATUS)
     0x5504, // Bitrate Stats (Sunshine protocol extension) - index 20 (IDX_BITRATE_STATS)
+    0x5505, // Auto Bitrate Stats V2 (Sunshine protocol extension) - index 21 (IDX_AUTO_BITRATE_STATS_V2)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -284,44 +291,44 @@ static const char startBGen5[] = { 0 };
 static const char requestIdrFrameGen7Enc[] = { 0, 0 };
 
 static const short payloadLengthsGen3[] = {
-    sizeof(requestIdrFrameGen3), // Request IDR frame
-    sizeof(startBGen3), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen3), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen3), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 64, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen4[] = {
-    sizeof(requestIdrFrameGen4), // Request IDR frame
-    sizeof(startBGen4), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    64, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen4), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen4), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 64, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen5[] = {
-    sizeof(startAGen5), // Start A
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_START_A] = sizeof(startAGen5), // Start A
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = -1,
 };
 static const short payloadLengthsGen7[] = {
-    sizeof(startAGen5), // Start A
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_START_A] = sizeof(startAGen5), // Start A
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = 32, // Auto Bitrate Stats V2
 };
 static const short payloadLengthsGen7Enc[] = {
-    sizeof(requestIdrFrameGen7Enc), // Request IDR frame
-    sizeof(startBGen5), // Start B
-    24, // Invalidate reference frames
-    32, // Loss Stats
-    80, // Frame Stats
-    -1, // Input data
+    [IDX_REQUEST_IDR_FRAME] = sizeof(requestIdrFrameGen7Enc), // Request IDR frame
+    [IDX_START_B] = sizeof(startBGen5), // Start B
+    [IDX_INVALIDATE_REF_FRAMES] = 24, // Invalidate reference frames
+    [IDX_LOSS_STATS] = 32, // Loss Stats
+    [4] = 80, // Frame Stats (unused)
+    [IDX_AUTO_BITRATE_STATS_V2] = 32, // Auto Bitrate Stats V2
 };
 
 static const char* preconstructedPayloadsGen3[] = {
@@ -1492,6 +1499,15 @@ static void controlReceiveThreadFunc(void* context) {
 
 static void lossStatsThreadFunc(void* context) {
     BYTE_BUFFER byteBuffer;
+    typedef struct _AUTO_BITRATE_STATS_V2_PAYLOAD {
+        uint32_t loss_pct_milli;
+        uint32_t loss_count;
+        uint32_t interval_ms;
+        uint64_t last_good_frame;
+        uint32_t client_max_bitrate_kbps;
+        uint8_t conn_status_hint;
+        uint8_t reserved[7];
+    } AUTO_BITRATE_STATS_V2_PAYLOAD;
 
     if (usePeriodicPing) {
         char periodicPingPayload[8];
@@ -1537,10 +1553,56 @@ static void lossStatsThreadFunc(void* context) {
                                       periodicPingPayload,
                                       CTRL_CHANNEL_GENERIC,
                                       ENET_PACKET_FLAG_RELIABLE,
-                                      false)) {
+                                     false)) {
                 Limelog("Loss Stats: Transaction failed: %d\n", (int)LastSocketError());
                 ListenerCallbacks.connectionTerminated(LastSocketFail());
                 return;
+            }
+
+            // Send auto bitrate stats V2 (Sunshine extension)
+            if (packetTypes[IDX_AUTO_BITRATE_STATS_V2] != -1) {
+                AUTO_BITRATE_STATS_V2_PAYLOAD ab_payload = {0};
+
+                uint64_t nowMs = PltGetMillis();
+                uint64_t intervalMs = (intervalStartTimeMs != 0) ? (nowMs - intervalStartTimeMs) : LOSS_REPORT_INTERVAL_MS;
+                if (intervalMs == 0) {
+                    intervalMs = LOSS_REPORT_INTERVAL_MS;
+                }
+
+                uint32_t totalFrames = (uint32_t)intervalTotalFrameCount;
+                uint32_t goodFrames = (uint32_t)intervalGoodFrameCount;
+                uint32_t lostFrames = totalFrames > goodFrames ? (totalFrames - goodFrames) : 0;
+
+                uint32_t lossPctMilli = 0;
+                if (totalFrames != 0) {
+                    lossPctMilli = (uint32_t)((uint64_t)lostFrames * 100000ULL / totalFrames);
+                }
+
+                ab_payload.loss_pct_milli = LE32(lossPctMilli);
+                ab_payload.loss_count = LE32(lostFrames);
+                ab_payload.interval_ms = LE32((uint32_t)intervalMs);
+                ab_payload.last_good_frame = LE64(lastGoodFrame);
+                ab_payload.client_max_bitrate_kbps = LE32(StreamConfig.bitrate);
+                ab_payload.conn_status_hint = (uint8_t)((lastConnectionStatusUpdate == CONN_STATUS_POOR) ? 1 :
+                                                        (lastConnectionStatusUpdate == CONN_STATUS_OKAY) ? 0 : 2);
+
+                if (!sendMessageAndForget(packetTypes[IDX_AUTO_BITRATE_STATS_V2],
+                                          sizeof(ab_payload),
+                                          &ab_payload,
+                                          CTRL_CHANNEL_GENERIC,
+                                          ENET_PACKET_FLAG_UNSEQUENCED,
+                                          false)) {
+                    Limelog("AutoBitrate: Sending stats V2 failed: %d\n", (int)LastSocketError());
+                }
+                else {
+                    Limelog("AutoBitrate: Sent stats V2 loss=%.3f%% lost=%u interval=%ums lastGood=%" PRIu64 " clientMax=%u statusHint=%u\n",
+                            lossPctMilli / 1000.0f, lostFrames, (unsigned int)intervalMs, lastGoodFrame, StreamConfig.bitrate, ab_payload.conn_status_hint);
+                }
+
+                // Reset interval tracking after sending
+                intervalStartTimeMs = nowMs;
+                intervalGoodFrameCount = 0;
+                intervalTotalFrameCount = 0;
             }
 
             // Wait a bit
