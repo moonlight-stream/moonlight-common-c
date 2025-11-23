@@ -439,16 +439,9 @@ uint64_t PltGetMillis(void) {
 
 uint64_t PltGetMicroseconds(void) {
 #if defined(LC_WINDOWS)
-    // Use QueryPerformanceCounter for high-resolution timing on Windows
-    static LARGE_INTEGER frequency = {0};
-    LARGE_INTEGER counter;
-    
-    if (frequency.QuadPart == 0) {
-        QueryPerformanceFrequency(&frequency);
-    }
-    
-    QueryPerformanceCounter(&counter);
-    return (uint64_t)((counter.QuadPart * 1000000) / frequency.QuadPart);
+    // Use GetTickCount64() * 1000 to ensure same epoch as PltGetMillis()
+    // This ensures compatibility with code that sets timestamps using LiGetMillis() * 1000
+    return GetTickCount64() * 1000;
 #elif defined(CLOCK_MONOTONIC) && !defined(NO_CLOCK_GETTIME)
     struct timespec tv;
 
