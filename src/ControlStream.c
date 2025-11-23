@@ -354,6 +354,10 @@ static bool supportsIdrFrameRequest;
 #define LOSS_REPORT_INTERVAL_MS 50
 #define PERIODIC_PING_INTERVAL_MS 100
 
+// Forward declarations
+static void sendConnectionStatusToHost(int status);
+static bool sendMessageAndForget(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData);
+
 // Initializes the control stream
 int initializeControlStream(void) {
     stopping = false;
