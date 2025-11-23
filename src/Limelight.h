@@ -993,6 +993,10 @@ uint32_t LiGetHostFeatureFlags(void);
 // during RTSP SETUP. Returns 0 if the host did not send a max bitrate limit or if not connected.
 int LiGetHostMaxBitrateKbps(void);
 
+// This function returns whether the current connection status was provided by the host
+// (true) or calculated locally by the client (false).
+bool LiIsConnectionStatusFromHost(void);
+
 #ifdef __cplusplus
 }
 #endif
