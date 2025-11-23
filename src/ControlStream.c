@@ -413,6 +413,14 @@ int initializeControlStream(void) {
     hdrEnabled = false;
     memset(&hdrMetadata, 0, sizeof(hdrMetadata));
 
+    // Reset host-provided connection status tracking for new session
+    hostConnectionStatus = -1;  // -1 = unknown
+    connectionStatusFromHost = false;
+
+    // Reset auto bitrate statistics for new session
+    memset(&autoBitrateStats, 0, sizeof(autoBitrateStats));
+    lastStatsReceiveTimeMs = 0;
+
     return 0;
 }
 
