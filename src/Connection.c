@@ -36,6 +36,7 @@ uint32_t SunshineFeatureFlags;
 uint32_t EncryptionFeaturesSupported;
 uint32_t EncryptionFeaturesRequested;
 uint32_t EncryptionFeaturesEnabled;
+uint32_t HostMaxBitrateKbps;
 
 // Connection stages
 static const char* stageNames[STAGE_MAX] = {
@@ -56,6 +57,11 @@ static const char* stageNames[STAGE_MAX] = {
 // Get the name of the current stage based on its number
 const char* LiGetStageName(int stage) {
     return stageNames[stage];
+}
+
+// Get the host's maximum bitrate limit in Kbps
+int LiGetHostMaxBitrateKbps(void) {
+    return (int)HostMaxBitrateKbps;
 }
 
 // Interrupt a pending connection attempt. This interruption happens asynchronously
@@ -267,6 +273,7 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     VideoPortNumber = 0;
     ControlPortNumber = 0;
     AudioPortNumber = 0;
+    HostMaxBitrateKbps = 0;
 
     // Parse RTSP port number from RTSP session URL
     if (!parseRtspPortNumberFromUrl(serverInfo->rtspSessionUrl, &RtspPortNumber)) {
