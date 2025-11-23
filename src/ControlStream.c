@@ -1541,7 +1541,7 @@ static void lossStatsThreadFunc(void* context) {
         uint8_t reserved[7];
     } AUTO_BITRATE_STATS_V2_PAYLOAD;
     #pragma pack(pop)
-    _Static_assert(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32, "AUTO_BITRATE_STATS_V2_PAYLOAD must be 32 bytes");
+    typedef char AUTO_BITRATE_STATS_V2_PAYLOAD_size_check[(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32) ? 1 : -1];
 
     if (usePeriodicPing) {
         char periodicPingPayload[8];
