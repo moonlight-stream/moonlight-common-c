@@ -989,6 +989,10 @@ void LiRequestIdrFrame(void);
 #define LI_FF_CONTROLLER_TOUCH_EVENTS 0x02 // LiSendControllerTouchEvent() supported
 uint32_t LiGetHostFeatureFlags(void);
 
+// This function returns the host's maximum bitrate limit in Kbps, as received from the host
+// during RTSP SETUP. Returns 0 if the host did not send a max bitrate limit or if not connected.
+int LiGetHostMaxBitrateKbps(void);
+
 #ifdef __cplusplus
 }
 #endif

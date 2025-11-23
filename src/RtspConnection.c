@@ -1260,6 +1260,16 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("Video port: %u\n", VideoPortNumber);
         }
 
+        // Parse the host max bitrate limit from RTSP SETUP response
+        char* hostMaxBitrateStr = getOptionContent(response.options, "x-ml-video.hostMaxBitrateKbps");
+        if (hostMaxBitrateStr != NULL) {
+            HostMaxBitrateKbps = (uint32_t)strtoul(hostMaxBitrateStr, NULL, 0);
+            Limelog("Host max bitrate limit: %u Kbps\n", HostMaxBitrateKbps);
+        }
+        else {
+            HostMaxBitrateKbps = 0;
+        }
+
         freeMessage(&response);
     }
     
