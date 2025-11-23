@@ -1607,6 +1607,13 @@ static void lossStatsThreadFunc(void* context) {
                 uint32_t totalFrames = (uint32_t)intervalTotalFrameCount;
                 uint32_t goodFrames = (uint32_t)intervalGoodFrameCount;
 
+                // If interval counters reset (e.g., connectionSawFrame sampling window), resync telemetry base
+                if (totalFrames < abTelemetryTotalFrameCount || goodFrames < abTelemetryGoodFrameCount) {
+                    abTelemetryStartTimeMs = intervalStartTimeMs ? intervalStartTimeMs : nowMs;
+                    abTelemetryTotalFrameCount = totalFrames;
+                    abTelemetryGoodFrameCount = goodFrames;
+                }
+
                 uint32_t deltaTotal = totalFrames - abTelemetryTotalFrameCount;
                 uint32_t deltaGood = goodFrames - abTelemetryGoodFrameCount;
                 uint32_t lostFrames = deltaTotal > deltaGood ? (deltaTotal - deltaGood) : 0;
