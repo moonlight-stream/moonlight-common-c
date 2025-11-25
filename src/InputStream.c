@@ -724,9 +724,14 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
 
     // Queue a packet holder if this is the only pending relative mouse event
     if (!currentRelativeMouseState.dirty) {
+        // Set the dirty flag to claim ownership of inserting the packet holder
+        // and unlock to allow other threads to enqueue or process input.
+        currentRelativeMouseState.dirty = true;
+        PltUnlockMutex(&batchedInputMutex);
+
         holder = allocatePacketHolder(0);
         if (holder == NULL) {
-            PltUnlockMutex(&batchedInputMutex);
+            currentRelativeMouseState.dirty = false;
             return -1;
         }
 
@@ -747,21 +752,20 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
         // Remaining fields are set in the input thread based on the latest currentRelativeMouseState values
 
         err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
-        if (err == LBQ_SUCCESS) {
-            currentRelativeMouseState.dirty = true;
-        }
-        else {
+        if (err != LBQ_SUCCESS) {
             LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
             Limelog("Input queue reached maximum size limit\n");
             freePacketHolder(holder);
+
+            // We weren't able to insert the entry, so let the next call try again
+            currentRelativeMouseState.dirty = false;
         }
     }
     else {
         // There's already a packet holder queued to send this event
+        PltUnlockMutex(&batchedInputMutex);
         err = 0;
     }
-
-    PltUnlockMutex(&batchedInputMutex);
 
     return err;
 }
@@ -785,9 +789,14 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
 
     // Queue a packet holder if this is the only pending absolute mouse event
     if (!currentAbsoluteMouseState.dirty) {
+        // Set the dirty flag to claim ownership of inserting the packet holder
+        // and unlock to allow other threads to enqueue or process input.
+        currentAbsoluteMouseState.dirty = true;
+        PltUnlockMutex(&batchedInputMutex);
+
         holder = allocatePacketHolder(0);
         if (holder == NULL) {
-            PltUnlockMutex(&batchedInputMutex);
+            currentAbsoluteMouseState.dirty = false;
             return -1;
         }
 
@@ -803,21 +812,20 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
         // Remaining fields are set in the input thread based on the latest currentAbsoluteMouseState values
 
         err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
-        if (err == LBQ_SUCCESS) {
-            currentAbsoluteMouseState.dirty = true;
-        }
-        else {
+        if (err != LBQ_SUCCESS) {
             LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
             Limelog("Input queue reached maximum size limit\n");
             freePacketHolder(holder);
+
+            // We weren't able to insert the entry, so let the next call try again
+            currentAbsoluteMouseState.dirty = false;
         }
     }
     else {
         // There's already a packet holder queued to send this event
+        PltUnlockMutex(&batchedInputMutex);
         err = 0;
     }
-
-    PltUnlockMutex(&batchedInputMutex);
 
     // This is not thread safe, but it's not a big deal because callers that want to
     // use LiSendRelativeMotionAsMousePositionEvent() must not mix these function
@@ -1536,9 +1544,14 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
 
     // Queue a packet holder if this is the only pending sensor event
     if (!currentGamepadSensorState[controllerNumber][motionType - 1].dirty) {
+        // Set the dirty flag to claim ownership of inserting the packet holder
+        // and unlock to allow other threads to enqueue or process input.
+        currentGamepadSensorState[controllerNumber][motionType - 1].dirty = true;
+        PltUnlockMutex(&batchedInputMutex);
+
         holder = allocatePacketHolder(0);
         if (holder == NULL) {
-            PltUnlockMutex(&batchedInputMutex);
+            currentGamepadSensorState[controllerNumber][motionType - 1].dirty = false;
             return -1;
         }
 
@@ -1554,21 +1567,20 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
         // Remaining fields are set in the input thread based on the latest currentGamepadSensorState values
 
         err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
-        if (err == LBQ_SUCCESS) {
-            currentGamepadSensorState[controllerNumber][motionType - 1].dirty = true;
-        }
-        else {
+        if (err != LBQ_SUCCESS) {
             LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
             Limelog("Input queue reached maximum size limit\n");
             freePacketHolder(holder);
+
+            // We weren't able to insert the entry, so let the next call try again
+            currentGamepadSensorState[controllerNumber][motionType - 1].dirty = false;
         }
     }
     else {
         // There's already a packet holder queued to send this event
+        PltUnlockMutex(&batchedInputMutex);
         err = 0;
     }
-
-    PltUnlockMutex(&batchedInputMutex);
 
     return err;
 }
