@@ -1670,7 +1670,10 @@ bool isControlDataInTransit(void) {
 bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVariance) {
     bool ret = false;
 
-    PltLockMutex(&enetMutex);
+    // We do not acquire enetMutex here because we're just reading metrics
+    // and observing a torn write every once in a while is totally fine.
+    // The peer pointer points to memory reserved inside the client object,
+    // so it's guaranteed that it will never go away underneath us.
     if (peer != NULL && peer->state == ENET_PEER_STATE_CONNECTED) {
         if (estimatedRtt != NULL) {
             *estimatedRtt = peer->roundTripTime;
@@ -1682,7 +1685,6 @@ bool LiGetEstimatedRttInfo(uint32_t* estimatedRtt, uint32_t* estimatedRttVarianc
 
         ret = true;
     }
-    PltUnlockMutex(&enetMutex);
 
     return ret;
 }
