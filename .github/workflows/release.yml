@@ -1,7 +1,7 @@
 ---
 name: Release
 permissions:
-  contents: read
+  contents: write
 
 on:
   release:
@@ -46,6 +46,7 @@ jobs:
           brew install cmake ninja openssl
 
       - name: Configure CMake
+        shell: bash
         run: |
           mkdir build
           cd build
@@ -61,6 +62,7 @@ jobs:
           cmake --install . --config Release
 
       - name: Configure CMake for static library
+        shell: bash
         run: |
           mkdir build-static
           cd build-static
