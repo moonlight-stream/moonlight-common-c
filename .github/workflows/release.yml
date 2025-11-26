@@ -1,0 +1,130 @@
+---
+name: Release
+permissions:
+  contents: read
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+            cmake_args: "-DCMAKE_BUILD_TYPE=Release"
+          - os: windows-latest
+            name: windows-x86_64
+            cmake_args: "-DCMAKE_BUILD_TYPE=Release -G 'Visual Studio 17 2022' -A x64"
+          - os: macos-latest
+            name: macos-x86_64
+            cmake_args: "-DCMAKE_BUILD_TYPE=Release"
+
+    env:
+      VERSION: ${{ github.event.release.tag_name }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+          fetch-depth: 1
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libssl-dev
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja openssl
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake ${{ matrix.cmake_args }} \
+            -DCMAKE_INSTALL_PREFIX=../install \
+            -DBUILD_SHARED_LIBS=ON \
+            ..
+
+      - name: Build shared library
+        run: |
+          cd build
+          cmake --build . --config Release
+          cmake --install . --config Release
+
+      - name: Configure CMake for static library
+        run: |
+          mkdir build-static
+          cd build-static
+          cmake ${{ matrix.cmake_args }} \
+            -DCMAKE_INSTALL_PREFIX=../install-static \
+            -DBUILD_SHARED_LIBS=OFF \
+            ..
+
+      - name: Build static library
+        run: |
+          cd build-static
+          cmake --build . --config Release
+          cmake --install . --config Release
+
+      - name: Package artifacts (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Create shared library package
+          mkdir -p moonlight-common-c-${VERSION#v}-linux-x86_64-shared
+          cp -r install/* moonlight-common-c-${VERSION#v}-linux-x86_64-shared/
+          tar -czf moonlight-common-c-${VERSION#v}-linux-x86_64-shared.tar.gz moonlight-common-c-${VERSION#v}-linux-x86_64-shared/
+
+          # Create static library package
+          mkdir -p moonlight-common-c-${VERSION#v}-linux-x86_64-static
+          cp -r install-static/* moonlight-common-c-${VERSION#v}-linux-x86_64-static/
+          tar -czf moonlight-common-c-${VERSION#v}-linux-x86_64-static.tar.gz moonlight-common-c-${VERSION#v}-linux-x86_64-static/
+
+      - name: Package artifacts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${env:VERSION}".TrimStart("v")
+
+          # Create shared library package
+          New-Item -ItemType Directory -Path "moonlight-common-c-$version-windows-x86_64-shared" -Force
+          Copy-Item -Path "install/*" -Destination "moonlight-common-c-$version-windows-x86_64-shared/" -Recurse
+          Compress-Archive -Path "moonlight-common-c-$version-windows-x86_64-shared/*" -DestinationPath "moonlight-common-c-$version-windows-x86_64-shared.zip"
+
+          # Create static library package
+          New-Item -ItemType Directory -Path "moonlight-common-c-$version-windows-x86_64-static" -Force
+          Copy-Item -Path "install-static/*" -Destination "moonlight-common-c-$version-windows-x86_64-static/" -Recurse
+          Compress-Archive -Path "moonlight-common-c-$version-windows-x86_64-static/*" -DestinationPath "moonlight-common-c-$version-windows-x86_64-static.zip"
+
+      - name: Package artifacts (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          VERSION_CLEAN=${VERSION#v}
+
+          # Create shared library package
+          mkdir -p moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-shared
+          cp -r install/* moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-shared/
+          tar -czf moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-shared.tar.gz moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-shared/
+
+          # Create static library package
+          mkdir -p moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-static
+          cp -r install-static/* moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-static/
+          tar -czf moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-static.tar.gz moonlight-common-c-${VERSION_CLEAN}-macos-x86_64-static/
+
+      - name: Upload artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            moonlight-common-c-*-${{ matrix.name }}-*.tar.gz
+            moonlight-common-c-*-${{ matrix.name }}-*.zip
+          prerelease: ${{ github.event.release.prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
