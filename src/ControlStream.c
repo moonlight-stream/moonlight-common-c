@@ -1584,7 +1584,12 @@ static void lossStatsThreadFunc(void* context) {
         uint8_t reserved[7];
     } AUTO_BITRATE_STATS_V2_PAYLOAD;
     #pragma pack(pop)
-    typedef char AUTO_BITRATE_STATS_V2_PAYLOAD_size_check[(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32) ? 1 : -1];
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+    _Static_assert(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32, "AUTO_BITRATE_STATS_V2_PAYLOAD size mismatch");
+#else
+    /* Fallback compile-time check without creating an unused typedef */
+    enum { AUTO_BITRATE_STATS_V2_PAYLOAD_size_check = 1/(int)(sizeof(AUTO_BITRATE_STATS_V2_PAYLOAD) == 32) };
+#endif
 
     if (usePeriodicPing) {
         char periodicPingPayload[8];
