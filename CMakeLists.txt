@@ -81,3 +81,14 @@ target_include_directories(moonlight-common-c PRIVATE
 )
 
 target_compile_definitions(moonlight-common-c PRIVATE HAS_SOCKLEN_T)
+
+# Install rules
+install(TARGETS moonlight-common-c
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+install(FILES src/Limelight.h
+    DESTINATION include/moonlight-common-c
+)
