@@ -1,5 +1,7 @@
 #include "Limelight-internal.h"
 
+#include <math.h>
+
 #define ENET_INTERNAL_TIMEOUT_MS 100
 
 // This function wraps enet_host_service() and hides the fact that it must be called
@@ -126,6 +128,33 @@ bool isReferenceFrameInvalidationEnabled(void) {
 
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig) {
     memset(streamConfig, 0, sizeof(*streamConfig));
+}
+
+void LiConvertFloatingPointFrameRateToFraction(double value, int* outNum, int* outDen) {
+    if (fabs(value) < 1.0) {
+        // Unrealistic scenario, we don't care about perfect precision
+        *outNum = (int)round(INT32_MAX * value);
+        *outDen = INT32_MAX;
+    }
+    else if (fabs(value) > 1000.0) {
+        // Unrealistic scenario, we don't care about perfect precision
+        *outNum = INT32_MAX;
+        *outDen = (int)round(INT32_MAX / value);
+    }
+    else {
+        // Try different numerators for the best precision
+        double minError = 1.0;
+        for (int i = 0; i < value; ++i) {
+            int num = INT32_MAX - i;
+            int den = (int)round(num / value);
+            double error = fabs((double)num / den - value);
+            if (error < minError) {
+                minError = error;
+                *outNum = num;
+                *outDen = den;
+            }
+        }
+    }
 }
 
 void LiInitializeVideoCallbacks(PDECODER_RENDERER_CALLBACKS drCallbacks) {
