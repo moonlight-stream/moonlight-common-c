@@ -374,6 +374,23 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             if (StreamConfig.autoBitrateEnabled) {
                 snprintf(payloadStr, sizeof(payloadStr), "1");
                 err |= addAttributeString(&optionHead, "x-ml-video.autoBitrateEnabled", payloadStr);
+                
+                // Send min and max bitrate values
+                // Validate and ensure min is at least 1 Kbps
+                int minKbps = StreamConfig.autoBitrateMinKbps;
+                if (minKbps < 1) {
+                    minKbps = 1;
+                }
+                snprintf(payloadStr, sizeof(payloadStr), "%d", minKbps);
+                err |= addAttributeString(&optionHead, "x-ml-video.autoBitrateMinKbps", payloadStr);
+                
+                // Validate and ensure max is at least min
+                int maxKbps = StreamConfig.autoBitrateMaxKbps;
+                if (maxKbps < minKbps) {
+                    maxKbps = StreamConfig.bitrate > minKbps ? StreamConfig.bitrate : minKbps;
+                }
+                snprintf(payloadStr, sizeof(payloadStr), "%d", maxKbps);
+                err |= addAttributeString(&optionHead, "x-ml-video.autoBitrateMaxKbps", payloadStr);
             }
             // When checkbox is unchecked, flag is NOT sent (existing static bitrate flow)
         }
