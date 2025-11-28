@@ -9,3 +9,4 @@ limelight-common/Release/
 *.suo
 limelight-common/limelight-common.vcxproj.user
 .DS_Store
+docs/html/
