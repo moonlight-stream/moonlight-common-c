@@ -104,6 +104,9 @@ typedef struct _STREAM_CONFIGURATION {
     // Enable automatic bitrate adjustment based on network conditions
     // Set to 1 when client checkbox is checked, 0 otherwise
     int autoBitrateEnabled;
+    // Minimum and maximum bitrate for auto bitrate adjustment (in Kbps)
+    int autoBitrateMinKbps;
+    int autoBitrateMaxKbps;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
