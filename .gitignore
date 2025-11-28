@@ -10,3 +10,4 @@ limelight-common/Release/
 limelight-common/limelight-common.vcxproj.user
 .DS_Store
 docs/html/
+docs/Doxyfile
