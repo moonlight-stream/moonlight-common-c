@@ -1,0 +1,50 @@
+# Cursor IDE Agent Rules for Moonlight-Common-C
+
+## Pull Request Target
+
+- **ALWAYS** create pull requests against the `alexworland` organization repository
+- When creating PRs, ensure the target repository is `alexworland/moonlight-common-c` (or the appropriate repository name in the alexworland org)
+
+## Code Documentation Requirements
+
+### Doxygen Comments
+
+When editing, removing, or adding code, functions, structures, or macros:
+
+1. **Update Doxygen comments** to reflect all changes:
+   - Use `@brief` for brief descriptions
+   - Use `@param` for function parameters (with `[in]`, `[out]`, or `[in,out]` as appropriate)
+   - Use `@return` for return value descriptions
+   - Use `@struct` for structure documentation
+   - Use `@def` for macro definitions
+   - Use `@file` for file-level documentation
+   - Use `@note` for important notes
+
+2. **Follow existing Doxygen patterns** in the codebase:
+   ```c
+   /**
+    * @brief Brief description of the function.
+    * @param param_name Description of parameter.
+    * @return Description of return value.
+    * @note Important note about usage or behavior.
+    */
+   ```
+
+3. **Remove Doxygen comments** when removing code/functions/structures
+
+4. **Add Doxygen comments** when adding new public APIs, functions, or significant structures
+
+### Inline Comments
+
+- Add relevant inline comments to explain complex logic, non-obvious behavior, or important implementation details
+- Use `//` for single-line comments
+- Use `/* */` for multi-line comments when appropriate
+- Ensure comments enhance code readability and maintainability
+- Document C-specific patterns and platform-specific code clearly
+
+## Code Style
+
+- Follow the existing code style and formatting conventions in the repository
+- Maintain consistency with surrounding code
+- Follow C coding conventions (this is a C codebase, not C++)
+
