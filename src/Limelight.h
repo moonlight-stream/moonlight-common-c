@@ -1,6 +1,10 @@
-//
-// This header exposes the public streaming API for client usage
-//
+/**
+ * @file src/Limelight.h
+ * @brief Public streaming API for Moonlight client usage.
+ * 
+ * This header exposes the core GameStream client API for connecting to
+ * NVIDIA GameStream hosts and Sunshine servers.
+ */
 
 #pragma once
 
@@ -11,189 +15,194 @@
 extern "C" {
 #endif
 
-// Enable this definition during debugging to enable assertions
+/**
+ * @def LC_DEBUG
+ * @brief Enable this definition during debugging to enable assertions.
+ * @note Currently commented out by default.
+ */
 //#define LC_DEBUG
 
-// Values for the 'streamingRemotely' field below
+/**
+ * @def STREAM_CFG_LOCAL
+ * @brief Stream configuration: local network streaming.
+ */
 #define STREAM_CFG_LOCAL   0
+
+/**
+ * @def STREAM_CFG_REMOTE
+ * @brief Stream configuration: remote (Internet) streaming.
+ */
 #define STREAM_CFG_REMOTE  1
+
+/**
+ * @def STREAM_CFG_AUTO
+ * @brief Stream configuration: automatically detect local vs remote.
+ */
 #define STREAM_CFG_AUTO    2
 
-// Values for the 'colorSpace' field below.
-// Rec. 2020 is not supported with H.264 video streams on GFE hosts.
+/**
+ * @def COLORSPACE_REC_601
+ * @brief Colorspace: Rec. 601 (SDTV).
+ */
 #define COLORSPACE_REC_601  0
+
+/**
+ * @def COLORSPACE_REC_709
+ * @brief Colorspace: Rec. 709 (HDTV).
+ */
 #define COLORSPACE_REC_709  1
+
+/**
+ * @def COLORSPACE_REC_2020
+ * @brief Colorspace: Rec. 2020 (UHDTV/HDR).
+ * @note Rec. 2020 is not supported with H.264 video streams on GFE hosts.
+ */
 #define COLORSPACE_REC_2020 2
 
-// Values for the 'colorRange' field below
+/**
+ * @def COLOR_RANGE_LIMITED
+ * @brief Color range: limited range (16-235 for Y, 16-240 for Cb/Cr).
+ */
 #define COLOR_RANGE_LIMITED  0
+
+/**
+ * @def COLOR_RANGE_FULL
+ * @brief Color range: full range (0-255 for all components).
+ */
 #define COLOR_RANGE_FULL     1
 
-// Values for 'encryptionFlags' field below
+/**
+ * @def ENCFLG_NONE
+ * @brief Encryption flags: no encryption.
+ */
 #define ENCFLG_NONE  0x00000000
+
+/**
+ * @def ENCFLG_AUDIO
+ * @brief Encryption flags: encrypt audio stream.
+ */
 #define ENCFLG_AUDIO 0x00000001
+
+/**
+ * @def ENCFLG_VIDEO
+ * @brief Encryption flags: encrypt video stream.
+ */
 #define ENCFLG_VIDEO 0x00000002
+
+/**
+ * @def ENCFLG_ALL
+ * @brief Encryption flags: encrypt all streams.
+ */
 #define ENCFLG_ALL   0xFFFFFFFF
 
-// This function returns a string that you SHOULD append to the /launch and /resume
-// query parameter string. This is used to enable certain extended functionality
-// with Sunshine hosts. The returned string is owned by moonlight-common-c and
-// should not be freed by the caller.
+/**
+ * @brief Get launch URL query parameters for extended Sunshine functionality.
+ * @details Returns a string that SHOULD be appended to the /launch and /resume
+ *          query parameter string. This is used to enable certain extended
+ *          functionality with Sunshine hosts.
+ * @return Query parameter string (owned by moonlight-common-c, do not free).
+ */
 const char* LiGetLaunchUrlQueryParameters(void);
 
+/**
+ * @brief Stream configuration structure.
+ * @details Contains all parameters for configuring a streaming session.
+ */
 typedef struct _STREAM_CONFIGURATION {
-    // Dimensions in pixels of the desired video stream
-    int width;
-    int height;
-
-    // FPS of the desired video stream
-    int fps;
-
-    // Bitrate of the desired video stream (audio adds another ~1 Mbps). This
-    // includes error correction data, so the actual encoder bitrate will be
-    // about 20% lower when using the standard 20% FEC configuration.
-    int bitrate;
-
-    // Max video packet size in bytes (use 1024 if unsure). If STREAM_CFG_AUTO
-    // determines the stream is remote (see below), it will cap this value at
-    // 1024 to avoid MTU-related issues like packet loss and fragmentation.
-    int packetSize;
-
-    // Determines whether to enable remote (over the Internet)
-    // streaming optimizations. If unsure, set to STREAM_CFG_AUTO.
-    // STREAM_CFG_AUTO uses a heuristic (whether the target address is
-    // in the RFC 1918 address blocks) to decide whether the stream
-    // is remote or not.
-    int streamingRemotely;
-
-    // Specifies the channel configuration of the audio stream.
-    // See AUDIO_CONFIGURATION constants and MAKE_AUDIO_CONFIGURATION() below.
-    int audioConfiguration;
-
-    // Specifies the mask of supported video formats.
-    // See VIDEO_FORMAT constants below.
-    int supportedVideoFormats;
-
-    // If specified, the client's display refresh rate x 100. For example,
-    // 59.94 Hz would be specified as 5994. This is used by recent versions
-    // of GFE for enhanced frame pacing.
-    int clientRefreshRateX100;
-
-    // If specified, sets the encoder colorspace to the provided COLORSPACE_*
-    // option (listed above). If not set, the encoder will default to Rec 601.
-    int colorSpace;
-
-    // If specified, sets the encoder color range to the provided COLOR_RANGE_*
-    // option (listed above). If not set, the encoder will default to Limited.
-    int colorRange;
-
-    // Specifies the data streams where encryption may be enabled if supported
-    // by the host PC. Ideally, you would pass ENCFLG_ALL to encrypt everything
-    // that we support encrypting. However, lower performance hardware may not
-    // be able to support encrypting heavy stuff like video or audio data, so
-    // that encryption may be disabled here. Remote input encryption is always
-    // enabled.
-    int encryptionFlags;
-
-    // AES encryption data for the remote input stream. This must be
-    // the same as what was passed as rikey and rikeyid
-    // in /launch and /resume requests.
-    char remoteInputAesKey[16];
-    char remoteInputAesIv[16];
-
-    // Enable automatic bitrate adjustment based on network conditions
-    // Set to 1 when client checkbox is checked, 0 otherwise
-    int autoBitrateEnabled;
-    // Minimum and maximum bitrate for auto bitrate adjustment (in Kbps)
-    int autoBitrateMinKbps;
-    int autoBitrateMaxKbps;
+    int width;  ///< Dimensions in pixels of the desired video stream (width)
+    int height;  ///< Dimensions in pixels of the desired video stream (height)
+    int fps;  ///< FPS of the desired video stream
+    int bitrate;  ///< Bitrate of the desired video stream in Kbps (audio adds another ~1 Mbps). Includes error correction data, so actual encoder bitrate will be about 20% lower with standard 20% FEC.
+    int packetSize;  ///< Max video packet size in bytes (use 1024 if unsure). If STREAM_CFG_AUTO determines remote, this will be capped at 1024 to avoid MTU issues.
+    int streamingRemotely;  ///< Enable remote (Internet) streaming optimizations. Use STREAM_CFG_AUTO if unsure. AUTO uses RFC 1918 heuristic to detect remote.
+    int audioConfiguration;  ///< Channel configuration of the audio stream. See AUDIO_CONFIGURATION constants and MAKE_AUDIO_CONFIGURATION().
+    int supportedVideoFormats;  ///< Mask of supported video formats. See VIDEO_FORMAT constants.
+    int clientRefreshRateX100;  ///< Client's display refresh rate x 100 (e.g., 5994 for 59.94 Hz). Used by recent GFE versions for enhanced frame pacing.
+    int colorSpace;  ///< Encoder colorspace (COLORSPACE_* option). Defaults to Rec 601 if not set.
+    int colorRange;  ///< Encoder color range (COLOR_RANGE_* option). Defaults to Limited if not set.
+    int encryptionFlags;  ///< Data streams where encryption may be enabled (ENCFLG_* flags). Ideally use ENCFLG_ALL. Remote input encryption is always enabled.
+    char remoteInputAesKey[16];  ///< AES encryption key for remote input stream. Must match rikey from /launch and /resume requests.
+    char remoteInputAesIv[16];  ///< AES encryption IV for remote input stream. Must match rikeyid from /launch and /resume requests.
+    int autoBitrateEnabled;  ///< Enable automatic bitrate adjustment based on network conditions (1 = enabled, 0 = disabled)
+    int autoBitrateMinKbps;  ///< Minimum bitrate for auto bitrate adjustment (in Kbps)
+    int autoBitrateMaxKbps;  ///< Maximum bitrate for auto bitrate adjustment (in Kbps)
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
-// Use this function to zero the stream configuration when allocated on the stack or heap
+/**
+ * @brief Initialize stream configuration structure to zero.
+ * @details Use this function to zero the stream configuration when allocated on the stack or heap.
+ * @param streamConfig Pointer to stream configuration structure to initialize.
+ */
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
 
-// These identify codec configuration data in the buffer lists
-// of frames identified as IDR frames for H.264 and HEVC formats.
-// For other codecs, all data is marked as BUFFER_TYPE_PICDATA.
+/**
+ * @def BUFFER_TYPE_PICDATA
+ * @brief Buffer type: picture data.
+ * @details For non-H.264/HEVC codecs, all data is marked as BUFFER_TYPE_PICDATA.
+ */
 #define BUFFER_TYPE_PICDATA  0x00
+
+/**
+ * @def BUFFER_TYPE_SPS
+ * @brief Buffer type: Sequence Parameter Set (H.264/HEVC only).
+ */
 #define BUFFER_TYPE_SPS      0x01
+
+/**
+ * @def BUFFER_TYPE_PPS
+ * @brief Buffer type: Picture Parameter Set (H.264/HEVC only).
+ */
 #define BUFFER_TYPE_PPS      0x02
+
+/**
+ * @def BUFFER_TYPE_VPS
+ * @brief Buffer type: Video Parameter Set (HEVC only).
+ */
 #define BUFFER_TYPE_VPS      0x03
 
+/**
+ * @brief Linked list entry for video data buffers.
+ * @details These identify codec configuration data in buffer lists of IDR frames
+ *          for H.264 and HEVC formats.
+ */
 typedef struct _LENTRY {
-    // Pointer to the next entry or NULL if this is the last entry
-    struct _LENTRY* next;
-
-    // Pointer to data (never NULL)
-    char* data;
-
-    // Size of data in bytes (never <= 0)
-    int length;
-
-    // Buffer type (listed above, only set for H.264 and HEVC formats)
-    int bufferType;
+    struct _LENTRY* next;  ///< Pointer to the next entry or NULL if this is the last entry
+    char* data;  ///< Pointer to data (never NULL)
+    int length;  ///< Size of data in bytes (never <= 0)
+    int bufferType;  ///< Buffer type (BUFFER_TYPE_* constants, only set for H.264 and HEVC formats)
 } LENTRY, *PLENTRY;
 
-// This is a standard frame which references the IDR frame and
-// previous P-frames.
+/**
+ * @def FRAME_TYPE_PFRAME
+ * @brief Frame type: P-frame (predictive frame).
+ * @details Standard frame which references the IDR frame and previous P-frames.
+ */
 #define FRAME_TYPE_PFRAME 0x00
 
-// This is a key frame.
-//
-// For H.264 and HEVC, this means the frame contains SPS, PPS, and VPS (HEVC only) NALUs
-// as the first buffers in the list. The I-frame data follows immediately
-// after the codec configuration NALUs.
-//
-// For other codecs, any configuration data is not split into separate buffers.
+/**
+ * @def FRAME_TYPE_IDR
+ * @brief Frame type: IDR frame (key frame).
+ * @details For H.264 and HEVC, contains SPS, PPS, and VPS (HEVC only) NALUs
+ *          as the first buffers. I-frame data follows immediately after.
+ *          For other codecs, configuration data is not split into separate buffers.
+ */
 #define FRAME_TYPE_IDR    0x01
 
-// A decode unit describes a buffer chain of video data from multiple packets
+/**
+ * @brief Decode unit structure describing a buffer chain of video data.
+ * @details A decode unit describes a buffer chain of video data from multiple packets.
+ */
 typedef struct _DECODE_UNIT {
-    // Frame number
-    int frameNumber;
-
-    // Frame type
-    int frameType;
-
-    // Optional host processing latency of the frame, in 1/10 ms units.
-    // Zero when the host doesn't provide the latency data
-    // or frame processing latency is not applicable to the current frame
-    // (happens when the frame is repeated).
-    uint16_t frameHostProcessingLatency;
-
-    // Receive time of first buffer. This value uses an implementation-defined epoch,
-    // but the same epoch as enqueueTimeMs and LiGetMillis().
-    uint64_t receiveTimeMs;
-
-    // Time the frame was fully assembled and queued for the video decoder to process.
-    // This is also approximately the same time as the final packet was received, so
-    // enqueueTimeMs - receiveTimeMs is the time taken to receive the frame. At the
-    // time the decode unit is passed to submitDecodeUnit(), the total queue delay
-    // can be calculated by LiGetMillis() - enqueueTimeMs.
-    uint64_t enqueueTimeMs;
-
-    // Presentation time in milliseconds with the epoch at the first captured frame.
-    // This can be used to aid frame pacing or to drop old frames that were queued too
-    // long prior to display.
-    unsigned int presentationTimeMs;
-
-    // Length of the entire buffer chain in bytes
-    int fullLength;
-
-    // Head of the buffer chain (never NULL)
-    PLENTRY bufferList;
-
-    // Determines if this frame is SDR or HDR
-    //
-    // Note: This is not currently parsed from the actual bitstream, so if your
-    // client has access to a bitstream parser, prefer that over this field.
-    bool hdrActive;
-
-    // Provides the colorspace of this frame (see COLORSPACE_* defines above)
-    //
-    // Note: This is not currently parsed from the actual bitstream, so if your
-    // client has access to a bitstream parser, prefer that over this field.
-    uint8_t colorspace;
+    int frameNumber;  ///< Frame number
+    int frameType;  ///< Frame type (FRAME_TYPE_* constants)
+    uint16_t frameHostProcessingLatency;  ///< Optional host processing latency in 1/10 ms units. Zero when not provided or not applicable (e.g., repeated frames).
+    uint64_t receiveTimeMs;  ///< Receive time of first buffer (uses same epoch as enqueueTimeMs and LiGetMillis())
+    uint64_t enqueueTimeMs;  ///< Time frame was fully assembled and queued for decoder. enqueueTimeMs - receiveTimeMs = receive time. Total queue delay = LiGetMillis() - enqueueTimeMs.
+    unsigned int presentationTimeMs;  ///< Presentation time in milliseconds (epoch at first captured frame). Used for frame pacing and dropping old frames.
+    int fullLength;  ///< Length of the entire buffer chain in bytes
+    PLENTRY bufferList;  ///< Head of the buffer chain (never NULL)
+    bool hdrActive;  ///< Whether this frame is HDR (not parsed from bitstream - prefer bitstream parser if available)
+    uint8_t colorspace;  ///< Colorspace of this frame (COLORSPACE_* constants, not parsed from bitstream - prefer bitstream parser if available)
 } DECODE_UNIT, *PDECODE_UNIT;
 
 // Specifies that the audio stream should be encoded in stereo (default)

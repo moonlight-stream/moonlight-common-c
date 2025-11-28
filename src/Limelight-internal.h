@@ -1,3 +1,10 @@
+/**
+ * @file src/Limelight-internal.h
+ * @brief Internal definitions and globals for Limelight streaming library.
+ * 
+ * @note This header is for internal use only and is not part of the public API.
+ */
+
 #pragma once
 
 #include "Platform.h"

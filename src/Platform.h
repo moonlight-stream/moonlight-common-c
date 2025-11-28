@@ -1,3 +1,11 @@
+/**
+ * @file src/Platform.h
+ * @brief Platform abstraction layer for cross-platform compatibility.
+ * 
+ * This header provides platform-specific definitions and includes
+ * for Windows, POSIX, and various embedded platforms.
+ */
+
 #pragma once
 
 #ifdef _WIN32
