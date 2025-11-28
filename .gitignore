@@ -8,3 +8,4 @@ limelight-common/Release/
 *.sdf
 *.suo
 limelight-common/limelight-common.vcxproj.user
+.DS_Store

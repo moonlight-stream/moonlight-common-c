@@ -1,3 +1,10 @@
+/**
+ * @file src/PlatformSockets.h
+ * @brief Platform abstraction layer for socket operations.
+ * 
+ * Provides cross-platform socket functions for Windows, POSIX, and embedded platforms.
+ */
+
 #pragma once
 
 #include "Limelight.h"

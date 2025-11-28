@@ -1,11 +1,17 @@
+/**
+ * @file src/Input.h
+ * @brief Input packet structures for gamepad, keyboard, and mouse input.
+ */
+
 #pragma once
 
 #include <stdint.h>
 
 #pragma pack(push, 1)
 
-// netfloat is just a little-endian float in byte form
-// for network transmission.
+/**
+ * @brief Network float type (little-endian float in byte form for network transmission).
+ */
 typedef uint8_t netfloat[4];
 
 typedef struct _NV_INPUT_HEADER {

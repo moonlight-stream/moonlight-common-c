@@ -1,8 +1,20 @@
+/**
+ * @file src/PlatformThreads.h
+ * @brief Platform abstraction layer for threading operations.
+ * 
+ * Provides cross-platform thread, mutex, and condition variable functions
+ * for Windows, POSIX, and embedded platforms.
+ */
+
 #pragma once
 
 #include "Limelight.h"
 #include "Platform.h"
 
+/**
+ * @brief Thread entry point function type.
+ * @param context User-provided context pointer.
+ */
 typedef void(*ThreadEntry)(void* context);
 
 #if defined(LC_WINDOWS)
