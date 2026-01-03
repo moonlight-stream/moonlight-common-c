@@ -466,7 +466,7 @@ static bool isIdrFrameStart(PBUFFER_DESC buffer) {
 }
 
 // Reassemble the frame with the given frame number
-static void reassembleFrame(int frameNumber) {
+static void reassembleFrame(int frameNumber, bool frameIsLTR) {
     if (nalChainHead != NULL) {
         QUEUED_DECODE_UNIT qduDS;
         PQUEUED_DECODE_UNIT qdu;
@@ -539,7 +539,7 @@ static void reassembleFrame(int frameNumber) {
             }
 
             // Notify the control connection
-            connectionReceivedCompleteFrame(frameNumber);
+            connectionReceivedCompleteFrame(frameNumber, frameIsLTR);
 
             // Clear frame drops
             consecutiveFrameDrops = 0;
@@ -748,6 +748,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     BUFFER_DESC currentPos;
     uint32_t frameIndex;
     uint8_t flags;
+    uint8_t extraFlags;
     bool firstPacket, lastPacket;
     uint32_t streamPacketIndex;
     uint8_t fecCurrentBlockNumber;
@@ -765,6 +766,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     fecLastBlockNumber = (videoPacket->multiFecBlocks >> 6) & 0x3;
     frameIndex = videoPacket->frameIndex;
     flags = videoPacket->flags;
+    extraFlags = videoPacket->extraFlags;
     firstPacket = isFirstPacket(flags, fecCurrentBlockNumber);
     lastPacket = (flags & FLAG_EOF) && fecCurrentBlockNumber == fecLastBlockNumber;
 
@@ -1119,7 +1121,7 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             }
         }
 
-        reassembleFrame(frameIndex);
+        reassembleFrame(frameIndex, extraFlags & NV_VIDEO_PACKET_EXTRA_FLAG_LTR_FRAME);
     }
 }
 

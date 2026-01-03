@@ -382,9 +382,9 @@ cleanup_packets:
 
                     // Check all NV_VIDEO_PACKET fields except FEC stuff which differs in the recovered packet
                     LC_ASSERT_VT(nvPacket->flags == droppedNvPacket->flags);
+                    LC_ASSERT_VT(nvPacket->extraFlags == droppedNvPacket->extraFlags);
                     LC_ASSERT_VT(nvPacket->frameIndex == droppedNvPacket->frameIndex);
                     LC_ASSERT_VT(nvPacket->streamPacketIndex == droppedNvPacket->streamPacketIndex);
-                    LC_ASSERT_VT(nvPacket->reserved == droppedNvPacket->reserved);
                     LC_ASSERT_VT(!queue->multiFecCapable || nvPacket->multiFecBlocks == droppedNvPacket->multiFecBlocks);
 
                     // Check the data itself - use memcmp() and only loop if an error is detected
