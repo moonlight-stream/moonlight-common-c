@@ -22,11 +22,13 @@ typedef struct _ENC_VIDEO_HEADER {
 #define FLAG_EOF 0x2
 #define FLAG_SOF 0x4
 
+#define NV_VIDEO_PACKET_EXTRA_FLAG_LTR_FRAME 0x1
+
 typedef struct _NV_VIDEO_PACKET {
     uint32_t streamPacketIndex;
     uint32_t frameIndex;
     uint8_t flags;
-    uint8_t reserved;
+    uint8_t extraFlags;
     uint8_t multiFecFlags;
     uint8_t multiFecBlocks;
     uint32_t fecInfo;
@@ -66,5 +68,21 @@ typedef struct _SS_FRAME_FEC_STATUS {
     uint8_t multiFecBlockIndex;
     uint8_t multiFecBlockCount;
 } SS_FRAME_FEC_STATUS, *PSS_FRAME_FEC_STATUS;
+
+// Fields are little-endian
+#define SS_LTR_FRAME_ACK_PTYPE 0x0350
+typedef struct _SS_LTR_FRAME_ACK {
+    uint32_t frameIndex;
+    uint32_t reserved;
+} SS_LTR_FRAME_ACK, *PSS_LTR_FRAME_ACK;
+
+// Fields are little-endian
+#define SS_RFI_REQUEST_PTYPE 0x0301
+typedef struct _SS_RFI_REQUEST {
+    uint32_t firstFrameIndex;
+    uint32_t reserved1;
+    uint32_t lastFrameIndex;
+    uint32_t reserved2[3];
+} SS_RFI_REQUEST, *PSS_RFI_REQUEST;
 
 #pragma pack(pop)
