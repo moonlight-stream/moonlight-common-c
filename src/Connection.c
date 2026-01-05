@@ -377,6 +377,19 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
         ListenerCallbacks.stageFailed(STAGE_NAME_RESOLUTION, err);
         goto Cleanup;
     }
+
+    // Resolve LocalAddr by RemoteAddr.
+    {
+        SOCKADDR_LEN localAddrLen;
+        err = getLocalAddressByUdpConnect(&RemoteAddr, AddrLen, &LocalAddr, &localAddrLen);
+        if (err != 0) {
+            Limelog("failed to resolve local addr: %d\n", err);
+            ListenerCallbacks.stageFailed(STAGE_NAME_RESOLUTION, err);
+            goto Cleanup;
+        }
+        LC_ASSERT(localAddrLen == AddrLen);
+    }
+
     stage++;
     LC_ASSERT(stage == STAGE_NAME_RESOLUTION);
     ListenerCallbacks.stageComplete(STAGE_NAME_RESOLUTION);
