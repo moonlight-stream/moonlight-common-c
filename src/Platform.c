@@ -286,7 +286,9 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
 
         pthread_attr_init(&attr);
 
+#ifdef __vita__
         pthread_attr_setstacksize(&attr, 0x100000);
+#endif
 
         ctx->name = name;
 
