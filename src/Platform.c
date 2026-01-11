@@ -293,6 +293,7 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
         ctx->name = name;
 
         int err = pthread_create(&thread->thread, &attr, ThreadProc, ctx);
+        pthread_attr_destroy(&attr);
         if (err != 0) {
             free(ctx);
             return err;
