@@ -477,18 +477,6 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     // Decrypt (if necessary) and deserialize the RTSP response
     ret = unsealRtspMessage(responseBuffer, offset, response);
 
-    // Fetch the local address for this socket if it's not populated yet
-    if (LocalAddr.ss_family == 0) {
-        SOCKADDR_LEN addrLen = (SOCKADDR_LEN)sizeof(LocalAddr);
-        if (getsockname(sock, (struct sockaddr*)&LocalAddr, &addrLen) < 0) {
-            Limelog("Failed to get local address: %d\n", LastSocketError());
-            memset(&LocalAddr, 0, sizeof(LocalAddr));
-        }
-        else {
-            LC_ASSERT(addrLen == AddrLen);
-        }
-    }
-
 Exit:
     if (serializedMessage != NULL) {
         free(serializedMessage);

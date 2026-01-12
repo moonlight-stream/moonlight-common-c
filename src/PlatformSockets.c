@@ -568,6 +568,36 @@ Exit:
     return s;
 }
 
+int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKADDR_LEN targetAddrLen,
+    struct sockaddr_storage* localAddr, SOCKADDR_LEN* localAddrLen) {
+    SOCKET udpSocket;
+
+    udpSocket = createSocket(targetAddr->ss_family, SOCK_DGRAM, IPPROTO_UDP, false);
+    if (udpSocket == INVALID_SOCKET) {
+        return -1;
+    }
+
+    if (connect(udpSocket, (struct sockaddr*)targetAddr, targetAddrLen) < 0) {
+        int err = LastSocketError();
+        Limelog("UDP connect() failed: %d\n", err);
+        closeSocket(udpSocket);
+        SetLastSocketError(err);
+        return -1;
+    }
+
+    *localAddrLen = sizeof(*localAddr);
+    if (getsockname(udpSocket, (struct sockaddr*)localAddr, localAddrLen) < 0) {
+        int err = LastSocketError();
+        Limelog("getsockname() failed: %d\n", err);
+        closeSocket(udpSocket);
+        SetLastSocketError(err);
+        return -1;
+    }
+
+    closeSocket(udpSocket);
+    return 0;
+}
+
 // See TCP_MAXSEG note in connectTcpSocket() above for more information.
 // TCP_NODELAY must be enabled on the socket for this function to work!
 int sendMtuSafe(SOCKET s, char* buffer, int size) {
