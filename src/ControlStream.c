@@ -438,8 +438,8 @@ void connectionReceivedCompleteFrame(uint32_t frameIndex, bool frameIsLTR) {
         qfit = malloc(sizeof(*qfit));
         if (qfit != NULL) {
             *qfit = (QUEUED_REFERENCE_FRAME_CONTROL){
-                qfit->startFrame = frameIndex,
-                qfit->invalidate = false,
+                .startFrame = frameIndex,
+                .invalidate = false,
             };
             if (LbqOfferQueueItem(&referenceFrameControlQueue, qfit, &qfit->entry) == LBQ_BOUND_EXCEEDED) {
                 // This shouldn't happen and indicates that something has gone wrong with the queue
