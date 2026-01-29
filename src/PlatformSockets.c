@@ -574,15 +574,14 @@ int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKA
 
     udpSocket = createSocket(targetAddr->ss_family, SOCK_DGRAM, IPPROTO_UDP, false);
     if (udpSocket == INVALID_SOCKET) {
-        return -1;
+        return LastSocketError();
     }
 
     if (connect(udpSocket, (struct sockaddr*)targetAddr, targetAddrLen) < 0) {
         int err = LastSocketError();
         Limelog("UDP connect() failed: %d\n", err);
         closeSocket(udpSocket);
-        SetLastSocketError(err);
-        return -1;
+        return err;
     }
 
     *localAddrLen = sizeof(*localAddr);
@@ -590,8 +589,7 @@ int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKA
         int err = LastSocketError();
         Limelog("getsockname() failed: %d\n", err);
         closeSocket(udpSocket);
-        SetLastSocketError(err);
-        return -1;
+        return err;
     }
 
     closeSocket(udpSocket);
