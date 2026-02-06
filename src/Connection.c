@@ -381,7 +381,23 @@ int LiStartConnection(PSERVER_INFORMATION serverInfo, PSTREAM_CONFIGURATION stre
     // Resolve LocalAddr by RemoteAddr.
     {
         SOCKADDR_LEN localAddrLen;
+        #ifdef __FreeBSD__
+        // FreeBSD will check port in struct sockaddr for connect().
+        // Invalid port or address will let connect() return EADDRNOTAVAIL.
+        struct sockaddr_storage remote;
+        memcpy(&remote, &RemoteAddr, sizeof(remote));
+        if (remote.ss_family == AF_INET) {
+          struct sockaddr_in *r4 = (struct sockaddr_in *)&remote;
+          r4->sin_port = htons(RtspPortNumber);
+        }
+        else if (remote.ss_family == AF_INET6) {
+          struct sockaddr_in6 *r6 = (struct sockaddr_in6 *)&remote;
+          r6->sin6_port = htons(RtspPortNumber);
+        }
+        err = getLocalAddressByUdpConnect(&remote, AddrLen, &LocalAddr, &localAddrLen);
+        #else
         err = getLocalAddressByUdpConnect(&RemoteAddr, AddrLen, &LocalAddr, &localAddrLen);
+        #endif
         if (err != 0) {
             Limelog("failed to resolve local addr: %d\n", err);
             ListenerCallbacks.stageFailed(STAGE_NAME_RESOLUTION, err);
