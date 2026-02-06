@@ -127,14 +127,13 @@ void reed_solomon_release(reed_solomon *rs)
 
 int reed_solomon_decode(reed_solomon *rs, u8 **data, u8 *marks, int nr_shards, int bs)
 {
-    int ret = 0;
     if (nr_shards < rs->ts)
         return -1;
 
     // This replaces 3 dynamic arrays which MSVC doesn't support.
     // u8 erasures[rs->ds], colperm[rs->ds], rowperm[rs->ds];
-    thread_local static u8 *buf = NULL;
-    thread_local static size_t buf_size = 0;
+    _Thread_local static u8 *buf = NULL;
+    _Thread_local static size_t buf_size = 0;
 
     const size_t need = (size_t)rs->ds * 3; // erasures + colperm + rowperm
     if (need > buf_size) {
