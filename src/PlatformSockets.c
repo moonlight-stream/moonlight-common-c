@@ -568,16 +568,22 @@ Exit:
     return s;
 }
 
-int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKADDR_LEN targetAddrLen,
-    struct sockaddr_storage* localAddr, SOCKADDR_LEN* localAddrLen) {
+int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKADDR_LEN targetAddrLen, unsigned short targetPort,
+                                struct sockaddr_storage* localAddr, SOCKADDR_LEN* localAddrLen) {
     SOCKET udpSocket;
+    LC_SOCKADDR connAddr;
+
+    LC_ASSERT(targetPort != 0);
 
     udpSocket = createSocket(targetAddr->ss_family, SOCK_DGRAM, IPPROTO_UDP, false);
     if (udpSocket == INVALID_SOCKET) {
         return LastSocketError();
     }
 
-    if (connect(udpSocket, (struct sockaddr*)targetAddr, targetAddrLen) < 0) {
+    memcpy(&connAddr, targetAddr, targetAddrLen);
+    SET_PORT(&connAddr, RtspPortNumber);
+
+    if (connect(udpSocket, (struct sockaddr*)&connAddr, targetAddrLen) < 0) {
         int err = LastSocketError();
         Limelog("UDP connect() failed: %d\n", err);
         closeSocket(udpSocket);
