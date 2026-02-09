@@ -58,14 +58,10 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
     for (unsigned idx = 0, p = 0; idx < k; idx += 8 * sizeof(u32), p++) {
         u32 tmp = b[p];
         while (tmp > 0) {
-#if _MSC_VER
-    #if _M_ARM64
+#ifdef _MSC_VER
             unsigned long index = 0;
             _BitScanForward(&index, tmp);
             unsigned tz = (unsigned int)index;
-    #else
-            unsigned tz = _tzcnt_u32(tmp);
-    #endif
 #else
             unsigned tz = __builtin_ctz(tmp);
 #endif

@@ -130,24 +130,14 @@ int reed_solomon_decode(reed_solomon *rs, u8 **data, u8 *marks, int nr_shards, i
     if (nr_shards < rs->ts)
         return -1;
 
-    // This replaces 3 dynamic arrays which MSVC doesn't support.
-    // u8 erasures[rs->ds], colperm[rs->ds], rowperm[rs->ds];
-    _Thread_local static u8 *buf = NULL;
-    _Thread_local static size_t buf_size = 0;
+#ifdef _MSC_VER
+    u8 *erasures = _alloca(rs->ds);
+    u8 *colperm = _alloca(rs->ds);
+    u8 *rowperm = _alloca(rs->ds);
+#else
+    u8 erasures[rs->ds], colperm[rs->ds], rowperm[rs->ds];
+#endif
 
-    const size_t need = (size_t)rs->ds * 3; // erasures + colperm + rowperm
-    if (need > buf_size) {
-        // thread-local buffer does not need to be freed
-        u8 *newbuf = (u8 *)realloc(buf, need);
-        if (!newbuf)
-            return -1;
-        buf = newbuf;
-        buf_size = need;
-    }
-
-    u8 *erasures = buf;
-    u8 *colperm  = buf + rs->ds * 1;
-    u8 *rowperm  = buf + rs->ds * 2;
 
     u8 *wrk = rs->p + 1 * rs->ps * rs->ds;
     u8 gaps = 0;
