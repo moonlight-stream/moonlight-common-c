@@ -2,7 +2,14 @@
 
 #include "Video.h"
 
-#include "rs.h"
+#include "rswrapper.h"
+
+typedef struct _reed_solomon {
+    int ds;
+    int ps;
+    int ts;
+    uint8_t p[];
+} reed_solomon;
 
 // Maximum time to wait for an OOS data/FEC shard
 // after the entire FEC block should have been received

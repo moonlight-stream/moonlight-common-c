@@ -1,5 +1,5 @@
 #include "Limelight-internal.h"
-#include "rs.h"
+#include "rswrapper.h"
 
 #if defined(LC_DEBUG) && !defined(LC_FUZZING)
 // This enables FEC validation mode with a synthetic drop
@@ -328,7 +328,7 @@ static int reconstructFrame(PRTP_VIDEO_QUEUE queue) {
         }
     }
 
-    ret = reed_solomon_reconstruct(rs, packets, marks, totalPackets, receiveSize);
+    ret = reed_solomon_decode(rs, packets, marks, totalPackets, receiveSize);
 
     // We should always provide enough parity to recover the missing data successfully.
     // If this fails, something is probably wrong with our FEC state.
