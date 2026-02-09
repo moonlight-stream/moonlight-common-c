@@ -39,7 +39,7 @@
 #define gemm DECORATE_FUNC(gemm, ISA_SUFFIX)
 #define invert_mat DECORATE_FUNC(invert_mat, ISA_SUFFIX)
 
-#if defined(__x86_64__) || defined(__i386__) || (defined(_MSC_VER) && !defined(__aarch64__))
+#if defined(__x86_64__) || defined(__i386__) || (defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64)))
 
   // Compile a variant for SSSE3
   #if defined(__clang__)
@@ -97,8 +97,7 @@
 
 #endif
 
-// Compile a default variant, this will be the NEON version if __aarch64__
-// and the SSE3 version when built with MSVC on Windows.
+// Compile a default variant
 #define ISA_SUFFIX _def
 #include "../nanors/deps/obl/autoshim.h"
 #include "../nanors/rs.c"
@@ -118,37 +117,17 @@ reed_solomon_release_t reed_solomon_release_fn;
 reed_solomon_encode_t reed_solomon_encode_fn;
 reed_solomon_decode_t reed_solomon_decode_fn;
 
-#if defined(_MSC_VER) && !defined(__aarch64__)
-  // https://learn.microsoft.com/en-us/cpp/intrinsics/cpuid-cpuidex?view=msvc-170
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
 
-  // The EBX/ECX registers indicate CPU feature flags using bits.
-  // SSSE3: bit 9 of ECX
-  // AVX2: bit 5 of EBX
-  // AVX512F: bit 16 of EBX
-  // AVX512BW: bit 30 of EBX
+  #if defined(_M_AMD64)
+  // For some reason this is needed to avoid a "C1189 No target architecture" error from winnt.h
+  # define _AMD64_
+  #endif
+  #include <processthreadsapi.h>
+  BOOL _msc_supports_ssse3(void)   { return IsProcessorFeaturePresent(PF_SSSE3_INSTRUCTIONS_AVAILABLE); }
+  BOOL _msc_supports_avx2(void)    { return IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE); }
+  BOOL _msc_supports_avx512f(void) { return IsProcessorFeaturePresent(PF_AVX512F_INSTRUCTIONS_AVAILABLE); }
 
-  #include <intrin.h>
-
-  int _msc_check_ebx(int bit) {
-    int cpuInfo[4] = {0};
-    __cpuid(cpuInfo, 0);
-    int maxFunctionId = cpuInfo[0];
-    if (maxFunctionId >= 7) {
-      __cpuidex(cpuInfo, 7, 0);
-      return (cpuInfo[1] & (1 << bit)) != 0;
-    }
-    return 0;
-  }
-
-  int _msc_supports_avx2(void)     { return _msc_check_ebx(5); }
-  int _msc_supports_avx512f(void)  { return _msc_check_ebx(16); }
-  int _msc_supports_avx512bw(void) { return _msc_check_ebx(30); }
-
-  int _msc_supports_ssse3(void) {
-    int cpuInfo[4] = {0};
-    __cpuid(cpuInfo, 1);
-    return (cpuInfo[2] & (1 << 9)) != 0;
-  }
 #endif
 
 /**
@@ -156,9 +135,9 @@ reed_solomon_decode_t reed_solomon_decode_fn;
  * @details The streaming code will directly invoke these function pointers during encoding.
  */
 void reed_solomon_init(void) {
-#if defined(_MSC_VER) && !defined(__aarch64__)
+#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
   // Visual Studio
-  if (_msc_supports_avx512f() && _msc_supports_avx512bw()) {
+  if (_msc_supports_avx512f()) {
     reed_solomon_new_fn = reed_solomon_new_avx512;
     reed_solomon_release_fn = reed_solomon_release_avx512;
     reed_solomon_encode_fn = reed_solomon_encode_avx512;
