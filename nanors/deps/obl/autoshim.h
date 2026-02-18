@@ -7,10 +7,9 @@
 #if defined(__SSSE3__) || (defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64))
 #define OBLAS_SSE3
 #else
-// This doesn't build right with MSVC
-// #if defined(__aarch64__) || (defined(_MSC_VER) && defined(_M_ARM64))
-#if defined(__aarch64__)
-#define OBLAS_NEON
+#if defined(__aarch64__) || (defined(_MSC_VER) && defined(_M_ARM64))
+// To be replaced with SIMDe
+// #define OBLAS_NEON
 #endif
 #endif
 #endif
