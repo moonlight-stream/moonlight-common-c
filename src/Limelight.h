@@ -107,7 +107,7 @@ typedef struct _STREAM_CONFIGURATION {
     char remoteInputAesIv[16];
 
     // If specified, request the encoder to tone map HDR content.
-    // If not set, HDR content will be encoded as is if selected format is 10-bit.
+    // If not set and selected format is 10-bit, HDR content will be encoded as is.
     // The reason behind this field is the ambiguity of 'supportedVideoFormats',
     // as it's impossible to request 10-bit tone mapped content through that field alone.
     int toneMapHDR;
