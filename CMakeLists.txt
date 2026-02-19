@@ -105,8 +105,9 @@ endif()
 
 target_include_directories(moonlight-common-c SYSTEM PUBLIC src)
 
-target_include_directories(moonlight-common-c PRIVATE
+target_include_directories(moonlight-common-c SYSTEM PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/nanors
+  ${CMAKE_CURRENT_SOURCE_DIR}/nanors/deps
   ${CMAKE_CURRENT_SOURCE_DIR}/nanors/deps/obl
 )
 

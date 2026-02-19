@@ -176,7 +176,8 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
 #else
 #if defined(OBLAS_SSE3) || defined(OBLAS_NEON)
 #if defined(OBLAS_NEON)
-#include "sse2neon/sse2neon.h"
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/ssse3.h>
 #else
 #include <emmintrin.h>
 #include <tmmintrin.h>

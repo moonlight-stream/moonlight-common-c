@@ -1,3 +1,6 @@
 [submodule "enet"]
 	path = enet
 	url = https://github.com/cgutman/enet.git
+[submodule "nanors/deps/simde"]
+	path = nanors/deps/simde
+	url = https://github.com/simd-everywhere/simde-no-tests.git

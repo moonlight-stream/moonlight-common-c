@@ -8,8 +8,7 @@
 #define OBLAS_SSE3
 #else
 #if defined(__aarch64__) || (defined(_MSC_VER) && defined(_M_ARM64))
-// To be replaced with SIMDe
-// #define OBLAS_NEON
+#define OBLAS_NEON
 #endif
 #endif
 #endif
