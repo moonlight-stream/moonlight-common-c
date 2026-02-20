@@ -20,7 +20,7 @@ extern in_port_t n3ds_udp_port;
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 #include <wlanapi.h>
 #ifndef __MINGW32__
 #include <timeapi.h>
