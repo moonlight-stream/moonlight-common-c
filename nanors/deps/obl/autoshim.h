@@ -6,10 +6,6 @@
 #else
 #if defined(__SSSE3__) || (defined(_MSC_VER) && defined(_M_X64) && !defined(_M_ARM64))
 #define OBLAS_SSE3
-#else
-#if defined(__aarch64__) || (defined(_MSC_VER) && defined(_M_ARM64))
-#define OBLAS_NEON
-#endif
 #endif
 #endif
 #endif

@@ -124,8 +124,7 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
         }                                                                                                                          \
     } while (0)
 
-#else
-#if defined(OBLAS_AVX2)
+#elif defined(OBLAS_AVX2)
 #include <immintrin.h>
 
 #undef OBLAS_ALIGN
@@ -174,13 +173,13 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
     } while (0)
 
 #else
-#if defined(OBLAS_SSE3) || defined(OBLAS_NEON)
-#if defined(OBLAS_NEON)
-#define SIMDE_ENABLE_NATIVE_ALIASES
-#include <simde/x86/ssse3.h>
-#else
+
+#if defined(OBLAS_SSE3)
 #include <emmintrin.h>
 #include <tmmintrin.h>
+#else
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/ssse3.h>
 #endif
 
 #undef OBLAS_ALIGN
@@ -231,26 +230,6 @@ void obl_axpyb32_ref(u8 *a, u32 *b, u8 u, unsigned k)
             _mm_storeu_si128(ap, _mm_xor_si128(_mm_loadu_si128(ap), ret_hi));                                                      \
         }                                                                                                                          \
     } while (0)
-
-#else
-
-#undef OBLAS_ALIGN
-#define OBLAS_ALIGN (sizeof(void *))
-
-#undef OBL_SHUF
-#define OBL_SHUF(op, a, b, f)                                                                                                      \
-    do {                                                                                                                           \
-        op##_ref(a, b, u, k);                                                                                                      \
-    } while (0)
-
-#undef OBL_SHUF_XOR
-#define OBL_SHUF_XOR
-
-#undef OBL_AXPYB32
-#define OBL_AXPYB32 obl_axpyb32_ref
-
-#endif
-#endif
 #endif
 
 #define OBL_NOOP(a, b) (b)
