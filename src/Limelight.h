@@ -21,9 +21,14 @@ extern "C" {
 
 // Values for the 'colorSpace' field below.
 // Rec. 2020 is not supported with H.264 video streams on GFE hosts.
-#define COLORSPACE_REC_601  0
-#define COLORSPACE_REC_709  1
-#define COLORSPACE_REC_2020 2
+// To use any of the RGB colorspaces, the following conditions must be satisfied:
+// 1. Server advertised SCM_MASK_RGB SCM flag in addition to individual SCM formats from SCM_MASK_YUV444
+// 2. Client included these 4:4:4 formats in 'supportedVideoFormats' field of STREAM_CONFIGURATION
+#define COLORSPACE_REC_601    0
+#define COLORSPACE_REC_709    1
+#define COLORSPACE_REC_2020   2
+#define COLORSPACE_RGB_SRGB   3
+#define COLORSPACE_RGB_P3_D65 4
 
 // Values for the 'colorRange' field below
 #define COLOR_RANGE_LIMITED  0
@@ -100,6 +105,12 @@ typedef struct _STREAM_CONFIGURATION {
     // in /launch and /resume requests.
     char remoteInputAesKey[16];
     char remoteInputAesIv[16];
+
+    // If specified, request the encoder to tone map HDR content.
+    // If not set and selected format is 10-bit, HDR content will be encoded as is.
+    // The reason behind this field is the ambiguity of 'supportedVideoFormats',
+    // as it's impossible to request 10-bit tone mapped content through that field alone.
+    int toneMapHDR;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
@@ -520,6 +531,8 @@ void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks)
 #define SCM_MASK_AV1    (SCM_AV1_MAIN8 | SCM_AV1_MAIN10 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
 #define SCM_MASK_10BIT  (SCM_HEVC_MAIN10 | SCM_HEVC_REXT10_444 | SCM_AV1_MAIN10 | SCM_AV1_HIGH10_444)
 #define SCM_MASK_YUV444 (SCM_H264_HIGH8_444 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
+#define SCM_MASK_RGB    0x80000000 // Indicates that YUV444 profiles also support RGB payload
+#define SCM_MASK_RECOMB 0x40000000 // Indicates that YUV420 profiles also support recombined YUV444 payload
 
 typedef struct _SERVER_INFORMATION {
     // Server host name or IP address in text form
