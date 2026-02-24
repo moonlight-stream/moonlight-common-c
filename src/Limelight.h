@@ -681,6 +681,16 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
                    float contactAreaMajor, float contactAreaMinor,
                    uint16_t rotation, uint8_t tilt);
 
+#define LI_TRACKPAD_EVENT_FINGER_DOWN   0x00
+#define LI_TRACKPAD_EVENT_FINGER_UP     0x01
+#define LI_TRACKPAD_EVENT_FINGER_MOVE   0x02
+#define LI_TRACKPAD_EVENT_BUTTON_DOWN   0x03
+#define LI_TRACKPAD_EVENT_BUTTON_UP     0x04
+#define LI_TRACKPAD_EVENT_CANCEL_ALL    0x05
+#define LI_ROT_UNKNOWN 0xFFFF
+int LiSendTrackpadEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance,
+                        float contactAreaMajor, float contactAreaMinor, uint16_t rotation);
+
 // This function queues a mouse button event to be sent to the remote server.
 #define BUTTON_ACTION_PRESS 0x07
 #define BUTTON_ACTION_RELEASE 0x08
@@ -1002,6 +1012,7 @@ void LiRequestIdrFrame(void);
 // This function returns any extended feature flags supported by the host.
 #define LI_FF_PEN_TOUCH_EVENTS        0x01 // LiSendTouchEvent()/LiSendPenEvent() supported
 #define LI_FF_CONTROLLER_TOUCH_EVENTS 0x02 // LiSendControllerTouchEvent() supported
+#define LI_FF_TRACKPAD_EVENTS         0x04 // LiSendTrackpadEvent() supported for trackpads
 uint32_t LiGetHostFeatureFlags(void);
 
 #ifdef __cplusplus
