@@ -21,9 +21,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # TODO: Win32 build cannot find OpenSSL
-          # - os: windows-latest
-          #   cmake_args: -A Win32
+          # TODO: arm build fails to link
+          # - os: windows-11-arm
+          #   cmake_args: -A ARM64 -DOPENSSL_ROOT_DIR="C:\OpenSSL" -DOPENSSL_INCLUDE_DIR="C:\OpenSSL\include\arm64"
+          #   install_win_openssl: true
+          - os: windows-latest
+            cmake_args: -A Win32 -DOPENSSL_ROOT_DIR="C:\OpenSSL" -DOPENSSL_INCLUDE_DIR="C:\OpenSSL\include\x86"
+            install_win_openssl: true
           - os: windows-latest
             cmake_args: -A x64
           - os: windows-11-arm
@@ -61,10 +65,34 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Windows OpenSSL
+        if: matrix.install_win_openssl
+        run: |
+          # https://slproweb.com/products/Win32OpenSSL.html
+          Write-Host "Downloading OpenSSL installer..."
+          $url = "https://slproweb.com/download/WinUniversalOpenSSL-3_5_0.exe"
+          $output = Join-Path -Path $env:TEMP -ChildPath "openssl.exe"
+          Invoke-WebRequest -Uri $url -OutFile $output
+
+          Write-Host "Download complete. Starting installation..."
+          Start-Process `
+            -FilePath $output `
+            -ArgumentList "/SP", "/SILENT", "/ALLUSERS", "/DIR=C:\OpenSSL", "/LOG=openssl.log" `
+            -Wait
+
+          Write-Host "Installation complete."
+          Write-Host "OpenSSL installation log:"
+          Get-Content -Path "openssl.log"
+          Write-Host "OpenSSL installation log end."
+
+          Write-Host "Cleaning up..."
+          Remove-Item -Path $output
+          Write-Host "Cleanup complete."
+
       - name: Prebuild
         if: matrix.prebuild_cmd
         run: |
-          eval "${{ matrix.prebuild_cmd }}"
+          ${{ matrix.prebuild_cmd }}
 
       - name: Build Debug
         run: |
