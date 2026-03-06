@@ -1,5 +1,6 @@
 .idea/
 .vscode/
+.cache/
 limelight-common/ARM/
 limelight-common/Debug/
 Build/
