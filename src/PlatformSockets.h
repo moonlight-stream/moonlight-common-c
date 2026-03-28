@@ -42,17 +42,30 @@ extern in_port_t n3ds_udp_port;
 #endif
 #define EINTR WSAEINTR
 
-#ifdef __MINGW32__
+#ifdef EWOULDBLOCK
 #undef EWOULDBLOCK
+#endif
+#define EWOULDBLOCK WSAEWOULDBLOCK
+
+#ifdef EINPROGRESS
 #undef EINPROGRESS
+#endif
+#define EINPROGRESS WSAEINPROGRESS
+
+#ifdef ETIMEDOUT
 #undef ETIMEDOUT
+#endif
+#define ETIMEDOUT WSAETIMEDOUT
+
+#ifdef ECONNREFUSED
 #undef ECONNREFUSED
 #endif
-
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EINPROGRESS WSAEINPROGRESS
-#define ETIMEDOUT WSAETIMEDOUT
 #define ECONNREFUSED WSAECONNREFUSED
+
+#ifdef EMSGSIZE
+#undef EMSGSIZE
+#endif
+#define EMSGSIZE WSAEMSGSIZE
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
