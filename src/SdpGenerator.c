@@ -299,6 +299,15 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
             EncryptionFeaturesEnabled |= SS_ENC_AUDIO;
         }
 
+        // If microphone encryption is supported by the host, enable it
+        // Microphone encryption follows audio encryption - if audio is encrypted, mic should be too
+        if (EncryptionFeaturesSupported & SS_ENC_MICROPHONE) {
+            // Enable mic encryption if audio encryption is enabled or if host explicitly requests it
+            if ((EncryptionFeaturesEnabled & SS_ENC_AUDIO) || (EncryptionFeaturesRequested & SS_ENC_MICROPHONE)) {
+                EncryptionFeaturesEnabled |= SS_ENC_MICROPHONE;
+            }
+        }
+
         snprintf(payloadStr, sizeof(payloadStr), "%u", EncryptionFeaturesEnabled);
         err |= addAttributeString(&optionHead, "x-ss-general.encryptionEnabled", payloadStr);
 
