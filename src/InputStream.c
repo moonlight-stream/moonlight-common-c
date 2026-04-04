@@ -45,6 +45,7 @@ static uint8_t currentPenButtonState;
 
 // Don't batch up/down/cancel events
 #define TOUCH_EVENT_IS_BATCHABLE(x) ((x) == LI_TOUCH_EVENT_HOVER || (x) == LI_TOUCH_EVENT_MOVE)
+#define TRACKPAD_EVENT_IS_BATCHABLE(x) ((x) == LI_TRACKPAD_EVENT_FINGER_MOVE)
 
 // Contains input stream packets
 typedef struct _PACKET_HOLDER {
@@ -68,6 +69,7 @@ typedef struct _PACKET_HOLDER {
         NV_HAPTICS_PACKET haptics;
         SS_TOUCH_PACKET touch;
         SS_PEN_PACKET pen;
+        SS_TRACKPAD_PACKET trackpad;
         SS_CONTROLLER_ARRIVAL_PACKET controllerArrival;
         SS_CONTROLLER_TOUCH_PACKET controllerTouch;
         SS_CONTROLLER_MOTION_PACKET controllerMotion;
@@ -1321,6 +1323,53 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
 
 int LiSendHScrollEvent(signed char scrollClicks) {
     return LiSendHighResHScrollEvent(scrollClicks * LI_WHEEL_DELTA);
+}
+
+int LiSendTrackpadEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance,
+                        float contactAreaMajor, float contactAreaMinor, uint16_t rotation) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!(SunshineFeatureFlags & LI_FF_TRACKPAD_EVENTS)) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocatePacketHolder(0);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->channelId = CTRL_CHANNEL_TRACKPAD;
+
+    // Allow move and hover events to be dropped if a newer one arrives, but don't allow
+    // state changing events like up/down/leave events to be dropped.
+    holder->enetPacketFlags = TRACKPAD_EVENT_IS_BATCHABLE(eventType) ? 0 : ENET_PACKET_FLAG_RELIABLE;
+
+    holder->packet.trackpad.header.size = BE32(sizeof(SS_TRACKPAD_PACKET) - sizeof(uint32_t));
+    holder->packet.trackpad.header.magic = LE32(SS_TRACKPAD_MAGIC);
+    holder->packet.trackpad.eventType = eventType;
+    holder->packet.trackpad.pointerId = LE32(pointerId);
+    holder->packet.trackpad.rotation = LE16(rotation);
+    memset(holder->packet.trackpad.zero, 0, sizeof(holder->packet.trackpad.zero));
+    floatToNetfloat(x, holder->packet.trackpad.x);
+    floatToNetfloat(y, holder->packet.trackpad.y);
+    floatToNetfloat(pressureOrDistance, holder->packet.trackpad.pressureOrDistance);
+    floatToNetfloat(contactAreaMajor, holder->packet.trackpad.contactAreaMajor);
+    floatToNetfloat(contactAreaMinor, holder->packet.trackpad.contactAreaMinor);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
 }
 
 int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, float pressureOrDistance,
