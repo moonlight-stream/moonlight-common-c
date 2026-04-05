@@ -83,6 +83,14 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t left[DS_EFFECT_PAYLOAD_SIZE];
             uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
         } dsAdaptiveTrigger;
+        struct {
+            uint16_t controllerNumber;
+            uint8_t ledValue;
+        } setPlayerLed;
+        struct {
+            uint16_t controllerNumber;
+            uint8_t ledState;
+        } setMicLed;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -140,6 +148,8 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
 #define IDX_DS_ADAPTIVE_TRIGGERS 12
+#define IDX_SET_PLAYER_LED 13
+#define IDX_SET_MIC_LED 14
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -214,6 +224,8 @@ static const short packetTypesGen7Enc[] = {
     0x5501, // Set motion event (Sunshine protocol extension)
     0x5502, // Set RGB LED (Sunshine protocol extension)
     0x5503, // Set Adaptive Triggers (Sunshine protocol extension)
+    0x5504, // Set Player LED (Sunshine protocol extension)
+    0x5505, // Set Mic LED (Sunshine protocol extension)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -1010,6 +1022,14 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.dsAdaptiveTrigger.left,
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
+        case IDX_SET_PLAYER_LED:
+            ListenerCallbacks.setPlayerLed(queuedCb->data.setPlayerLed.controllerNumber,
+                                           queuedCb->data.setPlayerLed.ledValue);
+            break;
+        case IDX_SET_MIC_LED:
+            ListenerCallbacks.setMicLed(queuedCb->data.setMicLed.controllerNumber,
+                                        queuedCb->data.setMicLed.ledState);
+            break;
         default:
             // Unhandled packet type from queueAsyncCallback()
             LC_ASSERT(false);
@@ -1026,7 +1046,9 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_SET_MOTION_EVENT] ||
            packetType == packetTypes[IDX_SET_RGB_LED] ||
            packetType == packetTypes[IDX_HDR_INFO] ||
-           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS];
+           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS] ||
+           packetType == packetTypes[IDX_SET_PLAYER_LED] ||
+           packetType == packetTypes[IDX_SET_MIC_LED];
 }
 
 static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLength) {
@@ -1086,6 +1108,16 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.left, DS_EFFECT_PAYLOAD_SIZE);
         BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.right, DS_EFFECT_PAYLOAD_SIZE);
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
+    }
+    else if (ctlHdr->type == packetTypes[IDX_SET_PLAYER_LED]) {
+        BbGet16(&bb, &queuedCb->data.setPlayerLed.controllerNumber);
+        BbGet8(&bb, &queuedCb->data.setPlayerLed.ledValue);
+        queuedCb->typeIndex = IDX_SET_PLAYER_LED;
+    }
+    else if (ctlHdr->type == packetTypes[IDX_SET_MIC_LED]) {
+        BbGet16(&bb, &queuedCb->data.setMicLed.controllerNumber);
+        BbGet8(&bb, &queuedCb->data.setMicLed.ledState);
+        queuedCb->typeIndex = IDX_SET_MIC_LED;
     }
     else {
         // Unhandled packet type from needsAsyncCallback()

@@ -483,6 +483,14 @@ typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
 
+// This callback is invoked to set a controller's player indicator LEDs.
+// The ledValue is a bitmask of 5 LEDs (bits 0-4).
+typedef void(*ConnListenerSetPlayerLed)(uint16_t controllerNumber, uint8_t ledValue);
+
+// This callback is invoked to set a controller's mic mute LED state.
+// Values: 0 = off, 1 = on (solid), 2 = pulse (blink)
+typedef void(*ConnListenerSetMicLed)(uint16_t controllerNumber, uint8_t ledState);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -497,6 +505,8 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerSetMotionEventState setMotionEventState;
     ConnListenerSetControllerLED setControllerLED;
     ConnListenerSetAdaptiveTriggers setAdaptiveTriggers;
+    ConnListenerSetPlayerLed setPlayerLed;
+    ConnListenerSetMicLed setMicLed;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
@@ -781,8 +791,22 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CCAP_GYRO            0x20 // Can report gyroscope events via LiSendControllerMotionEvent()
 #define LI_CCAP_BATTERY_STATE   0x40 // Reports battery state via LiSendControllerBatteryEvent()
 #define LI_CCAP_RGB_LED         0x80 // Can set RGB LED state via ConnListenerSetControllerLED()
+#define LI_CCAP_FIRMWARE_INFO   0x100 // Has firmware info available for passthrough
 int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
                                  uint32_t supportedButtonFlags, uint16_t capabilities);
+
+// Controller metadata TLV tags for extended arrival events.
+// TLV entries are appended after the fixed SS_CONTROLLER_ARRIVAL_PACKET fields.
+// Each entry is: tag (1 byte) + reserved (1 byte) + length (2 bytes LE) + value (length bytes).
+#define LI_CTRL_META_TAG_FIRMWARE_INFO  0x01 // Value: 64 bytes of raw HID feature report 0x20
+
+// Extended version of LiSendControllerArrivalEvent that includes optional
+// controller metadata as a buffer of concatenated TLV entries.
+// If metadataBlob is NULL or metadataBlobLen is 0, this behaves identically
+// to LiSendControllerArrivalEvent().
+int LiSendControllerArrivalEventWithMetadata(uint8_t controllerNumber, uint16_t activeGamepadMask,
+                                             uint8_t type, uint32_t supportedButtonFlags, uint16_t capabilities,
+                                             const uint8_t *metadataBlob, uint16_t metadataBlobLen);
 
 // This function is similar to LiSendTouchEvent(), but the touch events are associated with a
 // touchpad device present on a game controller instead of a touchscreen.
