@@ -483,6 +483,14 @@ typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
 
+// This callback is invoked to set a controller's player indicator LEDs.
+// The ledValue is a bitmask of 5 LEDs (bits 0-4).
+typedef void(*ConnListenerSetPlayerLed)(uint16_t controllerNumber, uint8_t ledValue);
+
+// This callback is invoked to set a controller's mic mute LED state.
+// Values: 0 = off, 1 = on (solid), 2 = pulse (blink)
+typedef void(*ConnListenerSetMicLed)(uint16_t controllerNumber, uint8_t ledState);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -497,6 +505,8 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerSetMotionEventState setMotionEventState;
     ConnListenerSetControllerLED setControllerLED;
     ConnListenerSetAdaptiveTriggers setAdaptiveTriggers;
+    ConnListenerSetPlayerLed setPlayerLed;
+    ConnListenerSetMicLed setMicLed;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
