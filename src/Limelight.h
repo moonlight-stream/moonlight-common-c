@@ -781,8 +781,22 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CCAP_GYRO            0x20 // Can report gyroscope events via LiSendControllerMotionEvent()
 #define LI_CCAP_BATTERY_STATE   0x40 // Reports battery state via LiSendControllerBatteryEvent()
 #define LI_CCAP_RGB_LED         0x80 // Can set RGB LED state via ConnListenerSetControllerLED()
+#define LI_CCAP_FIRMWARE_INFO   0x100 // Has firmware info available for passthrough
 int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
                                  uint32_t supportedButtonFlags, uint16_t capabilities);
+
+// Controller metadata TLV tags for extended arrival events.
+// TLV entries are appended after the fixed SS_CONTROLLER_ARRIVAL_PACKET fields.
+// Each entry is: tag (1 byte) + reserved (1 byte) + length (2 bytes LE) + value (length bytes).
+#define LI_CTRL_META_TAG_FIRMWARE_INFO  0x01 // Value: 64 bytes of raw HID feature report 0x20
+
+// Extended version of LiSendControllerArrivalEvent that includes optional
+// controller metadata as a buffer of concatenated TLV entries.
+// If metadataBlob is NULL or metadataBlobLen is 0, this behaves identically
+// to LiSendControllerArrivalEvent().
+int LiSendControllerArrivalEventWithMetadata(uint8_t controllerNumber, uint16_t activeGamepadMask,
+                                             uint8_t type, uint32_t supportedButtonFlags, uint16_t capabilities,
+                                             const uint8_t *metadataBlob, uint16_t metadataBlobLen);
 
 // This function is similar to LiSendTouchEvent(), but the touch events are associated with a
 // touchpad device present on a game controller instead of a touchscreen.
