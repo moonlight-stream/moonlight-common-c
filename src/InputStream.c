@@ -1435,6 +1435,11 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
     // Sunshine supports up to 16 controllers
     controllerNumber %= MAX_GAMEPADS;
 
+    // Always set the older touchpad cap if we have dual touchpads
+    if (capabilities & LI_CCAP_DUAL_TOUCHPAD) {
+        capabilities |= LI_CCAP_TOUCHPAD;
+    }
+
     // The arrival event is only supported by Sunshine
     if (IS_SUNSHINE()) {
         holder = allocatePacketHolder(0);
@@ -1466,7 +1471,7 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
     return LiSendMultiControllerEvent(controllerNumber, activeGamepadMask, 0, 0, 0, 0, 0, 0, 0);
 }
 
-int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure) {
+int LiSendControllerTouchEvent2(uint8_t controllerNumber, uint8_t eventType, uint8_t touchpadIndex, uint32_t pointerId, float x, float y, float pressure) {
     PPACKET_HOLDER holder;
     int err;
 
@@ -1498,7 +1503,8 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
     holder->packet.controllerTouch.header.magic = LE32(SS_CONTROLLER_TOUCH_MAGIC);
     holder->packet.controllerTouch.controllerNumber = controllerNumber;
     holder->packet.controllerTouch.eventType = eventType;
-    memset(holder->packet.controllerTouch.zero, 0, sizeof(holder->packet.controllerTouch.zero));
+    memset(&holder->packet.controllerTouch.zero, 0, sizeof(holder->packet.controllerTouch.zero));
+    holder->packet.controllerTouch.touchpadIndex = touchpadIndex;
     holder->packet.controllerTouch.pointerId = LE32(pointerId);
     floatToNetfloat(x, holder->packet.controllerTouch.x);
     floatToNetfloat(y, holder->packet.controllerTouch.y);
@@ -1512,6 +1518,10 @@ int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint
     }
 
     return err;
+}
+
+int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure) {
+    return LiSendControllerTouchEvent2(controllerNumber, eventType, 0, pointerId, x, y, pressure);
 }
 
 int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, float x, float y, float z) {
