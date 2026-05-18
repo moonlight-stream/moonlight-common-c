@@ -116,7 +116,7 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
         queueHead->tail = entry;
     }
 
-    queueHead->currentSize++;
+    atomic_fetch_add(&queueHead->currentSize, 1);
     queueHead->lifetimeSize++;
 
     PltUnlockMutex(&queueHead->mutex);
@@ -180,7 +180,7 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
     entry = queueHead->head;
     queueHead->head = entry->flink;
-    queueHead->currentSize--;
+    atomic_fetch_add(&queueHead->currentSize, -1);
     if (queueHead->head == NULL) {
         LC_ASSERT(queueHead->currentSize == 0);
         queueHead->tail = NULL;
@@ -231,7 +231,7 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
     entry = queueHead->head;
     queueHead->head = entry->flink;
-    queueHead->currentSize--;
+    atomic_fetch_add(&queueHead->currentSize, -1);
     if (queueHead->head == NULL) {
         LC_ASSERT(queueHead->currentSize == 0);
         queueHead->tail = NULL;
