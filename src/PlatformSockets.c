@@ -969,6 +969,23 @@ void enterLowLatencyMode(void) {
             if (error == ERROR_SUCCESS) {
                 Limelog("WLAN interface %d is now in low latency mode\n", i);
             }
+            else {
+                Limelog("WLAN interface %d failed to enter low latency mode (error %u)\n", i, error);
+            }
+
+            // Disable WLAN AutoConfig to prevent OS-level background scanning that causes
+            // periodic latency spikes (50-400ms) independently of driver-level BG scan settings.
+            // This is the programmatic equivalent of: netsh wlan set autoconfig enabled=no interface="Wi-Fi"
+            // It will be automatically re-enabled when we close the WLAN handle in exitLowLatencyMode().
+            value = FALSE;
+            error = pfnWlanSetInterface(WlanHandle, &wlanInterfaceList->InterfaceInfo[i].InterfaceGuid,
+                                        wlan_intf_opcode_autoconf_enabled, sizeof(value), &value, NULL);
+            if (error == ERROR_SUCCESS) {
+                Limelog("WLAN interface %d cyclic background scan disabled\n", i);
+            }
+            else {
+                Limelog("WLAN interface %d failed to disable cyclic background scan (error %u)\n", i, error);
+            }
         }
     }
 
@@ -979,7 +996,28 @@ void enterLowLatencyMode(void) {
 
 void exitLowLatencyMode(void) {
 #if defined(LC_WINDOWS_DESKTOP)
-    // Closing our WLAN client handle will undo our optimizations
+    // Re-enable WLAN AutoConfig before closing the handle to ensure
+    // network discovery is restored even if the handle close doesn't undo it.
+    if (WlanHandle != NULL && pfnWlanSetInterface != NULL && pfnWlanEnumInterfaces != NULL) {
+        PWLAN_INTERFACE_INFO_LIST wlanInterfaceList;
+        if (pfnWlanEnumInterfaces(WlanHandle, NULL, &wlanInterfaceList) == ERROR_SUCCESS) {
+            DWORD i;
+            for (i = 0; i < wlanInterfaceList->dwNumberOfItems; i++) {
+                BOOL value = TRUE;
+                DWORD error = pfnWlanSetInterface(WlanHandle, &wlanInterfaceList->InterfaceInfo[i].InterfaceGuid,
+                                    wlan_intf_opcode_autoconf_enabled, sizeof(value), &value, NULL);
+                if (error == ERROR_SUCCESS) {
+                    Limelog("WLAN interface %d cyclic background scan re-enabled\n", i);
+                }
+                else {
+                    Limelog("WLAN interface %d failed to re-enable cyclic background scan (error %u)\n", i, error);
+                }
+            }
+            pfnWlanFreeMemory(wlanInterfaceList);
+        }
+    }
+
+    // Closing our WLAN client handle will undo our other optimizations
     if (WlanHandle != NULL) {
         pfnWlanCloseHandle(WlanHandle, NULL);
         WlanHandle = NULL;
