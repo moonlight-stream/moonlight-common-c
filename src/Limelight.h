@@ -21,9 +21,14 @@ extern "C" {
 
 // Values for the 'colorSpace' field below.
 // Rec. 2020 is not supported with H.264 video streams on GFE hosts.
-#define COLORSPACE_REC_601  0
-#define COLORSPACE_REC_709  1
-#define COLORSPACE_REC_2020 2
+// To use any of the RGB colorspaces, the following conditions must be satisfied:
+// 1. Server advertised SCM_MASK_RGB SCM flag in addition to individual SCM formats from SCM_MASK_YUV444
+// 2. Client included these 4:4:4 formats in 'supportedVideoFormats' field of STREAM_CONFIGURATION
+#define COLORSPACE_REC_601    0
+#define COLORSPACE_REC_709    1
+#define COLORSPACE_REC_2020   2
+#define COLORSPACE_RGB_SRGB   3
+#define COLORSPACE_RGB_P3_D65 4
 
 // Values for the 'colorRange' field below
 #define COLOR_RANGE_LIMITED  0
@@ -276,6 +281,10 @@ typedef struct _DECODE_UNIT {
 // supports reference frame invalidation for AV1 streams. This flag is only valid on video renderers.
 #define CAPABILITY_REFERENCE_FRAME_INVALIDATION_AV1 0x40
 
+// If set in the video renderer capabilities field, this flag indicates that the renderer
+// wants HDR content to be tone-mapped to SDR on the server side.
+#define CAPABILITY_PREFERS_TONE_MAPPED_SDR_OVER_HDR 0x80
+
 // If set in the video renderer capabilities field, this macro specifies that the renderer
 // supports slicing to increase decoding performance. The parameter specifies the desired
 // number of slices per frame. This capability is only valid on video renderers.
@@ -520,6 +529,8 @@ void LiInitializeConnectionCallbacks(PCONNECTION_LISTENER_CALLBACKS clCallbacks)
 #define SCM_MASK_AV1    (SCM_AV1_MAIN8 | SCM_AV1_MAIN10 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
 #define SCM_MASK_10BIT  (SCM_HEVC_MAIN10 | SCM_HEVC_REXT10_444 | SCM_AV1_MAIN10 | SCM_AV1_HIGH10_444)
 #define SCM_MASK_YUV444 (SCM_H264_HIGH8_444 | SCM_HEVC_REXT8_444 | SCM_HEVC_REXT10_444 | SCM_AV1_HIGH8_444 | SCM_AV1_HIGH10_444)
+#define SCM_MASK_RGB    0x80000000 // Indicates that YUV444 profiles support RGB payload
+#define SCM_MASK_RECOMB 0x40000000 // Indicates that YUV420 profiles support recombined YUV444 payload
 
 typedef struct _SERVER_INFORMATION {
     // Server host name or IP address in text form

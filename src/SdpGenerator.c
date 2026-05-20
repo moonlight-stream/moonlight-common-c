@@ -309,6 +309,14 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         else {
             err |= addAttributeString(&optionHead, "x-ss-video[0].chromaSamplingType", "0");
         }
+
+        // Enable server-side HDR tone mapping if requested by video renderer
+        if (VideoCallbacks.capabilities & CAPABILITY_PREFERS_TONE_MAPPED_SDR_OVER_HDR) {
+            err |= addAttributeString(&optionHead, "x-ml-video[0].toneMapHDR", "1");
+        }
+        else {
+            err |= addAttributeString(&optionHead, "x-ml-video[0].toneMapHDR", "0");
+        }
     }
 
     snprintf(payloadStr, sizeof(payloadStr), "%d", StreamConfig.width);
