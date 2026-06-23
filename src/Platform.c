@@ -73,6 +73,9 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 #elif defined(__WIIU__)
 int ThreadProc(int argc, const char** argv) {
     struct thread_context* ctx = (struct thread_context*)argv;
+#elif defined (__3DS__)
+void ThreadProc(void* context) {
+    struct thread_context* ctx = (struct thread_context*)context;
 #else
 void* ThreadProc(void* context) {
     struct thread_context* ctx = (struct thread_context*)context;
@@ -90,8 +93,10 @@ void* ThreadProc(void* context) {
 
     free(ctx);
 
-#if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
+#if defined(LC_WINDOWS) || defined(__vita__) || defined(__WIIU__)
     return 0;
+#elif defined(__3DS__)
+    return;
 #else
     return NULL;
 #endif
