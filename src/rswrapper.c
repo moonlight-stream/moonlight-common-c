@@ -39,7 +39,7 @@
 #define gemm DECORATE_FUNC(gemm, ISA_SUFFIX)
 #define invert_mat DECORATE_FUNC(invert_mat, ISA_SUFFIX)
 
-#if defined(__x86_64__) || defined(__i386__) || (defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64)))
+#if !defined(NXDK) && (defined(__x86_64__) || defined(__i386__) || (defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))))
 
   // Compile a variant for SSSE3
   #if defined(__clang__)
