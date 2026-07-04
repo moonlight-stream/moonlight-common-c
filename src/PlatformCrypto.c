@@ -68,6 +68,27 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
             return false;
         }
 
+#ifdef MBEDTLS_CIPHER_MODE_WITH_PADDING
+        // mbedTLS 3.x no longer defaults CBC contexts to PKCS7 padding in
+        // mbedtls_cipher_setup() (mbedTLS 2.x and OpenSSL's EVP layer do).
+        // The GameStream protocol requires PKCS7 for AES-CBC.
+        if (cipherMode == MBEDTLS_MODE_CBC &&
+                mbedtls_cipher_set_padding_mode(&ctx->ctx, MBEDTLS_PADDING_PKCS7) != 0) {
+            return false;
+        }
+#endif
+
+        // The OpenSSL path applies the caller's IV as part of the first
+        // initialization even without CIPHER_FLAG_RESET_IV. Match that here.
+        // (GCM passes its per-message IV to the auth encrypt call instead.)
+        if (tag == NULL) {
+            if (mbedtls_cipher_set_iv(&ctx->ctx, iv, ivLength) != 0) {
+                return false;
+            }
+
+            mbedtls_cipher_reset(&ctx->ctx);
+        }
+
         ctx->initialized = true;
     }
 
@@ -266,6 +287,27 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 
         if (mbedtls_cipher_setkey(&ctx->ctx, key, keyLength * 8, MBEDTLS_DECRYPT) != 0) {
             return false;
+        }
+
+#ifdef MBEDTLS_CIPHER_MODE_WITH_PADDING
+        // mbedTLS 3.x no longer defaults CBC contexts to PKCS7 padding in
+        // mbedtls_cipher_setup() (mbedTLS 2.x and OpenSSL's EVP layer do).
+        // The GameStream protocol requires PKCS7 for AES-CBC.
+        if (cipherMode == MBEDTLS_MODE_CBC &&
+                mbedtls_cipher_set_padding_mode(&ctx->ctx, MBEDTLS_PADDING_PKCS7) != 0) {
+            return false;
+        }
+#endif
+
+        // The OpenSSL path applies the caller's IV as part of the first
+        // initialization even without CIPHER_FLAG_RESET_IV. Match that here.
+        // (GCM passes its per-message IV to the auth decrypt call instead.)
+        if (tag == NULL) {
+            if (mbedtls_cipher_set_iv(&ctx->ctx, iv, ivLength) != 0) {
+                return false;
+            }
+
+            mbedtls_cipher_reset(&ctx->ctx);
         }
 
         ctx->initialized = true;
