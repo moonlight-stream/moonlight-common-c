@@ -151,7 +151,8 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 #elif defined(__3DS__)
     int err;
     u64 poll_start = osGetTime();
-    for (u64 i = poll_start; (i - poll_start) < timeoutMs; i = osGetTime()) {
+    // seems like timeoutMs is never negative
+    for (u64 i = poll_start; (i - poll_start) < (u64)timeoutMs; i = osGetTime()) {
         err = poll(pollFds, pollFdsCount, 0); // This is running for 14ms
         if (err) {
             break;
@@ -471,18 +472,17 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // We still must split our own sends into smaller chunks with TCP_NODELAY enabled to
     // avoid MTU issues on the way out to to the target.
 #if defined(LC_WINDOWS) && !defined(NXDK)
-    int val;
 
     // Windows doesn't support setting TCP_MAXSEG but IP_PMTUDISC_DONT forces the MSS to the protocol
     // minimum which is what we want here. Linux doesn't do this (disabling PMTUD just avoids setting DF).
     if (dstaddr->ss_family == AF_INET) {
-        val = IP_PMTUDISC_DONT;
+        int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IP, IP_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
             Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
         }
     }
     else {
-        val = IP_PMTUDISC_DONT;
+        int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IPV6, IPV6_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
             Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
         }
