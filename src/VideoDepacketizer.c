@@ -1153,6 +1153,11 @@ void notifyFrameLost(unsigned int frameNumber, bool speculative) {
         // Notify the host that we lost this one
         connectionDetectedFrameLoss(startFrameNumber, frameNumber);
     }
+    else {
+        // This loss came from the FEC queue, not processRtpPayload()'s frame gap detection,
+        // so waitingForNextSuccessfulFrame was never set and we'd never request the IDR frame.
+        waitingForNextSuccessfulFrame = true;
+    }
 }
 
 // Add an RTP Packet to the queue
