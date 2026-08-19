@@ -1,18 +1,8 @@
 #include "Limelight-internal.h"
 
-#ifdef USE_MBEDTLS
-#include <mbedtls/entropy.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/version.h>
-
-mbedtls_entropy_context EntropyContext;
-mbedtls_ctr_drbg_context CtrDrbgContext;
-bool RandomStateInitialized = false;
-
-#if MBEDTLS_VERSION_MAJOR > 2 || (MBEDTLS_VERSION_MAJOR == 2 && MBEDTLS_VERSION_MINOR >= 25)
-#define USE_MBEDTLS_CRYPTO_EXT
-#endif
-
+#ifdef USE_PSA_CRYPTO
+#include <psa/crypto.h>
+#include <stdlib.h>
 #else
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -29,113 +19,159 @@ static int addPkcs7PaddingInPlace(unsigned char* plaintext, int plaintextLen) {
 
 // When CIPHER_FLAG_PAD_TO_BLOCK_SIZE is used, inputData buffer must be allocated such that
 // the buffer length is at least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) and inputData
-// buffer may be modified!
+// buffer may be modified! If CIPHER_FLAG_PAD_TO_BLOCK_SIZE is used, it must be passed to
+// all invocations of PltEncryptMessage() on the same crypto context (mixing padded and
+// non-padded encryption is not allowed).
+//
+// CIPHER_FLAG_PAD_TO_BLOCK_SIZE and CIPHER_FLAG_FINISH may not be used on the same context.
+//
+// When CIPHER_FLAG_FINISH is used with CBC encryption, the output buffer size must be at
+// least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength).
+//
 // For GCM, the IV can change from message to message without CIPHER_FLAG_RESET_IV.
 // CIPHER_FLAG_RESET_IV is only required for GCM when the IV length changes.
+//
 // Changing the key between encrypt/decrypt calls on a single context is not supported.
+// Using the same crypto context for both encryption and decryption is not supported.
 bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength) {
-#ifdef USE_MBEDTLS
-    mbedtls_cipher_mode_t cipherMode;
-    size_t outLength;
-
-    switch (algorithm) {
-    case ALGORITHM_AES_CBC:
-        LC_ASSERT(tag == NULL);
-        LC_ASSERT(tagLength == 0);
-        cipherMode = MBEDTLS_MODE_CBC;
-        break;
-    case ALGORITHM_AES_GCM:
+#ifdef USE_PSA_CRYPTO
+    if (algorithm == ALGORITHM_AES_GCM) {
         LC_ASSERT(tag != NULL);
         LC_ASSERT(tagLength > 0);
-        cipherMode = MBEDTLS_MODE_GCM;
-        break;
-    default:
-        LC_ASSERT(false);
-        return false;
-    }
 
-    if (!ctx->initialized) {
-        if (mbedtls_cipher_setup(&ctx->ctx, mbedtls_cipher_info_from_values(MBEDTLS_CIPHER_ID_AES, keyLength * 8, cipherMode)) != 0) {
-            return false;
-        }
-
-        if (mbedtls_cipher_setkey(&ctx->ctx, key, keyLength * 8, MBEDTLS_ENCRYPT) != 0) {
-            return false;
-        }
-
-        ctx->initialized = true;
-    }
-
-    if (tag != NULL) {
-#ifdef USE_MBEDTLS_CRYPTO_EXT
-        // In mbedTLS, tag is always after ciphertext, while we need to put tag BEFORE ciphertext here
-        // To avoid frequent heap allocation, we will use some evil tricks...
-        // We only support 16 bytes sized tag
-        LC_ASSERT(tagLength == 16);
-        // Assume outputData is right after tag
-        LC_ASSERT(outputData == tag + tagLength);
-#ifndef LC_DEBUG
-        if (tagLength != 16 || outputData != tag + tagLength) {
-            return false;
-        }
-#endif
-        size_t encryptedLength = 0;
-        unsigned char * encryptedData = tag;
-        size_t encryptedCapacity = inputDataLength + tagLength;
-        if (mbedtls_cipher_auth_encrypt_ext(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, encryptedData,
-                                            encryptedCapacity, &encryptedLength, tagLength) != 0) {
-            return false;
-        }
-        outLength = encryptedLength - tagLength;
-
-        unsigned char tagTemp[16];
-        // Copy the tag to temp buffer
-        memcpy(tagTemp, encryptedData + outLength, tagLength);
-        // Move ciphertext to the end
-        memmove(encryptedData + tagLength, encryptedData, outLength);
-        // Copy back tag
-        memcpy(encryptedData, tagTemp, tagLength);
-#else
-        if (mbedtls_cipher_auth_encrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
-            return false;
-        }
-#endif
-    }
-    else {
-        if (flags & CIPHER_FLAG_RESET_IV) {
-            if (mbedtls_cipher_set_iv(&ctx->ctx, iv, ivLength) != 0) {
+        if (!ctx->initialized) {
+            if (psa_crypto_init() != PSA_SUCCESS) {
                 return false;
             }
 
-            mbedtls_cipher_reset(&ctx->ctx);
+            psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+            psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+            psa_set_key_bits(&attributes, keyLength * 8);
+            psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+            psa_set_key_algorithm(&attributes, PSA_ALG_GCM);
+
+            if (psa_import_key(&attributes, key, keyLength, &ctx->key) != PSA_SUCCESS) {
+                psa_reset_key_attributes(&attributes);
+                return false;
+            }
+
+            psa_reset_key_attributes(&attributes);
+            ctx->initialized = true;
+        }
+
+        psa_aead_operation_t aeadOp = PSA_AEAD_OPERATION_INIT;
+        if (psa_aead_encrypt_setup(&aeadOp, ctx->key, PSA_ALG_GCM) != PSA_SUCCESS) {
+            return false;
+        }
+
+        if (psa_aead_set_lengths(&aeadOp, 0, inputDataLength) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        if (psa_aead_set_nonce(&aeadOp, iv, ivLength) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        size_t outLen = 0;
+        if (psa_aead_update(&aeadOp, inputData, inputDataLength, outputData, inputDataLength, &outLen) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        size_t finishLen = 0;
+        size_t tagOutLen = 0;
+        if (psa_aead_finish(&aeadOp, outputData + outLen, inputDataLength - outLen, &finishLen, tag, tagLength, &tagOutLen) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        LC_ASSERT(tagOutLen == (size_t)tagLength);
+        *outputDataLength = (int)(outLen + finishLen);
+        return true;
+    }
+    else if (algorithm == ALGORITHM_AES_CBC) {
+        psa_algorithm_t alg = (flags & CIPHER_FLAG_PAD_TO_BLOCK_SIZE) ? PSA_ALG_CBC_NO_PADDING : PSA_ALG_CBC_PKCS7;
+
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+
+        if (!ctx->initialized) {
+            if (psa_crypto_init() != PSA_SUCCESS) {
+                return false;
+            }
+
+            psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+            psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+            psa_set_key_bits(&attributes, keyLength * 8);
+            psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+            psa_set_key_algorithm(&attributes, alg);
+
+            if (psa_import_key(&attributes, key, keyLength, &ctx->key) != PSA_SUCCESS) {
+                psa_reset_key_attributes(&attributes);
+                return false;
+            }
+
+            psa_reset_key_attributes(&attributes);
+            ctx->initialized = true;
+        }
+
+        if (!ctx->cipherOpActive || (flags & CIPHER_FLAG_RESET_IV)) {
+            if (ctx->cipherOpActive) {
+                psa_cipher_abort(&ctx->cipherOp);
+                ctx->cipherOpActive = false;
+            }
+
+            if (psa_cipher_encrypt_setup(&ctx->cipherOp, ctx->key, alg) != PSA_SUCCESS) {
+                return false;
+            }
+
+            if (psa_cipher_set_iv(&ctx->cipherOp, iv, ivLength) != PSA_SUCCESS) {
+                psa_cipher_abort(&ctx->cipherOp);
+                return false;
+            }
+
+            ctx->cipherOpActive = true;
         }
 
         if (flags & CIPHER_FLAG_PAD_TO_BLOCK_SIZE) {
             inputDataLength = addPkcs7PaddingInPlace(inputData, inputDataLength);
         }
 
-        if (mbedtls_cipher_update(&ctx->ctx, inputData, inputDataLength, outputData, &outLength) != 0) {
+        // NB: We do not use ROUND_TO_PKCS7_PADDED_LEN() here because outputData size is
+        // only guaranteed to be padded to PKCS7 length when CIPHER_FLAG_FINISH is used.
+        size_t outLen = 0;
+        if (psa_cipher_update(&ctx->cipherOp, inputData, inputDataLength, outputData, inputDataLength, &outLen) != PSA_SUCCESS) {
+            psa_cipher_abort(&ctx->cipherOp);
+            ctx->cipherOpActive = false;
             return false;
         }
 
         if (flags & CIPHER_FLAG_FINISH) {
-            size_t finishLength;
+            size_t finishLength = 0;
 
-            if (mbedtls_cipher_finish(&ctx->ctx, &outputData[outLength], &finishLength) != 0) {
+            if (psa_cipher_finish(&ctx->cipherOp, outputData + outLen, ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) - outLen, &finishLength) != PSA_SUCCESS) {
+                ctx->cipherOpActive = false;
                 return false;
             }
 
-            outLength += finishLength;
+            ctx->cipherOpActive = false;
+            outLen += finishLength;
         }
-    }
 
-    *outputDataLength = outLength;
-    return true;
+        *outputDataLength = (int)outLen;
+        return true;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
 #else
     LC_ASSERT(keyLength == 16);
 
@@ -230,103 +266,142 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 
 // When CBC is used, outputData buffer must be allocated such that the buffer length is
 // at least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) to allow room for PKCS7 padding.
+//
 // For GCM, the IV can change from message to message without CIPHER_FLAG_RESET_IV.
 // CIPHER_FLAG_RESET_IV is only required for GCM when the IV length changes.
+//
 // Changing the key between encrypt/decrypt calls on a single context is not supported.
+// Using the same crypto context for both encryption and decryption is not supported.
 bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength) {
-#ifdef USE_MBEDTLS
-    mbedtls_cipher_mode_t cipherMode;
-    size_t outLength;
-
-    switch (algorithm) {
-    case ALGORITHM_AES_CBC:
-        LC_ASSERT(tag == NULL);
-        LC_ASSERT(tagLength == 0);
-        cipherMode = MBEDTLS_MODE_CBC;
-        break;
-    case ALGORITHM_AES_GCM:
+#ifdef USE_PSA_CRYPTO
+    if (algorithm == ALGORITHM_AES_GCM) {
         LC_ASSERT(tag != NULL);
         LC_ASSERT(tagLength > 0);
-        cipherMode = MBEDTLS_MODE_GCM;
-        break;
-    default:
-        LC_ASSERT(false);
-        return false;
-    }
 
-    if (!ctx->initialized) {
-        if (mbedtls_cipher_setup(&ctx->ctx, mbedtls_cipher_info_from_values(MBEDTLS_CIPHER_ID_AES, keyLength * 8, cipherMode)) != 0) {
-            return false;
-        }
-
-        if (mbedtls_cipher_setkey(&ctx->ctx, key, keyLength * 8, MBEDTLS_DECRYPT) != 0) {
-            return false;
-        }
-
-        ctx->initialized = true;
-    }
-
-    if (tag != NULL) {
-#ifdef USE_MBEDTLS_CRYPTO_EXT
-        // We only support 16 bytes sized tag
-        LC_ASSERT(tagLength == 16);
-        // Assume inputData is right after tag
-        LC_ASSERT(inputData == tag + tagLength);
-#ifndef LC_DEBUG
-        if (tagLength != 16 || inputData != tag + tagLength) {
-            return false;
-        }
-#endif
-        unsigned char * encryptedData = tag;
-        size_t encryptedDataLen = inputDataLength + tagLength;
-        unsigned char tagTemp[16];
-        // Copy the tag to temp buffer
-        memcpy(tagTemp, encryptedData, tagLength);
-        // Move ciphertext to the beginning
-        memmove(encryptedData, encryptedData + tagLength, inputDataLength);
-        // Copy back tag to the end
-        memcpy(encryptedData + inputDataLength, tagTemp, tagLength);
-        if (mbedtls_cipher_auth_decrypt_ext(&ctx->ctx, iv, ivLength, NULL, 0, encryptedData, encryptedDataLen,
-                                            outputData, inputDataLength, &outLength, tagLength) != 0) {
-            return false;
-        }
-#else
-        if (mbedtls_cipher_auth_decrypt(&ctx->ctx, iv, ivLength, NULL, 0, inputData, inputDataLength, outputData, &outLength, tag, tagLength) != 0) {
-            return false;
-        }
-#endif
-    }
-    else {
-        if (flags & CIPHER_FLAG_RESET_IV) {
-            if (mbedtls_cipher_set_iv(&ctx->ctx, iv, ivLength) != 0) {
+        if (!ctx->initialized) {
+            if (psa_crypto_init() != PSA_SUCCESS) {
                 return false;
             }
 
-            mbedtls_cipher_reset(&ctx->ctx);
+            psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+            psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+            psa_set_key_bits(&attributes, keyLength * 8);
+            psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+            psa_set_key_algorithm(&attributes, PSA_ALG_GCM);
+
+            if (psa_import_key(&attributes, key, keyLength, &ctx->key) != PSA_SUCCESS) {
+                psa_reset_key_attributes(&attributes);
+                return false;
+            }
+
+            psa_reset_key_attributes(&attributes);
+            ctx->initialized = true;
         }
 
-        if (mbedtls_cipher_update(&ctx->ctx, inputData, inputDataLength, outputData, &outLength) != 0) {
+        psa_aead_operation_t aeadOp = PSA_AEAD_OPERATION_INIT;
+        if (psa_aead_decrypt_setup(&aeadOp, ctx->key, PSA_ALG_GCM) != PSA_SUCCESS) {
+            return false;
+        }
+
+        if (psa_aead_set_lengths(&aeadOp, 0, inputDataLength) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        if (psa_aead_set_nonce(&aeadOp, iv, ivLength) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        size_t outLen = 0;
+        if (psa_aead_update(&aeadOp, inputData, inputDataLength, outputData, inputDataLength, &outLen) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        size_t verifyLen = 0;
+        if (psa_aead_verify(&aeadOp, outputData + outLen, inputDataLength - outLen, &verifyLen, tag, tagLength) != PSA_SUCCESS) {
+            psa_aead_abort(&aeadOp);
+            return false;
+        }
+
+        *outputDataLength = (int)(outLen + verifyLen);
+        return true;
+    }
+    else if (algorithm == ALGORITHM_AES_CBC) {
+        LC_ASSERT(tag == NULL);
+        LC_ASSERT(tagLength == 0);
+
+        if (!ctx->initialized) {
+            if (psa_crypto_init() != PSA_SUCCESS) {
+                return false;
+            }
+
+            psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+            psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+            psa_set_key_bits(&attributes, keyLength * 8);
+            psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+            psa_set_key_algorithm(&attributes, PSA_ALG_CBC_PKCS7);
+
+            if (psa_import_key(&attributes, key, keyLength, &ctx->key) != PSA_SUCCESS) {
+                psa_reset_key_attributes(&attributes);
+                return false;
+            }
+
+            psa_reset_key_attributes(&attributes);
+            ctx->initialized = true;
+        }
+
+        if (!ctx->cipherOpActive || (flags & CIPHER_FLAG_RESET_IV)) {
+            if (ctx->cipherOpActive) {
+                psa_cipher_abort(&ctx->cipherOp);
+                ctx->cipherOpActive = false;
+            }
+
+            if (psa_cipher_decrypt_setup(&ctx->cipherOp, ctx->key, PSA_ALG_CBC_PKCS7) != PSA_SUCCESS) {
+                return false;
+            }
+
+            if (psa_cipher_set_iv(&ctx->cipherOp, iv, ivLength) != PSA_SUCCESS) {
+                psa_cipher_abort(&ctx->cipherOp);
+                return false;
+            }
+
+            ctx->cipherOpActive = true;
+        }
+
+        size_t outBufferSize = ROUND_TO_PKCS7_PADDED_LEN(inputDataLength);
+        size_t outLen = 0;
+        if (psa_cipher_update(&ctx->cipherOp, inputData, inputDataLength, outputData, outBufferSize, &outLen) != PSA_SUCCESS) {
+            psa_cipher_abort(&ctx->cipherOp);
+            ctx->cipherOpActive = false;
             return false;
         }
 
         if (flags & CIPHER_FLAG_FINISH) {
-            size_t finishLength;
+            size_t finishLength = 0;
 
-            if (mbedtls_cipher_finish(&ctx->ctx, &outputData[outLength], &finishLength) != 0) {
+            if (psa_cipher_finish(&ctx->cipherOp, outputData + outLen, outBufferSize - outLen, &finishLength) != PSA_SUCCESS) {
+                ctx->cipherOpActive = false;
                 return false;
             }
 
-            outLength += finishLength;
+            ctx->cipherOpActive = false;
+            outLen += finishLength;
         }
-    }
 
-    *outputDataLength = outLength;
-    return true;
+        *outputDataLength = (int)outLen;
+        return true;
+    }
+    else {
+        LC_ASSERT(false);
+        return false;
+    }
 #else
     LC_ASSERT(keyLength == 16);
 
@@ -425,8 +500,10 @@ PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) {
 
     ctx->initialized = false;
 
-#ifdef USE_MBEDTLS
-    mbedtls_cipher_init(&ctx->ctx);
+#ifdef USE_PSA_CRYPTO
+    ctx->key = PSA_KEY_ID_NULL;
+    ctx->cipherOp = psa_cipher_operation_init();
+    ctx->cipherOpActive = false;
 #else
     ctx->ctx = EVP_CIPHER_CTX_new();
     if (!ctx->ctx) {
@@ -439,8 +516,18 @@ PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) {
 }
 
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) {
-#ifdef USE_MBEDTLS
-    mbedtls_cipher_free(&ctx->ctx);
+    if (!ctx) {
+        return;
+    }
+
+#ifdef USE_PSA_CRYPTO
+    if (ctx->cipherOpActive) {
+        psa_cipher_abort(&ctx->cipherOp);
+    }
+
+    if (ctx->initialized) {
+        psa_destroy_key(ctx->key);
+    }
 #else
     EVP_CIPHER_CTX_free(ctx->ctx);
 #endif
@@ -448,22 +535,17 @@ void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx) {
 }
 
 void PltGenerateRandomData(unsigned char* data, int length) {
-#ifdef USE_MBEDTLS
-    // FIXME: This is not thread safe...
-    if (!RandomStateInitialized) {
-        mbedtls_entropy_init(&EntropyContext);
-        mbedtls_ctr_drbg_init(&CtrDrbgContext);
-        if (mbedtls_ctr_drbg_seed(&CtrDrbgContext, mbedtls_entropy_func, &EntropyContext, NULL, 0) != 0) {
-            // Nothing we can really do here...
-            Limelog("Seeding MbedTLS random number generator failed!\n");
-            LC_ASSERT(false);
-            return;
-        }
-
-        RandomStateInitialized = true;
+#ifdef USE_PSA_CRYPTO
+    if (psa_crypto_init() != PSA_SUCCESS) {
+        Limelog("Initializing PSA crypto failed!\n");
+        LC_ASSERT(false);
+        return;
     }
 
-    mbedtls_ctr_drbg_random(&CtrDrbgContext, data, length);
+    if (psa_generate_random(data, length) != PSA_SUCCESS) {
+        Limelog("Generating random data failed!\n");
+        LC_ASSERT(false);
+    }
 #else
     RAND_bytes(data, length);
 #endif
