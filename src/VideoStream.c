@@ -1,5 +1,9 @@
 #include "Limelight-internal.h"
 
+#ifdef __3DS__
+#include <stdio.h>
+#endif
+
 #define FIRST_FRAME_MAX 1500
 #define FIRST_FRAME_TIMEOUT_SEC 10
 
@@ -296,6 +300,16 @@ void stopVideoStream(void) {
     }
 
     PltJoinThread(&udpPingThread);
+
+#ifdef __3DS__
+    // 3DS has no SO_RCVTIMEO support. Closing the UDP socket before the join
+    // wakes recvfrom() if teardown races with the receive loop.
+    if (rtpSocket != INVALID_SOCKET) {
+        closeSocket(rtpSocket);
+        rtpSocket = INVALID_SOCKET;
+    }
+#endif
+
     PltJoinThread(&receiveThread);
     if ((VideoCallbacks.capabilities & (CAPABILITY_DIRECT_SUBMIT | CAPABILITY_PULL_RENDERER)) == 0) {
         PltJoinThread(&decoderThread);
