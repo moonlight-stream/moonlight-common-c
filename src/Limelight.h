@@ -483,6 +483,46 @@ typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
 
+// Addressable controller haptic targets used by LI_CONTROLLER_HAPTIC_EFFECT.
+#define LI_HAPTIC_TARGET_NONE  0x00
+#define LI_HAPTIC_TARGET_LEFT  0x01
+#define LI_HAPTIC_TARGET_RIGHT 0x02
+#define LI_HAPTIC_TARGET_BOTH  0x03
+
+// Addressable controller haptic effect kinds used by LI_CONTROLLER_HAPTIC_EFFECT.
+#define LI_HAPTIC_EFFECT_OFF               0x00
+#define LI_HAPTIC_EFFECT_TICK              0x01
+#define LI_HAPTIC_EFFECT_CLICK             0x02
+#define LI_HAPTIC_EFFECT_TONE              0x03
+#define LI_HAPTIC_EFFECT_RUMBLE            0x04
+#define LI_HAPTIC_EFFECT_NOISE             0x05
+#define LI_HAPTIC_EFFECT_SCRIPT            0x06
+#define LI_HAPTIC_EFFECT_LOGARITHMIC_SWEEP 0x07
+#define LI_HAPTIC_EFFECT_PULSE             0x08
+
+// Profile-neutral addressable haptic effect parameters. Fields that are not
+// applicable to the selected effect kind are zero.
+typedef struct _LI_CONTROLLER_HAPTIC_EFFECT {
+    uint8_t target;
+    uint8_t kind;
+    int8_t gainDb;
+    uint16_t intensity;
+    uint16_t frequencyHz;
+    int32_t durationUs;
+    uint32_t intervalUs;
+    uint16_t repeatCount;
+    uint16_t lfoFrequencyHz;
+    uint8_t lfoDepthPercent;
+    uint16_t startFrequencyHz;
+    uint16_t endFrequencyHz;
+    uint8_t scriptId;
+} LI_CONTROLLER_HAPTIC_EFFECT, *PLI_CONTROLLER_HAPTIC_EFFECT;
+
+// This callback is invoked to play an addressable haptic effect on a
+// controller. Clients should preserve the target when the controller has
+// independently addressable left and right actuators.
+typedef void(*ConnListenerSetControllerHaptics)(uint16_t controllerNumber, const LI_CONTROLLER_HAPTIC_EFFECT* effect);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -497,6 +537,7 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerSetMotionEventState setMotionEventState;
     ConnListenerSetControllerLED setControllerLED;
     ConnListenerSetAdaptiveTriggers setAdaptiveTriggers;
+    ConnListenerSetControllerHaptics setControllerHaptics;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
@@ -740,6 +781,14 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length);
 #define PADDLE4_FLAG  0x080000
 #define TOUCHPAD_FLAG 0x100000 // Touchpad buttons on Sony controllers
 #define MISC_FLAG     0x200000 // Share/Mic/Capture/Mute buttons on various controllers
+#define STEAM_LEFT_TOUCHPAD_FLAG TOUCHPAD_FLAG // Left trackpad click on the Steam Controller (2nd generation)
+#define STEAM_RIGHT_TOUCHPAD_FLAG 0x400000 // Right trackpad click on the Steam Controller (2nd generation)
+#define STEAM_LEFT_TRIGGER_CLICK_FLAG 0x800000 // Left trigger full-pull click on the Steam Controller (2nd generation)
+#define STEAM_RIGHT_TRIGGER_CLICK_FLAG 0x1000000 // Right trigger full-pull click on the Steam Controller (2nd generation)
+#define STEAM_LEFT_STICK_TOUCH_FLAG 0x2000000 // Left thumbstick capacitive touch on the Steam Controller (2nd generation)
+#define STEAM_RIGHT_STICK_TOUCH_FLAG 0x4000000 // Right thumbstick capacitive touch on the Steam Controller (2nd generation)
+#define STEAM_LEFT_GRIP_TOUCH_FLAG 0x8000000 // Left grip capacitive touch on the Steam Controller (2nd generation)
+#define STEAM_RIGHT_GRIP_TOUCH_FLAG 0x10000000 // Right grip capacitive touch on the Steam Controller (2nd generation)
 
 // This function queues a controller event to be sent to the remote server. It will
 // be seen by the computer as the first controller.
@@ -788,6 +837,7 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CCAP_BATTERY_STATE   0x40 // Reports battery state via LiSendControllerBatteryEvent()
 #define LI_CCAP_RGB_LED         0x80 // Can set RGB LED state via ConnListenerSetControllerLED()
 #define LI_CCAP_DUAL_TOUCHPAD  0x100 // Reports touchpad events from 2 separate touchpads
+#define LI_CCAP_HAPTICS        0x200 // Can play addressable effects via ConnListenerSetControllerHaptics()
 int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
                                  uint32_t supportedButtonFlags, uint16_t capabilities);
 
