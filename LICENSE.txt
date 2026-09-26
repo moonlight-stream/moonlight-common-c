@@ -672,3 +672,11 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <http://www.gnu.org/philosophy/why-not-lgpl.html>.
+
+App Store Distribution Exception
+
+As additional permission under section 7, you are allowed to distribute the
+software through an app store, even if that store has restrictive terms and
+conditions that are incompatible with the GPL, provided that the source is
+also available under the GPL with or without this permission through a channel
+without those restrictive terms and conditions.
