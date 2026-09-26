@@ -694,12 +694,17 @@ int LiSendMouseButtonEvent(char action, int button);
 // This function queues a keyboard event to be sent to the remote server.
 // Key codes are Win32 Virtual Key (VK) codes and interpreted as keys on
 // a US English layout.
+//
+// MODIFIER_EXTENDED indicates an extended key (0xE0 scancode prefix).
+// This is required to distinguish between certain keys like Enter
+// and Numpad Enter that share the same VK code.
 #define KEY_ACTION_DOWN 0x03
 #define KEY_ACTION_UP 0x04
 #define MODIFIER_SHIFT 0x01
 #define MODIFIER_CTRL 0x02
 #define MODIFIER_ALT 0x04
 #define MODIFIER_META 0x08
+#define MODIFIER_EXTENDED 0x10
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 // Similar to LiSendKeyboardEvent() but allows the client to inform the host that

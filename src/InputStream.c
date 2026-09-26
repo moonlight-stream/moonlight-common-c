@@ -941,6 +941,9 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
                 // No fixups
                 break;
         }
+
+        // MODIFIER_EXTENDED is a Sunshine extension
+        modifiers &= ~MODIFIER_EXTENDED;
     }
 
     holder->packet.keyboard.header.size = BE32(sizeof(NV_KEYBOARD_PACKET) - sizeof(uint32_t));
