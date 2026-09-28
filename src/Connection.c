@@ -1,5 +1,7 @@
 #include "Limelight-internal.h"
 
+#include <stdatomic.h>
+
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;
 static bool alreadyTerminated;
@@ -17,7 +19,7 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
-volatile bool ConnectionInterrupted;
+volatile atomic_bool ConnectionInterrupted = ATOMIC_VAR_INIT(false);
 bool HighQualitySurroundSupported;
 bool HighQualitySurroundEnabled;
 OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
