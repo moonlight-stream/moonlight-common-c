@@ -123,6 +123,7 @@ void connectionReceivedCompleteFrame(uint32_t frameIndex, bool frameIsLTR);
 void connectionSawFrame(uint32_t frameIndex);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
 int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
+bool isControlStreamEncrypted(void);
 void flushInputOnControlStream(void);
 bool isControlDataInTransit(void);
 
