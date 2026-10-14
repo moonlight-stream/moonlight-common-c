@@ -292,9 +292,22 @@ void insertOption(POPTION_ITEM* optionsHead, POPTION_ITEM opt) {
 
     // Traverse the list and insert the new option at the end
     while (current != NULL) {
+        // Check for self-insertion
+        if (current == opt) {
+            LC_ASSERT(current != opt);
+            return;
+        }
+
         // Check for duplicate option; if so, replace the option currently there
         if (!strcmp(current->option, opt->option)) {
+            if (current->flags & FLAG_ALLOCATED_OPTION_FIELDS) {
+                free(current->option);
+                free(current->content);
+            }
+            current->option = opt->option;
             current->content = opt->content;
+            current->flags = opt->flags;
+            free(opt);
             return;
         }
         if (current->next == NULL) {
