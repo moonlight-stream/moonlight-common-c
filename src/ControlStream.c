@@ -83,6 +83,11 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t left[DS_EFFECT_PAYLOAD_SIZE];
             uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
         } dsAdaptiveTrigger;
+        struct {
+            uint32_t token;
+            uint32_t length;
+            char *text;
+        } clipboardText;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -140,6 +145,8 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
 #define IDX_DS_ADAPTIVE_TRIGGERS 12
+// Not an index into packetTypes[]. Host clipboard updates use SS_CLIPBOARD_CONTROL_PTYPE.
+#define IDX_CLIPBOARD_TEXT 100
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -689,7 +696,7 @@ static bool isPacketSentWaitingForAck(ENetPacket* packet) {
     return false;
 }
 
-static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageEnet(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     ENetPacket* enetPacket;
     int err;
 
@@ -703,7 +710,12 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     if (encryptedControlStream) {
         PNVCTL_ENCRYPTED_PACKET_HEADER encPacket;
         PNVCTL_ENET_PACKET_HEADER_V2 packet;
-        char tempBuffer[256];
+        char stackBuffer[256];
+        char* plainBuffer = stackBuffer;
+
+        if (paylen < 0 || paylen > 65535) {
+            return false;
+        }
 
         enetPacket = enet_packet_create(NULL,
                                         sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
@@ -721,19 +733,33 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
         encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
         encPacket->seq = currentEnetSequenceNumber++;
 
-        // Construct the plaintext data for encryption
-        LC_ASSERT(sizeof(*packet) + paylen < sizeof(tempBuffer));
-        packet = (PNVCTL_ENET_PACKET_HEADER_V2)tempBuffer;
+        // Construct the plaintext data for encryption. Large clipboard packets
+        // do not fit in the stack buffer.
+        if ((int)sizeof(*packet) + paylen > (int)sizeof(stackBuffer)) {
+            plainBuffer = malloc(sizeof(*packet) + paylen);
+            if (plainBuffer == NULL) {
+                enet_packet_destroy(enetPacket);
+                PltUnlockMutex(&enetMutex);
+                return false;
+            }
+        }
+        packet = (PNVCTL_ENET_PACKET_HEADER_V2)plainBuffer;
         packet->type = ptype;
-        packet->payloadLength = paylen;
+        packet->payloadLength = (unsigned short)paylen;
         memcpy(&packet[1], payload, paylen);
 
         // Encrypt the data into the final packet (and byteswap for BE machines)
         if (!encryptControlMessage(encPacket, packet)) {
             Limelog("Failed to encrypt control stream message\n");
+            if (plainBuffer != stackBuffer) {
+                free(plainBuffer);
+            }
             enet_packet_destroy(enetPacket);
             PltUnlockMutex(&enetMutex);
             return false;
+        }
+        if (plainBuffer != stackBuffer) {
+            free(plainBuffer);
         }
 
         // enetMutex still locked here
@@ -818,7 +844,7 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     return true;
 }
 
-static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
+static bool sendMessageTcp(short ptype, int paylen, const void* payload) {
     PNVCTL_TCP_PACKET_HEADER packet;
     SOCK_RET err;
 
@@ -843,7 +869,7 @@ static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
     return true;
 }
 
-static bool sendMessageAndForget(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndForget(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     bool ret;
 
     // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
@@ -858,7 +884,7 @@ static bool sendMessageAndForget(short ptype, short paylen, const void* payload,
     return ret;
 }
 
-static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndDiscardReply(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     if (AppVersionQuad[0] >= 5) {
         if (!sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData)) {
             return false;
@@ -1010,6 +1036,14 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.dsAdaptiveTrigger.left,
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
+        case IDX_CLIPBOARD_TEXT:
+            if (ListenerCallbacks.clipboardText != NULL) {
+                ListenerCallbacks.clipboardText(queuedCb->data.clipboardText.token,
+                                                queuedCb->data.clipboardText.text,
+                                                queuedCb->data.clipboardText.length);
+            }
+            free(queuedCb->data.clipboardText.text);
+            break;
         default:
             // Unhandled packet type from queueAsyncCallback()
             LC_ASSERT(false);
@@ -1026,7 +1060,8 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_SET_MOTION_EVENT] ||
            packetType == packetTypes[IDX_SET_RGB_LED] ||
            packetType == packetTypes[IDX_HDR_INFO] ||
-           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS];
+           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS] ||
+           packetType == SS_CLIPBOARD_CONTROL_PTYPE;
 }
 
 static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLength) {
@@ -1040,6 +1075,8 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     if (!queuedCb) {
         return;
     }
+    queuedCb->typeIndex = -1;
+    queuedCb->data.clipboardText.text = NULL;
 
     BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
@@ -1087,6 +1124,30 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.right, DS_EFFECT_PAYLOAD_SIZE);
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
+    else if (ctlHdr->type == SS_CLIPBOARD_CONTROL_PTYPE) {
+        if (!BbGet32(&bb, &queuedCb->data.clipboardText.token) ||
+                !BbGet32(&bb, &queuedCb->data.clipboardText.length) ||
+                queuedCb->data.clipboardText.length > SS_CLIPBOARD_TEXT_MAX) {
+            free(queuedCb);
+            return;
+        }
+
+        queuedCb->data.clipboardText.text = malloc(queuedCb->data.clipboardText.length + 1);
+        if (queuedCb->data.clipboardText.text == NULL) {
+            free(queuedCb);
+            return;
+        }
+
+        if (queuedCb->data.clipboardText.length > 0 &&
+                !BbGetBytes(&bb, (uint8_t*)queuedCb->data.clipboardText.text, (int)queuedCb->data.clipboardText.length)) {
+            free(queuedCb->data.clipboardText.text);
+            free(queuedCb);
+            return;
+        }
+
+        queuedCb->data.clipboardText.text[queuedCb->data.clipboardText.length] = '\0';
+        queuedCb->typeIndex = IDX_CLIPBOARD_TEXT;
+    }
     else {
         // Unhandled packet type from needsAsyncCallback()
         LC_ASSERT(false);
@@ -1097,6 +1158,9 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     err = LbqOfferQueueItem(&asyncCallbackQueue, queuedCb, &queuedCb->entry);
     if (err != LBQ_SUCCESS) {
         Limelog("Failed to queue async callback: %d\n", err);
+        if (queuedCb->typeIndex == IDX_CLIPBOARD_TEXT) {
+            free(queuedCb->data.clipboardText.text);
+        }
         free(queuedCb);
     }
 }
@@ -1708,6 +1772,10 @@ void flushInputOnControlStream(void) {
         enet_host_flush(client);
         PltUnlockMutex(&enetMutex);
     }
+}
+
+bool isControlStreamEncrypted(void) {
+    return encryptedControlStream;
 }
 
 bool isControlDataInTransit(void) {
