@@ -980,7 +980,7 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
         return -1;
     }
 
-    holder->channelId = CTRL_CHANNEL_UTF8;
+    holder->channelId = CTRL_CHANNEL_KEYBOARD;
     holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
 
     // Magic + string length
