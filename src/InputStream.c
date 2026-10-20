@@ -319,6 +319,36 @@ static void floatToNetfloat(float in, netfloat out) {
     }
 }
 
+// Returns the length in bytes of the UTF-8 code point at the given offset in the text,
+// or 0 if the byte at that offset does not start a valid UTF-8 code point.
+static uint32_t getUtf8CodePointLength(const char* utf8Text, uint32_t offset) {
+    uint8_t firstByte = (uint8_t)utf8Text[offset];
+    uint32_t codePointLength;
+
+    if ((firstByte & 0x80) == 0x00) {
+        // 1 byte code point
+        codePointLength = 1;
+    }
+    else if ((firstByte & 0xE0) == 0xC0) {
+        // 2 byte code point
+        codePointLength = 2;
+    }
+    else if ((firstByte & 0xF0) == 0xE0) {
+        // 3 byte code point
+        codePointLength = 3;
+    }
+    else if ((firstByte & 0xF8) == 0xF0) {
+        // 4 byte code point
+        codePointLength = 4;
+    }
+    else {
+        Limelog("Invalid unicode code point starting byte: %02x\n", firstByte);
+        return 0;
+    }
+
+    return codePointLength;
+}
+
 // Input thread proc
 static void inputSendThreadProc(void* context) {
     SOCK_RET err;
@@ -549,56 +579,71 @@ static void inputSendThreadProc(void* context) {
             uint32_t totalLength = PAYLOAD_SIZE(holder) - sizeof(uint32_t);
             uint32_t i = 0;
 
-            // HACK: This is a workaround for the fact that GFE doesn't appear to synchronize keyboard
-            // and UTF-8 text events with each other. We need to make sure any previous keyboard events
-            // have been processed prior to sending these UTF-8 events to avoid interference between
-            // the two (especially with modifier keys).
-            flushInputOnControlStream();
-            while (!PltIsThreadInterrupted(&inputSendThread) && isControlDataInTransit()) {
-                PltSleepMs(10);
+            if (!IS_SUNSHINE()) {
+                // HACK: This is a workaround for the fact that GFE doesn't appear to synchronize keyboard
+                // and UTF-8 text events with each other. We need to make sure any previous keyboard events
+                // have been processed prior to sending these UTF-8 events to avoid interference between
+                // the two (especially with modifier keys).
+                flushInputOnControlStream();
+                while (!PltIsThreadInterrupted(&inputSendThread) && isControlDataInTransit()) {
+                    PltSleepMs(10);
+                }
+
+                // Finally, sleep an additional 50 ms to allow the events to be processed by Windows
+                PltSleepMs(50);
             }
 
-            // Finally, sleep an additional 50 ms to allow the events to be processed by Windows
-            PltSleepMs(50);
-
-            // We send each Unicode code point individually. This way we can always ensure they will
-            // never straddle a packet boundary (which will cause a parsing error on the host).
             while (i < totalLength && !PltIsThreadInterrupted(&inputSendThread)) {
-                uint32_t codePointLength;
-                uint8_t firstByte = (uint8_t)holder->packet.unicode.text[i];
-                if ((firstByte & 0x80) == 0x00) {
-                    // 1 byte code point
-                    codePointLength = 1;
-                }
-                else if ((firstByte & 0xE0) == 0xC0) {
-                    // 2 byte code point
-                    codePointLength = 2;
-                }
-                else if ((firstByte & 0xF0) == 0xE0) {
-                    // 3 byte code point
-                    codePointLength = 3;
-                }
-                else if ((firstByte & 0xF8) == 0xF0) {
-                    // 4 byte code point
-                    codePointLength = 4;
+                uint32_t chunkLength = 0;
+                uint32_t remaining = totalLength - i;
+
+                if (IS_SUNSHINE()) {
+                    // Sunshine accepts multiple code points per packet, so we pack as many as
+                    // fit within the NV_UNICODE_PACKET to send fewer packets overall. Code points
+                    // are never split across packet boundaries.
+                    while (chunkLength < remaining) {
+                        uint32_t codePointLength = getUtf8CodePointLength(holder->packet.unicode.text, i + chunkLength);
+                        if (codePointLength == 0) {
+                            break;
+                        }
+                        if (chunkLength + codePointLength > UTF8_TEXT_EVENT_MAX_COUNT) {
+                            break;
+                        }
+                        chunkLength += codePointLength;
+                    }
+
+                    // No code point fit, so stop sending
+                    if (chunkLength == 0) {
+                        break;
+                    }
                 }
                 else {
-                    Limelog("Invalid unicode code point starting byte: %02x\n", firstByte);
-                    break;
+                    // We send each Unicode code point individually. This way we can always ensure they will
+                    // never straddle a packet boundary (which will cause a parsing error on the host).
+                    uint32_t codePointLength = getUtf8CodePointLength(holder->packet.unicode.text, i);
+                    if (codePointLength == 0) {
+                        break;
+                    }
+                    chunkLength = codePointLength;
                 }
 
-                // Use the original packet as a template and fixup to send one code point at a time
-                splitPacket = *holder;
-                splitPacket.packet.unicode.header.size = BE32(sizeof(uint32_t) + codePointLength);
-                memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], codePointLength);
+                // Clamp the chunk if the final code point is truncated
+                if (chunkLength > remaining) {
+                    chunkLength = remaining;
+                }
 
-                // Encrypt and send the split packet
-                if (!sendInputPacket(&splitPacket, i + 1 < totalLength)) {
+                // Use the original packet as a template and fixup to send the chunk
+                splitPacket = *holder;
+                splitPacket.packet.unicode.header.size = BE32(sizeof(uint32_t) + chunkLength);
+                memcpy(splitPacket.packet.unicode.text, &holder->packet.unicode.text[i], chunkLength);
+
+                // Encrypt and send the chunk
+                if (!sendInputPacket(&splitPacket, i + chunkLength < totalLength)) {
                     freePacketHolder(holder);
                     return;
                 }
 
-                i += codePointLength;
+                i += chunkLength;
             }
 
             freePacketHolder(holder);
