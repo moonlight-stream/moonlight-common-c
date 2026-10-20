@@ -80,6 +80,11 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             // that silently goes somewhere else.
             char* url;
         } openUrl;
+        struct {
+            // Owned by this entry and freed with it, like the URL. Never NULL once queued:
+            // a message with no reason carries an empty string.
+            char* reason;
+        } terminateStream;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -140,6 +145,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_TOGGLE_MOUSE 13
 #define IDX_SET_VIRTUAL_KEYBOARD 14
 #define IDX_OPEN_URL 15
+#define IDX_TERMINATE_STREAM 16
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -161,6 +167,7 @@ static const short packetTypesGen3[] = {
     -1,     // Mouse Toggle (unused)
     -1,     // Set virtual keyboard (unused)
     -1,     // Open URL (unused)
+    -1,     // Terminate stream (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -179,6 +186,7 @@ static const short packetTypesGen4[] = {
     -1,     // Mouse Toggle (unused)
     -1,     // Set virtual keyboard (unused)
     -1,     // Open URL (unused)
+    -1,     // Terminate stream (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -197,6 +205,7 @@ static const short packetTypesGen5[] = {
     -1,     // Mouse Toggle (unused)
     -1,     // Set virtual keyboard (unused)
     -1,     // Open URL (unused)
+    -1,     // Terminate stream (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -215,6 +224,7 @@ static const short packetTypesGen7[] = {
     -1,     // Mouse Toggle (unused)
     -1,     // Set virtual keyboard (unused)
     -1,     // Open URL (unused)
+    -1,     // Terminate stream (unused)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -233,6 +243,7 @@ static const short packetTypesGen7Enc[] = {
     0x5503, // Mouse Toggle (Sunshine protocol extension)
     0x5504, // Set virtual keyboard (Sunshine protocol extension)
     0x5505, // Open URL (Sunshine protocol extension)
+    0x5506, // Terminate stream (OnePlay protocol extension)
 };
 
 static const char requestIdrFrameGen3[] = { 0, 0 };
@@ -1013,6 +1024,13 @@ static void asyncCallbackThreadFunc(void* context) {
             free(queuedCb->data.openUrl.url);
             break;
 
+        case IDX_TERMINATE_STREAM:
+            // Passed on as many times as it arrives. The host already collapses repeats,
+            // and ending a session is the client's to make idempotent: it owns the session.
+            ListenerCallbacks.terminateStream(queuedCb->data.terminateStream.reason);
+            free(queuedCb->data.terminateStream.reason);
+            break;
+
         case IDX_SET_VIRTUAL_KEYBOARD:
             // Not batched. A show followed by a hide are different instructions, and
             // collapsing them would leave the keyboard in whichever state arrived last
@@ -1041,6 +1059,7 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_SET_RGB_LED] ||
            packetType == packetTypes[IDX_SET_VIRTUAL_KEYBOARD] ||
            packetType == packetTypes[IDX_OPEN_URL] ||
+           packetType == packetTypes[IDX_TERMINATE_STREAM] ||
            packetType == packetTypes[IDX_HDR_INFO];
 }
 
@@ -1123,6 +1142,32 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         queuedCb->data.openUrl.url[urlLength] = '\0';
 
         queuedCb->typeIndex = IDX_OPEN_URL;
+    }
+    else if (ctlHdr->type == packetTypes[IDX_TERMINATE_STREAM]) {
+        uint16_t reasonLength = 0;
+
+        BbGet16(&bb, &reasonLength);
+
+        // Same framing as the URL, with one difference: a length of zero is valid and means
+        // the game gave no reason. The session must end all the same.
+        int available = packetLength - (int)sizeof(*ctlHdr) - (int)sizeof(reasonLength);
+        if (available < 0 || reasonLength > available) {
+            Limelog("Discarding malformed terminate-stream message\n");
+            free(queuedCb);
+            return;
+        }
+
+        queuedCb->data.terminateStream.reason = malloc(reasonLength + 1);
+        if (!queuedCb->data.terminateStream.reason) {
+            free(queuedCb);
+            return;
+        }
+
+        memcpy(queuedCb->data.terminateStream.reason,
+               (char*)ctlHdr + sizeof(*ctlHdr) + sizeof(reasonLength), reasonLength);
+        queuedCb->data.terminateStream.reason[reasonLength] = '\0';
+
+        queuedCb->typeIndex = IDX_TERMINATE_STREAM;
     }
     else if (ctlHdr->type == packetTypes[IDX_HDR_INFO]) {
         queuedCb->typeIndex = IDX_HDR_INFO;
