@@ -24,7 +24,7 @@ extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
 extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
-extern volatile bool ConnectionInterrupted;
+extern volatile atomic_bool ConnectionInterrupted;
 extern bool HighQualitySurroundSupported;
 extern bool HighQualitySurroundEnabled;
 extern OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
