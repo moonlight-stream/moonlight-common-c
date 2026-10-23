@@ -22,6 +22,7 @@ static float absCurrentPosY;
 #define MAX_MOTION_EVENTS 2
 
 static uint8_t currentPenButtonState;
+static uint8_t currentPenToolType;
 
 #define CLAMP(val, min, max) (((val) < (min)) ? (min) : (((val) > (max)) ? (max) : (val)))
 
@@ -114,6 +115,7 @@ int initializeInputStream(void) {
     batchedScrollDelta = 0;
 
     currentPenButtonState = 0;
+    currentPenToolType = 0;
 
     // Start with the virtual mouse centered
     absCurrentPosX = absCurrentPosY = 0.5f;
@@ -521,8 +523,9 @@ static void inputSendThreadProc(void* context) {
                     break;
                 }
 
-                // If the buttons or event type is different, we cannot batch
+                // If the buttons, tool type, or event type is different, we cannot batch
                 if (holder->packet.pen.penButtons != penBatchHolder->packet.pen.penButtons ||
+                    holder->packet.pen.toolType != penBatchHolder->packet.pen.toolType ||
                     holder->packet.pen.eventType != penBatchHolder->packet.pen.eventType) {
                     break;
                 }
@@ -531,6 +534,9 @@ static void inputSendThreadProc(void* context) {
                 if (LbqPollQueueElement(&packetQueue, (void**)&penBatchHolder) != LBQ_SUCCESS) {
                     break;
                 }
+
+                // Propagate the reliable flag if any packet in this batch required reliability
+                penBatchHolder->enetPacketFlags |= holder->enetPacketFlags;
 
                 // Replace the current packet with the new one
                 freePacketHolder(holder);
@@ -1450,10 +1456,13 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
 
     holder->channelId = CTRL_CHANNEL_PEN;
 
-    // Allow move and hover events to be dropped if a newer one arrives (if no buttons changed),
+    // Allow move and hover events to be dropped if a newer one arrives (if no buttons or tool changed),
     // but don't allow state changing events like up/down/leave events to be dropped.
-    holder->enetPacketFlags = (TOUCH_EVENT_IS_BATCHABLE(eventType) && !(penButtons ^ currentPenButtonState)) ? 0 : ENET_PACKET_FLAG_RELIABLE;
+    holder->enetPacketFlags = (TOUCH_EVENT_IS_BATCHABLE(eventType) &&
+                               penButtons == currentPenButtonState &&
+                               toolType == currentPenToolType) ? 0 : ENET_PACKET_FLAG_RELIABLE;
     currentPenButtonState = penButtons;
+    currentPenToolType = toolType;
 
     holder->packet.pen.header.size = BE32(sizeof(SS_PEN_PACKET) - sizeof(uint32_t));
     holder->packet.pen.header.magic = LE32(SS_PEN_MAGIC);
