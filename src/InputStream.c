@@ -405,56 +405,56 @@ static void inputSendThreadProc(void* context) {
 
             PltLockMutex(&batchedInputMutex);
 
+            int deltaX = currentRelativeMouseState.deltaX;
+            int deltaY = currentRelativeMouseState.deltaY;
+            currentRelativeMouseState.deltaX = 0;
+            currentRelativeMouseState.deltaY = 0;
+
+            // The state change is no longer pending
+            currentRelativeMouseState.dirty = false;
+
+            PltUnlockMutex(&batchedInputMutex);
+
             // Send as many packets as it takes to get the entire delta through
-            while (currentRelativeMouseState.deltaX != 0 || currentRelativeMouseState.deltaY != 0) {
+            while (deltaX != 0 || deltaY != 0) {
                 bool more = false;
 
-                if (currentRelativeMouseState.deltaX < INT16_MIN) {
+                if (deltaX < INT16_MIN) {
                     holder->packet.mouseMoveRel.deltaX = BE16(INT16_MIN);
-                    currentRelativeMouseState.deltaX -= INT16_MIN;
+                    deltaX -= INT16_MIN;
                     more = true;
                 }
-                else if (currentRelativeMouseState.deltaX > INT16_MAX) {
+                else if (deltaX > INT16_MAX) {
                     holder->packet.mouseMoveRel.deltaX = BE16(INT16_MAX);
-                    currentRelativeMouseState.deltaX -= INT16_MAX;
+                    deltaX -= INT16_MAX;
                     more = true;
                 }
                 else {
-                    holder->packet.mouseMoveRel.deltaX = BE16(currentRelativeMouseState.deltaX);
-                    currentRelativeMouseState.deltaX = 0;
+                    holder->packet.mouseMoveRel.deltaX = BE16(deltaX);
+                    deltaX = 0;
                 }
 
-                if (currentRelativeMouseState.deltaY < INT16_MIN) {
+                if (deltaY < INT16_MIN) {
                     holder->packet.mouseMoveRel.deltaY = BE16(INT16_MIN);
-                    currentRelativeMouseState.deltaY -= INT16_MIN;
+                    deltaY -= INT16_MIN;
                     more = true;
                 }
-                else if (currentRelativeMouseState.deltaY > INT16_MAX) {
+                else if (deltaY > INT16_MAX) {
                     holder->packet.mouseMoveRel.deltaY = BE16(INT16_MAX);
-                    currentRelativeMouseState.deltaY -= INT16_MAX;
+                    deltaY -= INT16_MAX;
                     more = true;
                 }
                 else {
-                    holder->packet.mouseMoveRel.deltaY = BE16(currentRelativeMouseState.deltaY);
-                    currentRelativeMouseState.deltaY = 0;
+                    holder->packet.mouseMoveRel.deltaY = BE16(deltaY);
+                    deltaY = 0;
                 }
-
-                // Don't hold the batching lock while we're doing network I/O
-                PltUnlockMutex(&batchedInputMutex);
 
                 // Encrypt and send the split packet
                 if (!sendInputPacket(holder, more)) {
                     freePacketHolder(holder);
                     return;
                 }
-
-                PltLockMutex(&batchedInputMutex);
             }
-
-            // The state change is no longer pending
-            currentRelativeMouseState.dirty = false;
-
-            PltUnlockMutex(&batchedInputMutex);
 
             lastMousePacketTime = now;
 
