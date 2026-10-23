@@ -118,6 +118,7 @@ int initializeInputStream(void) {
     // Start with the virtual mouse centered
     absCurrentPosX = absCurrentPosY = 0.5f;
 
+    memset(currentQueuedControllerPacket, 0, sizeof(currentQueuedControllerPacket));
     memset(currentGamepadSensorState, 0, sizeof(currentGamepadSensorState));
     memset(&currentRelativeMouseState, 0, sizeof(currentRelativeMouseState));
     memset(&currentAbsoluteMouseState, 0, sizeof(currentAbsoluteMouseState));
@@ -154,6 +155,7 @@ void destroyInputStream(void) {
         entry = nextEntry;
     }
 
+    memset(currentQueuedControllerPacket, 0, sizeof(currentQueuedControllerPacket));
     PltDeleteMutex(&batchedInputMutex);
 }
 
@@ -1198,6 +1200,13 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
         if (err != LBQ_SUCCESS) {
             LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
             Limelog("Input queue reached maximum size limit\n");
+
+            PltLockMutex(&batchedInputMutex);
+            if (currentQueuedControllerPacket[controllerNumber] == holder) {
+                currentQueuedControllerPacket[controllerNumber] = NULL;
+            }
+            PltUnlockMutex(&batchedInputMutex);
+
             freePacketHolder(holder);
         }
     }
