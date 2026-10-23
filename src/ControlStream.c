@@ -84,7 +84,6 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
         } dsAdaptiveTrigger;
         struct {
-            uint32_t token;
             uint32_t length;
             char *text;
         } clipboardText;
@@ -696,7 +695,7 @@ static bool isPacketSentWaitingForAck(ENetPacket* packet) {
     return false;
 }
 
-static bool sendMessageEnet(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     ENetPacket* enetPacket;
     int err;
 
@@ -710,12 +709,6 @@ static bool sendMessageEnet(short ptype, int paylen, const void* payload, uint8_
     if (encryptedControlStream) {
         PNVCTL_ENCRYPTED_PACKET_HEADER encPacket;
         PNVCTL_ENET_PACKET_HEADER_V2 packet;
-        char stackBuffer[256];
-        char* plainBuffer = stackBuffer;
-
-        if (paylen < 0 || paylen > 65535) {
-            return false;
-        }
 
         enetPacket = enet_packet_create(NULL,
                                         sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
@@ -733,33 +726,18 @@ static bool sendMessageEnet(short ptype, int paylen, const void* payload, uint8_
         encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
         encPacket->seq = currentEnetSequenceNumber++;
 
-        // Construct the plaintext data for encryption. Large clipboard packets
-        // do not fit in the stack buffer.
-        if ((int)sizeof(*packet) + paylen > (int)sizeof(stackBuffer)) {
-            plainBuffer = malloc(sizeof(*packet) + paylen);
-            if (plainBuffer == NULL) {
-                enet_packet_destroy(enetPacket);
-                PltUnlockMutex(&enetMutex);
-                return false;
-            }
-        }
-        packet = (PNVCTL_ENET_PACKET_HEADER_V2)plainBuffer;
+        // Construct the plaintext data for encryption
+        packet = (PNVCTL_ENET_PACKET_HEADER_V2)(((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH);
         packet->type = ptype;
-        packet->payloadLength = (unsigned short)paylen;
+        packet->payloadLength = paylen;
         memcpy(&packet[1], payload, paylen);
 
         // Encrypt the data into the final packet (and byteswap for BE machines)
         if (!encryptControlMessage(encPacket, packet)) {
             Limelog("Failed to encrypt control stream message\n");
-            if (plainBuffer != stackBuffer) {
-                free(plainBuffer);
-            }
             enet_packet_destroy(enetPacket);
             PltUnlockMutex(&enetMutex);
             return false;
-        }
-        if (plainBuffer != stackBuffer) {
-            free(plainBuffer);
         }
 
         // enetMutex still locked here
@@ -844,7 +822,7 @@ static bool sendMessageEnet(short ptype, int paylen, const void* payload, uint8_
     return true;
 }
 
-static bool sendMessageTcp(short ptype, int paylen, const void* payload) {
+static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
     PNVCTL_TCP_PACKET_HEADER packet;
     SOCK_RET err;
 
@@ -869,7 +847,7 @@ static bool sendMessageTcp(short ptype, int paylen, const void* payload) {
     return true;
 }
 
-static bool sendMessageAndForget(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndForget(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     bool ret;
 
     // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
@@ -884,7 +862,7 @@ static bool sendMessageAndForget(short ptype, int paylen, const void* payload, u
     return ret;
 }
 
-static bool sendMessageAndDiscardReply(short ptype, int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     if (AppVersionQuad[0] >= 5) {
         if (!sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData)) {
             return false;
@@ -1037,11 +1015,8 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
         case IDX_CLIPBOARD_TEXT:
-            if (ListenerCallbacks.clipboardText != NULL) {
-                ListenerCallbacks.clipboardText(queuedCb->data.clipboardText.token,
-                                                queuedCb->data.clipboardText.text,
-                                                queuedCb->data.clipboardText.length);
-            }
+            ListenerCallbacks.clipboardText(queuedCb->data.clipboardText.text,
+                                            queuedCb->data.clipboardText.length);
             free(queuedCb->data.clipboardText.text);
             break;
         default:
@@ -1125,8 +1100,7 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
     else if (ctlHdr->type == SS_CLIPBOARD_CONTROL_PTYPE) {
-        if (!BbGet32(&bb, &queuedCb->data.clipboardText.token) ||
-                !BbGet32(&bb, &queuedCb->data.clipboardText.length) ||
+        if (!BbGet32(&bb, &queuedCb->data.clipboardText.length) ||
                 queuedCb->data.clipboardText.length > SS_CLIPBOARD_TEXT_MAX) {
             free(queuedCb);
             return;
@@ -1456,7 +1430,7 @@ static void lossStatsThreadFunc(void* context) {
         char periodicPingPayload[8];
 
         BbInitializeWrappedBuffer(&byteBuffer, periodicPingPayload, 0, sizeof(periodicPingPayload), BYTE_ORDER_LITTLE);
-        BbPut16(&byteBuffer, 4); // Length of payload
+        BbPut32(&byteBuffer, 4); // Length of payload
         BbPut32(&byteBuffer, 0); // Timestamp?
 
         while (!PltIsThreadInterrupted(&lossStatsThread)) {
@@ -1772,10 +1746,6 @@ void flushInputOnControlStream(void) {
         enet_host_flush(client);
         PltUnlockMutex(&enetMutex);
     }
-}
-
-bool isControlStreamEncrypted(void) {
-    return encryptedControlStream;
 }
 
 bool isControlDataInTransit(void) {

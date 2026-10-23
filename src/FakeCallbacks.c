@@ -41,7 +41,7 @@ static void fakeClRumbleTriggers(uint16_t controllerNumber, uint16_t leftTrigger
 static void fakeClSetMotionEventState(uint16_t controllerNumber, uint8_t motionType, uint16_t reportRateHz) {}
 static void fakeClSetAdaptiveTriggers(uint16_t controllerNumber, uint8_t eventFlags, uint8_t typeLeft, uint8_t typeRight, uint8_t *left, uint8_t *right) {};
 static void fakeClSetControllerLED(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b) {}
-static void fakeClClipboardText(uint32_t token, const char *text, unsigned int length) {}
+static void fakeClClipboardText(const char *text, unsigned int length) {}
 
 static CONNECTION_LISTENER_CALLBACKS fakeClCallbacks = {
     .stageStarting = fakeClStageStarting,

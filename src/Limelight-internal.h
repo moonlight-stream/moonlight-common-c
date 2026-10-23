@@ -60,7 +60,7 @@ extern uint32_t EncryptionFeaturesEnabled;
 #define CTRL_CHANNEL_MOUSE        0x03
 #define CTRL_CHANNEL_PEN          0x04
 #define CTRL_CHANNEL_TOUCH        0x05
-#define CTRL_CHANNEL_UTF8         0x06
+#define CTRL_CHANNEL_CLIPBOARD    0x06
 #define CTRL_CHANNEL_GAMEPAD_BASE 0x10 // 0x10 to 0x1F by controller index
 #define CTRL_CHANNEL_SENSOR_BASE  0x20 // 0x20 to 0x2F by controller index
 #define CTRL_CHANNEL_COUNT        0x30
@@ -123,7 +123,6 @@ void connectionReceivedCompleteFrame(uint32_t frameIndex, bool frameIsLTR);
 void connectionSawFrame(uint32_t frameIndex);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
 int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
-bool isControlStreamEncrypted(void);
 void flushInputOnControlStream(void);
 bool isControlDataInTransit(void);
 

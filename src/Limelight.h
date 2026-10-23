@@ -483,10 +483,9 @@ typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
 
-// Host -> client clipboard text. token is the value Sunshine chose for this update.
-// text is not necessarily NUL-terminated; use length.
+// Host -> client clipboard text. text is not necessarily NUL-terminated; use length.
 #define SS_CLIPBOARD_CONTROL_PTYPE 0x5505
-typedef void(*ConnListenerClipboardText)(uint32_t token, const char *text, unsigned int length);
+typedef void(*ConnListenerClipboardText)(const char *text, unsigned int length);
 
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
@@ -722,8 +721,8 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
 // This function queues an UTF-8 encoded text to be sent to the remote server.
 int LiSendUtf8TextEvent(const char *text, unsigned int length);
 
-// Send clipboard text to a Sunshine host. length 0 subscribes to host clipboard
-// updates and does not change the host clipboard. Requires an encrypted control stream.
+// Queues clipboard text for a Sunshine host. A length of 0 subscribes to host
+// clipboard updates and does not change the host clipboard.
 #define SS_CLIPBOARD_TEXT_MAX 32755
 int LiSendClipboardText(const char *text, unsigned int length);
 
