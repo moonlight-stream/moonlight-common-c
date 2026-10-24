@@ -888,6 +888,20 @@ static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
     if (host->receivedDataLength == sizeof(ENetProtocolHeader) + sizeof(ENetProtocolDisconnect)) {
         ENetProtocolHeader* protoHeader = (ENetProtocolHeader*)host->receivedData;
         ENetProtocolDisconnect* disconnect = (ENetProtocolDisconnect*)(protoHeader + 1);
+        enet_uint16 peerID = ENET_NET_TO_HOST_16(protoHeader->peerID);
+        enet_uint8 sessionID = (peerID & ENET_PROTOCOL_HEADER_SESSION_MASK) >> ENET_PROTOCOL_HEADER_SESSION_SHIFT;
+
+        peerID &= ~(ENET_PROTOCOL_HEADER_FLAG_MASK | ENET_PROTOCOL_HEADER_SESSION_MASK);
+
+        // This runs before ENet validates the packet at all, so only act on disconnects
+        // that are addressed to our peer and come from the address we're talking to.
+        // Anything else is left for ENet's own processing.
+        if (peer == NULL ||
+            peerID != peer->incomingPeerID ||
+            sessionID != peer->incomingSessionID ||
+            !enet_address_equal(&host->receivedPeerAddress, &peer->address)) {
+            return 0;
+        }
 
         if ((disconnect->header.command & ENET_PROTOCOL_COMMAND_MASK) == ENET_PROTOCOL_COMMAND_DISCONNECT) {
             Limelog("ENet disconnect event pending\n");
