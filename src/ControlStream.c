@@ -157,6 +157,7 @@ static const short packetTypesGen3[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -171,6 +172,7 @@ static const short packetTypesGen4[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -185,6 +187,7 @@ static const short packetTypesGen5[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -199,6 +202,7 @@ static const short packetTypesGen7[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
