@@ -83,6 +83,10 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t left[DS_EFFECT_PAYLOAD_SIZE];
             uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
         } dsAdaptiveTrigger;
+        struct {
+            uint32_t length;
+            char *text;
+        } clipboardText;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -140,6 +144,8 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
 #define IDX_DS_ADAPTIVE_TRIGGERS 12
+// Not an index into packetTypes[]. Host clipboard updates use SS_CLIPBOARD_CONTROL_PTYPE.
+#define IDX_CLIPBOARD_TEXT 100
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -1026,6 +1032,11 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.dsAdaptiveTrigger.left,
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
+        case IDX_CLIPBOARD_TEXT:
+            ListenerCallbacks.clipboardText(queuedCb->data.clipboardText.text,
+                                            queuedCb->data.clipboardText.length);
+            free(queuedCb->data.clipboardText.text);
+            break;
         default:
             // Unhandled packet type from queueAsyncCallback()
             LC_ASSERT(false);
@@ -1042,7 +1053,8 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_SET_MOTION_EVENT] ||
            packetType == packetTypes[IDX_SET_RGB_LED] ||
            packetType == packetTypes[IDX_HDR_INFO] ||
-           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS];
+           packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS] ||
+           packetType == SS_CLIPBOARD_CONTROL_PTYPE;
 }
 
 static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLength) {
@@ -1056,6 +1068,8 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     if (!queuedCb) {
         return;
     }
+    queuedCb->typeIndex = -1;
+    queuedCb->data.clipboardText.text = NULL;
 
     BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
@@ -1103,6 +1117,29 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.right, DS_EFFECT_PAYLOAD_SIZE);
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
+    else if (ctlHdr->type == SS_CLIPBOARD_CONTROL_PTYPE) {
+        if (!BbGet32(&bb, &queuedCb->data.clipboardText.length) ||
+                queuedCb->data.clipboardText.length > SS_CLIPBOARD_TEXT_MAX) {
+            free(queuedCb);
+            return;
+        }
+
+        queuedCb->data.clipboardText.text = malloc(queuedCb->data.clipboardText.length + 1);
+        if (queuedCb->data.clipboardText.text == NULL) {
+            free(queuedCb);
+            return;
+        }
+
+        if (queuedCb->data.clipboardText.length > 0 &&
+                !BbGetBytes(&bb, (uint8_t*)queuedCb->data.clipboardText.text, (int)queuedCb->data.clipboardText.length)) {
+            free(queuedCb->data.clipboardText.text);
+            free(queuedCb);
+            return;
+        }
+
+        queuedCb->data.clipboardText.text[queuedCb->data.clipboardText.length] = '\0';
+        queuedCb->typeIndex = IDX_CLIPBOARD_TEXT;
+    }
     else {
         // Unhandled packet type from needsAsyncCallback()
         LC_ASSERT(false);
@@ -1113,6 +1150,9 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     err = LbqOfferQueueItem(&asyncCallbackQueue, queuedCb, &queuedCb->entry);
     if (err != LBQ_SUCCESS) {
         Limelog("Failed to queue async callback: %d\n", err);
+        if (queuedCb->typeIndex == IDX_CLIPBOARD_TEXT) {
+            free(queuedCb->data.clipboardText.text);
+        }
         free(queuedCb);
     }
 }
