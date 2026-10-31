@@ -1,4 +1,5 @@
 #include "Limelight-internal.h"
+#include "VideoFrameLimits.h"
 
 // Uncomment to test 3 byte Annex B start sequences with GFE
 //#define FORCE_3_BYTE_START_SEQUENCES
@@ -603,8 +604,15 @@ static int getBufferFlags(char* data, int length) {
 
 // As an optimization, we can cast the existing packet buffer to a PLENTRY and avoid
 // a malloc() and a memcpy() of the packet data.
-static void queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offset, int length) {
+static bool queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offset, int length) {
     PLENTRY_INTERNAL entry;
+
+    // Check before allocating or adding to the signed decode-unit length.
+    // Also covers the multi-NAL slow path which may append several buffers
+    // from a single RTP packet.
+    if (!canAppendVideoFrameFragment(nalChainDataLength, length)) {
+        return false;
+    }
 
     if (existingEntry == NULL || *existingEntry == NULL) {
         entry = (PLENTRY_INTERNAL)malloc(sizeof(*entry) + length);
@@ -648,11 +656,14 @@ static void queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
             nalChainTail->next = (PLENTRY)entry;
             nalChainTail = nalChainTail->next;
         }
+        return true;
     }
+
+    return false; // OOM: do not submit a truncated frame to the decoder
 }
 
 // Process an RTP Payload using the slow path that handles multiple NALUs per packet
-static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
+static bool processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERNAL* existingEntry) {
     // We should not have any NALUs when processing the first packet in an IDR frame
     LC_ASSERT(nalChainHead == NULL);
     LC_ASSERT(nalChainTail == NULL);
@@ -708,9 +719,12 @@ static void processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERN
 
         // To minimize copies, we'll allocate for SPS, PPS, and VPS to allow
         // us to reuse the packet buffer for the picture data in the I-frame.
-        queueFragment(containsPicData ? existingEntry : NULL,
-                      currentPos->data, start, currentPos->offset - start);
+        if (!queueFragment(containsPicData ? existingEntry : NULL,
+                           currentPos->data, start, currentPos->offset - start)) {
+            return false;
+        }
     }
+    return true;
 }
 
 // Dumps the decode unit queue and ensures the next frame submitted to the decoder will be
@@ -739,6 +753,20 @@ static bool isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
 
     // Check if it's just the start or both start and end of a frame
     return (flags == (FLAG_SOF | FLAG_EOF) || flags == FLAG_SOF) && fecBlockNumber == 0;
+}
+
+// Drop an invalid frame and use the same recovery strategy as packet loss.
+// Called only after setting decodingFrame=false (at a frame boundary).
+static void discardCorruptFrame(uint32_t frameIndex) {
+    decodingFrame = false;
+    nextFrameNumber = frameIndex + 1;
+    dropFrameState();
+    if (waitingForIdrFrame) {
+        LiRequestIdrFrame();
+    }
+    else {
+        connectionDetectedFrameLoss(startFrameNumber, frameIndex);
+    }
 }
 
 // Process an RTP Payload
@@ -785,20 +813,21 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     // the streamPacketIndex not matching correctly should find nearly all of the rest.
     if (isBefore24(streamPacketIndex, U24(lastPacketInStream + 1)) ||
             (!(flags & FLAG_SOF) && streamPacketIndex != U24(lastPacketInStream + 1))) {
-        Limelog("Depacketizer detected corrupt frame: %d", frameIndex);
-        decodingFrame = false;
-        nextFrameNumber = frameIndex + 1;
-        dropFrameState();
-        if (waitingForIdrFrame) {
-            LiRequestIdrFrame();
-        }
-        else {
-            connectionDetectedFrameLoss(startFrameNumber, frameIndex);
-        }
+        Limelog("Depacketizer detected corrupt frame: %u\n", frameIndex);
+        discardCorruptFrame(frameIndex);
         return;
     }
 
-    // Verify that we didn't receive an incomplete frame
+    // Release builds must enforce the frame-start invariant too. A run of
+    // in-sequence continuation packets without SOF used to accumulate an
+    // unbounded NAL chain, even across different frame indexes.
+    if (!isValidVideoFramePacket(firstPacket, decodingFrame,
+                                 frameIndex, nextFrameNumber)) {
+        Limelog("Depacketizer detected invalid frame start: %u\n", frameIndex);
+        discardCorruptFrame(frameIndex);
+        return;
+    }
+
     LC_ASSERT(firstPacket ^ decodingFrame);
 
     // Check sequencing of this frame to ensure we didn't
@@ -1006,7 +1035,9 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
     if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_H264 | VIDEO_FORMAT_MASK_H265)) {
         if (firstPacket && isIdrFrameStart(&currentPos)) {
             // SPS and PPS prefix is padded between NALs, so we must decode it with the slow path
-            processAvcHevcRtpPayloadSlow(&currentPos, existingEntry);
+            if (!processAvcHevcRtpPayloadSlow(&currentPos, existingEntry)) {
+                goto corruptFrame;
+            }
         }
         else {
             // Intel's H.264 Media Foundation encoder prepends a PPS to each P-frame.
@@ -1022,7 +1053,9 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
             }
 #endif
 
-            queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
+            if (!queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length)) {
+                goto corruptFrame;
+            }
         }
     }
     else {
@@ -1066,7 +1099,9 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         }
 
         // Other codecs are just passed through as is.
-        queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length);
+        if (!queueFragment(existingEntry, currentPos.data, currentPos.offset, currentPos.length)) {
+            goto corruptFrame;
+        }
     }
 
     if (lastPacket) {
@@ -1124,6 +1159,11 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
 
         reassembleFrame(frameIndex, extraFlags & NV_VIDEO_PACKET_EXTRA_FLAG_LTR_FRAME);
     }
+    return;
+
+corruptFrame:
+    Limelog("Depacketizer rejected oversized or unallocatable frame: %u\n", frameIndex);
+    discardCorruptFrame(frameIndex);
 }
 
 // Called by the video RTP FEC queue to notify us of a lost frame

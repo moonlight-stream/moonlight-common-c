@@ -117,3 +117,13 @@ target_include_directories(moonlight-common-c SYSTEM PRIVATE
 )
 
 target_compile_definitions(moonlight-common-c PRIVATE HAS_SOCKLEN_T)
+
+# Header-only, protocol-boundary regression checks. Tests are deliberately
+# opt-in so embedding this library in clients doesn't change their builds.
+option(MOONLIGHT_COMMON_BUILD_TESTS "Build moonlight-common-c regression tests" OFF)
+if (MOONLIGHT_COMMON_BUILD_TESTS)
+  enable_testing()
+  add_executable(test-video-frame-limits tests/VideoFrameLimitsTests.c)
+  set_target_properties(test-video-frame-limits PROPERTIES C_STANDARD 11)
+  add_test(NAME video-frame-limits COMMAND test-video-frame-limits)
+endif()
