@@ -7,6 +7,7 @@
 static PLENTRY nalChainHead;
 static PLENTRY nalChainTail;
 static int nalChainDataLength;
+static unsigned int nalChainFragmentCount;
 
 static unsigned int nextFrameNumber;
 static unsigned int startFrameNumber;
@@ -94,6 +95,7 @@ static void cleanupFrameState(void) {
     nalChainTail = NULL;
 
     nalChainDataLength = 0;
+    nalChainFragmentCount = 0;
 }
 
 // Cleanup frame state and set that we're waiting for an IDR Frame
@@ -510,6 +512,7 @@ static void reassembleFrame(int frameNumber, bool frameIsLTR) {
 
             nalChainHead = nalChainTail = NULL;
             nalChainDataLength = 0;
+            nalChainFragmentCount = 0;
 
             if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
                 if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
@@ -610,7 +613,12 @@ static bool queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
     // Check before allocating or adding to the signed decode-unit length.
     // Also covers the multi-NAL slow path which may append several buffers
     // from a single RTP packet.
-    if (!canAppendVideoFrameFragment(nalChainDataLength, length)) {
+    if (length == 0) {
+        // Empty fragments carry no data. Avoid allocating one list entry per
+        // zero-byte packet, which could bypass a byte-only frame limit.
+        return true;
+    }
+    if (!canAppendVideoFrameFragment(nalChainDataLength, length, nalChainFragmentCount)) {
         return false;
     }
 
@@ -646,6 +654,7 @@ static bool queueFragment(PLENTRY_INTERNAL* existingEntry, char* data, int offse
         entry->entry.bufferType = getBufferFlags(entry->entry.data, entry->entry.length);
 
         nalChainDataLength += entry->entry.length;
+        nalChainFragmentCount++;
 
         if (nalChainTail == NULL) {
             LC_ASSERT(nalChainHead == NULL);

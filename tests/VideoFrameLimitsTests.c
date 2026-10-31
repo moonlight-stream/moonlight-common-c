@@ -5,19 +5,21 @@
 int main(void) {
     const int cap = MAX_VIDEO_REASSEMBLED_FRAME_SIZE;
 
-    // Legitimate fragments, exact limit, and zero-length fragments.
-    assert(canAppendVideoFrameFragment(0, 1200));
-    assert(canAppendVideoFrameFragment(1200, cap - 1200));
-    assert(canAppendVideoFrameFragment(cap, 0));
+    // Legitimate fragments and exact byte and entry limits.
+    assert(canAppendVideoFrameFragment(0, 1200, 0));
+    assert(canAppendVideoFrameFragment(1200, cap - 1200, 1));
+    assert(canAppendVideoFrameFragment(cap - 1, 1, MAX_VIDEO_REASSEMBLED_FRAGMENTS - 1));
 
     // Oversized first fragment, overflow-at-boundary, bad signed lengths.
-    assert(!canAppendVideoFrameFragment(0, cap + 1));
-    assert(!canAppendVideoFrameFragment(cap, 1));
-    assert(!canAppendVideoFrameFragment(cap - 1, 2));
-    assert(!canAppendVideoFrameFragment(-1, 1));
-    assert(!canAppendVideoFrameFragment(0, -1));
-    assert(!canAppendVideoFrameFragment(INT_MAX, 1));
-    assert(!canAppendVideoFrameFragment(1, INT_MAX));
+    assert(!canAppendVideoFrameFragment(0, cap + 1, 0));
+    assert(!canAppendVideoFrameFragment(cap, 1, 1));
+    assert(!canAppendVideoFrameFragment(cap - 1, 2, 1));
+    assert(!canAppendVideoFrameFragment(-1, 1, 1));
+    assert(!canAppendVideoFrameFragment(0, -1, 1));
+    assert(!canAppendVideoFrameFragment(INT_MAX, 1, 1));
+    assert(!canAppendVideoFrameFragment(1, INT_MAX, 1));
+    assert(!canAppendVideoFrameFragment(0, 1, MAX_VIDEO_REASSEMBLED_FRAGMENTS));
+    assert(!canAppendVideoFrameFragment(0, 0, 0));
 
     // Started frame may receive ordered continuation packets of same frame.
     assert(isValidVideoFramePacket(true, false, 1, 1));
