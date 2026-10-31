@@ -1,4 +1,7 @@
 #include "../src/VideoFrameLimits.h"
+#ifdef NDEBUG
+#undef NDEBUG // CMake Release adds -DNDEBUG; keep the test assertions active.
+#endif
 #include <assert.h>
 #include <limits.h>
 
