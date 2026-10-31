@@ -1,5 +1,6 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
+#include "RtspResponseValidation.h"
 
 #define RTSP_CONNECT_TIMEOUT_SEC 10
 #define RTSP_RECEIVE_TIMEOUT_SEC 15
@@ -19,6 +20,7 @@ static bool encryptedRtspEnabled;
 static PPLT_CRYPTO_CONTEXT encryptionCtx;
 static PPLT_CRYPTO_CONTEXT decryptionCtx;
 static uint32_t encryptionSequenceNumber;
+static uint32_t lastDecryptionSequenceNumber;
 
 static SOCKET sock = INVALID_SOCKET;
 static ENetHost* client;
@@ -153,10 +155,12 @@ static char* sealRtspMessage(PRTSP_MESSAGE request, int* messageLen) {
     return (char*)encryptedMessage;
 }
 
-static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE response) {
+static bool unsealRtspMessage(char* rawMessage, int rawMessageLen,
+                              PRTSP_MESSAGE request, PRTSP_MESSAGE response) {
     char* decryptedMessage;
     int decryptedMessageLen;
     bool success;
+    uint32_t authenticatedSequence = 0;
 
     // If the server just closed the connection without responding with anything,
     // there's no point in proceeding any further trying to parse it.
@@ -196,6 +200,13 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
 
         // Populate the IV in little endian byte order
         seq = BE32(encryptedMessage->sequenceNumber);
+        // Reject replayed/out-of-order ciphertext before allocating buffers.
+        // Sunshine increments this counter across the RTSP launch session.
+        if (!isFreshEncryptedRtspSequence(lastDecryptionSequenceNumber, seq)) {
+            Limelog("Rejecting replayed or out-of-order encrypted RTSP response\n");
+            return false;
+        }
+        authenticatedSequence = seq;
         iv[3] = (uint8_t)(seq >> 24);
         iv[2] = (uint8_t)(seq >> 16);
         iv[1] = (uint8_t)(seq >> 8);
@@ -230,6 +241,24 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
 
     if (parseRtspMessage(response, decryptedMessage, decryptedMessageLen) == RTSP_ERROR_SUCCESS) {
         success = true;
+
+        if (encryptedRtspEnabled) {
+            // Some hosts omit CSeq on ANNOUNCE/PLAY responses, so validate
+            // any present value without rejecting those legacy omissions.
+            // The authenticated nonce check still prevents replay when CSeq
+            // is absent.
+            char* requestCseqString = getOptionContent(request->options, "CSeq");
+            int expectedCseq = requestCseqString != NULL ? atoi(requestCseqString) : SEQ_INVALID;
+            if (!isMatchingRtspResponseCseq(expectedCseq, response->sequenceNumber)) {
+                Limelog("Rejecting encrypted RTSP response with mismatched CSeq\n");
+                freeMessage(response);
+                success = false;
+            }
+            else {
+                // Commit only after successful authentication and RTSP parsing.
+                lastDecryptionSequenceNumber = authenticatedSequence;
+            }
+        }
     }
     else {
         Limelog("Failed to parse RTSP response\n");
@@ -501,7 +530,7 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
     }
 
     // Decrypt (if necessary) and deserialize the RTSP response
-    ret = unsealRtspMessage(responseBuffer, offset, response);
+    ret = unsealRtspMessage(responseBuffer, offset, request, response);
 
 Exit:
     if (serializedMessage != NULL) {
@@ -949,6 +978,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     // Initialize global state
     useEnet = (AppVersionQuad[0] >= 5) && (AppVersionQuad[0] <= 7) && (AppVersionQuad[2] < 404);
     currentSeqNumber = 1;
+    lastDecryptionSequenceNumber = 0;
     hasSessionId = false;
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
     AudioEncryptionEnabled = false;

@@ -77,3 +77,8 @@ jobs:
           mkdir build_release
           cmake ${{ matrix.cmake_args }} -DCMAKE_BUILD_TYPE=Release -B build_release -S .
           cmake --build build_release --config Release
+      - name: Test encrypted RTSP replay guards
+        if: matrix.os == 'ubuntu-latest' && matrix.cc == 'gcc' && !matrix.cmake_args
+        run: |
+          cc -std=c11 -DNDEBUG -Wall -Wextra -Werror -pedantic tests/RtspResponseValidationTests.c -o rtsp-response-validation-test
+          ./rtsp-response-validation-test
