@@ -3,6 +3,8 @@
 #include "Platform.h"
 #include "PlatformThreads.h"
 
+#include <stdatomic.h>
+
 #define LBQ_SUCCESS 0
 #define LBQ_INTERRUPTED 1
 #define LBQ_BOUND_EXCEEDED 2
@@ -21,7 +23,7 @@ typedef struct _LINKED_BLOCKING_QUEUE {
     PLINKED_BLOCKING_QUEUE_ENTRY head;
     PLINKED_BLOCKING_QUEUE_ENTRY tail;
     int sizeBound;
-    int currentSize;
+    atomic_int currentSize;
     int lifetimeSize;
     bool shutdown;
     bool draining;
