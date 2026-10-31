@@ -552,6 +552,18 @@ static void reassembleFrame(int frameNumber, bool frameIsLTR) {
             // Move the start of our (potential) RFI window to the next frame
             startFrameNumber = nextFrameNumber;
         }
+        else {
+            // The queued decode-unit allocation failed. Do not keep this
+            // chain attached to the next frame or submit partial data later.
+            Limelog("Unable to allocate video decode unit\n");
+            dropFrameState();
+            if (waitingForIdrFrame) {
+                LiRequestIdrFrame();
+            }
+            else {
+                connectionDetectedFrameLoss(startFrameNumber, frameNumber);
+            }
+        }
     }
 }
 
