@@ -1,8 +1,31 @@
 #include "Limelight-internal.h"
-#include "VideoFrameLimits.h"
 
 // Uncomment to test 3 byte Annex B start sequences with GFE
 //#define FORCE_3_BYTE_START_SEQUENCES
+
+// A conservative cap on one decoded compressed frame, independent of the
+// negotiated bitrate. Keep below INT_MAX because DECODE_UNIT.fullLength is int.
+// This is a bound on a single NAL chain, not a cap on the queued decode units.
+#define MAX_VIDEO_REASSEMBLED_FRAME_SIZE (32 * 1024 * 1024)
+// Bound per-fragment metadata/allocations even for adversarial tiny packets.
+#define MAX_VIDEO_REASSEMBLED_FRAGMENTS 65536u
+
+static inline bool canAppendVideoFrameFragment(int currentLength, int fragmentLength,
+                                                unsigned int fragmentCount) {
+    return currentLength >= 0 &&
+           currentLength <= MAX_VIDEO_REASSEMBLED_FRAME_SIZE &&
+           fragmentLength > 0 &&
+           fragmentLength <= MAX_VIDEO_REASSEMBLED_FRAME_SIZE - currentLength &&
+           fragmentCount < MAX_VIDEO_REASSEMBLED_FRAGMENTS;
+}
+
+// Continuation packets must belong to a frame whose SOF was already seen.
+// A new SOF while a prior frame is unfinished is likewise invalid.
+static inline bool isValidVideoFramePacket(bool firstPacket, bool decodingFrame,
+                                           uint32_t frameIndex, uint32_t nextFrameNumber) {
+    return firstPacket ? !decodingFrame
+                       : decodingFrame && frameIndex == nextFrameNumber;
+}
 
 static PLENTRY nalChainHead;
 static PLENTRY nalChainTail;
@@ -777,7 +800,7 @@ static bool isFirstPacket(uint8_t flags, uint8_t fecBlockNumber) {
 }
 
 // Drop an invalid frame and use the same recovery strategy as packet loss.
-// Called only after setting decodingFrame=false (at a frame boundary).
+// Reset frame state and trigger recovery for an invalid packet or incomplete frame.
 static void discardCorruptFrame(uint32_t frameIndex) {
     decodingFrame = false;
     nextFrameNumber = frameIndex + 1;
@@ -839,6 +862,10 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         return;
     }
 
+    // Catch unexpected frame-state transitions in debug builds before the
+    // runtime check below rejects malformed input. Fuzzing may violate this.
+    LC_ASSERT_VT(firstPacket ^ decodingFrame);
+
     // Release builds must enforce the frame-start invariant too. A run of
     // in-sequence continuation packets without SOF used to accumulate an
     // unbounded NAL chain, even across different frame indexes.
@@ -848,8 +875,6 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         discardCorruptFrame(frameIndex);
         return;
     }
-
-    LC_ASSERT(firstPacket ^ decodingFrame);
 
     // Check sequencing of this frame to ensure we didn't
     // miss one in between
