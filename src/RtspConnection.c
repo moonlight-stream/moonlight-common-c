@@ -211,7 +211,7 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
             return false;
         }
 
-        success = PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+        success = PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0, 0, seq,
                                     (uint8_t*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                     iv, sizeof(iv),
                                     encryptedMessage->tag, sizeof(encryptedMessage->tag),
@@ -953,8 +953,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
     AudioEncryptionEnabled = false;
     encryptedRtspEnabled = serverInfo->rtspSessionUrl && strstr(serverInfo->rtspSessionUrl, "rtspenc://");
-    encryptionCtx = PltCreateCryptoContext();
-    decryptionCtx = PltCreateCryptoContext();
+    encryptionCtx = PltCreateCryptoContext(0);
+    decryptionCtx = PltCreateCryptoContext(1);
 
     // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
     // fake our target address so it doesn't match any of the PC's local interfaces. It seems

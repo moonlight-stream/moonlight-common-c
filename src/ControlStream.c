@@ -356,8 +356,8 @@ int initializeControlStream(void) {
     firstFrameTimeMs = 0;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
-    encryptionCtx = PltCreateCryptoContext();
-    decryptionCtx = PltCreateCryptoContext();
+    encryptionCtx = PltCreateCryptoContext(0);
+    decryptionCtx = PltCreateCryptoContext(CTRL_CHANNEL_COUNT);
     hdrEnabled = false;
     memset(&hdrMetadata, 0, sizeof(hdrMetadata));
 
@@ -595,9 +595,10 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
 }
 
 // Caller must free() *packet on success!!!
-static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
+static bool decryptControlMessageToV1(uint8_t channelId, PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
     unsigned char iv[16] = { 0 };
     int ivSize;
+    int cipherFlags;
 
     *packet = NULL;
 
@@ -631,10 +632,12 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
 
         // Use 12-byte IV which is ideal for AES-GCM
         ivSize = 12;
+        cipherFlags = 0;
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
         iv[0] = (unsigned char)encPacket->seq;
+        cipherFlags = CIPHER_FLAG_NO_REPLAY_CHECK;
 
         // Nvidia's old style encryption uses a 16-byte IV
         ivSize = 16;
@@ -648,7 +651,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
 
     LC_ASSERT(ivSize <= (int)sizeof(iv));
     LC_ASSERT(ivSize == 12 || ivSize == 16);
-    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, cipherFlags, channelId, encPacket->seq,
                            (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                            iv, ivSize,
                            (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header
@@ -1251,7 +1254,7 @@ static void controlReceiveThreadFunc(void* context) {
 
                     ctlHdr = NULL;
                     packetLength = (int)event.packet->dataLength;
-                    if (!decryptControlMessageToV1(encHdr, packetLength, &ctlHdr, &packetLength)) {
+                    if (!decryptControlMessageToV1(event.channelID, encHdr, packetLength, &ctlHdr, &packetLength)) {
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
                         continue;
