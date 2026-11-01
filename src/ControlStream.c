@@ -917,7 +917,8 @@ static bool sendMessageEnet(short ptype, unsigned int paylen, const void* payloa
         err = enet_host_service(client, NULL, 0);
 
         // Wait until the packet is actually sent to provide backpressure on senders
-        if (flags & ENET_PACKET_FLAG_RELIABLE) {
+        // sending small packets (like the input thread sending mouse/keyboard/gamepad data)
+        if (paylen < (ENET_HOST_DEFAULT_MTU - 128) && (flags & ENET_PACKET_FLAG_RELIABLE)) {
             // Don't wait longer than 10 milliseconds to avoid blocking callers for too long
             for (int i = 0; err >= 0 && i < 10; i++) {
                 // Break on disconnected, acked/freed, or sent (pending ack).
