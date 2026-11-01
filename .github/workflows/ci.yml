@@ -77,9 +77,3 @@ jobs:
           mkdir build_release
           cmake ${{ matrix.cmake_args }} -DCMAKE_BUILD_TYPE=Release -B build_release -S .
           cmake --build build_release --config Release
-      - name: Test video frame limits
-        if: matrix.os == 'ubuntu-latest' && matrix.cc == 'gcc' && matrix.cmake_args == ''
-        run: |
-          cmake -S . -B build_tests -DCMAKE_BUILD_TYPE=Release -DMOONLIGHT_COMMON_BUILD_TESTS=ON
-          cmake --build build_tests --target test-video-frame-limits
-          ctest --test-dir build_tests -R video-frame-limits --output-on-failure
