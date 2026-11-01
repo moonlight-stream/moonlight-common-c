@@ -293,7 +293,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder, bool moreData) {
             }
 
             err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
-                                                            (int)(encryptedSize + sizeof(encryptedLengthPrefix)),
+                                                            (unsigned int)(encryptedSize + sizeof(encryptedLengthPrefix)),
                                                             holder->channelId,
                                                             holder->enetPacketFlags,
                                                             moreData);
