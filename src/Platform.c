@@ -360,7 +360,10 @@ void PltClearEvent(PLT_EVENT* event) {
 #if defined(LC_WINDOWS)
     ResetEvent(*event);
 #else
+    // Synchronize with PltSetEvent() and PltWaitForEvent().
+    PltLockMutex(&event->mutex);
     event->signalled = false;
+    PltUnlockMutex(&event->mutex);
 #endif
 }
 
