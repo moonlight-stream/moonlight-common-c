@@ -823,7 +823,7 @@ static bool sendMessageEnet(short ptype, unsigned int paylen, const void* payloa
 
             encPacket = (PNVCTL_ENCRYPTED_PACKET_HEADER)enetPacket->data;
             encPacket->encryptedHeaderType = 0x0001;
-            encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
+            encPacket->length = (unsigned short)(sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen);
             encPacket->seq = currentEnetSequenceNumber++;
 
             // Construct the plaintext data for encryption
