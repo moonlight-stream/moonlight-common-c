@@ -1032,10 +1032,25 @@ static bool sendMessageAndDiscardReply(short ptype, unsigned int paylen, const v
 // pending receives first. It works around what appears to be a bug in ENet
 // where pending disconnects can cause loss of unprocessed received data.
 static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
-    if (host->receivedDataLength == sizeof(ENetProtocolHeader) + sizeof(ENetProtocolDisconnect)) {
+    if (host->receivedDataLength >= sizeof(ENetProtocolCommandHeader)) {
         ENetProtocolHeader* protoHeader = (ENetProtocolHeader*)host->receivedData;
-        ENetProtocolDisconnect* disconnect = (ENetProtocolDisconnect*)(protoHeader + 1);
         enet_uint16 peerID = ENET_NET_TO_HOST_16(protoHeader->peerID);
+        size_t headerSize = (peerID & ENET_PROTOCOL_HEADER_FLAG_SENT_TIME) ?
+                            sizeof(ENetProtocolHeader) :
+                            sizeof(ENetProtocolHeader) - sizeof(protoHeader->sentTime);
+        ENetProtocolDisconnect* disconnect;
+
+        // ENet appends the checksum after the optional sentTime field.
+        if (host->checksum != NULL) {
+            headerSize += sizeof(enet_uint32);
+        }
+
+        // A disconnect datagram contains exactly one disconnect command.
+        if (host->receivedDataLength != headerSize + sizeof(ENetProtocolDisconnect)) {
+            return 0;
+        }
+
+        disconnect = (ENetProtocolDisconnect*)(host->receivedData + headerSize);
         enet_uint8 sessionID = (peerID & ENET_PROTOCOL_HEADER_SESSION_MASK) >> ENET_PROTOCOL_HEADER_SESSION_SHIFT;
 
         peerID &= ~(ENET_PROTOCOL_HEADER_FLAG_MASK | ENET_PROTOCOL_HEADER_SESSION_MASK);
@@ -1062,7 +1077,6 @@ static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
 
     return 0;
 }
-
 static void asyncCallbackThreadFunc(void* context) {
     PQUEUED_ASYNC_CALLBACK queuedCb, nextCb;
 
