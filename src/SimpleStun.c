@@ -33,6 +33,32 @@ typedef struct _STUN_MESSAGE {
 
 #pragma pack(pop)
 
+static bool validateStunResponse(int bytesRead, PSTUN_MESSAGE request, PSTUN_MESSAGE response)
+{
+    if (bytesRead <= 0) {
+        // No response or an error
+        return false;
+    }
+    else if (bytesRead < (int)sizeof(*response)) {
+        Limelog("STUN message truncated: %d\n", bytesRead);
+        return false;
+    }
+    else if (htonl(response->magicCookie) != STUN_MESSAGE_COOKIE) {
+        Limelog("Bad STUN cookie value: %x\n", htonl(response->magicCookie));
+        return false;
+    }
+    else if (memcmp(request->transactionId, response->transactionId, sizeof(request->transactionId))) {
+        Limelog("STUN transaction ID mismatch\n");
+        return false;
+    }
+    else if (htons(response->messageType) != STUN_MESSAGE_BINDING_SUCCESS) {
+        Limelog("STUN message type mismatch: %x\n", htons(response->messageType));
+        return false;
+    }
+
+    return true;
+}
+
 // This is extremely rudamentary STUN code simply for deriving the WAN IPv4 address when behind a NAT.
 int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, unsigned int* wanAddr)
 {
@@ -44,6 +70,7 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     STUN_MESSAGE reqMsg;
     int i;
     int bytesRead;
+    bool validResponse;
     PSTUN_ATTRIBUTE_HEADER attribute;
     PSTUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE ipv4Attrib;
     union {
@@ -85,14 +112,15 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     reqMsg.magicCookie = htonl(STUN_MESSAGE_COOKIE);
     PltGenerateRandomData(reqMsg.transactionId, sizeof(reqMsg.transactionId));
 
-    bytesRead = SOCKET_ERROR;
-    for (i = 0; i < STUN_RECV_TIMEOUT_SEC * 1000 / UDP_RECV_POLL_TIMEOUT_MS && bytesRead <= 0; i++) {
-        // Retransmit the request every second until the timeout elapses or we get a response
+    bytesRead = 0;
+    validResponse = false;
+    for (i = 0; i < STUN_RECV_TIMEOUT_SEC * 1000 / UDP_RECV_POLL_TIMEOUT_MS && !validResponse; i++) {
+        // Retransmit the request every second until the timeout elapses or we get a valid response
         if (i % (1000 / UDP_RECV_POLL_TIMEOUT_MS) == 0) {
             struct addrinfo *current;
 
-            // Send a request to each resolved address but stop if we get a response
-            for (current = stunAddrs; current != NULL && bytesRead <= 0; current = current->ai_next) {
+            // Send a request to each resolved address but stop if we get a valid response
+            for (current = stunAddrs; current != NULL && !validResponse; current = current->ai_next) {
                 err = (int)sendto(sock, (char *)&reqMsg, sizeof(reqMsg), 0, current->ai_addr, (SOCKADDR_LEN)current->ai_addrlen);
                 if (err == SOCKET_ERROR) {
                     err = LastSocketFail();
@@ -103,11 +131,13 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
                 // Wait UDP_RECV_POLL_TIMEOUT_MS before moving on to the next server to
                 // avoid having to spam the other STUN servers if we find a working one.
                 bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
+                validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr);
             }
         }
         else {
             // This waits in UDP_RECV_POLL_TIMEOUT_MS increments
             bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
+            validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr);
         }
     }
 
@@ -121,24 +151,9 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
         Limelog("Failed to read STUN binding response: %d\n", err);
         goto Exit;
     }
-    else if (bytesRead < (int)sizeof(resp.hdr)) {
-        Limelog("STUN message truncated: %d\n", bytesRead);
+    else if (!validResponse) {
+        // Already logged in validateStunResponse()
         err = -3;
-        goto Exit;
-    }
-    else if (htonl(resp.hdr.magicCookie) != STUN_MESSAGE_COOKIE) {
-        Limelog("Bad STUN cookie value: %x\n", htonl(resp.hdr.magicCookie));
-        err = -3;
-        goto Exit;
-    }
-    else if (memcmp(reqMsg.transactionId, resp.hdr.transactionId, sizeof(reqMsg.transactionId))) {
-        Limelog("STUN transaction ID mismatch\n");
-        err = -3;
-        goto Exit;
-    }
-    else if (htons(resp.hdr.messageType) != STUN_MESSAGE_BINDING_SUCCESS) {
-        Limelog("STUN message type mismatch: %x\n", htons(resp.hdr.messageType));
-        err = -4;
         goto Exit;
     }
 
