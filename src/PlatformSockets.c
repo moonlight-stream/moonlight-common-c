@@ -583,7 +583,7 @@ int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKA
     }
 
     memcpy(&connAddr, targetAddr, targetAddrLen);
-    SET_PORT(&connAddr, RtspPortNumber);
+    SET_PORT(&connAddr, targetPort);
 
     if (connect(udpSocket, (struct sockaddr*)&connAddr, targetAddrLen) < 0) {
         int err = LastSocketError();
