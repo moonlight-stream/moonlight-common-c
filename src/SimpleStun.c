@@ -33,13 +33,50 @@ typedef struct _STUN_MESSAGE {
 
 #pragma pack(pop)
 
-static bool validateStunResponse(int bytesRead, PSTUN_MESSAGE request, PSTUN_MESSAGE response)
+static bool validateStunResponse(int bytesRead, PSTUN_MESSAGE request, PSTUN_MESSAGE response,
+                                 struct addrinfo* stunAddrs, struct sockaddr_storage* remoteAddr)
 {
+    bool remoteAddrMatch;
+    struct addrinfo *current;
+
     if (bytesRead <= 0) {
         // No response or an error
         return false;
     }
-    else if (bytesRead < (int)sizeof(*response)) {
+
+    // Check that the respone came from one of the addresses we tried
+    remoteAddrMatch = false;
+    for (current = stunAddrs; current != NULL && !remoteAddrMatch; current = current->ai_next) {
+        if (current->ai_family != remoteAddr->ss_family) {
+            continue;
+        }
+
+        if (current->ai_family == AF_INET) {
+            struct sockaddr_in* sin1 = (struct sockaddr_in*)current->ai_addr;
+            struct sockaddr_in* sin2 = (struct sockaddr_in*)remoteAddr;
+
+            remoteAddrMatch = (sin1->sin_port == sin2->sin_port &&
+                               memcmp(&sin1->sin_addr, &sin2->sin_addr, sizeof(sin1->sin_addr)) == 0);
+        }
+#ifdef AF_INET6
+        else if (current->ai_family == AF_INET6) {
+            struct sockaddr_in6* sin1 = (struct sockaddr_in6*)current->ai_addr;
+            struct sockaddr_in6* sin2 = (struct sockaddr_in6*)remoteAddr;
+
+            // We don't check scope for link-local addresses, but a STUN server will never be link-local
+            remoteAddrMatch = (sin1->sin6_port == sin2->sin6_port &&
+                               memcmp(&sin1->sin6_addr, &sin2->sin6_addr, sizeof(sin1->sin6_addr)) == 0);
+        }
+#endif
+    }
+
+    if (!remoteAddrMatch) {
+        Limelog("STUN message received from unexpected address\n");
+        return false;
+    }
+
+    // Validate that the response is valid and successful
+    if (bytesRead < (int)sizeof(*response)) {
         Limelog("STUN message truncated: %d\n", bytesRead);
         return false;
     }
@@ -71,6 +108,8 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
     int i;
     int bytesRead;
     bool validResponse;
+    struct sockaddr_storage remoteAddr;
+    SOCKADDR_LEN addrLen;
     PSTUN_ATTRIBUTE_HEADER attribute;
     PSTUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE ipv4Attrib;
     union {
@@ -130,14 +169,16 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
                 // Wait UDP_RECV_POLL_TIMEOUT_MS before moving on to the next server to
                 // avoid having to spam the other STUN servers if we find a working one.
-                bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
-                validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr);
+                addrLen = sizeof(remoteAddr);
+                bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true, &remoteAddr, &addrLen);
+                validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr, stunAddrs, &remoteAddr);
             }
         }
         else {
             // This waits in UDP_RECV_POLL_TIMEOUT_MS increments
-            bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true);
-            validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr);
+            addrLen = sizeof(remoteAddr);
+            bytesRead = recvUdpSocket(sock, resp.buf, sizeof(resp.buf), true, &remoteAddr, &addrLen);
+            validResponse = validateStunResponse(bytesRead, &reqMsg, &resp.hdr, stunAddrs, &remoteAddr);
         }
     }
 
