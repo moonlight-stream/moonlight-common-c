@@ -214,23 +214,28 @@ int LiFindExternalAddressIP4(const char* stunServer, unsigned short stunPort, un
 
     attribute = (PSTUN_ATTRIBUTE_HEADER)(&resp.hdr + 1);
     bytesRead -= sizeof(resp.hdr);
-    while (bytesRead > (int)sizeof(*attribute)) {
-        if (bytesRead < (int)(sizeof(*attribute) + htons(attribute->length))) {
-            Limelog("STUN attribute out of bounds: %d\n", htons(attribute->length));
+    while (bytesRead >= (int)sizeof(*attribute)) {
+        int attrLen = htons(attribute->length);
+
+        if (bytesRead < (int)sizeof(*attribute) + attrLen) {
+            Limelog("STUN attribute out of bounds: %d\n", attrLen);
             err = -5;
             goto Exit;
         }
         // Mask off the comprehension bit
         else if ((htons(attribute->type) & 0x7FFF) != STUN_ATTRIBUTE_XOR_MAPPED_ADDRESS) {
+            // Attributes are padded to 4 byte alignment
+            int attrPaddedLen = (attrLen + 3) & ~3;
+
             // Continue searching if this wasn't our address
-            bytesRead -= sizeof(*attribute) + htons(attribute->length);
-            attribute = (PSTUN_ATTRIBUTE_HEADER)(((char*)attribute) + sizeof(*attribute) + htons(attribute->length));
+            bytesRead -= sizeof(*attribute) + attrPaddedLen;
+            attribute = (PSTUN_ATTRIBUTE_HEADER)(((char*)attribute) + sizeof(*attribute) + attrPaddedLen);
             continue;
         }
 
         ipv4Attrib = (PSTUN_MAPPED_IPV4_ADDRESS_ATTRIBUTE)attribute;
-        if (htons(ipv4Attrib->hdr.length) != 8) {
-            Limelog("STUN address length mismatch: %d\n", htons(ipv4Attrib->hdr.length));
+        if (attrLen != 8) {
+            Limelog("STUN address length mismatch: %d\n", attrLen);
             err = -5;
             goto Exit;
         }
