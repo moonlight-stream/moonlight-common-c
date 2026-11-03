@@ -75,12 +75,26 @@ static bool validateStunResponse(int bytesRead, PSTUN_MESSAGE request, PSTUN_MES
         return false;
     }
 
-    // Validate that the response is valid and successful
+    // Verify that we at least got a full STUN header
     if (bytesRead < (int)sizeof(*response)) {
         Limelog("STUN message truncated: %d\n", bytesRead);
         return false;
     }
-    else if (htonl(response->magicCookie) != STUN_MESSAGE_COOKIE) {
+
+    // Verify that the message length is valid per RFC 5389
+    unsigned short stunBodyLen = htons(response->messageLength);
+    if ((stunBodyLen & 0x3) != 0) {
+        Limelog("STUN message length is not a multiple of 4\n");
+        return false;
+    }
+    else if (bytesRead < (int)(sizeof(STUN_MESSAGE) + stunBodyLen)) {
+        Limelog("STUN message truncated: expected %d bytes, got %d\n",
+                (int)sizeof(STUN_MESSAGE) + stunBodyLen, bytesRead);
+        return false;
+    }
+
+    // Validate that the response is valid and successful
+    if (htonl(response->magicCookie) != STUN_MESSAGE_COOKIE) {
         Limelog("Bad STUN cookie value: %x\n", htonl(response->magicCookie));
         return false;
     }
