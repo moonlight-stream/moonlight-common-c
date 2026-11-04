@@ -264,6 +264,100 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 #endif
 }
 
+static bool isReplayedMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags, unsigned char replayWindowIndex, unsigned int sequenceNumber) {
+    if (algorithm == ALGORITHM_AES_CBC || (flags & CIPHER_FLAG_NO_REPLAY_CHECK)) {
+        return false;
+    }
+
+    if (replayWindowIndex >= ctx->replayWindowCount) {
+        LC_ASSERT(false);
+        return true;
+    }
+
+    PREPLAY_WINDOW window = &ctx->replayWindows[replayWindowIndex];
+    if (!window->decryptedAuthedMessage) {
+        return false;
+    }
+
+    uint32_t diff = sequenceNumber - window->lastDecryptedAuthedSeqNum;
+    if (diff > 0 && diff < 0x80000000) {
+        // Newer sequence number
+        return false;
+    }
+
+    if (diff == 0) {
+        // Duplicate of highest received sequence number
+        return true;
+    }
+
+    // Packet is older than lastDecryptedAuthedSeqNum
+    uint32_t offset = window->lastDecryptedAuthedSeqNum - sequenceNumber;
+    if (offset >= REPLAY_WINDOW_SIZE) {
+        return true;
+    }
+
+    int wordIndex = (int)(offset / 64);
+    int bitIndex = (int)(offset % 64);
+    return (window->replayWindow[wordIndex] & ((uint64_t)1 << bitIndex)) != 0;
+}
+
+static void shiftReplayWindow(PREPLAY_WINDOW window, uint32_t shift) {
+    if (shift >= REPLAY_WINDOW_SIZE) {
+        memset(window->replayWindow, 0, sizeof(window->replayWindow));
+        window->replayWindow[0] = 1;
+        return;
+    }
+
+    int wordShift = (int)(shift / 64);
+    int bitShift = (int)(shift % 64);
+
+    for (int i = REPLAY_WINDOW_WORDS - 1; i >= 0; i--) {
+        uint64_t val = 0;
+        if (i >= wordShift) {
+            val = window->replayWindow[i - wordShift] << bitShift;
+            if (bitShift > 0 && i > wordShift) {
+                val |= window->replayWindow[i - wordShift - 1] >> (64 - bitShift);
+            }
+        }
+        window->replayWindow[i] = val;
+    }
+
+    window->replayWindow[0] |= 1;
+}
+
+static void recordSuccessfulAuthenticatedDecryption(PPLT_CRYPTO_CONTEXT ctx, int flags, unsigned char replayWindowIndex, unsigned int sequenceNumber) {
+    if (flags & CIPHER_FLAG_NO_REPLAY_CHECK) {
+        return;
+    }
+
+    if (replayWindowIndex >= ctx->replayWindowCount) {
+        LC_ASSERT(false);
+        return;
+    }
+
+    PREPLAY_WINDOW window = &ctx->replayWindows[replayWindowIndex];
+    if (!window->decryptedAuthedMessage) {
+        window->decryptedAuthedMessage = true;
+        window->lastDecryptedAuthedSeqNum = sequenceNumber;
+        memset(window->replayWindow, 0, sizeof(window->replayWindow));
+        window->replayWindow[0] = 1;
+        return;
+    }
+
+    uint32_t diff = sequenceNumber - window->lastDecryptedAuthedSeqNum;
+    if (diff > 0 && diff < 0x80000000) {
+        shiftReplayWindow(window, diff);
+        window->lastDecryptedAuthedSeqNum = sequenceNumber;
+    }
+    else if (diff >= 0x80000000) {
+        uint32_t offset = window->lastDecryptedAuthedSeqNum - sequenceNumber;
+        LC_ASSERT(offset < REPLAY_WINDOW_SIZE);
+        int wordIndex = (int)(offset / 64);
+        int bitIndex = (int)(offset % 64);
+        window->replayWindow[wordIndex] |= ((uint64_t)1 << bitIndex);
+    }
+}
+
 // When CBC is used, outputData buffer must be allocated such that the buffer length is
 // at least ROUND_TO_PKCS7_PADDED_LEN(inputDataLength) to allow room for PKCS7 padding.
 //
@@ -273,11 +367,17 @@ bool PltEncryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 // Changing the key between encrypt/decrypt calls on a single context is not supported.
 // Using the same crypto context for both encryption and decryption is not supported.
 bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
+                       unsigned char replayWindowIndex,
+                       unsigned int sequenceNumber,
                        unsigned char* key, int keyLength,
                        unsigned char* iv, int ivLength,
                        unsigned char* tag, int tagLength,
                        unsigned char* inputData, int inputDataLength,
                        unsigned char* outputData, int* outputDataLength) {
+    if (isReplayedMessage(ctx, algorithm, flags, replayWindowIndex, sequenceNumber)) {
+        return false;
+    }
+
 #ifdef USE_PSA_CRYPTO
     if (algorithm == ALGORITHM_AES_GCM) {
         LC_ASSERT(tag != NULL);
@@ -330,6 +430,7 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
             return false;
         }
 
+        recordSuccessfulAuthenticatedDecryption(ctx, flags, replayWindowIndex, sequenceNumber);
         *outputDataLength = (int)(outLen + verifyLen);
         return true;
     }
@@ -477,6 +578,8 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
             return false;
         }
         LC_ASSERT(len == 0);
+
+        recordSuccessfulAuthenticatedDecryption(ctx, flags, replayWindowIndex, sequenceNumber);
     }
     else if (flags & CIPHER_FLAG_FINISH) {
         int len;
@@ -492,13 +595,13 @@ bool PltDecryptMessage(PPLT_CRYPTO_CONTEXT ctx, int algorithm, int flags,
 #endif
 }
 
-PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(void) {
-    PPLT_CRYPTO_CONTEXT ctx = malloc(sizeof(*ctx));
+PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(unsigned char replayWindowCount) {
+    PPLT_CRYPTO_CONTEXT ctx = calloc(1, sizeof(*ctx) + (replayWindowCount * sizeof(REPLAY_WINDOW)));
     if (!ctx) {
         return NULL;
     }
 
-    ctx->initialized = false;
+    ctx->replayWindowCount = replayWindowCount;
 
 #ifdef USE_PSA_CRYPTO
     ctx->key = PSA_KEY_ID_NULL;

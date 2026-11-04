@@ -38,7 +38,7 @@ static bool receivedFullFrame;
 void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
     RtpvInitializeQueue(&rtpQueue);
-    decryptionCtx = PltCreateCryptoContext();
+    decryptionCtx = PltCreateCryptoContext(0);
     receivedDataFromPeer = false;
     firstDataTimeMs = 0;
     receivedFullFrame = false;
@@ -137,7 +137,9 @@ static void VideoReceiveThreadProc(void* context) {
         err = recvUdpSocket(rtpSocket,
                             encrypted ? encryptedBuffer : buffer,
                             receiveSize,
-                            useSelect);
+                            useSelect,
+                            NULL,
+                            NULL);
         if (err < 0) {
             Limelog("Video Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketFail());
@@ -210,7 +212,8 @@ static void VideoReceiveThreadProc(void* context) {
                 continue;
             }
 
-            if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+            // Replay detection is handled by the check above and in the RtpFecQueue
+            if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, CIPHER_FLAG_NO_REPLAY_CHECK, 0, 0,
                                    (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                    encHeader->iv, sizeof(encHeader->iv),
                                    encHeader->tag, sizeof(encHeader->tag),

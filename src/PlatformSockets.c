@@ -179,7 +179,8 @@ bool isSocketReadable(SOCKET s) {
     return true;
 }
 
-int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
+int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect,
+                  struct sockaddr_storage* remoteAddr, SOCKADDR_LEN* addrLen) {
     int err;
 
     do {
@@ -196,13 +197,13 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
             }
 
             // This won't block since the socket is readable
-            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+            err = (int)recvfrom(s, buffer, size, 0, (struct sockaddr*)remoteAddr, addrLen);
         }
         else {
             // The caller has already configured a timeout on this
             // socket via SO_RCVTIMEO, so we can avoid a syscall
             // for each packet.
-            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+            err = (int)recvfrom(s, buffer, size, 0, (struct sockaddr*)remoteAddr, addrLen);
             if (err < 0 &&
                     (LastSocketError() == EWOULDBLOCK ||
                      LastSocketError() == EINTR ||
@@ -478,13 +479,13 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     if (dstaddr->ss_family == AF_INET) {
         int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IP, IP_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
-            Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+            Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", (int)LastSocketError());
         }
     }
     else {
         int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IPV6, IPV6_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
-            Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+            Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", (int)LastSocketError());
         }
     }
 #elif defined(TCP_NOOPT)
@@ -583,7 +584,7 @@ int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKA
     }
 
     memcpy(&connAddr, targetAddr, targetAddrLen);
-    SET_PORT(&connAddr, RtspPortNumber);
+    SET_PORT(&connAddr, targetPort);
 
     if (connect(udpSocket, (struct sockaddr*)&connAddr, targetAddrLen) < 0) {
         int err = LastSocketError();

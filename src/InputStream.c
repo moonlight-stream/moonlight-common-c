@@ -100,7 +100,7 @@ int initializeInputStream(void) {
     LbqInitializeLinkedBlockingQueue(&packetQueue, MAX_QUEUED_INPUT_PACKETS);
     LbqInitializeLinkedBlockingQueue(&packetHolderFreeList, MAX_QUEUED_INPUT_PACKETS);
 
-    cryptoContext = PltCreateCryptoContext();
+    cryptoContext = PltCreateCryptoContext(0);
     encryptedControlStream = APP_VERSION_AT_LEAST(7, 1, 431);
 
     // FIXME: Unsure if this is exactly right, but it's probably good enough.
@@ -295,7 +295,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder, bool moreData) {
             }
 
             err = (SOCK_RET)sendInputPacketOnControlStream((unsigned char*) encryptedBuffer,
-                                                            (int)(encryptedSize + sizeof(encryptedLengthPrefix)),
+                                                            (unsigned int)(encryptedSize + sizeof(encryptedLengthPrefix)),
                                                             holder->channelId,
                                                             holder->enetPacketFlags,
                                                             moreData);

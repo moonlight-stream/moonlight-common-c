@@ -72,7 +72,7 @@ int initializeAudioStream(void) {
     receivedDataFromPeer = false;
     pingThreadStarted = false;
     firstReceiveTime = 0;
-    audioDecryptionCtx = PltCreateCryptoContext();
+    audioDecryptionCtx = PltCreateCryptoContext(0);
 #ifdef LC_DEBUG
     opusHeaderByte = INVALID_OPUS_HEADER;
 #endif
@@ -189,7 +189,7 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
         memcpy(iv, &ivSeq, sizeof(ivSeq));
 
-        if (!PltDecryptMessage(audioDecryptionCtx, ALGORITHM_AES_CBC, CIPHER_FLAG_RESET_IV | CIPHER_FLAG_FINISH,
+        if (!PltDecryptMessage(audioDecryptionCtx, ALGORITHM_AES_CBC, CIPHER_FLAG_RESET_IV | CIPHER_FLAG_FINISH, 0, ivSeq,
                                (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                iv, sizeof(iv),
                                NULL, 0,
@@ -267,7 +267,8 @@ static void AudioReceiveThreadProc(void* context) {
             }
         }
 
-        packet->header.size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE, useSelect);
+        packet->header.size = recvUdpSocket(rtpSocket, &packet->data[0], MAX_PACKET_SIZE,
+                                            useSelect, NULL, NULL);
         if (packet->header.size < 0) {
             Limelog("Audio Receive: recvUdpSocket() failed: %d\n", (int)LastSocketError());
             ListenerCallbacks.connectionTerminated(LastSocketFail());

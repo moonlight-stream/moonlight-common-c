@@ -31,6 +31,17 @@ typedef struct _NVCTL_ENCRYPTED_PACKET_HEADER {
     // encrypted NVCTL_ENET_PACKET_HEADER_V2 and payload data follow
 } NVCTL_ENCRYPTED_PACKET_HEADER, *PNVCTL_ENCRYPTED_PACKET_HEADER;
 
+#pragma pack(push, 1)
+typedef struct _NVCTL_ENCRYPTED_PACKET_HEADER_JUMBO {
+    unsigned short encryptedHeaderType; // Always LE 0x0002
+    unsigned int length; // sizeof(seq) + 16 byte tag + secondary header and data
+    unsigned int seq; // Monotonically increasing sequence number (used as IV for AES-GCM)
+
+    // encrypted NVCTL_ENET_PACKET_HEADER_V1 and payload data follow
+} NVCTL_ENCRYPTED_PACKET_HEADER_JUMBO, *PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO;
+#pragma pack(pop)
+
+
 typedef struct _QUEUED_REFERENCE_FRAME_CONTROL {
     uint32_t startFrame;
     uint32_t endFrame;
@@ -163,6 +174,7 @@ static const short packetTypesGen3[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen4[] = {
     0x0606, // Request IDR frame
@@ -177,6 +189,7 @@ static const short packetTypesGen4[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen5[] = {
     0x0305, // Start A
@@ -191,6 +204,7 @@ static const short packetTypesGen5[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen7[] = {
     0x0305, // Start A
@@ -205,6 +219,7 @@ static const short packetTypesGen7[] = {
     -1,     // Rumble triggers (unused)
     -1,     // Set motion event (unused)
     -1,     // Set RGB LED (unused)
+    -1,     // Set Adaptive Triggers (unused)
 };
 static const short packetTypesGen7Enc[] = {
     0x0302, // Request IDR frame
@@ -358,8 +373,8 @@ int initializeControlStream(void) {
     firstFrameTimeMs = 0;
     currentEnetSequenceNumber = 0;
     usePeriodicPing = APP_VERSION_AT_LEAST(7, 1, 415);
-    encryptionCtx = PltCreateCryptoContext();
-    decryptionCtx = PltCreateCryptoContext();
+    encryptionCtx = PltCreateCryptoContext(0);
+    decryptionCtx = PltCreateCryptoContext(CTRL_CHANNEL_COUNT);
     hdrEnabled = false;
     memset(&hdrMetadata, 0, sizeof(hdrMetadata));
 
@@ -551,33 +566,64 @@ static PNVCTL_TCP_PACKET_HEADER readNvctlPacketTcp(void) {
     return fullPacket;
 }
 
-static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
-    unsigned char iv[16] = { 0 };
-    int ivSize;
-    int encryptedSize = sizeof(*packet) + packet->payloadLength;
-
+static void populateOutgoingIv(unsigned int seq, unsigned char* iv, int* ivSize) {
     // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
     if (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) {
         // Populate the IV in little endian byte order
-        iv[3] = (unsigned char)(encPacket->seq >> 24);
-        iv[2] = (unsigned char)(encPacket->seq >> 16);
-        iv[1] = (unsigned char)(encPacket->seq >> 8);
-        iv[0] = (unsigned char)(encPacket->seq >> 0);
+        iv[3] = (unsigned char)(seq >> 24);
+        iv[2] = (unsigned char)(seq >> 16);
+        iv[1] = (unsigned char)(seq >> 8);
+        iv[0] = (unsigned char)(seq >> 0);
 
         // Set high bytes to something unique to ensure no IV collisions
         iv[10] = (unsigned char)'C'; // Client originated
         iv[11] = (unsigned char)'C'; // Control stream
 
         // Use 12-byte IV which is ideal for AES-GCM
-        ivSize = 12;
+        *ivSize = 12;
     }
     else {
         // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-        iv[0] = (unsigned char)encPacket->seq;
+        iv[0] = (unsigned char)seq;
 
         // Nvidia's old style encryption uses a 16-byte IV
-        ivSize = 16;
+        *ivSize = 16;
     }
+}
+
+static void populateIncomingIv(unsigned int seq, unsigned char* iv, int* ivSize, int* cipherFlags) {
+    if (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) {
+        // Populate the IV in little endian byte order
+        iv[3] = (unsigned char)(seq >> 24);
+        iv[2] = (unsigned char)(seq >> 16);
+        iv[1] = (unsigned char)(seq >> 8);
+        iv[0] = (unsigned char)(seq >> 0);
+
+        // Set high bytes to something unique to ensure no IV collisions
+        iv[10] = (unsigned char)'H'; // Host originated
+        iv[11] = (unsigned char)'C'; // Control stream
+
+        // Use 12-byte IV which is ideal for AES-GCM
+        *ivSize = 12;
+        *cipherFlags = 0;
+    }
+    else {
+        // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
+        iv[0] = (unsigned char)seq;
+        *cipherFlags = CIPHER_FLAG_NO_REPLAY_CHECK;
+
+        // Nvidia's old style encryption uses a 16-byte IV
+        *ivSize = 16;
+    }
+}
+
+static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVCTL_ENET_PACKET_HEADER_V2 packet) {
+    unsigned char iv[16] = { 0 };
+    int ivSize;
+    int encryptedSize = sizeof(*packet) + packet->payloadLength;
+
+    // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
+    populateOutgoingIv(encPacket->seq, iv, &ivSize);
 
     encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
     encPacket->length = LE16(encPacket->length);
@@ -596,10 +642,35 @@ static bool encryptControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, PNVC
                              ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, &encryptedSize); // Write ciphertext after the GCM tag
 }
 
-// Caller must free() *packet on success!!!
-static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
+static bool encryptJumboControlMessage(PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO encPacket, PNVCTL_ENET_PACKET_HEADER_V1 packet, unsigned int payloadLength) {
     unsigned char iv[16] = { 0 };
     int ivSize;
+    int encryptedSize = sizeof(*packet) + payloadLength;
+
+    // NB: Setting the IV must happen while encPacket->seq is still in native byte-order!
+    populateOutgoingIv(encPacket->seq, iv, &ivSize);
+
+    encPacket->encryptedHeaderType = LE16(encPacket->encryptedHeaderType);
+    encPacket->length = LE32(encPacket->length);
+    encPacket->seq = LE32(encPacket->seq);
+
+    packet->type = LE16(packet->type);
+
+    LC_ASSERT(ivSize <= (int)sizeof(iv));
+    LC_ASSERT(ivSize == 12 || ivSize == 16);
+    return PltEncryptMessage(encryptionCtx, ALGORITHM_AES_GCM, 0,
+                             (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                             iv, ivSize,
+                             (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // Write tag into the space after the encrypted header
+                             (unsigned char*)packet, encryptedSize,
+                             ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, &encryptedSize); // Write ciphertext after the GCM tag
+}
+
+// Caller must free() *packet on success!!!
+static bool decryptControlMessageToV1(uint8_t channelId, PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
+    unsigned char iv[16] = { 0 };
+    int ivSize;
+    int cipherFlags;
 
     *packet = NULL;
 
@@ -620,27 +691,7 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
         return false;
     }
 
-    if (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) {
-        // Populate the IV in little endian byte order
-        iv[3] = (unsigned char)(encPacket->seq >> 24);
-        iv[2] = (unsigned char)(encPacket->seq >> 16);
-        iv[1] = (unsigned char)(encPacket->seq >> 8);
-        iv[0] = (unsigned char)(encPacket->seq >> 0);
-
-        // Set high bytes to something unique to ensure no IV collisions
-        iv[10] = (unsigned char)'H'; // Host originated
-        iv[11] = (unsigned char)'C'; // Control stream
-
-        // Use 12-byte IV which is ideal for AES-GCM
-        ivSize = 12;
-    }
-    else {
-        // This is a truncating cast, but it's what Nvidia does, so we have to mimic it.
-        iv[0] = (unsigned char)encPacket->seq;
-
-        // Nvidia's old style encryption uses a 16-byte IV
-        ivSize = 16;
-    }
+    populateIncomingIv(encPacket->seq, iv, &ivSize, &cipherFlags);
 
     int plaintextLength = encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH;
     *packet = malloc(plaintextLength);
@@ -650,13 +701,14 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
 
     LC_ASSERT(ivSize <= (int)sizeof(iv));
     LC_ASSERT(ivSize == 12 || ivSize == 16);
-    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, cipherFlags, channelId, encPacket->seq,
                            (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                            iv, ivSize,
                            (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header
                            ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength, // The ciphertext is after the tag
                            (unsigned char*)*packet, &plaintextLength)) {
         free(*packet);
+        *packet = NULL;
         return false;
     }
 
@@ -664,6 +716,59 @@ static bool decryptControlMessageToV1(PNVCTL_ENCRYPTED_PACKET_HEADER encPacket, 
     // All we need to do is eliminate the new length field in V2 by shifting everything by 2 bytes.
     memmove(((unsigned char*)*packet) + 2, ((unsigned char*)*packet) + 4, plaintextLength - 4);
     *packetLength = plaintextLength - 2;
+
+    return true;
+}
+
+// Caller must free() *packet on success!!!
+static bool decryptJumboControlMessageToV1(uint8_t channelId, PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO encPacket, int encPacketLength, PNVCTL_ENET_PACKET_HEADER_V1* packet, int* packetLength) {
+    unsigned char iv[16] = { 0 };
+    int ivSize;
+    int cipherFlags;
+
+    *packet = NULL;
+
+    // It must be an encrypted jumbo packet to begin with
+    LC_ASSERT(encPacket->encryptedHeaderType == 0x0002);
+
+    // Make sure the host isn't lying to us about the packet length
+    size_t expectedEncLength = (size_t)encPacket->length + sizeof(encPacket->encryptedHeaderType) + sizeof(encPacket->length);
+    LC_ASSERT((size_t)encPacketLength == expectedEncLength);
+    if ((size_t)encPacketLength < expectedEncLength) {
+        Limelog("Length exceeds packet boundary (needed %zu, got %d)\n", expectedEncLength, encPacketLength);
+        return false;
+    }
+
+    // Check length first so we don't underflow
+    if (encPacket->length < sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(NVCTL_ENET_PACKET_HEADER_V1)) {
+        Limelog("Received runt jumbo packet (%u). Unable to decrypt.\n", encPacket->length);
+        return false;
+    }
+
+    populateIncomingIv(encPacket->seq, iv, &ivSize, &cipherFlags);
+
+    int plaintextLength = (int)(encPacket->length - sizeof(encPacket->seq) - AES_GCM_TAG_LENGTH);
+    *packet = malloc(plaintextLength);
+    if (*packet == NULL) {
+        return false;
+    }
+
+    LC_ASSERT(ivSize <= (int)sizeof(iv));
+    LC_ASSERT(ivSize == 12 || ivSize == 16);
+    if (!PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, cipherFlags, channelId, encPacket->seq,
+                           (unsigned char*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
+                           iv, ivSize,
+                           (unsigned char*)(encPacket + 1), AES_GCM_TAG_LENGTH, // The tag is located right after the header
+                           ((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH, plaintextLength, // The ciphertext is after the tag
+                           (unsigned char*)*packet, &plaintextLength)) {
+        free(*packet);
+        *packet = NULL;
+        return false;
+    }
+
+    // Jumbo packets contain NVCTL_ENET_PACKET_HEADER_V1 and payload directly,
+    // so no conversion is necessary.
+    *packetLength = plaintextLength;
 
     return true;
 }
@@ -695,7 +800,7 @@ static bool isPacketSentWaitingForAck(ENetPacket* packet) {
     return false;
 }
 
-static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageEnet(short ptype, unsigned int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     ENetPacket* enetPacket;
     int err;
 
@@ -707,36 +812,75 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
     }
 
     if (encryptedControlStream) {
-        PNVCTL_ENCRYPTED_PACKET_HEADER encPacket;
-        PNVCTL_ENET_PACKET_HEADER_V2 packet;
+        if (sizeof(uint32_t) + AES_GCM_TAG_LENGTH + sizeof(NVCTL_ENET_PACKET_HEADER_V2) + paylen <= 0xFFFF) {
+            PNVCTL_ENCRYPTED_PACKET_HEADER encPacket;
+            PNVCTL_ENET_PACKET_HEADER_V2 packet;
 
-        enetPacket = enet_packet_create(NULL,
-                                        sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
-                                        flags);
-        if (enetPacket == NULL) {
-            return false;
+            enetPacket = enet_packet_create(NULL,
+                                            sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
+                                            flags);
+            if (enetPacket == NULL) {
+                return false;
+            }
+
+            // We (ab)use the enetMutex to protect currentEnetSequenceNumber and the cipherContext
+            // used inside encryptControlMessage().
+            PltLockMutex(&enetMutex);
+
+            encPacket = (PNVCTL_ENCRYPTED_PACKET_HEADER)enetPacket->data;
+            encPacket->encryptedHeaderType = 0x0001;
+            encPacket->length = (unsigned short)(sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen);
+            encPacket->seq = currentEnetSequenceNumber++;
+
+            // Construct the plaintext data for encryption
+            packet = (PNVCTL_ENET_PACKET_HEADER_V2)(((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH);
+            packet->type = ptype;
+            packet->payloadLength = paylen;
+            memcpy(&packet[1], payload, paylen);
+
+            // Encrypt the data into the final packet (and byteswap for BE machines)
+            if (!encryptControlMessage(encPacket, packet)) {
+                Limelog("Failed to encrypt control stream message\n");
+                enet_packet_destroy(enetPacket);
+                PltUnlockMutex(&enetMutex);
+                return false;
+            }
         }
+        else if (IS_SUNSHINE() && (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2)) {
+            PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO encPacket;
+            PNVCTL_ENET_PACKET_HEADER_V1 packet;
 
-        // We (ab)use the enetMutex to protect currentEnetSequenceNumber and the cipherContext
-        // used inside encryptControlMessage().
-        PltLockMutex(&enetMutex);
+            enetPacket = enet_packet_create(NULL,
+                                            sizeof(*encPacket) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen,
+                                            flags);
+            if (enetPacket == NULL) {
+                return false;
+            }
 
-        encPacket = (PNVCTL_ENCRYPTED_PACKET_HEADER)enetPacket->data;
-        encPacket->encryptedHeaderType = 0x0001;
-        encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
-        encPacket->seq = currentEnetSequenceNumber++;
+            // We (ab)use the enetMutex to protect currentEnetSequenceNumber and the cipherContext
+            // used inside encryptJumboControlMessage().
+            PltLockMutex(&enetMutex);
 
-        // Construct the plaintext data for encryption
-        packet = (PNVCTL_ENET_PACKET_HEADER_V2)(((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH);
-        packet->type = ptype;
-        packet->payloadLength = paylen;
-        memcpy(&packet[1], payload, paylen);
+            encPacket = (PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO)enetPacket->data;
+            encPacket->encryptedHeaderType = 0x0002;
+            encPacket->length = sizeof(encPacket->seq) + AES_GCM_TAG_LENGTH + sizeof(*packet) + paylen;
+            encPacket->seq = currentEnetSequenceNumber++;
 
-        // Encrypt the data into the final packet (and byteswap for BE machines)
-        if (!encryptControlMessage(encPacket, packet)) {
-            Limelog("Failed to encrypt control stream message\n");
-            enet_packet_destroy(enetPacket);
-            PltUnlockMutex(&enetMutex);
+            // Construct the plaintext data for encryption
+            packet = (PNVCTL_ENET_PACKET_HEADER_V1)(((unsigned char*)(encPacket + 1)) + AES_GCM_TAG_LENGTH);
+            packet->type = ptype;
+            memcpy(&packet[1], payload, paylen);
+
+            // Encrypt the data into the final packet (and byteswap for BE machines)
+            if (!encryptJumboControlMessage(encPacket, packet, paylen)) {
+                Limelog("Failed to encrypt control stream message\n");
+                enet_packet_destroy(enetPacket);
+                PltUnlockMutex(&enetMutex);
+                return false;
+            }
+        }
+        else {
+            Limelog("Needed a jumbo message to a legacy server!\n");
             return false;
         }
 
@@ -779,7 +923,8 @@ static bool sendMessageEnet(short ptype, short paylen, const void* payload, uint
         err = enet_host_service(client, NULL, 0);
 
         // Wait until the packet is actually sent to provide backpressure on senders
-        if (flags & ENET_PACKET_FLAG_RELIABLE) {
+        // sending small packets (like the input thread sending mouse/keyboard/gamepad data)
+        if (paylen < (ENET_HOST_DEFAULT_MTU - 128) && (flags & ENET_PACKET_FLAG_RELIABLE)) {
             // Don't wait longer than 10 milliseconds to avoid blocking callers for too long
             for (int i = 0; err >= 0 && i < 10; i++) {
                 // Break on disconnected, acked/freed, or sent (pending ack).
@@ -847,7 +992,7 @@ static bool sendMessageTcp(short ptype, short paylen, const void* payload) {
     return true;
 }
 
-static bool sendMessageAndForget(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndForget(short ptype, unsigned int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     bool ret;
 
     // Unlike regular sockets, ENet sockets aren't safe to invoke from multiple
@@ -856,13 +1001,14 @@ static bool sendMessageAndForget(short ptype, short paylen, const void* payload,
         ret = sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData);
     }
     else {
-        ret = sendMessageTcp(ptype, paylen, payload);
+        LC_ASSERT(paylen <= 0xFFFF);
+        ret = sendMessageTcp(ptype, (short)paylen, payload);
     }
 
     return ret;
 }
 
-static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
+static bool sendMessageAndDiscardReply(short ptype, unsigned int paylen, const void* payload, uint8_t channelId, uint32_t flags, bool moreData) {
     if (AppVersionQuad[0] >= 5) {
         if (!sendMessageEnet(ptype, paylen, payload, channelId, flags, moreData)) {
             return false;
@@ -871,7 +1017,8 @@ static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* pa
     else {
         PNVCTL_TCP_PACKET_HEADER reply;
 
-        if (!sendMessageTcp(ptype, paylen, payload)) {
+        LC_ASSERT(paylen <= 0xFFFF);
+        if (!sendMessageTcp(ptype, (short)paylen, payload)) {
             return false;
         }
 
@@ -891,9 +1038,38 @@ static bool sendMessageAndDiscardReply(short ptype, short paylen, const void* pa
 // pending receives first. It works around what appears to be a bug in ENet
 // where pending disconnects can cause loss of unprocessed received data.
 static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
-    if (host->receivedDataLength == sizeof(ENetProtocolHeader) + sizeof(ENetProtocolDisconnect)) {
+    if (host->receivedDataLength >= sizeof(ENetProtocolCommandHeader)) {
         ENetProtocolHeader* protoHeader = (ENetProtocolHeader*)host->receivedData;
-        ENetProtocolDisconnect* disconnect = (ENetProtocolDisconnect*)(protoHeader + 1);
+        enet_uint16 peerID = ENET_NET_TO_HOST_16(protoHeader->peerID);
+        size_t headerSize = (peerID & ENET_PROTOCOL_HEADER_FLAG_SENT_TIME) ?
+                            sizeof(ENetProtocolHeader) :
+                            sizeof(ENetProtocolHeader) - sizeof(protoHeader->sentTime);
+        ENetProtocolDisconnect* disconnect;
+
+        // ENet appends the checksum after the optional sentTime field.
+        if (host->checksum != NULL) {
+            headerSize += sizeof(enet_uint32);
+        }
+
+        // A disconnect datagram contains exactly one disconnect command.
+        if (host->receivedDataLength != headerSize + sizeof(ENetProtocolDisconnect)) {
+            return 0;
+        }
+
+        disconnect = (ENetProtocolDisconnect*)(host->receivedData + headerSize);
+        enet_uint8 sessionID = (peerID & ENET_PROTOCOL_HEADER_SESSION_MASK) >> ENET_PROTOCOL_HEADER_SESSION_SHIFT;
+
+        peerID &= ~(ENET_PROTOCOL_HEADER_FLAG_MASK | ENET_PROTOCOL_HEADER_SESSION_MASK);
+
+        // This runs before ENet validates the packet at all, so only act on disconnects
+        // that are addressed to our peer and come from the address we're talking to.
+        // Anything else is left for ENet's own processing.
+        if (peer == NULL ||
+            peerID != peer->incomingPeerID ||
+            sessionID != peer->incomingSessionID ||
+            !enet_address_equal(&host->receivedPeerAddress, &peer->address)) {
+            return 0;
+        }
 
         if ((disconnect->header.command & ENET_PROTOCOL_COMMAND_MASK) == ENET_PROTOCOL_COMMAND_DISCONNECT) {
             Limelog("ENet disconnect event pending\n");
@@ -907,7 +1083,6 @@ static int ignoreDisconnectIntercept(ENetHost* host, ENetEvent* event) {
 
     return 0;
 }
-
 static void asyncCallbackThreadFunc(void* context) {
     PQUEUED_ASYNC_CALLBACK queuedCb, nextCb;
 
@@ -1273,8 +1448,33 @@ static void controlReceiveThreadFunc(void* context) {
 
                     ctlHdr = NULL;
                     packetLength = (int)event.packet->dataLength;
-                    if (!decryptControlMessageToV1(encHdr, packetLength, &ctlHdr, &packetLength)) {
+                    if (!decryptControlMessageToV1(event.channelID, encHdr, packetLength, &ctlHdr, &packetLength)) {
                         Limelog("Failed to decrypt control packet of size %d\n", event.packet->dataLength);
+                        enet_packet_destroy(event.packet);
+                        continue;
+                    }
+
+                    // We need to byteswap the unsealed header too
+                    ctlHdr->type = LE16(ctlHdr->type);
+                }
+                else if (ctlHdr->type == 0x0002) {
+                    PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO encHdr;
+
+                    if (event.packet->dataLength < sizeof(NVCTL_ENCRYPTED_PACKET_HEADER_JUMBO)) {
+                        Limelog("Discarding runt jumbo encrypted control packet: %d < %d\n", event.packet->dataLength, (int)sizeof(NVCTL_ENCRYPTED_PACKET_HEADER_JUMBO));
+                        enet_packet_destroy(event.packet);
+                        continue;
+                    }
+
+                    // encryptedHeaderType is already byteswapped by aliasing through ctlHdr above
+                    encHdr = (PNVCTL_ENCRYPTED_PACKET_HEADER_JUMBO)event.packet->data;
+                    encHdr->length = LE32(encHdr->length);
+                    encHdr->seq = LE32(encHdr->seq);
+
+                    ctlHdr = NULL;
+                    packetLength = (int)event.packet->dataLength;
+                    if (!decryptJumboControlMessageToV1(event.channelID, encHdr, packetLength, &ctlHdr, &packetLength)) {
+                        Limelog("Failed to decrypt jumbo control packet of size %d\n", event.packet->dataLength);
                         enet_packet_destroy(event.packet);
                         continue;
                     }
@@ -1728,7 +1928,7 @@ int stopControlStream(void) {
 }
 
 // Called by the input stream to send a packet for Gen 5+ servers
-int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData) {
+int sendInputPacketOnControlStream(unsigned char* data, unsigned int length, uint8_t channelId, uint32_t flags, bool moreData) {
     LC_ASSERT(AppVersionQuad[0] >= 5);
 
     // Send the input data (no reply expected)
