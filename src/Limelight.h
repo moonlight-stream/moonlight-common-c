@@ -1,3 +1,4 @@
+
 //
 // This header exposes the public streaming API for client usage
 //
@@ -100,10 +101,23 @@ typedef struct _STREAM_CONFIGURATION {
     // in /launch and /resume requests.
     char remoteInputAesKey[16];
     char remoteInputAesIv[16];
+
+    // Experimental NVIDIA GameStream microphone SETUP negotiation only.
+    // Zero (the default) leaves the existing handshake unchanged. This does not
+    // capture/send audio or negotiate microphone encryption. A nonzero value
+    // requires explicit client opt-in and an advertised native mic capability.
+    int requestNativeMic;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
+
+// Experimental native GameStream microphone destination for the current session.
+// Query only after LiStartConnection() succeeds and before LiStopConnection().
+// Returns zero if disabled, unsupported, rejected, or unavailable. A nonzero
+// port is not proof of a usable recording endpoint or encrypted microphone
+// transport. It must not be used as a Sunshine microphone capability flag.
+unsigned short LiGetNativeMicPort(void);
 
 // These identify codec configuration data in the buffer lists
 // of frames identified as IDR frames for H.264 and HEVC formats.
