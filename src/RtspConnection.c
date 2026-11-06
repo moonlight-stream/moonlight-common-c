@@ -1,5 +1,7 @@
+
 #include "Limelight-internal.h"
 #include "Rtsp.h"
+#include "NativeMicNegotiation.h"
 
 #define RTSP_CONNECT_TIMEOUT_SEC 10
 #define RTSP_RECEIVE_TIMEOUT_SEC 15
@@ -15,6 +17,16 @@ static char urlAddr[URLSAFESTRING_LEN];
 static bool useEnet;
 static char* controlStreamId;
 static bool encryptedRtspEnabled;
+static unsigned short nativeMicPort;
+
+void resetNativeMicState(void) {
+    nativeMicPort = 0;
+}
+
+unsigned short LiGetNativeMicPort(void) {
+    return nativeMicPort;
+}
+
 
 static PPLT_CRYPTO_CONTEXT encryptionCtx;
 static PPLT_CRYPTO_CONTEXT decryptionCtx;
@@ -592,7 +604,9 @@ static bool setupStream(PRTSP_MESSAGE response, char* target, int* error) {
             // It looks like GFE doesn't care what we say our port is but
             // we need to give it some port to successfully complete the
             // handshake process.
-            transportValue = "unicast;X-GS-ClientPort=50000-50001";
+            transportValue = strcmp(target, "streamid=mic/0/0") == 0
+                    ? "unicast;X-GS-ClientPort=50002-50003"
+                    : "unicast;X-GS-ClientPort=50000-50001";
         }
         else {
             transportValue = " ";
@@ -943,6 +957,9 @@ bool parseSdpAttributeToInt(const char* payload, const char* name, int* val) {
 // Perform RTSP Handshake with the streaming server machine as part of the connection process
 int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     int ret;
+    unsigned short advertisedMicPort = 0;
+
+    resetNativeMicState();
 
     LC_ASSERT(RtspPortNumber != 0);
 
@@ -1085,6 +1102,14 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP DESCRIBE no content in response\n");
             ret = -1;
             goto Exit;
+        }
+
+        // Native NVIDIA capability only. Sunshine requires a separately agreed
+        // protocol; do not probe an unsupported host just because the caller opts in.
+        if (StreamConfig.requestNativeMic && !IS_SUNSHINE() && AppVersionQuad[0] >= 7) {
+            if (response.payloadLength > 0) {
+                parseMicSdpPort(response.payload, (size_t)response.payloadLength, &advertisedMicPort);
+            }
         }
 
         if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "AV1/90000")) {
@@ -1330,6 +1355,34 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         freeMessage(&response);
     }
 
+    if (advertisedMicPort != 0) {
+        RTSP_MESSAGE response;
+        int error = -1;
+
+        // A declined optional stream must not prevent ordinary streaming.
+        // The destination remains unavailable unless SETUP succeeds.
+        if (setupStream(&response, "streamid=mic/0/0", &error)) {
+            if (response.message.response.statusCode == 200) {
+                const char* transport = NULL;
+                unsigned transportCount = 0;
+                for (POPTION_ITEM option = response.options; option != NULL; option = option->next) {
+                    if (equalAsciiInsensitive(option->option, strlen(option->option), "transport")) {
+                        transport = option->content;
+                        transportCount++;
+                    }
+                }
+                if (transportCount == 0) {
+                    nativeMicPort = advertisedMicPort;
+                }
+                else if (transportCount == 1 && transport != NULL) {
+                    parseMicTransportPort(transport, strlen(transport), &nativeMicPort);
+                }
+            }
+            freeMessage(&response);
+        }
+        Limelog("Native microphone negotiation: %s\n", nativeMicPort ? "available" : "unavailable");
+    }
+
     {
         RTSP_MESSAGE response;
         int error = -1;
@@ -1416,6 +1469,10 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     ret = 0;
 
 Exit:
+    if (ret != 0) {
+        resetNativeMicState();
+    }
+
     // Cleanup the ENet stuff
     if (useEnet) {
         if (peer != NULL) {
