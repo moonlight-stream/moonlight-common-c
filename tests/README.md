@@ -21,8 +21,8 @@ cmake --build build-mic-tests
 ctest --test-dir build-mic-tests --output-on-failure
 ```
 
-`MIC_PORT_ABSENT` and `MIC_PORT_INVALID` are distinct so the caller can apply a
-deliberate fallback policy. Invalid input always clears the output port. Both
+`MIC_PORT_ABSENT`, `MIC_PORT_DEFERRED`, and `MIC_PORT_INVALID` are distinct so the caller can apply a
+deliberate fallback policy. Native SDP zero yields `MIC_PORT_DEFERRED`: SETUP must supply a valid destination; zero is never a send port. Transport zero is invalid. Invalid input always clears the output port. Both
 functions accept bounded spans and reject embedded NUL bytes. SDP accepts CRLF
 or LF line endings and a final line without a terminator. Transport accepts
 a decimal port or an ascending decimal range, including optional surrounding

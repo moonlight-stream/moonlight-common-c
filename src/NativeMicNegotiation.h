@@ -8,7 +8,8 @@
 typedef enum _MIC_PORT_RESULT {
     MIC_PORT_INVALID = -1,
     MIC_PORT_ABSENT = 0,
-    MIC_PORT_VALID = 1
+    MIC_PORT_VALID = 1,
+    MIC_PORT_DEFERRED = 2 // Native SDP zero: resolve through SETUP, never send to zero.
 } MIC_PORT_RESULT;
 
 // Buffers are bounded spans, not necessarily NUL-terminated. NULL is valid only
@@ -28,7 +29,7 @@ static inline void trim(const char** start, const char** end) {
     while (*end > *start && whitespace((*end)[-1])) (*end)--;
 }
 
-static inline int decimalPort(const char** current, const char* end, unsigned short* port) {
+static inline int decimalPort(const char** current, const char* end, unsigned short* port, int allowZero) {
     unsigned value = 0;
     const char* p = *current;
     if (p == end || *p < '0' || *p > '9') return 0;
@@ -38,7 +39,7 @@ static inline int decimalPort(const char** current, const char* end, unsigned sh
         value = value * 10U + digit;
         p++;
     } while (p < end && *p >= '0' && *p <= '9');
-    if (value == 0) return 0;
+    if (value == 0 && !allowZero) return 0;
     *current = p;
     *port = (unsigned short)value;
     return 1;
@@ -75,7 +76,7 @@ static inline MIC_PORT_RESULT parseMicSdpPort(const char* data, size_t length, u
             seen = 1;
             start += sizeof(key) - 1;
             trim(&start, &end);
-            if (!decimalPort(&start, end, &parsed) || start != end) return MIC_PORT_INVALID;
+            if (!decimalPort(&start, end, &parsed, 1) || start != end) return MIC_PORT_INVALID;
         }
         if (offset < length && data[offset] == '\r') {
             offset++;
@@ -85,7 +86,7 @@ static inline MIC_PORT_RESULT parseMicSdpPort(const char* data, size_t length, u
     }
     if (!seen) return MIC_PORT_ABSENT;
     *port = parsed;
-    return MIC_PORT_VALID;
+    return parsed ? MIC_PORT_VALID : MIC_PORT_DEFERRED;
 }
 
 static inline MIC_PORT_RESULT parseMicTransportPort(const char* data, size_t length, unsigned short* port) {
@@ -115,11 +116,11 @@ static inline MIC_PORT_RESULT parseMicTransportPort(const char* data, size_t len
             seen = 1;
             start = equals + 1;
             trim(&start, &end);
-            if (!decimalPort(&start, end, &parsed)) return MIC_PORT_INVALID;
+            if (!decimalPort(&start, end, &parsed, 0)) return MIC_PORT_INVALID;
             if (start < end && *start == '-') {
                 unsigned short last;
                 start++;
-                if (!decimalPort(&start, end, &last) || last < parsed) return MIC_PORT_INVALID;
+                if (!decimalPort(&start, end, &last, 0) || last < parsed) return MIC_PORT_INVALID;
             }
             if (start != end) return MIC_PORT_INVALID;
         }

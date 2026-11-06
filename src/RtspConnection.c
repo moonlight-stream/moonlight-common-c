@@ -1,4 +1,3 @@
-
 #include "Limelight-internal.h"
 #include "Rtsp.h"
 #include "NativeMicNegotiation.h"
@@ -25,6 +24,18 @@ void resetNativeMicState(void) {
 
 unsigned short LiGetNativeMicPort(void) {
     return nativeMicPort;
+}
+
+int LiIsNativeMicAudioEncrypted(void) {
+    return nativeMicPort != 0 && AudioEncryptionEnabled;
+}
+
+int LiGetNativeMicAddress(char* address, int addressLength) {
+    if (address == NULL || addressLength <= 0) return 0;
+    address[0] = 0;
+    if (nativeMicPort == 0 || RemoteAddr.ss_family != AF_INET) return 0;
+    struct sockaddr_in* remote = (struct sockaddr_in*)&RemoteAddr;
+    return inet_ntop(AF_INET, &remote->sin_addr, address, (size_t)addressLength) != NULL;
 }
 
 
@@ -958,6 +969,7 @@ bool parseSdpAttributeToInt(const char* payload, const char* name, int* val) {
 int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     int ret;
     unsigned short advertisedMicPort = 0;
+    bool nativeMicEligible = false;
 
     resetNativeMicState();
 
@@ -1104,11 +1116,14 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             goto Exit;
         }
 
-        // Native NVIDIA capability only. Sunshine requires a separately agreed
-        // protocol; do not probe an unsupported host just because the caller opts in.
+        // Native NVIDIA only. The tested host advertises zero before SETUP;
+        // opt-in permits that native probe, but no destination is fabricated.
+        // Sunshine has a distinct protocol and is not probed here.
         if (StreamConfig.requestNativeMic && !IS_SUNSHINE() && AppVersionQuad[0] >= 7) {
             if (response.payloadLength > 0) {
-                parseMicSdpPort(response.payload, (size_t)response.payloadLength, &advertisedMicPort);
+                MIC_PORT_RESULT micResult = parseMicSdpPort(response.payload,
+                        (size_t)response.payloadLength, &advertisedMicPort);
+                nativeMicEligible = micResult != MIC_PORT_INVALID;
             }
         }
 
@@ -1355,7 +1370,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         freeMessage(&response);
     }
 
-    if (advertisedMicPort != 0) {
+    if (nativeMicEligible) {
         RTSP_MESSAGE response;
         int error = -1;
 

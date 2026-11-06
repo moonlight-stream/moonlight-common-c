@@ -1,4 +1,3 @@
-
 #include "Limelight-internal.h"
 
 static int stage = STAGE_NONE;

@@ -1,41 +1,29 @@
-# Experimental native microphone negotiation
+# Native microphone session negotiation
 
-This draft isolates opt-in NVIDIA GameStream microphone session negotiation for review. It does not capture audio, transmit voice, create a Windows recording device, or implement microphone encryption. Existing callers retain their current handshake when the new configuration field is zero.
+This shared-library change provides opt-in NVIDIA GameStream microphone negotiation and session endpoint access. The companion macOS Qt changes provide capture, consent, status and stop handling; the companion Windows package provides the version-pinned host integration, optional installer and manual effects/rollback documentation. Those companions are linked in the pull-request description. This library itself does not capture or transmit voice, create a Windows endpoint, or implement a new microphone cipher.
 
 ## Session behavior
 
-A caller initializes `STREAM_CONFIGURATION` with `LiInitializeStreamConfiguration()` and explicitly sets `requestNativeMic` before starting a connection. Only a generation 7 or later NVIDIA-style host advertising a valid `a=x-nv-general.clientPorts.mic:` SDP attribute is probed. Sunshine hosts are excluded: this is not a Sunshine microphone protocol extension.
+Initialize STREAM_CONFIGURATION with LiInitializeStreamConfiguration(), then explicitly set requestNativeMic before connecting. Zero is the default and retains the existing handshake. Only opted-in NVIDIA-style generation 7+ hosts are probed; Sunshine is excluded. The tested native host advertises a=x-nv-general.clientPorts.mic:0 before SETUP, so zero or absent SDP is deferred negotiation, not a destination. Malformed or duplicate attributes disable the optional path.
 
-The client sends an optional `SETUP streamid=mic/0/0` with the native client port pair `50002-50003`. A successful response supplies the server port through a single unambiguous Transport header. If that header is absent, the advertised SDP port is used. Malformed, duplicated, or ambiguous values leave the port unavailable. Rejection of the optional request leaves the normal handshake running. A transport failure can still consume the existing RTSP timeout; uninterrupted operation with every host version is not established by parser tests.
+Optional SETUP streamid=mic/0/0 advertises native client ports 50002-50003. A 200 response supplies the server port through a single unambiguous Transport header. When that entire header is absent, a valid positive SDP port may be used; zero/absent SDP cannot provide a fallback. Malformed, duplicated or ambiguous Transport values leave microphone unavailable. Optional rejection leaves normal handshake progression intact. A transport failure still consumes existing RTSP timeout and has not been proven harmless on every native host version.
 
-After a successful `LiStartConnection()`, `LiGetNativeMicPort()` returns the negotiated port, or zero when unavailable. State is cleared at connection start, connection stop, handshake entry, and handshake failure. The query is subject to the existing single-connection lifecycle; callers should not query concurrently with start or stop.
+After successful LiStartConnection(), LiGetNativeMicPort() returns the negotiated destination or zero. LiGetNativeMicAddress() copies the resolved session IPv4 address, avoiding a separate DNS destination choice. Native state clears at connection start, connection stop, handshake entry and handshake failure. Query only between successful start and stop, under the existing single-connection lifecycle; do not race queries with lifecycle changes.
 
-A negotiated port proves only that the host accepted this SETUP exchange. It does not prove microphone encryption, driver availability, or a working host recording endpoint. Playback audio encryption must not be treated as proof of microphone encryption.
+LiIsNativeMicAudioEncrypted() reflects the tested native host's negotiated legacy audio CBC mode. It is not independent authenticated microphone negotiation or a Sunshine capability. The Qt client refuses implicit plaintext forwarding. A port/mode query alone does not establish a working recording endpoint or delivery.
 
-## Scope and compatibility
+## Compatibility and security
 
-| Peer | Behavior |
-| --- | --- |
-| Existing client with requestNativeMic zero | Existing session negotiation |
-| Host without the native SDP attribute | No microphone SETUP |
-| Sunshine | No native microphone SETUP |
-| Native host with a valid advertisement | Optional SETUP attempted |
-| Host declining microphone SETUP | Microphone unavailable; normal negotiation continues |
+Historical end-to-end evidence covers native GameStream 7.1.437.0, GeForce Experience 3.25.1.27 and native audio 4.37.0.0 with the documented Windows modifications. Other versions, unmodified hosts, and proposed Sunshine microphone protocols are unverified. General generation 7 opt-in eligibility is broader than this tested set and is not a claim of broad compatibility.
 
-The native negotiation was derived from a local prototype. That prototype used host-side modifications; it does not establish compatibility with an unmodified host. This draft intentionally contains no host patch, privileged helper, binary, or instruction to alter a host executable. Current upstream host-version compatibility remains a review and testing task.
+Historical pre-SETUP SDP showed port 0 followed by successful SETUP with port 48002 and synthetic delivery. The old collector was not Content-Length framed; that observation is not a freshly bounded protocol capture. Current parser tests consume bounded spans and distinguish absent, deferred-zero, invalid and valid data.
 
-## Source review and verification
+Native CBC is encryption without packet authentication. It follows the existing identifier plus 16-bit RTP sequence IV construction: repeats after 65,536 packets and overlaps playback/microphone IV domains. The full client/host documentation describes these limitations and the trusted-network/tunnel boundary. No new authenticated protocol is claimed. Prior AES-GCM guidance on the separate Sunshine proposal (https://github.com/LizardByte/Sunshine/pull/4078) is context, not an asserted maintainer requirement for this NVIDIA contribution. The separate protocol proposal https://github.com/moonlight-stream/moonlight-common-c/pull/123 is not silently substituted for native compatibility.
 
-The bounded parsers in `src/NativeMicNegotiation.h` are shared directly with the regression tests. They distinguish absent, invalid, and valid values, reject ambiguous duplicates, and validate complete decimal ports and port ranges before exposing a destination. See `tests/README.md` for standalone test commands.
+The Windows companion must be evaluated as privileged, version-specific integration. It locally patches a verified original and performs native runtime handoff; a source build/manual route is provided alongside the optional executable. No proprietary NVIDIA binary or secret is redistributed. See the companion's exact effects, hashes, persistence and rollback before activation.
 
-The ordinary CMake library build also compiles the handshake integration. Cross-platform CI and host-level connection/reconnect verification are required before promotion from draft. A parser test or successful build is not an end-to-end microphone test.
+## Verification
 
-## Direction for a complete upstream feature
+Full common-c Debug and Release builds passed on macOS arm64 against OpenSSL. The production header's 59 parser table cases plus null-output checks passed through CTest and sanitizers. Independent production-block tests passed 24 reply/state scenarios and 7 eligibility gates with controlled SETUP replies; these do not execute a complete network handshake. Exact host/version, current candidate fixtures and historical live evidence remain separated in the full contribution's test matrix.
 
-The intended user experience is an off-by-default microphone option in the normal client, explicit operating-system permission, visible capture status and an immediate stop control, paired with a supported host implementation. Users should obtain that through the projects' normal source and release processes.
-
-For Sunshine, the next design step is agreement on advertised capabilities and authenticated microphone transport, followed by small host and client changes using that agreed protocol. Prior maintainer guidance recommends RTSP/SDP configuration and AES-GCM: https://github.com/LizardByte/Sunshine/pull/4078 . Another protocol proposal is open at https://github.com/moonlight-stream/moonlight-common-c/pull/123 . This native experiment does not establish or supersede that protocol.
-
-Before a complete feature is ready, the host recording endpoint, authentication and replay protection, direction-specific nonce/key domains, bounded queues, capture shutdown, permission errors, and unsupported-peer behavior need implementation and verification. Synthetic tone tests can demonstrate the complete path without publishing private recordings or pairing data.
-
-A convenience build should be produced by the project's build process from an identified source revision. Checksums and provenance help connect artifacts to source; official release signing and maintainer review provide a stronger distribution route than a separately shared Windows executable.
+Cross-platform CI and the revised Windows candidate's native acceptance, reboot and full uninstall/recovery require their own evidence. Source builds and fixtures are not presented as proof of every runtime case. The regular pull requests ask maintainers to review the complete, explicitly scoped implementation and its preferred distribution route.
