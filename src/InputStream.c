@@ -77,6 +77,8 @@ typedef struct _PACKET_HOLDER {
         SS_CONTROLLER_MOTION_PACKET controllerMotion;
         SS_CONTROLLER_BATTERY_PACKET controllerBattery;
         NV_UNICODE_PACKET unicode;
+        // Last so variable-length clipboard text can extend past this holder.
+        SS_CLIPBOARD_PACKET clipboard;
     } packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
 
@@ -1061,6 +1063,47 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     holder->packet.unicode.header.size = BE32(sizeof(uint32_t) + length);
     holder->packet.unicode.header.magic = LE32(UTF8_TEXT_EVENT_MAGIC);
     memcpy(holder->packet.unicode.text, text, length);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendClipboardText(const char *text, unsigned int length) {
+    PPACKET_HOLDER holder;
+    int err;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!IS_SUNSHINE()) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    if (length > SS_CLIPBOARD_TEXT_MAX || (length > 0 && text == NULL)) {
+        return -1;
+    }
+
+    holder = allocatePacketHolder((int)length);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    holder->channelId = CTRL_CHANNEL_CLIPBOARD;
+    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
+
+    holder->packet.clipboard.header.size = BE32(sizeof(uint32_t) + length);
+    holder->packet.clipboard.header.magic = LE32(SS_CLIPBOARD_TEXT_MAGIC);
+    if (length > 0) {
+        memcpy(holder->packet.clipboard.text, text, length);
+    }
 
     err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
     if (err != LBQ_SUCCESS) {
