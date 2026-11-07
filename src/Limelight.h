@@ -128,6 +128,21 @@ int LiIsNativeMicAudioEncrypted(void);
 // Returns 1 on success, 0 if unavailable, unsupported, or buffer too small.
 int LiGetNativeMicAddress(char* address, int addressLength);
 
+// The client owns capture, permission and encoding. Create after successful
+// LiStartConnection(), on explicit opt-in. Only the negotiated encrypted native
+// NVIDIA endpoint on private IPv4 is accepted. Returns NULL on failure.
+typedef struct _NATIVE_MIC_SENDER NATIVE_MIC_SENDER;
+NATIVE_MIC_SENDER* LiCreateNativeMicSender(void);
+
+// Send one 20-byte CBR Opus frame (48 kHz mono, 240 samples, 32 kbps).
+// Returns 0 on success and -1 on failure. Stop capture on transport failure.
+// Create only one sender per connection. Reconnect before enabling it again.
+// Serialize calls for each sender. Stop capture and destroy the sender before
+// LiStopConnection(). Legacy CBC does not authenticate packets.
+int LiSendNativeMicFrame(NATIVE_MIC_SENDER* sender, const unsigned char* frame, int length);
+void LiDestroyNativeMicSender(NATIVE_MIC_SENDER* sender);
+
+
 // These identify codec configuration data in the buffer lists
 // of frames identified as IDR frames for H.264 and HEVC formats.
 // For other codecs, all data is marked as BUFFER_TYPE_PICDATA.

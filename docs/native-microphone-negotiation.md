@@ -27,3 +27,17 @@ The Windows companion must be evaluated as privileged, version-specific integrat
 Full common-c Debug and Release builds passed on macOS arm64 against OpenSSL. The production header's 59 parser table cases plus null-output checks passed through CTest and sanitizers. Independent production-block tests passed 24 reply/state scenarios and 7 eligibility gates with controlled SETUP replies; these do not execute a complete network handshake. Exact host/version, current candidate fixtures and historical live evidence remain separated in the full contribution's test matrix.
 
 Cross-platform CI and the revised Windows candidate's native acceptance, reboot and full uninstall/recovery require their own evidence. Source builds and fixtures are not presented as proof of every runtime case. The regular pull requests ask maintainers to review the complete, explicitly scoped implementation and its preferred distribution route.
+
+## Portable sender for client capture adapters
+
+After an explicitly opted-in connection succeeds, create one
+`NATIVE_MIC_SENDER` with `LiCreateNativeMicSender()`. The sender uses the
+negotiated native port, resolved private IPv4 address and legacy CBC mode.
+The client owns capture permission, lifecycle and encoding. Pass one 20-byte
+Opus frame per `LiSendNativeMicFrame()` call: mono 48 kHz, 240 samples, 32 kbps
+CBR with DTX disabled. The sender supplies the native source port, RTP header,
+CBC padding and PINGs. This API does not add an Opus dependency to common-c.
+
+Stop capture on a send failure. Serialize calls and destroy the sender before
+stopping the connection. Reconnect before enabling forwarding again. The same
+legacy CBC limits apply on all client platforms.
