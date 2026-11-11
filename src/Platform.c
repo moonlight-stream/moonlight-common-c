@@ -15,10 +15,12 @@ struct thread_context {
     const char* name;
 };
 
-static int activeThreads = 0;
-static int activeMutexes = 0;
-static int activeEvents = 0;
-static int activeCondVars = 0;
+#ifdef LC_DEBUG
+static atomic_int activeThreads = 0;
+static atomic_int activeMutexes = 0;
+static atomic_int activeEvents = 0;
+static atomic_int activeCondVars = 0;
+#endif
 
 #if defined(LC_WINDOWS) && !defined(NXDK)
 
@@ -135,13 +137,14 @@ int PltCreateMutex(PLT_MUTEX* mutex) {
         return err;
     }
 #endif
+#ifdef LC_DEBUG
     activeMutexes++;
+#endif
     return 0;
 }
 
 void PltDeleteMutex(PLT_MUTEX* mutex) {
-    LC_ASSERT(activeMutexes > 0);
-    activeMutexes--;
+    LC_ASSERT(activeMutexes-- > 0);
 #if defined(LC_WINDOWS)
     // No-op to destroy a SRWLOCK
 #elif defined(__WIIU__) || defined(__3DS__)
@@ -176,8 +179,7 @@ void PltUnlockMutex(PLT_MUTEX* mutex) {
 }
 
 void PltJoinThread(PLT_THREAD* thread) {
-    LC_ASSERT(activeThreads > 0);
-    activeThreads--;
+    LC_ASSERT(activeThreads-- > 0);
 
 #if defined(LC_WINDOWS)
     WaitForSingleObjectEx(thread->handle, INFINITE, FALSE);
@@ -193,8 +195,7 @@ void PltJoinThread(PLT_THREAD* thread) {
 }
 
 void PltDetachThread(PLT_THREAD* thread) {
-    LC_ASSERT(activeThreads > 0);
-    activeThreads--;
+    LC_ASSERT(activeThreads-- > 0);
 
 #if defined(LC_WINDOWS)
     // According MSDN:
@@ -309,7 +310,9 @@ int PltCreateThread(const char* name, ThreadEntry entry, void* context, PLT_THRE
     }
 #endif
 
+#ifdef LC_DEBUG
     activeThreads++;
+#endif
 
     return 0;
 }
@@ -330,13 +333,14 @@ int PltCreateEvent(PLT_EVENT* event) {
     }
     event->signalled = false;
 #endif
+#ifdef LC_DEBUG
     activeEvents++;
+#endif
     return 0;
 }
 
 void PltCloseEvent(PLT_EVENT* event) {
-    LC_ASSERT(activeEvents > 0);
-    activeEvents--;
+    LC_ASSERT(activeEvents-- > 0);
 #if defined(LC_WINDOWS)
     CloseHandle(*event);
 #else
@@ -388,13 +392,14 @@ int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 #else
     pthread_cond_init(cond, NULL);
 #endif
+#ifdef LC_DEBUG
     activeCondVars++;
+#endif
     return 0;
 }
 
 void PltDeleteConditionVariable(PLT_COND* cond) {
-    LC_ASSERT(activeCondVars > 0);
-    activeCondVars--;
+    LC_ASSERT(activeCondVars-- > 0);
 #if defined(LC_WINDOWS)
     // No-op to delete a CONDITION_VARIABLE
 #elif defined(__WIIU__)
