@@ -416,6 +416,6 @@ int startVideoStream(void* rendererContext, int drFlags) {
     return 0;
 }
 
-const RTP_VIDEO_STATS* LiGetRTPVideoStats(void) {
-    return &rtpQueue.stats;
+void LiGetRTPVideoStats(PRTP_VIDEO_STATS stats) {
+    RtpvGetStats(&rtpQueue, stats);
 }

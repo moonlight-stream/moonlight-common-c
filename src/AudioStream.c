@@ -475,6 +475,6 @@ int LiGetPendingAudioDuration(void) {
     return LiGetPendingAudioFrames() * AudioPacketDuration;
 }
 
-const RTP_AUDIO_STATS* LiGetRTPAudioStats(void) {
-    return &rtpAudioQueue.stats;
+void LiGetRTPAudioStats(PRTP_AUDIO_STATS stats) {
+    RtpaGetStats(&rtpAudioQueue, stats);
 }

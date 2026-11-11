@@ -714,8 +714,8 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
         queue->multiFecCurrentBlockNumber = fecCurrentBlockNumber;
         queue->multiFecLastBlockNumber = (nvPacket->multiFecBlocks >> 6) & 0x3;
 
-        queue->stats.packetCountVideo += queue->bufferDataPackets;
-        queue->stats.packetCountFec += queue->bufferParityPackets;
+        atomic_fetch_add_explicit(&queue->stats.packetCountVideo, queue->bufferDataPackets, memory_order_relaxed);
+        atomic_fetch_add_explicit(&queue->stats.packetCountFec, queue->bufferParityPackets, memory_order_relaxed);
     }
 
     // Reject packets above our FEC queue valid sequence number range
@@ -807,5 +807,19 @@ int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_
 
         return RTPF_RET_QUEUED;
     }
+}
+
+void RtpvGetStats(PRTP_VIDEO_QUEUE queue, PRTP_VIDEO_STATS stats) {
+    if (stats == NULL) {
+        return;
+    }
+
+    stats->packetCountVideo = atomic_load_explicit(&queue->stats.packetCountVideo, memory_order_relaxed);
+    stats->packetCountFec = atomic_load_explicit(&queue->stats.packetCountFec, memory_order_relaxed);
+    stats->packetCountFecRecovered = atomic_load_explicit(&queue->stats.packetCountFecRecovered, memory_order_relaxed);
+    stats->packetCountFecFailed = atomic_load_explicit(&queue->stats.packetCountFecFailed, memory_order_relaxed);
+    stats->packetCountOOS = atomic_load_explicit(&queue->stats.packetCountOOS, memory_order_relaxed);
+    stats->packetCountInvalid = atomic_load_explicit(&queue->stats.packetCountInvalid, memory_order_relaxed);
+    stats->packetCountFecInvalid = atomic_load_explicit(&queue->stats.packetCountFecInvalid, memory_order_relaxed);
 }
 
