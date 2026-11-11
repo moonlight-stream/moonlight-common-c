@@ -452,24 +452,44 @@ void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex) {
 
 // These functions return a number of microseconds or milliseconds since an opaque start time.
 
-static bool ticks_started = false;
+#define TICKS_INIT_NOT_STARTED 0
+#define TICKS_INIT_IN_PROGRESS 1
+#define TICKS_INIT_COMPLETED 2
+
+static atomic_int ticks_init_state = TICKS_INIT_NOT_STARTED;
+
+static void PltTicksInitInternal(void);
+
+void PltTicksInit(void) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) == TICKS_INIT_COMPLETED) {
+        return;
+    }
+
+    int expected = TICKS_INIT_NOT_STARTED;
+    if (atomic_compare_exchange_strong_explicit(&ticks_init_state, &expected,
+            TICKS_INIT_IN_PROGRESS, memory_order_acq_rel, memory_order_acquire)) {
+        PltTicksInitInternal();
+        atomic_store_explicit(&ticks_init_state, TICKS_INIT_COMPLETED, memory_order_release);
+    }
+    else {
+        while (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
+            PltSleepMs(1);
+        }
+    }
+}
 
 #if defined(LC_WINDOWS)
 
 static LARGE_INTEGER start_ticks;
 static LARGE_INTEGER ticks_per_second;
 
-void PltTicksInit(void) {
-    if (ticks_started) {
-        return;
-    }
-    ticks_started = true;
+static void PltTicksInitInternal(void) {
     QueryPerformanceFrequency(&ticks_per_second);
     QueryPerformanceCounter(&start_ticks);
 }
 
 uint64_t PltGetMicroseconds(void) {
-    if (!ticks_started) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
     LARGE_INTEGER now;
@@ -481,16 +501,12 @@ uint64_t PltGetMicroseconds(void) {
 
 static uint64_t start_ns;
 
-void PltTicksInit(void) {
-    if (ticks_started) {
-        return;
-    }
-    ticks_started = true;
+static void PltTicksInitInternal(void) {
     start_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
 }
 
 uint64_t PltGetMicroseconds(void) {
-    if (!ticks_started) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
     const uint64_t now_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
@@ -501,16 +517,12 @@ uint64_t PltGetMicroseconds(void) {
 
 static uint64_t start;
 
-void PltTicksInit(void) {
-    if (ticks_started) {
-        return;
-    }
-    ticks_started = true;
+static void PltTicksInitInternal(void) {
     start = sceKernelGetProcessTimeWide();
 }
 
 uint64_t PltGetMicroseconds(void) {
-    if (!ticks_started) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
     uint64_t now = sceKernelGetProcessTimeWide();
@@ -521,16 +533,12 @@ uint64_t PltGetMicroseconds(void) {
 
 static uint64_t start;
 
-void PltTicksInit(void) {
-    if (ticks_started) {
-        return;
-    }
-    ticks_started = true;
+static void PltTicksInitInternal(void) {
     start = svcGetSystemTick();
 }
 
 uint64_t PltGetMicroseconds(void) {
-    if (!ticks_started) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
     uint64_t elapsed = svcGetSystemTick() - start;
@@ -552,11 +560,7 @@ static struct timespec start_ts;
 static bool has_monotonic_time = false;
 static struct timeval start_tv;
 
-void PltTicksInit(void) {
-    if (ticks_started) {
-        return;
-    }
-    ticks_started = true;
+static void PltTicksInitInternal(void) {
 #ifdef HAVE_CLOCK_GETTIME
     if (clock_gettime(PLT_MONOTONIC_CLOCK, &start_ts) == 0) {
         has_monotonic_time = true;
@@ -568,7 +572,7 @@ void PltTicksInit(void) {
 }
 
 uint64_t PltGetMicroseconds(void) {
-    if (!ticks_started) {
+    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
 
