@@ -2,7 +2,7 @@
 
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
-static bool initialized;
+static atomic_bool initialized;
 static bool encryptedControlStream;
 static bool needsBatchedScroll;
 static int batchedScrollDelta;
@@ -711,7 +711,7 @@ int startInputStream(void) {
     }
 
     // Allow input packets to be queued now
-    initialized = true;
+    atomic_store_explicit(&initialized, true, memory_order_release);
 
     // GFE will not send haptics events without this magic packet first
     sendEnableHaptics();
@@ -722,7 +722,7 @@ int startInputStream(void) {
 // Stops the input stream
 int stopInputStream(void) {
     // No more packets should be queued now
-    initialized = false;
+    atomic_store_explicit(&initialized, false, memory_order_release);
     LbqSignalQueueShutdown(&packetHolderFreeList);
 
     // Signal the input send thread to drain all pending
@@ -748,7 +748,7 @@ int LiSendMouseMoveEvent(short deltaX, short deltaY) {
     int err;
     bool enqueueHolder = false;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -827,7 +827,7 @@ int LiSendMousePositionEvent(short x, short y, short referenceWidth, short refer
     int err;
     bool enqueueHolder = false;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -919,7 +919,7 @@ int LiSendMouseButtonEvent(char action, int button) {
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -961,7 +961,7 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1045,7 +1045,7 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1080,7 +1080,7 @@ static int sendControllerEventInternal(short controllerNumber, short activeGamep
     int err;
     bool enqueueHolder = false;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1268,7 +1268,7 @@ int LiSendHighResScrollEvent(short scrollAmount) {
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1368,7 +1368,7 @@ int LiSendHighResHScrollEvent(short scrollAmount) {
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1412,7 +1412,7 @@ int LiSendTouchEvent(uint8_t eventType, uint32_t pointerId, float x, float y, fl
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1461,7 +1461,7 @@ int LiSendPenEvent(uint8_t eventType, uint8_t toolType, uint8_t penButtons,
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1515,7 +1515,7 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1562,7 +1562,7 @@ int LiSendControllerTouchEvent2(uint8_t controllerNumber, uint8_t eventType, uin
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1615,7 +1615,7 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
@@ -1686,7 +1686,7 @@ int LiSendControllerBatteryEvent(uint8_t controllerNumber, uint8_t batteryState,
     PPACKET_HOLDER holder;
     int err;
 
-    if (!initialized) {
+    if (!atomic_load_explicit(&initialized, memory_order_acquire)) {
         return -2;
     }
 
