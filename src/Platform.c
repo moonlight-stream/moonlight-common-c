@@ -211,11 +211,11 @@ void PltDetachThread(PLT_THREAD* thread) {
 }
 
 bool PltIsThreadInterrupted(PLT_THREAD* thread) {
-    return thread->cancelled;
+    return atomic_load_explicit(&thread->cancelled, memory_order_acquire);
 }
 
 void PltInterruptThread(PLT_THREAD* thread) {
-    thread->cancelled = true;
+    atomic_store_explicit(&thread->cancelled, true, memory_order_release);
 }
 
 #ifdef __WIIU__
