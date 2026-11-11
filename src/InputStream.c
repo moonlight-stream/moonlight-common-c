@@ -245,7 +245,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder, bool moreData) {
                                                         PACKET_SIZE(holder),
                                                         holder->channelId,
                                                         holder->enetPacketFlags,
-                                                        moreData);
+                                                        moreData || LbqGetItemCount(&packetQueue) > 0);
         if (err < 0) {
             Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
             ListenerCallbacks.connectionTerminated(err);
@@ -296,7 +296,7 @@ static bool sendInputPacket(PPACKET_HOLDER holder, bool moreData) {
                                                             (unsigned int)(encryptedSize + sizeof(encryptedLengthPrefix)),
                                                             holder->channelId,
                                                             holder->enetPacketFlags,
-                                                            moreData);
+                                                            moreData || LbqGetItemCount(&packetQueue) > 0);
             if (err < 0) {
                 Limelog("Input: sendInputPacketOnControlStream() failed: %d\n", (int) err);
                 ListenerCallbacks.connectionTerminated(err);
@@ -644,8 +644,8 @@ static void inputSendThreadProc(void* context) {
             continue;
         }
 
-        // Encrypt and send the input packet
-        if (!sendInputPacket(holder, LbqGetItemCount(&packetQueue) > 0)) {
+        // Encrypt and send the input packet (sendInputPacket checks packetQueue for batching)
+        if (!sendInputPacket(holder, false)) {
             freePacketHolder(holder);
             return;
         }
