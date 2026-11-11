@@ -23,7 +23,7 @@ PLINKED_BLOCKING_QUEUE_ENTRY LbqFlushQueueItems(PLINKED_BLOCKING_QUEUE queueHead
     if (head != NULL) {
         queueHead->head = NULL;
         queueHead->tail = NULL;
-        queueHead->currentSize = 0;
+        atomic_store_explicit(&queueHead->currentSize, 0, memory_order_release);
     }
     else {
         LC_ASSERT(queueHead->tail == NULL);
@@ -53,6 +53,7 @@ int LbqInitializeLinkedBlockingQueue(PLINKED_BLOCKING_QUEUE queueHead, int sizeB
     }
 
     queueHead->sizeBound = sizeBound;
+    atomic_store_explicit(&queueHead->currentSize, 0, memory_order_release);
 
     return 0;
 }
@@ -79,7 +80,8 @@ void LbqSignalQueueUserWake(PLINKED_BLOCKING_QUEUE queueHead) {
 }
 
 int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead) {
-    return queueHead->currentSize;
+    // Pairs with release stores in LbqOfferQueueItem() and friends
+    return atomic_load_explicit(&queueHead->currentSize, memory_order_acquire);
 }
 
 int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOCKING_QUEUE_ENTRY entry) {
@@ -116,7 +118,7 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
         queueHead->tail = entry;
     }
 
-    queueHead->currentSize++;
+    atomic_fetch_add_explicit(&queueHead->currentSize, 1, memory_order_release);
     queueHead->lifetimeSize++;
 
     PltUnlockMutex(&queueHead->mutex);
@@ -180,7 +182,7 @@ int LbqPollQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
     entry = queueHead->head;
     queueHead->head = entry->flink;
-    queueHead->currentSize--;
+    atomic_fetch_sub_explicit(&queueHead->currentSize, 1, memory_order_release);
     if (queueHead->head == NULL) {
         LC_ASSERT(queueHead->currentSize == 0);
         queueHead->tail = NULL;
@@ -231,7 +233,7 @@ int LbqWaitForQueueElement(PLINKED_BLOCKING_QUEUE queueHead, void** data) {
 
     entry = queueHead->head;
     queueHead->head = entry->flink;
-    queueHead->currentSize--;
+    atomic_fetch_sub_explicit(&queueHead->currentSize, 1, memory_order_release);
     if (queueHead->head == NULL) {
         LC_ASSERT(queueHead->currentSize == 0);
         queueHead->tail = NULL;
