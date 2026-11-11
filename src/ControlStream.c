@@ -484,7 +484,7 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
 }
 
 void connectionSawFrame(uint32_t frameIndex) {
-    LC_ASSERT_VT(!isBefore16(frameIndex, lastSeenFrame));
+    LC_ASSERT_VT(!isBefore32(frameIndex, lastSeenFrame));
 
     uint64_t now = PltGetMillis();
 
