@@ -538,8 +538,14 @@ static void reassembleFrame(int frameNumber, bool frameIsLTR) {
             nalChainFragmentCount = 0;
 
             if ((VideoCallbacks.capabilities & CAPABILITY_DIRECT_SUBMIT) == 0) {
-                if (LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry) == LBQ_BOUND_EXCEEDED) {
-                    Limelog("Video decode unit queue overflow\n");
+                int err = LbqOfferQueueItem(&decodeUnitQueue, qdu, &qdu->entry);
+                if (err != LBQ_SUCCESS) {
+                    if (err == LBQ_BOUND_EXCEEDED) {
+                        Limelog("Video decode unit queue overflow\n");
+                    }
+                    else {
+                        Limelog("Failed to queue video decode unit: %d\n", err);
+                    }
 
                     // RFI recovery is not supported here
                     waitingForIdrFrame = true;
@@ -555,8 +561,11 @@ static void reassembleFrame(int frameNumber, bool frameIsLTR) {
                     // Free all frames in the decode unit queue
                     freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
 
-                    // Request an IDR frame to recover
-                    LiRequestIdrFrame();
+                    // Request an IDR frame to recover if we're not shutting down
+                    if (err != LBQ_INTERRUPTED) {
+                        LiRequestIdrFrame();
+                    }
+
                     return;
                 }
             }
