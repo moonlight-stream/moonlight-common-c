@@ -437,14 +437,17 @@ static void queueFrameInvalidationTuple(uint32_t startFrame, uint32_t endFrame) 
         PQUEUED_REFERENCE_FRAME_CONTROL qfit;
         qfit = malloc(sizeof(*qfit));
         if (qfit != NULL) {
+            int err;
+
             *qfit = (QUEUED_REFERENCE_FRAME_CONTROL){
                 .startFrame = startFrame,
                 .endFrame = endFrame,
                 .invalidate = true,
             };
-            if (LbqOfferQueueItem(&referenceFrameControlQueue, qfit, &qfit->entry) == LBQ_BOUND_EXCEEDED) {
-                // Too many invalidation tuples, so we need an IDR frame now
-                Limelog("RFI range list reached maximum size limit\n");
+
+            err = LbqOfferQueueItem(&referenceFrameControlQueue, qfit, &qfit->entry);
+            if (err != LBQ_SUCCESS) {
+                Limelog("Failed to queue RFI range: %d\n", err);
                 free(qfit);
                 LiRequestIdrFrame();
             }
@@ -484,14 +487,18 @@ void connectionReceivedCompleteFrame(uint32_t frameIndex, bool frameIsLTR) {
         PQUEUED_REFERENCE_FRAME_CONTROL qfit;
         qfit = malloc(sizeof(*qfit));
         if (qfit != NULL) {
+            int err;
+
             *qfit = (QUEUED_REFERENCE_FRAME_CONTROL){
                 .startFrame = frameIndex,
                 .invalidate = false,
             };
-            if (LbqOfferQueueItem(&referenceFrameControlQueue, qfit, &qfit->entry) == LBQ_BOUND_EXCEEDED) {
+
+            err = LbqOfferQueueItem(&referenceFrameControlQueue, qfit, &qfit->entry);
+            if (err != LBQ_SUCCESS) {
                 // This shouldn't happen and indicates that something has gone wrong with the queue
                 LC_ASSERT(false);
-                Limelog("Couldn't queue LTR ACK because the list has reached maximum size limit\n");
+                Limelog("Couldn't queue LTR ACK: %d\n", err);
                 free(qfit);
                 LiRequestIdrFrame();
             }
@@ -509,14 +516,14 @@ void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus) {
     PQUEUED_FRAME_FEC_STATUS queuedFecStatus = malloc(sizeof(*queuedFecStatus));
     if (queuedFecStatus != NULL) {
         queuedFecStatus->fecStatus = *fecStatus;
-        if (LbqOfferQueueItem(&frameFecStatusQueue, queuedFecStatus, &queuedFecStatus->entry) == LBQ_BOUND_EXCEEDED) {
+        if (LbqOfferQueueItem(&frameFecStatusQueue, queuedFecStatus, &queuedFecStatus->entry) != LBQ_SUCCESS) {
             free(queuedFecStatus);
         }
     }
 }
 
 void connectionSawFrame(uint32_t frameIndex) {
-    LC_ASSERT_VT(!isBefore16(frameIndex, lastSeenFrame));
+    LC_ASSERT_VT(!isBefore32(frameIndex, lastSeenFrame));
 
     uint64_t now = PltGetMillis();
 

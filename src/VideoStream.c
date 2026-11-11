@@ -16,7 +16,7 @@ static PLT_THREAD udpPingThread;
 static PLT_THREAD receiveThread;
 static PLT_THREAD decoderThread;
 
-static bool receivedDataFromPeer;
+static atomic_bool receivedDataFromPeer; // Read by stopVideoStream()
 static uint64_t firstDataTimeMs;
 static bool receivedFullFrame;
 
@@ -39,7 +39,7 @@ void initializeVideoStream(void) {
     initializeVideoDepacketizer(StreamConfig.packetSize);
     RtpvInitializeQueue(&rtpQueue);
     decryptionCtx = PltCreateCryptoContext(0);
-    receivedDataFromPeer = false;
+    atomic_store_explicit(&receivedDataFromPeer, false, memory_order_relaxed);
     firstDataTimeMs = 0;
     receivedFullFrame = false;
 }
@@ -146,7 +146,7 @@ static void VideoReceiveThreadProc(void* context) {
             break;
         }
         else if  (err == 0) {
-            if (!receivedDataFromPeer) {
+            if (!atomic_load_explicit(&receivedDataFromPeer, memory_order_relaxed)) {
                 // If we wait many seconds without ever receiving a video packet,
                 // assume something is broken and terminate the connection.
                 waitingForVideoMs += UDP_RECV_POLL_TIMEOUT_MS;
@@ -161,8 +161,7 @@ static void VideoReceiveThreadProc(void* context) {
             continue;
         }
 
-        if (!receivedDataFromPeer) {
-            receivedDataFromPeer = true;
+        if (!atomic_exchange_explicit(&receivedDataFromPeer, true, memory_order_relaxed)) {
             Limelog("Received first video packet after %d ms\n", waitingForVideoMs);
 
             firstDataTimeMs = PltGetMillis();
@@ -279,7 +278,7 @@ int readFirstFrame(void) {
 
 // Terminate the video stream
 void stopVideoStream(void) {
-    if (!receivedDataFromPeer) {
+    if (!atomic_load_explicit(&receivedDataFromPeer, memory_order_relaxed)) {
         Limelog("No video traffic was ever received from the host!\n");
     }
 

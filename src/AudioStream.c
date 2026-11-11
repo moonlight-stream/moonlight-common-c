@@ -15,7 +15,7 @@ static uint32_t avRiKeyId;
 static unsigned short lastSeq;
 
 static bool pingThreadStarted;
-static bool receivedDataFromPeer;
+static atomic_bool receivedDataFromPeer; // Read by stopAudioStream()
 static uint64_t firstReceiveTime;
 
 #ifdef LC_DEBUG
@@ -69,7 +69,7 @@ int initializeAudioStream(void) {
     LbqInitializeLinkedBlockingQueue(&packetQueue, 30);
     RtpaInitializeQueue(&rtpAudioQueue);
     lastSeq = 0;
-    receivedDataFromPeer = false;
+    atomic_store_explicit(&receivedDataFromPeer, false, memory_order_relaxed);
     pingThreadStarted = false;
     firstReceiveTime = 0;
     audioDecryptionCtx = PltCreateCryptoContext(0);
@@ -277,7 +277,7 @@ static void AudioReceiveThreadProc(void* context) {
         else if (packet->header.size == 0) {
             // Receive timed out; try again
 
-            if (!receivedDataFromPeer) {
+            if (!atomic_load_explicit(&receivedDataFromPeer, memory_order_relaxed)) {
                 waitingForAudioMs += UDP_RECV_POLL_TIMEOUT_MS;
             }
             else {
@@ -295,8 +295,7 @@ static void AudioReceiveThreadProc(void* context) {
 
         rtp = (PRTP_PACKET)&packet->data[0];
 
-        if (!receivedDataFromPeer) {
-            receivedDataFromPeer = true;
+        if (!atomic_exchange_explicit(&receivedDataFromPeer, true, memory_order_relaxed)) {
             Limelog("Received first audio packet after %d ms\n", waitingForAudioMs);
 
             if (firstReceiveTime != 0) {
@@ -401,7 +400,7 @@ static void AudioDecoderThreadProc(void* context) {
 }
 
 void stopAudioStream(void) {
-    if (!receivedDataFromPeer) {
+    if (!atomic_load_explicit(&receivedDataFromPeer, memory_order_relaxed)) {
         Limelog("No audio traffic was ever received from the host!\n");
     }
 
@@ -450,7 +449,6 @@ int startAudioStream(void* audioContext, int arFlags) {
     err = PltCreateThread("AudioRecv", AudioReceiveThreadProc, NULL, &receiveThread);
     if (err != 0) {
         AudioCallbacks.stop();
-        closeSocket(rtpSocket);
         AudioCallbacks.cleanup();
         return err;
     }
@@ -461,7 +459,6 @@ int startAudioStream(void* audioContext, int arFlags) {
             AudioCallbacks.stop();
             PltInterruptThread(&receiveThread);
             PltJoinThread(&receiveThread);
-            closeSocket(rtpSocket);
             AudioCallbacks.cleanup();
             return err;
         }

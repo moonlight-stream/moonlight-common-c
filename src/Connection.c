@@ -2,7 +2,7 @@
 
 static int stage = STAGE_NONE;
 static ConnListenerConnectionTerminated originalTerminationCallback;
-static bool alreadyTerminated;
+static atomic_bool alreadyTerminated;
 static PLT_THREAD terminationCallbackThread;
 static int terminationCallbackErrorCode;
 
@@ -17,7 +17,7 @@ CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;
-volatile bool ConnectionInterrupted;
+atomic_bool ConnectionInterrupted;
 bool HighQualitySurroundSupported;
 bool HighQualitySurroundEnabled;
 OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
@@ -159,13 +159,17 @@ static void ClInternalConnectionTerminated(int errorCode)
 {
     int err;
 
-    // Avoid recursion and issuing multiple callbacks
-    if (alreadyTerminated || ConnectionInterrupted) {
+    // Ensure only one thread triggers connection termination
+    if (atomic_exchange_explicit(&alreadyTerminated, true, memory_order_acq_rel)) {
+        return;
+    }
+
+    // If the connection is being stopped, no callback is needed
+    if (ConnectionInterrupted) {
         return;
     }
 
     terminationCallbackErrorCode = errorCode;
-    alreadyTerminated = true;
 
     // Invoke the termination callback on a separate thread
     err = PltCreateThread("AsyncTerm", terminationCallbackThreadFunc, NULL, &terminationCallbackThread);
