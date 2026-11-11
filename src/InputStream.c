@@ -1,4 +1,5 @@
 #include "Limelight-internal.h"
+#include "Clipboard.h"
 
 static SOCKET inputSock = INVALID_SOCKET;
 static unsigned char currentAesIv[16];
@@ -77,7 +78,7 @@ typedef struct _PACKET_HOLDER {
         SS_CONTROLLER_MOTION_PACKET controllerMotion;
         SS_CONTROLLER_BATTERY_PACKET controllerBattery;
         NV_UNICODE_PACKET unicode;
-        // Last so variable-length clipboard text can extend past this holder.
+        // Last so variable-length clipboard data can extend past this holder.
         SS_CLIPBOARD_PACKET clipboard;
     } packet;
 } PACKET_HOLDER, *PPACKET_HOLDER;
@@ -1074,9 +1075,43 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     return err;
 }
 
-int LiSendClipboardText(const char *text, unsigned int length) {
-    PPACKET_HOLDER holder;
+// Input packets that do not fit in the 16-bit encrypted control envelope (sequence
+// number, GCM tag, and V2 header) need jumbo control messages, which require SS_ENC_CONTROL_V2.
+static bool canSendClipboardBody(uint32_t bodyLength) {
+    return (EncryptionFeaturesEnabled & SS_ENC_CONTROL_V2) ||
+           sizeof(NV_INPUT_HEADER) + bodyLength <= 0xFFFF - 24;
+}
+
+static PPACKET_HOLDER allocateClipboardPacket(int maxBodyLength) {
+    PPACKET_HOLDER holder = allocatePacketHolder(maxBodyLength);
+
+    if (holder != NULL) {
+        holder->channelId = CTRL_CHANNEL_CLIPBOARD;
+        holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
+    }
+
+    return holder;
+}
+
+static int queueClipboardPacket(PPACKET_HOLDER holder, uint32_t magic, int bodyLength) {
     int err;
+
+    holder->packet.clipboard.header.size = BE32(sizeof(uint32_t) + bodyLength);
+    holder->packet.clipboard.header.magic = LE32(magic);
+
+    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
+    if (err != LBQ_SUCCESS) {
+        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
+        Limelog("Input queue reached maximum size limit\n");
+        freePacketHolder(holder);
+    }
+
+    return err;
+}
+
+int LiSendClipboardOffer(const char* const* mimeTypes, int mimeTypeCount, uint32_t sequence) {
+    PPACKET_HOLDER holder;
+    int length;
 
     if (!initialized) {
         return -2;
@@ -1087,32 +1122,95 @@ int LiSendClipboardText(const char *text, unsigned int length) {
         return LI_ERR_UNSUPPORTED;
     }
 
-    if (length > SS_CLIPBOARD_TEXT_MAX || (length > 0 && text == NULL)) {
-        return -1;
-    }
-
-    holder = allocatePacketHolder((int)length);
+    holder = allocateClipboardPacket(SS_CLIPBOARD_OFFER_MAX);
     if (holder == NULL) {
         return -1;
     }
 
-    holder->channelId = CTRL_CHANNEL_CLIPBOARD;
-    holder->enetPacketFlags = ENET_PACKET_FLAG_RELIABLE;
-
-    holder->packet.clipboard.header.size = BE32(sizeof(uint32_t) + length);
-    holder->packet.clipboard.header.magic = LE32(SS_CLIPBOARD_TEXT_MAGIC);
-    if (length > 0) {
-        memcpy(holder->packet.clipboard.text, text, length);
+    length = ClipboardEncodeOffer(holder->packet.clipboard.body, SS_CLIPBOARD_OFFER_MAX, mimeTypes, mimeTypeCount, sequence);
+    if (length < 0) {
+        free(holder);
+        return -1;
     }
 
-    err = LbqOfferQueueItem(&packetQueue, holder, &holder->entry);
-    if (err != LBQ_SUCCESS) {
-        LC_ASSERT(err == LBQ_BOUND_EXCEEDED);
-        Limelog("Input queue reached maximum size limit\n");
-        freePacketHolder(holder);
+    return queueClipboardPacket(holder, SS_CLIPBOARD_OFFER_MAGIC, length);
+}
+
+int LiSendClipboardRequest(const char* mimeType, uint32_t sequence) {
+    PPACKET_HOLDER holder;
+    int length;
+
+    if (!initialized) {
+        return -2;
     }
 
-    return err;
+    // This is a protocol extension only supported with Sunshine
+    if (!IS_SUNSHINE()) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    holder = allocateClipboardPacket(SS_CLIPBOARD_REQUEST_MAX);
+    if (holder == NULL) {
+        return -1;
+    }
+
+    length = ClipboardEncodeRequest(holder->packet.clipboard.body, SS_CLIPBOARD_REQUEST_MAX, mimeType, sequence);
+    if (length < 0) {
+        free(holder);
+        return -1;
+    }
+
+    return queueClipboardPacket(holder, SS_CLIPBOARD_REQUEST_MAGIC, length);
+}
+
+int LiSendClipboardData(const char* mimeType, const void* data, uint32_t length, uint32_t sequence) {
+    uint16_t count = ClipboardChunkCount(length);
+    uint16_t index;
+
+    if (!initialized) {
+        return -2;
+    }
+
+    // This is a protocol extension only supported with Sunshine
+    if (!IS_SUNSHINE()) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    if (length > SS_CLIPBOARD_DATA_MAX || (length > 0 && data == NULL)) {
+        return -1;
+    }
+
+    if (!canSendClipboardBody(SS_CLIPBOARD_DATA_HEADER_MAX + (length < SS_CLIPBOARD_CHUNK_MAX ? length : SS_CLIPBOARD_CHUNK_MAX))) {
+        return LI_ERR_UNSUPPORTED;
+    }
+
+    for (index = 0; index < count; index++) {
+        uint32_t offset = (uint32_t)index * SS_CLIPBOARD_CHUNK_MAX;
+        uint32_t chunkLength = length - offset < SS_CLIPBOARD_CHUNK_MAX ? length - offset : SS_CLIPBOARD_CHUNK_MAX;
+        int maxBodyLength = SS_CLIPBOARD_DATA_HEADER_MAX + (int)chunkLength;
+        PPACKET_HOLDER holder;
+        int bodyLength;
+        int err;
+
+        holder = allocateClipboardPacket(maxBodyLength);
+        if (holder == NULL) {
+            return -1;
+        }
+
+        bodyLength = ClipboardEncodeChunk(holder->packet.clipboard.body, maxBodyLength, mimeType, sequence, index, count,
+                                          chunkLength > 0 ? (const uint8_t*)data + offset : NULL, chunkLength);
+        if (bodyLength < 0) {
+            free(holder);
+            return -1;
+        }
+
+        err = queueClipboardPacket(holder, SS_CLIPBOARD_DATA_MAGIC, bodyLength);
+        if (err != LBQ_SUCCESS) {
+            return err;
+        }
+    }
+
+    return 0;
 }
 
 static int sendControllerEventInternal(short controllerNumber, short activeGamepadMask,

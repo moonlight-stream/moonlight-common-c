@@ -196,14 +196,13 @@ typedef struct _SS_CONTROLLER_BATTERY_PACKET {
     uint8_t zero[1]; // Alignment/reserved
 } SS_CONTROLLER_BATTERY_PACKET, *PSS_CONTROLLER_BATTERY_PACKET;
 
-// Client -> host clipboard text. Length 0 subscribes without changing the host clipboard.
-#define SS_CLIPBOARD_TEXT_MAGIC 0x55000008
-#ifndef SS_CLIPBOARD_TEXT_MAX
-#define SS_CLIPBOARD_TEXT_MAX 32755
-#endif
+// Client -> host clipboard messages. The bodies are described in Clipboard.h.
+#define SS_CLIPBOARD_OFFER_MAGIC 0x55000008
+#define SS_CLIPBOARD_REQUEST_MAGIC 0x55000009
+#define SS_CLIPBOARD_DATA_MAGIC 0x5500000A
 typedef struct _SS_CLIPBOARD_PACKET {
     NV_INPUT_HEADER header;
-    char text[1];
+    uint8_t body[1];
 } SS_CLIPBOARD_PACKET, *PSS_CLIPBOARD_PACKET;
 
 #pragma pack(pop)

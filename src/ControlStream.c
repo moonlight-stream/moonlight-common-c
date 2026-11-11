@@ -1,4 +1,5 @@
 #include "Limelight-internal.h"
+#include "Clipboard.h"
 
 // This is a private header, but it just contains some time macros
 #include <enet/time.h>
@@ -94,10 +95,8 @@ typedef struct _QUEUED_ASYNC_CALLBACK {
             uint8_t left[DS_EFFECT_PAYLOAD_SIZE];
             uint8_t right[DS_EFFECT_PAYLOAD_SIZE];
         } dsAdaptiveTrigger;
-        struct {
-            uint32_t length;
-            char *text;
-        } clipboardText;
+        // CLIPBOARD_OFFER, CLIPBOARD_REQUEST, or CLIPBOARD_ASSEMBLER holding complete data
+        void* clipboard;
     } data;
     LINKED_BLOCKING_QUEUE_ENTRY entry;
 } QUEUED_ASYNC_CALLBACK, *PQUEUED_ASYNC_CALLBACK;
@@ -155,8 +154,12 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
 #define IDX_DS_ADAPTIVE_TRIGGERS 12
-// Not an index into packetTypes[]. Host clipboard updates use SS_CLIPBOARD_CONTROL_PTYPE.
-#define IDX_CLIPBOARD_TEXT 100
+// Not indexes into packetTypes[]. Clipboard messages use the SS_CLIPBOARD_*_PTYPE types.
+#define IDX_CLIPBOARD_OFFER 100
+#define IDX_CLIPBOARD_REQUEST 101
+#define IDX_CLIPBOARD_DATA 102
+
+static CLIPBOARD_ASSEMBLER clipboardAssembler;
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -391,6 +394,28 @@ static void freeBasicLbqList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
     }
 }
 
+static void freeAsyncCallback(PQUEUED_ASYNC_CALLBACK queuedCb) {
+    if (queuedCb->typeIndex == IDX_CLIPBOARD_DATA) {
+        free(((PCLIPBOARD_ASSEMBLER)queuedCb->data.clipboard)->data);
+    }
+    if (queuedCb->typeIndex == IDX_CLIPBOARD_OFFER ||
+            queuedCb->typeIndex == IDX_CLIPBOARD_REQUEST ||
+            queuedCb->typeIndex == IDX_CLIPBOARD_DATA) {
+        free(queuedCb->data.clipboard);
+    }
+    free(queuedCb);
+}
+
+static void freeAsyncCallbackList(PLINKED_BLOCKING_QUEUE_ENTRY entry) {
+    PLINKED_BLOCKING_QUEUE_ENTRY nextEntry;
+
+    while (entry != NULL) {
+        nextEntry = entry->flink;
+        freeAsyncCallback((PQUEUED_ASYNC_CALLBACK)entry->data);
+        entry = nextEntry;
+    }
+}
+
 // Cleans up control stream
 void destroyControlStream(void) {
     LC_ASSERT(stopping);
@@ -399,7 +424,8 @@ void destroyControlStream(void) {
     PltCloseEvent(&idrFrameRequiredEvent);
     freeBasicLbqList(LbqDestroyLinkedBlockingQueue(&referenceFrameControlQueue));
     freeBasicLbqList(LbqDestroyLinkedBlockingQueue(&frameFecStatusQueue));
-    freeBasicLbqList(LbqDestroyLinkedBlockingQueue(&asyncCallbackQueue));
+    freeAsyncCallbackList(LbqDestroyLinkedBlockingQueue(&asyncCallbackQueue));
+    ClipboardAssemblerReset(&clipboardAssembler);
 
     PltDeleteMutex(&enetMutex);
 }
@@ -1189,18 +1215,34 @@ static void asyncCallbackThreadFunc(void* context) {
                                                   queuedCb->data.dsAdaptiveTrigger.left,
                                                   queuedCb->data.dsAdaptiveTrigger.right);
             break;
-        case IDX_CLIPBOARD_TEXT:
-            ListenerCallbacks.clipboardText(queuedCb->data.clipboardText.text,
-                                            queuedCb->data.clipboardText.length);
-            free(queuedCb->data.clipboardText.text);
+        case IDX_CLIPBOARD_OFFER: {
+            PCLIPBOARD_OFFER offer = queuedCb->data.clipboard;
+            const char* mimeTypes[SS_CLIPBOARD_MIME_TYPES_MAX];
+            int i;
+
+            for (i = 0; i < offer->mimeTypeCount; i++) {
+                mimeTypes[i] = offer->mimeTypes[i];
+            }
+            ListenerCallbacks.clipboardOffer(mimeTypes, offer->mimeTypeCount, offer->sequence);
             break;
+        }
+        case IDX_CLIPBOARD_REQUEST: {
+            PCLIPBOARD_REQUEST request = queuedCb->data.clipboard;
+            ListenerCallbacks.clipboardRequest(request->mimeType, request->sequence);
+            break;
+        }
+        case IDX_CLIPBOARD_DATA: {
+            PCLIPBOARD_ASSEMBLER data = queuedCb->data.clipboard;
+            ListenerCallbacks.clipboardData(data->mimeType, data->data, data->length, data->sequence);
+            break;
+        }
         default:
             // Unhandled packet type from queueAsyncCallback()
             LC_ASSERT(false);
             break;
         }
 
-        free(queuedCb);
+        freeAsyncCallback(queuedCb);
     }
 }
 
@@ -1211,7 +1253,9 @@ static bool needsAsyncCallback(unsigned short packetType) {
            packetType == packetTypes[IDX_SET_RGB_LED] ||
            packetType == packetTypes[IDX_HDR_INFO] ||
            packetType == packetTypes[IDX_DS_ADAPTIVE_TRIGGERS] ||
-           packetType == SS_CLIPBOARD_CONTROL_PTYPE;
+           packetType == SS_CLIPBOARD_OFFER_PTYPE ||
+           packetType == SS_CLIPBOARD_REQUEST_PTYPE ||
+           packetType == SS_CLIPBOARD_DATA_PTYPE;
 }
 
 static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLength) {
@@ -1226,7 +1270,6 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         return;
     }
     queuedCb->typeIndex = -1;
-    queuedCb->data.clipboardText.text = NULL;
 
     BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
@@ -1274,28 +1317,58 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
         BbGetBytes(&bb, queuedCb->data.dsAdaptiveTrigger.right, DS_EFFECT_PAYLOAD_SIZE);
         queuedCb->typeIndex = IDX_DS_ADAPTIVE_TRIGGERS;
     }
-    else if (ctlHdr->type == SS_CLIPBOARD_CONTROL_PTYPE) {
-        if (!BbGet32(&bb, &queuedCb->data.clipboardText.length) ||
-                queuedCb->data.clipboardText.length > SS_CLIPBOARD_TEXT_MAX) {
+    else if (ctlHdr->type == SS_CLIPBOARD_OFFER_PTYPE) {
+        PCLIPBOARD_OFFER offer = malloc(sizeof(*offer));
+        if (offer == NULL || !ClipboardDecodeOffer((uint8_t*)(ctlHdr + 1), packetLength - (int)sizeof(*ctlHdr), offer)) {
+            free(offer);
             free(queuedCb);
             return;
         }
 
-        queuedCb->data.clipboardText.text = malloc(queuedCb->data.clipboardText.length + 1);
-        if (queuedCb->data.clipboardText.text == NULL) {
+        queuedCb->data.clipboard = offer;
+        queuedCb->typeIndex = IDX_CLIPBOARD_OFFER;
+    }
+    else if (ctlHdr->type == SS_CLIPBOARD_REQUEST_PTYPE) {
+        PCLIPBOARD_REQUEST request = malloc(sizeof(*request));
+        if (request == NULL || !ClipboardDecodeRequest((uint8_t*)(ctlHdr + 1), packetLength - (int)sizeof(*ctlHdr), request)) {
+            free(request);
             free(queuedCb);
             return;
         }
 
-        if (queuedCb->data.clipboardText.length > 0 &&
-                !BbGetBytes(&bb, (uint8_t*)queuedCb->data.clipboardText.text, (int)queuedCb->data.clipboardText.length)) {
-            free(queuedCb->data.clipboardText.text);
+        queuedCb->data.clipboard = request;
+        queuedCb->typeIndex = IDX_CLIPBOARD_REQUEST;
+    }
+    else if (ctlHdr->type == SS_CLIPBOARD_DATA_PTYPE) {
+        CLIPBOARD_CHUNK chunk;
+        PCLIPBOARD_ASSEMBLER data;
+
+        if (!ClipboardDecodeChunk((uint8_t*)(ctlHdr + 1), packetLength - (int)sizeof(*ctlHdr), &chunk)) {
+            Limelog("Dropping malformed clipboard data\n");
             free(queuedCb);
             return;
         }
 
-        queuedCb->data.clipboardText.text[queuedCb->data.clipboardText.length] = '\0';
-        queuedCb->typeIndex = IDX_CLIPBOARD_TEXT;
+        // Data is passed to the client only once all of its chunks have arrived
+        if (ClipboardAssemblerAdd(&clipboardAssembler, &chunk) != 1) {
+            free(queuedCb);
+            return;
+        }
+
+        data = malloc(sizeof(*data));
+        if (data == NULL) {
+            ClipboardAssemblerReset(&clipboardAssembler);
+            free(queuedCb);
+            return;
+        }
+
+        // Move the joined data out of the assembler
+        *data = clipboardAssembler;
+        clipboardAssembler.data = NULL;
+        ClipboardAssemblerReset(&clipboardAssembler);
+
+        queuedCb->data.clipboard = data;
+        queuedCb->typeIndex = IDX_CLIPBOARD_DATA;
     }
     else {
         // Unhandled packet type from needsAsyncCallback()
@@ -1307,10 +1380,7 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
     err = LbqOfferQueueItem(&asyncCallbackQueue, queuedCb, &queuedCb->entry);
     if (err != LBQ_SUCCESS) {
         Limelog("Failed to queue async callback: %d\n", err);
-        if (queuedCb->typeIndex == IDX_CLIPBOARD_TEXT) {
-            free(queuedCb->data.clipboardText.text);
-        }
-        free(queuedCb);
+        freeAsyncCallback(queuedCb);
     }
 }
 
