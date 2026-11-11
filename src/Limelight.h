@@ -483,6 +483,28 @@ typedef void(*ConnListenerSetAdaptiveTriggers)(uint16_t controllerNumber, uint8_
 // This callback is invoked to set a controller's RGB LED (if present).
 typedef void(*ConnListenerSetControllerLED)(uint16_t controllerNumber, uint8_t r, uint8_t g, uint8_t b);
 
+// Clipboard sync with Sunshine hosts works the same way in both directions. When a
+// clipboard changes, that side sends an offer listing its MIME types. The other side
+// requests the types it wants and receives each one as clipboard data. The sequence
+// number ties requests and data to one offer, so replies to an older offer can be dropped.
+#define SS_CLIPBOARD_MIME_TEXT "text/plain;charset=utf-8"
+#define SS_CLIPBOARD_MIME_PNG "image/png"
+#define SS_CLIPBOARD_MIME_JPEG "image/jpeg"
+#define SS_CLIPBOARD_MIME_MAX 255
+#define SS_CLIPBOARD_MIME_TYPES_MAX 8
+#define SS_CLIPBOARD_DATA_MAX (64 * 1024 * 1024)
+
+// This callback is invoked when the host clipboard changes. Request the MIME types
+// you want with LiSendClipboardRequest().
+typedef void(*ConnListenerClipboardOffer)(const char* const* mimeTypes, int mimeTypeCount, uint32_t sequence);
+
+// This callback is invoked when the host requests a MIME type from the client's last
+// offer. Answer with LiSendClipboardData() if the sequence still matches that offer.
+typedef void(*ConnListenerClipboardRequest)(const char* mimeType, uint32_t sequence);
+
+// This callback is invoked with host clipboard data the client requested.
+typedef void(*ConnListenerClipboardData)(const char* mimeType, const void* data, uint32_t length, uint32_t sequence);
+
 typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerStageStarting stageStarting;
     ConnListenerStageComplete stageComplete;
@@ -497,6 +519,9 @@ typedef struct _CONNECTION_LISTENER_CALLBACKS {
     ConnListenerSetMotionEventState setMotionEventState;
     ConnListenerSetControllerLED setControllerLED;
     ConnListenerSetAdaptiveTriggers setAdaptiveTriggers;
+    ConnListenerClipboardOffer clipboardOffer;
+    ConnListenerClipboardRequest clipboardRequest;
+    ConnListenerClipboardData clipboardData;
 } CONNECTION_LISTENER_CALLBACKS, *PCONNECTION_LISTENER_CALLBACKS;
 
 // Use this function to zero the connection callbacks when allocated on the stack or heap
@@ -715,6 +740,14 @@ int LiSendKeyboardEvent2(short keyCode, char keyAction, char modifiers, char fla
 
 // This function queues an UTF-8 encoded text to be sent to the remote server.
 int LiSendUtf8TextEvent(const char *text, unsigned int length);
+
+// These functions sync the clipboard with a Sunshine host. They return LI_ERR_UNSUPPORTED
+// for other hosts. Send an offer with no MIME types after connecting to receive host
+// clipboard changes; it does not change the host clipboard. After that, send an offer
+// with a new sequence number whenever the client clipboard changes.
+int LiSendClipboardOffer(const char* const* mimeTypes, int mimeTypeCount, uint32_t sequence);
+int LiSendClipboardRequest(const char* mimeType, uint32_t sequence);
+int LiSendClipboardData(const char* mimeType, const void* data, uint32_t length, uint32_t sequence);
 
 // Button flags
 #define A_FLAG     0x1000
