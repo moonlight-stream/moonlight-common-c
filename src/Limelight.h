@@ -970,7 +970,6 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 typedef void* VIDEO_FRAME_HANDLE;
 bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
 bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
-bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit);
 void LiWakeWaitForVideoFrame(void);
 void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
 

@@ -290,20 +290,6 @@ bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeU
     return true;
 }
 
-bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit) {
-    PQUEUED_DECODE_UNIT qdu;
-
-    int err = LbqPeekQueueElement(&decodeUnitQueue, (void**)&qdu);
-    if (err != LBQ_SUCCESS) {
-        return false;
-    }
-
-    validateDecodeUnitForPlayback(&qdu->decodeUnit);
-
-    *decodeUnit = &qdu->decodeUnit;
-    return true;
-}
-
 void LiWakeWaitForVideoFrame(void) {
     LbqSignalQueueUserWake(&decodeUnitQueue);
 }
