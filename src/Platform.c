@@ -356,7 +356,7 @@ void PltSetEvent(PLT_EVENT* event) {
     PltLockMutex(&event->mutex);
     event->signalled = true;
     PltUnlockMutex(&event->mutex);
-    PltSignalConditionVariable(&event->cond);
+    PltBroadcastConditionVariable(&event->cond);
 #endif
 }
 
@@ -420,6 +420,19 @@ void PltSignalConditionVariable(PLT_COND* cond) {
     CondVar_Signal(cond);
 #else
     pthread_cond_signal(cond);
+#endif
+}
+
+void PltBroadcastConditionVariable(PLT_COND* cond) {
+#if defined(LC_WINDOWS)
+    WakeAllConditionVariable(cond);
+#elif defined(__WIIU__)
+    // FIXME: This only wakes one thread
+    OSFastCond_Signal(cond);
+#elif defined(__3DS__)
+    CondVar_Broadcast(cond);
+#else
+    pthread_cond_broadcast(cond);
 #endif
 }
 

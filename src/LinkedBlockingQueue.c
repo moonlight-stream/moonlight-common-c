@@ -62,21 +62,21 @@ void LbqSignalQueueShutdown(PLINKED_BLOCKING_QUEUE queueHead) {
     PltLockMutex(&queueHead->mutex);
     queueHead->shutdown = true;
     PltUnlockMutex(&queueHead->mutex);
-    PltSignalConditionVariable(&queueHead->cond);
+    PltBroadcastConditionVariable(&queueHead->cond);
 }
 
 void LbqSignalQueueDrain(PLINKED_BLOCKING_QUEUE queueHead) {
     PltLockMutex(&queueHead->mutex);
     queueHead->draining = true;
     PltUnlockMutex(&queueHead->mutex);
-    PltSignalConditionVariable(&queueHead->cond);
+    PltBroadcastConditionVariable(&queueHead->cond);
 }
 
 void LbqSignalQueueUserWake(PLINKED_BLOCKING_QUEUE queueHead) {
     PltLockMutex(&queueHead->mutex);
     queueHead->pendingUserWake = true;
     PltUnlockMutex(&queueHead->mutex);
-    PltSignalConditionVariable(&queueHead->cond);
+    PltBroadcastConditionVariable(&queueHead->cond);
 }
 
 int LbqGetItemCount(PLINKED_BLOCKING_QUEUE queueHead) {
@@ -122,12 +122,7 @@ int LbqOfferQueueItem(PLINKED_BLOCKING_QUEUE queueHead, void* data, PLINKED_BLOC
     queueHead->lifetimeSize++;
 
     PltUnlockMutex(&queueHead->mutex);
-
-    if (wasEmpty) {
-        // Only call PltSignalConditionVariable() when transitioning from
-        // empty -> non-empty to avoid a useless syscall for each new entry.
-        PltSignalConditionVariable(&queueHead->cond);
-    }
+    PltSignalConditionVariable(&queueHead->cond);
 
     return LBQ_SUCCESS;
 }

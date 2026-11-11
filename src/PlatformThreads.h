@@ -69,6 +69,7 @@ void PltWaitForEvent(PLT_EVENT* event);
 int PltCreateConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex);
 void PltDeleteConditionVariable(PLT_COND* cond);
 void PltSignalConditionVariable(PLT_COND* cond);
+void PltBroadcastConditionVariable(PLT_COND* cond);
 void PltWaitForConditionVariable(PLT_COND* cond, PLT_MUTEX* mutex);
 
 void PltSleepMs(int ms);
