@@ -95,23 +95,30 @@ int sendMicrophoneOpusData(const unsigned char* opusData, int opusLength) {
     
     if (EncryptionFeaturesEnabled & SS_ENC_MICROPHONE) {
         unsigned char iv[MIC_IV_LEN] = {0};
-        // PltEncryptMessage() appends exactly one PKCS7 pad when
-        // CIPHER_FLAG_PAD_TO_BLOCK_SIZE is set. The host strips that pad.
-        // Do not pad again here, and do not pass CIPHER_FLAG_FINISH.
-        unsigned char paddedData[ROUND_TO_PKCS7_PADDED_LEN(MAX_MIC_PACKET_SIZE)];
+        // The host strips exactly one PKCS7 pad of 1-16 bytes. Append that pad
+        // here, including a full block when the Opus data is already aligned.
+        // CIPHER_FLAG_PAD_TO_BLOCK_SIZE then adds nothing to aligned input, and
+        // CIPHER_FLAG_FINISH must stay off so EncryptFinal does not add another.
+        unsigned char paddedData[MAX_MIC_PACKET_SIZE + 16];
         unsigned char encryptedData[sizeof(paddedData)];
         int encryptedLength = (int)sizeof(encryptedData);
         uint32_t ivSeq;
+        int padLength;
+        int paddedLength;
 
         // Once encryption is negotiated, never fall back to sending plaintext.
         if (micEncryptionCtx == NULL) {
             return -1;
         }
 
+        padLength = 16 - (opusLength % 16);
+        paddedLength = opusLength + padLength;
+        memcpy(paddedData, opusData, opusLength);
+        memset(&paddedData[opusLength], padLength, padLength);
+
         // IV = riKeyId + sequenceNumber in big-endian
         ivSeq = BE32(micRiKeyId + micSequenceNumber);
         memcpy(iv, &ivSeq, sizeof(ivSeq));
-        memcpy(paddedData, opusData, opusLength);
 
         if (!PltEncryptMessage(micEncryptionCtx,
                               ALGORITHM_AES_CBC,
@@ -120,7 +127,7 @@ int sendMicrophoneOpusData(const unsigned char* opusData, int opusLength) {
                               sizeof(StreamConfig.remoteInputAesKey),
                               iv, sizeof(iv),
                               NULL, 0,
-                              paddedData, opusLength,
+                              paddedData, paddedLength,
                               encryptedData, &encryptedLength)) {
             Limelog("MIC: Encryption failed\n");
             return -1;
