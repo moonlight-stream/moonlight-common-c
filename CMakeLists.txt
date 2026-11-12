@@ -17,7 +17,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ${CMAKE_POSITION_INDEPENDENT_CODE_BACKUP})
 unset(CMAKE_POSITION_INDEPENDENT_CODE_BACKUP)
 
 aux_source_directory(src SRC_LIST)
-aux_source_directory(reedsolomon SRC_LIST)
+list(APPEND SRC_LIST
+  nanors/rs.c
+  nanors/deps/obl/oblas_common.c
+  nanors/deps/obl/oblas_lite.c
+)
 
 # Build shared library by default, but allows user override
 if (NOT DEFINED BUILD_SHARED_LIBS)
@@ -35,7 +39,7 @@ endif()
 target_link_libraries(moonlight-common-c PRIVATE enet)
 
 if(MSVC)
-  target_compile_options(moonlight-common-c PRIVATE /W3 /wd4100 /wd4232 /wd5105 /WX)
+  target_compile_options(moonlight-common-c PRIVATE /W3 /wd4100 /wd4232 /wd5105 /WX /experimental:c11atomics)
   target_link_libraries(moonlight-common-c PRIVATE ws2_32.lib winmm.lib)
 elseif(MINGW)
   target_link_libraries(moonlight-common-c PRIVATE -lws2_32 -lwinmm)
@@ -106,8 +110,10 @@ endif()
 
 target_include_directories(moonlight-common-c SYSTEM PUBLIC src)
 
-target_include_directories(moonlight-common-c PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/reedsolomon
+target_include_directories(moonlight-common-c SYSTEM PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/nanors
+  ${CMAKE_CURRENT_SOURCE_DIR}/nanors/deps
+  ${CMAKE_CURRENT_SOURCE_DIR}/nanors/deps/obl
 )
 
 target_compile_definitions(moonlight-common-c PRIVATE HAS_SOCKLEN_T)

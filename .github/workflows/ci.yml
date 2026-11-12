@@ -10,8 +10,6 @@ on:
       - synchronize
       - reopened
   push:
-    branches:
-      - master
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -28,6 +26,8 @@ jobs:
           #   cmake_args: -A Win32
           - os: windows-latest
             cmake_args: -A x64
+          - os: windows-11-arm
+            cmake_args: -A ARM64
           - os: macos-latest
             build_target: macos
             cmake_args: -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl
@@ -35,6 +35,12 @@ jobs:
             cc: clang
             cxx: clang++
           - os: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - os: ubuntu-24.04-arm
+            cc: clang
+            cxx: clang++
+          - os: ubuntu-24.04-arm
             cc: gcc
             cxx: g++
           - os: ubuntu-latest

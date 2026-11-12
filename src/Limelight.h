@@ -699,12 +699,17 @@ int LiSendMouseButtonEvent(char action, int button);
 // This function queues a keyboard event to be sent to the remote server.
 // Key codes are Win32 Virtual Key (VK) codes and interpreted as keys on
 // a US English layout.
+//
+// MODIFIER_EXTENDED indicates an extended key (0xE0 scancode prefix).
+// This is required to distinguish between certain keys like Enter
+// and Numpad Enter that share the same VK code.
 #define KEY_ACTION_DOWN 0x03
 #define KEY_ACTION_UP 0x04
 #define MODIFIER_SHIFT 0x01
 #define MODIFIER_CTRL 0x02
 #define MODIFIER_ALT 0x04
 #define MODIFIER_META 0x08
+#define MODIFIER_EXTENDED 0x10
 int LiSendKeyboardEvent(short keyCode, char keyAction, char modifiers);
 
 // Similar to LiSendKeyboardEvent() but allows the client to inform the host that
@@ -778,6 +783,7 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CTYPE_XBOX     0x01
 #define LI_CTYPE_PS       0x02
 #define LI_CTYPE_NINTENDO 0x03
+#define LI_CTYPE_STEAM    0x04 // Valve Steam Controller (Xbox-style layout plus dual touchpads, gyro/accel and grip buttons)
 #define LI_CCAP_ANALOG_TRIGGERS 0x01 // Reports values between 0x00 and 0xFF for trigger axes
 #define LI_CCAP_RUMBLE          0x02 // Can rumble in response to ConnListenerRumble() callback
 #define LI_CCAP_TRIGGER_RUMBLE  0x04 // Can rumble triggers in response to ConnListenerRumbleTriggers() callback
@@ -786,6 +792,7 @@ int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
 #define LI_CCAP_GYRO            0x20 // Can report gyroscope events via LiSendControllerMotionEvent()
 #define LI_CCAP_BATTERY_STATE   0x40 // Reports battery state via LiSendControllerBatteryEvent()
 #define LI_CCAP_RGB_LED         0x80 // Can set RGB LED state via ConnListenerSetControllerLED()
+#define LI_CCAP_DUAL_TOUCHPAD  0x100 // Reports touchpad events from 2 separate touchpads
 int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepadMask, uint8_t type,
                                  uint32_t supportedButtonFlags, uint16_t capabilities);
 
@@ -798,6 +805,13 @@ int LiSendControllerArrivalEvent(uint8_t controllerNumber, uint16_t activeGamepa
 // To determine if LiSendControllerTouchEvent() is supported without calling it, call LiGetHostFeatureFlags()
 // and check for the LI_FF_CONTROLLER_TOUCH_EVENTS flag.
 int LiSendControllerTouchEvent(uint8_t controllerNumber, uint8_t eventType, uint32_t pointerId, float x, float y, float pressure);
+
+// This function is similar to LiSendControllerTouchEvent(), but it allows the touchpad index to be
+// provided for use with controllers that have multiple touchpads (like the Steam Controller).
+//
+// The only valid touchpad indices are currently 0 (support indicated by LI_CCAP_TOUCHPAD) and 1
+// (support indicated by LI_CCAP_DUAL_TOUCHPAD).
+int LiSendControllerTouchEvent2(uint8_t controllerNumber, uint8_t eventType, uint8_t touchpadIndex, uint32_t pointerId, float x, float y, float pressure);
 
 // This function allows clients to send controller-associated motion events to a supported host.
 //
@@ -870,8 +884,7 @@ int LiGetPendingAudioFrames(void);
 // negotiated audio frame duration.
 int LiGetPendingAudioDuration(void);
 
-// Returns a pointer to a struct containing various statistics about the RTP audio stream.
-// The data should be considered read-only and must not be modified.
+// Populates a caller-supplied struct containing various statistics about the RTP audio stream.
 typedef struct _RTP_AUDIO_STATS {
     uint32_t packetCountAudio;         // total audio packets
     uint32_t packetCountFec;           // total packets of type FEC
@@ -882,10 +895,9 @@ typedef struct _RTP_AUDIO_STATS {
     uint32_t packetCountFecInvalid;    // invalid FEC packet
 } RTP_AUDIO_STATS, *PRTP_AUDIO_STATS;
 
-const RTP_AUDIO_STATS* LiGetRTPAudioStats(void);
+void LiGetRTPAudioStats(PRTP_AUDIO_STATS stats);
 
-// Returns a pointer to a struct containing various statistics about the RTP video stream.
-// The data should be considered read-only and must not be modified.
+// Populates a caller-supplied struct containing various statistics about the RTP video stream.
 // Right now this is mainly used to track total video and FEC packets, as there are
 // many video stats already implemented at a higher level in moonlight-qt.
 typedef struct _RTP_VIDEO_STATS {
@@ -898,7 +910,7 @@ typedef struct _RTP_VIDEO_STATS {
     uint32_t packetCountFecInvalid;    // invalid FEC packet
 } RTP_VIDEO_STATS, *PRTP_VIDEO_STATS;
 
-const RTP_VIDEO_STATS* LiGetRTPVideoStats(void);
+void LiGetRTPVideoStats(PRTP_VIDEO_STATS stats);
 
 // Port index flags for use with LiGetPortFromPortFlagIndex() and LiGetProtocolFromPortFlagIndex()
 #define ML_PORT_INDEX_TCP_47984 0
@@ -961,7 +973,6 @@ unsigned int LiTestClientConnectivity(const char* testServer, unsigned short ref
 typedef void* VIDEO_FRAME_HANDLE;
 bool LiWaitForNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
 bool LiPollNextVideoFrame(VIDEO_FRAME_HANDLE* frameHandle, PDECODE_UNIT* decodeUnit);
-bool LiPeekNextVideoFrame(PDECODE_UNIT* decodeUnit);
 void LiWakeWaitForVideoFrame(void);
 void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus);
 

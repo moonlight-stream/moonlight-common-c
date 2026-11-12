@@ -1,9 +1,33 @@
 #include "Platform.h"
 #include "Rtsp.h"
+#include <limits.h>
+#include <errno.h>
+
+// Case-insensitive ASCII string comparison for RTSP header names
+static int rtspStrCaseCmp(const char* s1, const char* s2) {
+    while (*s1 && *s2) {
+        char c1 = (*s1 >= 'A' && *s1 <= 'Z') ? (*s1 + ('a' - 'A')) : *s1;
+        char c2 = (*s2 >= 'A' && *s2 <= 'Z') ? (*s2 + ('a' - 'A')) : *s2;
+        if (c1 != c2) {
+            return (unsigned char)c1 - (unsigned char)c2;
+        }
+        s1++;
+        s2++;
+    }
+    return (unsigned char)*s1 - (unsigned char)*s2;
+}
 
 // Check if String s begins with the given prefix
 static bool startsWith(const char* s, const char* prefix) {
     return strncmp(s, prefix, strlen(prefix)) == 0;
+}
+
+// Trims trailing spaces and tabs from s in place
+static void trimTrailingWhitespace(char* s) {
+    size_t len = strlen(s);
+    while (len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t')) {
+        s[--len] = '\0';
+    }
 }
 
 // Gets the length of the message
@@ -51,11 +75,91 @@ static int getMessageLength(PRTSP_MESSAGE msg) {
     return (int)count;
 }
 
+// Check if we're at the end of the message portion marked by \r\n\r\n
+static bool checkMessageEnded(char* endCheck, char* messageBuffer, int length, char** payload) {
+    if (endCheck <= messageBuffer + length) {
+        int remaining = (int)((messageBuffer + length) - endCheck);
+
+        // RTSP over ENet doesn't always have the second CRLF for some reason
+        if (remaining == 0) {
+            return true;
+        }
+        // Previous `if` statement already handle situation when two bytes are missing.
+        // This is the workaround for the same problem, but for only one byte missing.
+        // Sometimes on android emulators last byte or two bytes are missing.
+        // This is link to this bug in Goggle Issue Tracker:
+        // https://issuetracker.google.com/issues/150758736?pli=1
+        else if (remaining == 1 && endCheck[0] == '\r') {
+            return true;
+        }
+        else if (remaining >= 2 && memcmp(endCheck, "\r\n", 2) == 0) {
+            // We've encountered the end of the message - mark it thus
+            // The payload is the remainder of messageBuffer. If none, then payload = null
+            if (remaining > 2) {
+                *payload = &endCheck[2];
+            }
+
+            return true;
+        }
+        else if (remaining >= 1 && endCheck[0] == '\n') {
+            // End of message marked by bare LF
+            if (remaining > 1) {
+                *payload = &endCheck[1];
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Terminates current line at lineEnd and returns a pointer to the start of the next line
+static char* getNextLine(char* lineEnd, char* bufferEnd) {
+    char origEnd = *lineEnd;
+    *lineEnd = '\0';
+    char* nextLine = lineEnd + 1;
+    if (origEnd == '\r' && nextLine < bufferEnd && *nextLine == '\n') {
+        nextLine++;
+    }
+    return nextLine;
+}
+
+// Skips spaces and tabs, returning a pointer to the first non-whitespace character
+static char* skipSpaces(char* s) {
+    while (*s == ' ' || *s == '\t') {
+        s++;
+    }
+    return s;
+}
+
+// Extracts the next whitespace-delimited token from *ptr, null-terminates it, and advances *ptr
+static char* getNextToken(char** ptr) {
+    char* token = skipSpaces(*ptr);
+    if (*token == '\0') {
+        *ptr = token;
+        return NULL;
+    }
+
+    char* end = token;
+    while (*end != '\0' && *end != ' ' && *end != '\t') {
+        end++;
+    }
+
+    if (*end != '\0') {
+        *end = '\0';
+        *ptr = skipSpaces(end + 1);
+    }
+    else {
+        *ptr = end;
+    }
+
+    return token;
+}
+
 // Given an RTSP message string rtspMessage, parse it into an RTSP_MESSAGE struct msg
 int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
-    char* token;
     char* protocol;
-    char* endCheck;
     char* target;
     char* statusStr;
     char* command;
@@ -63,7 +167,6 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     char flag;
     bool messageEnded = false;
 
-    char* strtokCtx = NULL;
     char* payload = NULL;
     char* opt = NULL;
     int statusCode = 0;
@@ -72,11 +175,9 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     POPTION_ITEM options = NULL;
     POPTION_ITEM newOpt;
 
-    // Delimeter sets for strtok()
-    char* delim = " \r\n";
-    char* end = "\r\n";
-    char* optDelim = " :\r\n";
-    char typeFlag = TOKEN_OPTION;
+    if (length <= 0) {
+        return RTSP_ERROR_MALFORMED;
+    }
 
     // Put the raw message into a string we can use
     char* messageBuffer = malloc(length + 1);
@@ -87,119 +188,115 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
     memcpy(messageBuffer, rtspMessage, length);
 
     // The payload logic depends on a null-terminator at the end
-    messageBuffer[length] = 0;
+    messageBuffer[length] = '\0';
 
-    // Get the first token of the message
-    token = strtok_r(messageBuffer, delim, &strtokCtx);
-    if (token == NULL) {
+    char* ptr = messageBuffer;
+    char* bufferEnd = messageBuffer + length;
+
+    // Find the end of the start line
+    char* lineEnd = strpbrk(ptr, "\r\n");
+    if (lineEnd == NULL) {
         exitCode = RTSP_ERROR_MALFORMED;
         goto ExitFailure;
     }
 
+    char* nextLine = getNextLine(lineEnd, bufferEnd);
+
+    ptr = skipSpaces(ptr);
+
     // The message is a response
-    if (startsWith(token, "RTSP")) {
+    if (startsWith(ptr, "RTSP/")) {
         flag = TYPE_RESPONSE;
-        // The current token is the protocol
-        protocol = token;
 
-        // Get the status code
-        token = strtok_r(NULL, delim, &strtokCtx);
-        if (token == NULL) {
-            exitCode = RTSP_ERROR_MALFORMED;
-            goto ExitFailure;
-        }
-        statusCode = atoi(token);
-
-        // Get the status string
-        statusStr = strtok_r(NULL, end, &strtokCtx);
-        if (statusStr == NULL) {
+        protocol = getNextToken(&ptr);
+        char* codeStr = getNextToken(&ptr);
+        if (codeStr == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
 
-        // Request fields - we don't care about them here
+        char* endPtr;
+        errno = 0;
+        long val = strtol(codeStr, &endPtr, 10);
+        if (endPtr == codeStr || *endPtr != '\0' || errno == ERANGE || val <= 0 || val > INT_MAX) {
+            exitCode = RTSP_ERROR_MALFORMED;
+            goto ExitFailure;
+        }
+        statusCode = (int)val;
+        statusStr = ptr;
+        trimTrailingWhitespace(statusStr);
+
         target = NULL;
         command = NULL;
     }
-
     // The message is a request
     else {
         flag = TYPE_REQUEST;
-        command = token;
-        target = strtok_r(NULL, delim, &strtokCtx);
-        if (target == NULL) {
+
+        command = getNextToken(&ptr);
+        target = getNextToken(&ptr);
+        protocol = getNextToken(&ptr);
+        if (target == NULL || protocol == NULL) {
             exitCode = RTSP_ERROR_MALFORMED;
             goto ExitFailure;
         }
-        protocol = strtok_r(NULL, delim, &strtokCtx);
-        if (protocol == NULL) {
-            exitCode = RTSP_ERROR_MALFORMED;
-            goto ExitFailure;
-        }
-        // Response field - we don't care about it here
+
         statusStr = NULL;
     }
+
     if (strcmp(protocol, "RTSP/1.0")) {
         exitCode = RTSP_ERROR_MALFORMED;
         goto ExitFailure;
     }
+
+    ptr = nextLine;
+
     // Parse remaining options
-    while (token != NULL)
-    {
-        token = strtok_r(NULL, typeFlag == TOKEN_OPTION ? optDelim : end, &strtokCtx);
-        if (token != NULL) {
-            if (typeFlag == TOKEN_OPTION) {
-                opt = token;
-            }
-            // The token is content
-            else {
-                // Create a new node containing the option and content
-                newOpt = (POPTION_ITEM)malloc(sizeof(OPTION_ITEM));
-                if (newOpt == NULL) {
-                    exitCode = RTSP_ERROR_NO_MEMORY;
-                    goto ExitFailure;
-                }
-                newOpt->flags = 0;
-                newOpt->option = opt;
-                newOpt->content = token + 1; // Skip the protocol defined blank space
-                newOpt->next = NULL;
-                insertOption(&options, newOpt);
-
-                // Check if we're at the end of the message portion marked by \r\n\r\n
-                // endCheck points to the remainder of messageBuffer after the token
-                endCheck = &token[0] + strlen(token) + 1;
-
-                // See if we've hit the end of the message. The first \r is missing because it's been tokenized
-                if (startsWith(endCheck, "\n") && endCheck[1] == '\0') {
-                    // RTSP over ENet doesn't always have the second CRLF for some reason
-                    messageEnded = true;
-
-                    break;
-                }
-                else if (startsWith(endCheck, "\n\r") && endCheck[2] == '\0') {
-                    // Previous `if` statement already handle situation when two bytes are missing.
-                    // This is the workaround for the same problem, but for only one byte missing.
-                    // Sometimes on android emulators last byte or two bytes are missing.
-                    // This is link to this bug in Goggle Issue Tracker:
-                    // https://issuetracker.google.com/issues/150758736?pli=1
-                    messageEnded = true;
-
-                    break;
-                }
-                else if (startsWith(endCheck, "\n\r\n")) {
-                    // We've encountered the end of the message - mark it thus
-                    messageEnded = true;
-
-                    // The payload is the remainder of messageBuffer. If none, then payload = null
-                    if (endCheck[3] != '\0')
-                        payload = &endCheck[3];
-
-                    break;
-                }
-            }
+    while (ptr <= bufferEnd) {
+        if (checkMessageEnded(ptr, messageBuffer, length, &payload)) {
+            messageEnded = true;
+            break;
         }
-        typeFlag ^= 1; // flip the flag
+
+        lineEnd = strpbrk(ptr, "\r\n");
+        if (lineEnd == NULL) {
+            break;
+        }
+
+        nextLine = getNextLine(lineEnd, bufferEnd);
+
+        char* colon = strchr(ptr, ':');
+        if (colon == NULL) {
+            exitCode = RTSP_ERROR_MALFORMED;
+            goto ExitFailure;
+        }
+
+        *colon = '\0';
+        opt = skipSpaces(ptr);
+        trimTrailingWhitespace(opt);
+        if (*opt == '\0') {
+            exitCode = RTSP_ERROR_MALFORMED;
+            goto ExitFailure;
+        }
+
+        char* val = skipSpaces(colon + 1);
+        trimTrailingWhitespace(val);
+
+        // Create a new node containing the option and content
+        newOpt = (POPTION_ITEM)malloc(sizeof(OPTION_ITEM));
+        if (newOpt == NULL) {
+            exitCode = RTSP_ERROR_NO_MEMORY;
+            goto ExitFailure;
+        }
+        newOpt->flags = 0;
+        newOpt->option = opt;
+        newOpt->content = val;
+        newOpt->next = NULL;
+        insertOption(&options, newOpt);
+
+        ptr = nextLine;
     }
+
     // If we never encountered the double CRLF, then the message is malformed!
     if (!messageEnded) {
         exitCode = RTSP_ERROR_MALFORMED;
@@ -208,11 +305,14 @@ int parseRtspMessage(PRTSP_MESSAGE msg, char* rtspMessage, int length) {
 
     // Get sequence number as an integer
     sequence = getOptionContent(options, "CSeq");
+    sequenceNum = SEQ_INVALID;
     if (sequence != NULL) {
-        sequenceNum = atoi(sequence);
-    }
-    else {
-        sequenceNum = SEQ_INVALID;
+        char* endPtr;
+        errno = 0;
+        long val = strtol(sequence, &endPtr, 10);
+        if (endPtr != sequence && *endPtr == '\0' && errno != ERANGE && val >= 0 && val <= INT_MAX) {
+            sequenceNum = (int)val;
+        }
     }
     // Package the new parsed message into the struct
     if (flag == TYPE_REQUEST) {
@@ -270,7 +370,7 @@ char* getOptionContent(POPTION_ITEM optionsHead, char* option) {
     POPTION_ITEM current = optionsHead;
     while (current != NULL) {
         // Check if current node is what we're looking for
-        if (!strcmp(current->option, option)) {
+        if (!rtspStrCaseCmp(current->option, option)) {
             return current->content;
         }
         current = current->next;
@@ -282,22 +382,36 @@ char* getOptionContent(POPTION_ITEM optionsHead, char* option) {
 // Adds new option opt to the struct's option list
 void insertOption(POPTION_ITEM* optionsHead, POPTION_ITEM opt) {
     POPTION_ITEM current = *optionsHead;
-    opt->next = NULL;
 
     // Empty options list
     if (*optionsHead == NULL) {
+        opt->next = NULL;
         *optionsHead = opt;
         return;
     }
 
     // Traverse the list and insert the new option at the end
     while (current != NULL) {
+        // Check for self-insertion
+        if (current == opt) {
+            LC_ASSERT(current != opt);
+            return;
+        }
+
         // Check for duplicate option; if so, replace the option currently there
-        if (!strcmp(current->option, opt->option)) {
+        if (!rtspStrCaseCmp(current->option, opt->option)) {
+            if (current->flags & FLAG_ALLOCATED_OPTION_FIELDS) {
+                free(current->option);
+                free(current->content);
+            }
+            current->option = opt->option;
             current->content = opt->content;
+            current->flags = opt->flags;
+            free(opt);
             return;
         }
         if (current->next == NULL) {
+            opt->next = NULL;
             current->next = opt;
             return;
         }
@@ -320,7 +434,7 @@ void freeOptionList(POPTION_ITEM optionsHead) {
     }
 }
 
-bool appendString(char* dest, int* destOffset, int* destRemainingLength, char* source) {
+bool appendString(char* dest, int* destOffset, int* destRemainingLength, const char* source) {
     int ret = snprintf(&dest[*destOffset], *destRemainingLength, "%s", source);
     if (ret < 0 || ret >= *destRemainingLength) {
         LC_ASSERT(false);
@@ -403,6 +517,9 @@ char* serializeRtspMessage(PRTSP_MESSAGE msg, int* serializedLength) {
     else {
         *serializedLength = offset;
     }
+
+    // Ensure null-termination as reserved by getMessageLength
+    serializedMessage[*serializedLength] = '\0';
 
     return serializedMessage;
 

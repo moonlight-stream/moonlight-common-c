@@ -26,7 +26,7 @@ int initializeMicrophoneStream(void) {
         return 0;
     }
     
-    micEncryptionCtx = PltCreateCryptoContext();
+    micEncryptionCtx = PltCreateCryptoContext(0);
     if (micEncryptionCtx == NULL) {
         return -1;
     }
@@ -93,23 +93,34 @@ int sendMicrophoneOpusData(const unsigned char* opusData, int opusLength) {
     header.timestamp = LE32((uint32_t)PltGetMillis());
     header.ssrc = LE32(MIC_PACKET_MAGIC);
     
-    if ((EncryptionFeaturesEnabled & SS_ENC_MICROPHONE) && micEncryptionCtx != NULL) {
+    if (EncryptionFeaturesEnabled & SS_ENC_MICROPHONE) {
         unsigned char iv[MIC_IV_LEN] = {0};
-        unsigned char encryptedData[ROUND_TO_PKCS7_PADDED_LEN(MAX_MIC_PACKET_SIZE)];
+        // PltEncryptMessage() appends exactly one PKCS7 pad when
+        // CIPHER_FLAG_PAD_TO_BLOCK_SIZE is set. The host strips that pad.
+        // Do not pad again here, and do not pass CIPHER_FLAG_FINISH.
+        unsigned char paddedData[ROUND_TO_PKCS7_PADDED_LEN(MAX_MIC_PACKET_SIZE)];
+        unsigned char encryptedData[sizeof(paddedData)];
         int encryptedLength = (int)sizeof(encryptedData);
-        
+        uint32_t ivSeq;
+
+        // Once encryption is negotiated, never fall back to sending plaintext.
+        if (micEncryptionCtx == NULL) {
+            return -1;
+        }
+
         // IV = riKeyId + sequenceNumber in big-endian
-        uint32_t ivSeq = BE32(micRiKeyId + micSequenceNumber);
+        ivSeq = BE32(micRiKeyId + micSequenceNumber);
         memcpy(iv, &ivSeq, sizeof(ivSeq));
-        
-        if (!PltEncryptMessage(micEncryptionCtx, 
+        memcpy(paddedData, opusData, opusLength);
+
+        if (!PltEncryptMessage(micEncryptionCtx,
                               ALGORITHM_AES_CBC,
-                              CIPHER_FLAG_RESET_IV | CIPHER_FLAG_FINISH | CIPHER_FLAG_PAD_TO_BLOCK_SIZE,
+                              CIPHER_FLAG_RESET_IV | CIPHER_FLAG_PAD_TO_BLOCK_SIZE,
                               (unsigned char*)StreamConfig.remoteInputAesKey,
                               sizeof(StreamConfig.remoteInputAesKey),
                               iv, sizeof(iv),
                               NULL, 0,
-                              (unsigned char*)opusData, opusLength,
+                              paddedData, opusLength,
                               encryptedData, &encryptedLength)) {
             Limelog("MIC: Encryption failed\n");
             return -1;

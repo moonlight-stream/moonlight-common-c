@@ -1,5 +1,7 @@
 #include "Limelight-internal.h"
 
+#include <rs.h>
+
 #if defined(LC_DEBUG) && !defined(LC_FUZZING)
 // This enables FEC validation mode with a synthetic drop
 // and recovered packet checks vs the original input. It
@@ -55,8 +57,7 @@ void RtpaInitializeQueue(PRTP_AUDIO_QUEUE queue) {
     // works correctly. This is possible because the data and FEC shard count is
     // constant and known in advance.
     const unsigned char parity[] = { 0x77, 0x40, 0x38, 0x0e, 0xc7, 0xa7, 0x0d, 0x6c };
-    memcpy(&queue->rs->m[16], parity, sizeof(parity));
-    memcpy(queue->rs->parity, parity, sizeof(parity));
+    memcpy(queue->rs->p, parity, sizeof(parity));
 }
 
 static void validateFecBlockState(PRTP_AUDIO_QUEUE queue) {
@@ -204,19 +205,19 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
 
     if (packet->packetType == RTP_PAYLOAD_TYPE_AUDIO) {
         if (length < sizeof(RTP_PACKET)) {
-            queue->stats.packetCountInvalid++;
+            atomic_fetch_add_explicit(&queue->stats.packetCountInvalid, 1, memory_order_relaxed);
             Limelog("RTP audio data packet too small: %u\n", length);
             LC_ASSERT_VT(false);
             return NULL;
         }
 
-        queue->stats.packetCountAudio++;
+        atomic_fetch_add_explicit(&queue->stats.packetCountAudio, 1, memory_order_relaxed);
 
         // Remember if we've received out-of-sequence packets lately. We can use
         // this knowledge to more quickly give up on FEC blocks.
         if (!queue->synchronizing && isBefore16(packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber)) {
             queue->lastOosSequenceNumber = packet->sequenceNumber;
-            queue->stats.packetCountOOS++;
+            atomic_fetch_add_explicit(&queue->stats.packetCountOOS, 1, memory_order_relaxed);
             if (!queue->receivedOosData) {
                 Limelog("Leaving fast audio recovery mode after OOS audio data (%u < %u)\n",
                         packet->sequenceNumber, queue->oldestRtpBaseSequenceNumber);
@@ -242,13 +243,13 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
         PAUDIO_FEC_HEADER fecHeader = (PAUDIO_FEC_HEADER)(packet + 1);
 
         if (length < sizeof(RTP_PACKET) + sizeof(AUDIO_FEC_HEADER)) {
-            queue->stats.packetCountFecInvalid++;
+            atomic_fetch_add_explicit(&queue->stats.packetCountFecInvalid, 1, memory_order_relaxed);
             Limelog("RTP audio FEC packet too small: %u\n", length);
             LC_ASSERT_VT(false);
             return NULL;
         }
 
-        queue->stats.packetCountFec++;
+        atomic_fetch_add_explicit(&queue->stats.packetCountFec, 1, memory_order_relaxed);
 
         // This is an FEC packet, so we can just copy (and byteswap) the FEC header
         fecBlockPayloadType = fecHeader->payloadType;
@@ -259,7 +260,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
         // Ensure the FEC shard index is valid to prevent OOB access
         // later during recovery.
         if (fecHeader->fecShardIndex >= RTPA_FEC_SHARDS) {
-            queue->stats.packetCountFecInvalid++;
+            atomic_fetch_add_explicit(&queue->stats.packetCountFecInvalid, 1, memory_order_relaxed);
             Limelog("Too many audio FEC shards: %u\n", fecHeader->fecShardIndex);
             LC_ASSERT_VT(false);
             return NULL;
@@ -269,7 +270,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             // The FEC blocks must start on a RTPA_DATA_SHARDS boundary for our queuing logic to work. This isn't
             // the case for older versions of GeForce Experience (at least 3.13). Disable the FEC logic if this
             // invariant is validated.
-            queue->stats.packetCountFecInvalid++;
+            atomic_fetch_add_explicit(&queue->stats.packetCountFecInvalid, 1, memory_order_relaxed);
             Limelog("Invalid FEC block base sequence number (got %u, expected %u)\n",
                     fecBlockBaseSeqNum, (fecBlockBaseSeqNum / RTPA_DATA_SHARDS) * RTPA_DATA_SHARDS);
             Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software!\n");
@@ -313,7 +314,7 @@ static PRTPA_FEC_BLOCK getFecBlockForRtpPacket(PRTP_AUDIO_QUEUE queue, PRTP_PACK
             if (existingBlock->blockSize != blockSize) {
                 // This can happen with older versions of GeForce Experience (3.13) and Sunshine that don't use a
                 // constant size for audio packets.
-                queue->stats.packetCountFecInvalid++;
+                atomic_fetch_add_explicit(&queue->stats.packetCountFecInvalid, 1, memory_order_relaxed);
                 Limelog("Audio block size mismatch (got %u, expected %u)\n", blockSize, existingBlock->blockSize);
                 Limelog("Audio FEC has been disabled due to an incompatibility with your host's old software!\n");
                 LC_ASSERT_VT(existingBlock->blockSize == blockSize);
@@ -444,7 +445,7 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
     memset(block->dataPackets[dropIndex], 0, sizeof(RTP_PACKET) + block->blockSize);
 #endif
 
-    int res = reed_solomon_reconstruct(queue->rs, shards, block->marks, RTPA_TOTAL_SHARDS, block->blockSize);
+    int res = reed_solomon_decode(queue->rs, shards, block->marks, RTPA_TOTAL_SHARDS, block->blockSize);
     if (res != 0) {
         // We should always have enough data to recover the entire block since we checked above.
         LC_ASSERT(res == 0);
@@ -466,7 +467,7 @@ static bool completeFecBlock(PRTP_AUDIO_QUEUE queue, PRTPA_FEC_BLOCK block) {
 
 
     if (block->dataShardsReceived != RTPA_DATA_SHARDS) {
-        queue->stats.packetCountFecRecovered += RTPA_DATA_SHARDS - block->dataShardsReceived;
+        atomic_fetch_add_explicit(&queue->stats.packetCountFecRecovered, RTPA_DATA_SHARDS - block->dataShardsReceived, memory_order_relaxed);
 #ifdef FEC_VERBOSE
         Limelog("Recovered %d audio data shards from block %d\n",
                 RTPA_DATA_SHARDS - block->dataShardsReceived,
@@ -546,7 +547,7 @@ static void handleMissingPackets(PRTP_AUDIO_QUEUE queue) {
     if (!queue->receivedOosData || PltGetMicroseconds() - queue->blockHead->queueTimeUs > (uint64_t)(AudioPacketDuration * RTPA_DATA_SHARDS) + (RTPQ_OOS_WAIT_TIME_MS * 1000)) {
         LC_ASSERT(!isBefore16(queue->nextRtpSequenceNumber, queue->blockHead->fecHeader.baseSequenceNumber));
 
-        queue->stats.packetCountFecFailed++;
+        atomic_fetch_add_explicit(&queue->stats.packetCountFecFailed, 1, memory_order_relaxed);
         Limelog("Unable to recover audio data block %u to %u (%u+%u=%u received < %u needed)\n",
                 queue->blockHead->fecHeader.baseSequenceNumber,
                 queue->blockHead->fecHeader.baseSequenceNumber + RTPA_DATA_SHARDS - 1,
@@ -727,4 +728,18 @@ PRTP_PACKET RtpaGetQueuedPacket(PRTP_AUDIO_QUEUE queue, uint16_t customHeaderLen
     }
 
     return NULL;
+}
+
+void RtpaGetStats(PRTP_AUDIO_QUEUE queue, PRTP_AUDIO_STATS stats) {
+    if (stats == NULL) {
+        return;
+    }
+
+    stats->packetCountAudio = atomic_load_explicit(&queue->stats.packetCountAudio, memory_order_relaxed);
+    stats->packetCountFec = atomic_load_explicit(&queue->stats.packetCountFec, memory_order_relaxed);
+    stats->packetCountFecRecovered = atomic_load_explicit(&queue->stats.packetCountFecRecovered, memory_order_relaxed);
+    stats->packetCountFecFailed = atomic_load_explicit(&queue->stats.packetCountFecFailed, memory_order_relaxed);
+    stats->packetCountOOS = atomic_load_explicit(&queue->stats.packetCountOOS, memory_order_relaxed);
+    stats->packetCountInvalid = atomic_load_explicit(&queue->stats.packetCountInvalid, memory_order_relaxed);
+    stats->packetCountFecInvalid = atomic_load_explicit(&queue->stats.packetCountFecInvalid, memory_order_relaxed);
 }

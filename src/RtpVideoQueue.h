@@ -2,6 +2,8 @@
 
 #include "Video.h"
 
+#include <stdatomic.h>
+
 typedef struct _RTPV_QUEUE_ENTRY {
     struct _RTPV_QUEUE_ENTRY* next;
     struct _RTPV_QUEUE_ENTRY* prev;
@@ -18,6 +20,16 @@ typedef struct _RTPV_QUEUE_LIST {
     PRTPV_QUEUE_ENTRY tail;
     uint32_t count;
 } RTPV_QUEUE_LIST, *PRTPV_QUEUE_LIST;
+
+typedef struct _RTP_VIDEO_QUEUE_STATS {
+    atomic_uint packetCountVideo;
+    atomic_uint packetCountFec;
+    atomic_uint packetCountFecRecovered;
+    atomic_uint packetCountFecFailed;
+    atomic_uint packetCountOOS;
+    atomic_uint packetCountInvalid;
+    atomic_uint packetCountFecInvalid;
+} RTP_VIDEO_QUEUE_STATS, *PRTP_VIDEO_QUEUE_STATS;
 
 typedef struct _RTP_VIDEO_QUEUE {
     RTPV_QUEUE_LIST pendingFecBlockList;
@@ -47,7 +59,7 @@ typedef struct _RTP_VIDEO_QUEUE {
     uint64_t lastOosFramePresentationTimestamp;
     bool receivedOosData;
 
-    RTP_VIDEO_STATS stats; // the above values are short-lived, this tracks stats for the life of the queue
+    RTP_VIDEO_QUEUE_STATS stats; // the above values are short-lived, this tracks stats for the life of the queue
 } RTP_VIDEO_QUEUE, *PRTP_VIDEO_QUEUE;
 
 #define RTPF_RET_QUEUED    0
@@ -58,3 +70,4 @@ void RtpvCleanupQueue(PRTP_VIDEO_QUEUE queue);
 int RtpvAddPacket(PRTP_VIDEO_QUEUE queue, PRTP_PACKET packet, int length, PRTPV_QUEUE_ENTRY packetEntry);
 uint32_t RtpvGetCurrentFrameNumber(PRTP_VIDEO_QUEUE queue);
 void RtpvSubmitQueuedPackets(PRTP_VIDEO_QUEUE queue);
+void RtpvGetStats(PRTP_VIDEO_QUEUE queue, PRTP_VIDEO_STATS stats);

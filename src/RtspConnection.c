@@ -4,6 +4,7 @@
 #define RTSP_CONNECT_TIMEOUT_SEC 10
 #define RTSP_RECEIVE_TIMEOUT_SEC 15
 #define RTSP_RETRY_DELAY_MS 500
+#define MAX_RTSP_RESPONSE_SIZE (1024 * 1024)
 
 static int currentSeqNumber;
 static char rtspTargetUrl[256];
@@ -210,7 +211,7 @@ static bool unsealRtspMessage(char* rawMessage, int rawMessageLen, PRTSP_MESSAGE
             return false;
         }
 
-        success = PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0,
+        success = PltDecryptMessage(decryptionCtx, ALGORITHM_AES_GCM, 0, 0, seq,
                                     (uint8_t*)StreamConfig.remoteInputAesKey, sizeof(StreamConfig.remoteInputAesKey),
                                     iv, sizeof(iv),
                                     encryptedMessage->tag, sizeof(encryptedMessage->tag),
@@ -310,6 +311,12 @@ static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE respons
         goto Exit;
     }
 
+    if (event.packet->dataLength > MAX_RTSP_RESPONSE_SIZE) {
+        Limelog("RTSP response exceeded maximum allowed size\n");
+        enet_packet_destroy(event.packet);
+        goto Exit;
+    }
+
     responseBuffer = malloc(event.packet->dataLength);
     if (responseBuffer == NULL) {
         Limelog("Failed to allocate RTSP response buffer\n");
@@ -328,6 +335,12 @@ static bool transactRtspMessageEnet(PRTSP_MESSAGE request, PRTSP_MESSAGE respons
         if (serviceEnetHost(client, &event, RTSP_RECEIVE_TIMEOUT_SEC * 1000) <= 0 ||
             event.type != ENET_EVENT_TYPE_RECEIVE) {
             Limelog("Failed to receive RTSP reply payload: %d\n", LastSocketFail());
+            goto Exit;
+        }
+
+        if ((size_t)offset + event.packet->dataLength > MAX_RTSP_RESPONSE_SIZE) {
+            Limelog("RTSP response exceeded maximum allowed size\n");
+            enet_packet_destroy(event.packet);
             goto Exit;
         }
 
@@ -436,7 +449,14 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
         struct pollfd pfd;
 
         if (offset >= responseBufferSize) {
+            if ((size_t)offset >= MAX_RTSP_RESPONSE_SIZE) {
+                *error = EMSGSIZE;
+                Limelog("RTSP response exceeded maximum allowed size\n");
+                goto Exit;
+            }
+      
             responseBufferSize = offset + 16384;
+      
             responseBuffer = extendBuffer(responseBuffer, responseBufferSize);
             if (responseBuffer == NULL) {
                 Limelog("Failed to allocate RTSP response buffer\n");
@@ -470,24 +490,18 @@ static bool transactRtspMessageTcp(PRTSP_MESSAGE request, PRTSP_MESSAGE response
             break;
         }
         else {
+            if ((size_t)offset + err > MAX_RTSP_RESPONSE_SIZE) {
+                *error = EMSGSIZE;
+                Limelog("RTSP response exceeded maximum allowed size\n");
+                goto Exit;
+            }
+      
             offset += err;
         }
     }
 
     // Decrypt (if necessary) and deserialize the RTSP response
     ret = unsealRtspMessage(responseBuffer, offset, response);
-
-    // Fetch the local address for this socket if it's not populated yet
-    if (LocalAddr.ss_family == 0) {
-        SOCKADDR_LEN addrLen = (SOCKADDR_LEN)sizeof(LocalAddr);
-        if (getsockname(sock, (struct sockaddr*)&LocalAddr, &addrLen) < 0) {
-            Limelog("Failed to get local address: %d\n", LastSocketError());
-            memset(&LocalAddr, 0, sizeof(LocalAddr));
-        }
-        else {
-            LC_ASSERT(addrLen == AddrLen);
-        }
-    }
 
 Exit:
     if (serializedMessage != NULL) {
@@ -608,7 +622,7 @@ static bool playStream(PRTSP_MESSAGE response, char* target, int* error) {
     *error = -1;
 
     ret = initializeRtspRequest(&request, "PLAY", target);
-    if (ret) {
+    if (ret != 0) {
         if (addOption(&request, "Session", sessionIdString)) {
             ret = transactRtspMessage(&request, response, false, error);
         }
@@ -888,7 +902,7 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
 
 // SDP attributes are in the form:
 // a=x-nv-bwe.bwuSafeZoneLowLimit:70\r\n
-bool parseSdpAttributeToUInt(const char* payload, const char* name, unsigned int* val) {
+bool parseSdpAttributeToUInt(const char* payload, const char* name, uint32_t* val) {
     // Find the entry for the specified attribute name
     char* attribute = strstr(payload, name);
     if (!attribute) {
@@ -940,8 +954,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     AudioEncryptionEnabled = false;
     MicPortNumber = 0;
     encryptedRtspEnabled = serverInfo->rtspSessionUrl && strstr(serverInfo->rtspSessionUrl, "rtspenc://");
-    encryptionCtx = PltCreateCryptoContext();
-    decryptionCtx = PltCreateCryptoContext();
+    encryptionCtx = PltCreateCryptoContext(0);
+    decryptionCtx = PltCreateCryptoContext(1);
 
     // HACK: In order to get GFE to respect our request for a lower audio bitrate, we must
     // fake our target address so it doesn't match any of the PC's local interfaces. It seems
@@ -1045,7 +1059,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP OPTIONS request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1066,14 +1079,12 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP DESCRIBE request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
         if (!response.payload) {
             Limelog("RTSP DESCRIBE no content in response\n");
             ret = -1;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1148,7 +1159,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         // Parse the Opus surround parameters out of the RTSP DESCRIBE response.
         ret = parseOpusConfigurations(&response);
         if (ret != 0) {
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1159,6 +1169,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         RTSP_MESSAGE response;
         char* sessionId;
         char* pingPayload;
+        char* sessionToken;
         int error = -1;
         char* strtokCtx = NULL;
 
@@ -1174,7 +1185,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP SETUP streamid=audio request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1207,7 +1217,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         if (sessionId == NULL) {
             Limelog("RTSP SETUP streamid=audio is missing session attribute\n");
             ret = -1;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1216,13 +1225,20 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         // resolves any 454 session not found errors on
         // standard RTSP server implementations.
         // (i.e - sessionId = "DEADBEEFCAFE;timeout = 90")
-        sessionIdString = strdup(strtok_r(sessionId, ";", &strtokCtx));
+        sessionToken = strtok_r(sessionId, ";", &strtokCtx);
+        if (sessionToken == NULL || sessionToken[0] == '\0') {
+            Limelog("RTSP SETUP streamid=audio has malformed session attribute\n");
+            ret = -1;
+            goto Exit;
+        }
+      
+        sessionIdString = strdup(sessionToken);
         if (sessionIdString == NULL) {
             Limelog("Failed to duplicate session ID string\n");
             ret = -1;
-            freeMessage(&response);
             goto Exit;
         }
+      
 
         hasSessionId = true;
 
@@ -1246,7 +1262,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP SETUP streamid=video request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1279,8 +1294,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         char* pingPayload;
 
         if (!setupStream(&response,
-                        AppVersionQuad[0] >= 5 ? "streamid=mic/0/0" : "streamid=mic",
-                        &error)) {
+                         AppVersionQuad[0] >= 5 ? "streamid=mic/0/0" : "streamid=mic",
+                         &error)) {
             Limelog("RTSP SETUP streamid=mic request failed: %d\n", error);
             ret = error;
             goto Exit;
@@ -1297,8 +1312,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
         // Parse the microphone port out of the RTSP SETUP response
         LC_ASSERT(MicPortNumber == 0);
         if (!parseServerPortFromTransport(&response, &MicPortNumber)) {
-            // Use the well known port if parsing fails
-            MicPortNumber = 47996;
+            // Sunshine's default base port is 47989 and the microphone stream is offset 12.
+            MicPortNumber = 48001;
 
             Limelog("Microphone port: %u (RTSP parsing failed)\n", MicPortNumber);
         }
@@ -1315,7 +1330,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
 
         freeMessage(&response);
     }
-    
+
     if (AppVersionQuad[0] >= 5) {
         RTSP_MESSAGE response;
         int error = -1;
@@ -1333,7 +1348,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP SETUP streamid=control request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1375,7 +1389,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP ANNOUNCE request failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1397,7 +1410,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             Limelog("RTSP PLAY failed: %d\n",
                 response.message.response.statusCode);
             ret = response.message.response.statusCode;
-            freeMessage(&response);
             goto Exit;
         }
 
@@ -1418,7 +1430,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
                 Limelog("RTSP PLAY streamid=video failed: %d\n",
                     response.message.response.statusCode);
                 ret = response.message.response.statusCode;
-                freeMessage(&response);
                 goto Exit;
             }
 
@@ -1439,7 +1450,6 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
                 Limelog("RTSP PLAY streamid=audio failed: %d\n",
                     response.message.response.statusCode);
                 ret = response.message.response.statusCode;
-                freeMessage(&response);
                 goto Exit;
             }
 
@@ -1468,6 +1478,8 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             freeMessage(&response);
         }
     }
+
+
     ret = 0;
 
 Exit:

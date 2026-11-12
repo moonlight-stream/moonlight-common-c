@@ -168,7 +168,8 @@ typedef struct _SS_CONTROLLER_TOUCH_PACKET {
     NV_INPUT_HEADER header;
     uint8_t controllerNumber;
     uint8_t eventType;
-    uint8_t zero[2]; // Alignment/reserved
+    uint8_t zero; // Alignment/reserved
+    uint8_t touchpadIndex;
     uint32_t pointerId;
     netfloat x;
     netfloat y;

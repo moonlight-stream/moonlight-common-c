@@ -12,6 +12,7 @@
 #include "ByteBuffer.h"
 
 #include <enet/enet.h>
+#include <stdatomic.h>
 
 // Common globals
 extern char* RemoteAddrString;
@@ -24,7 +25,7 @@ extern CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
 extern DECODER_RENDERER_CALLBACKS VideoCallbacks;
 extern AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 extern int NegotiatedVideoFormat;
-extern volatile bool ConnectionInterrupted;
+extern atomic_bool ConnectionInterrupted;
 extern bool HighQualitySurroundSupported;
 extern bool HighQualitySurroundEnabled;
 extern OPUS_MULTISTREAM_CONFIGURATION NormalQualityOpusConfig;
@@ -68,7 +69,6 @@ extern uint32_t EncryptionFeaturesEnabled;
 #define CTRL_CHANNEL_MOUSE        0x03
 #define CTRL_CHANNEL_PEN          0x04
 #define CTRL_CHANNEL_TOUCH        0x05
-#define CTRL_CHANNEL_UTF8         0x06
 #define CTRL_CHANNEL_GAMEPAD_BASE 0x10 // 0x10 to 0x1F by controller index
 #define CTRL_CHANNEL_SENSOR_BASE  0x20 // 0x20 to 0x2F by controller index
 #define CTRL_CHANNEL_COUNT        0x30
@@ -130,7 +130,7 @@ void connectionDetectedFrameLoss(uint32_t startFrame, uint32_t endFrame);
 void connectionReceivedCompleteFrame(uint32_t frameIndex, bool frameIsLTR);
 void connectionSawFrame(uint32_t frameIndex);
 void connectionSendFrameFecStatus(PSS_FRAME_FEC_STATUS fecStatus);
-int sendInputPacketOnControlStream(unsigned char* data, int length, uint8_t channelId, uint32_t flags, bool moreData);
+int sendInputPacketOnControlStream(unsigned char* data, unsigned int length, uint8_t channelId, uint32_t flags, bool moreData);
 void flushInputOnControlStream(void);
 bool isControlDataInTransit(void);
 

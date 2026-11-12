@@ -12,7 +12,7 @@
 #endif
 #define TCPv6_MSS 1220
 
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
 
 #ifndef SIO_UDP_CONNRESET
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12)
@@ -70,7 +70,7 @@ void shutdownTcpSocket(SOCKET s) {
 }
 
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     // Windows says that SO_RCVTIMEO puts the socket into an indeterminate state
     // when a timeout occurs. MSDN doesn't go into it any more than that, but it
     // seems likely that they are referring to the inability to know whether a
@@ -93,7 +93,7 @@ int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs) {
 }
 
 int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     // We could have used WSAPoll() but it has some nasty bugs
     // https://daniel.haxx.se/blog/2012/10/10/wsapoll-is-broken/
     //
@@ -151,7 +151,8 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 #elif defined(__3DS__)
     int err;
     u64 poll_start = osGetTime();
-    for (u64 i = poll_start; (i - poll_start) < timeoutMs; i = osGetTime()) {
+    // seems like timeoutMs is never negative
+    for (u64 i = poll_start; (i - poll_start) < (u64)timeoutMs; i = osGetTime()) {
         err = poll(pollFds, pollFdsCount, 0); // This is running for 14ms
         if (err) {
             break;
@@ -178,7 +179,8 @@ bool isSocketReadable(SOCKET s) {
     return true;
 }
 
-int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
+int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect,
+                  struct sockaddr_storage* remoteAddr, SOCKADDR_LEN* addrLen) {
     int err;
 
     do {
@@ -195,18 +197,18 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
             }
 
             // This won't block since the socket is readable
-            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+            err = (int)recvfrom(s, buffer, size, 0, (struct sockaddr*)remoteAddr, addrLen);
         }
         else {
             // The caller has already configured a timeout on this
             // socket via SO_RCVTIMEO, so we can avoid a syscall
             // for each packet.
-            err = (int)recvfrom(s, buffer, size, 0, NULL, NULL);
+            err = (int)recvfrom(s, buffer, size, 0, (struct sockaddr*)remoteAddr, addrLen);
             if (err < 0 &&
                     (LastSocketError() == EWOULDBLOCK ||
                      LastSocketError() == EINTR ||
                      LastSocketError() == EAGAIN ||
-         #if defined(LC_WINDOWS)
+         #if defined(LC_WINDOWS) && !defined(NXDK)
                      // This error is specific to overlapped I/O which isn't even
                      // possible to perform with recvfrom(). It seems to randomly
                      // be returned instead of WSAETIMEDOUT on certain systems.
@@ -221,7 +223,7 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
     // We may receive an error due to a previous ICMP Port Unreachable error received
     // by this socket. We want to ignore those and continue reading. If the remote party
     // is really dead, ENet or TCP connection failures will trigger connection teardown.
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     } while (err < 0 && LastSocketError() == WSAECONNRESET);
 #else
     } while (err < 0 && LastSocketError() == ECONNREFUSED);
@@ -231,7 +233,7 @@ int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect) {
 }
 
 void closeSocket(SOCKET s) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     closesocket(s);
 #else
     close(s);
@@ -335,7 +337,7 @@ SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCK
         int val = 1;
         setsockopt(s, SOL_SOCKET, SO_NOSIGPIPE, (char*)&val, sizeof(val));
     }
-#elif defined(LC_WINDOWS)
+#elif defined(LC_WINDOWS) && !defined(NXDK)
     {
         // Disable WSAECONNRESET for UDP sockets on Windows
         BOOL val = FALSE;
@@ -409,10 +411,10 @@ int setSocketNonBlocking(SOCKET s, bool enabled) {
 #if defined(__vita__) || defined(__HAIKU__)
     int val = enabled ? 1 : 0;
     return setsockopt(s, SOL_SOCKET, SO_NONBLOCK, (char*)&val, sizeof(val));
-#elif defined(O_NONBLOCK)
+#elif defined(O_NONBLOCK) && !defined(NXDK)
     return fcntl(s, F_SETFL, (enabled ? O_NONBLOCK : 0) | (fcntl(s, F_GETFL) & ~O_NONBLOCK));
 #elif defined(FIONBIO)
-#ifdef LC_WINDOWS
+#if defined(LC_WINDOWS) && !defined(NXDK)
     u_long val = enabled ? 1 : 0;
 #else
     int val = enabled ? 1 : 0;
@@ -452,7 +454,6 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     LC_SOCKADDR addr;
     struct pollfd pfd;
     int err;
-    int val;
 
     // Create a non-blocking TCP socket
     s = createSocket(dstaddr->ss_family, SOCK_STREAM, IPPROTO_TCP, true);
@@ -471,19 +472,20 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // Note: This only changes the max packet size we can *receive* from the host PC.
     // We still must split our own sends into smaller chunks with TCP_NODELAY enabled to
     // avoid MTU issues on the way out to to the target.
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
+
     // Windows doesn't support setting TCP_MAXSEG but IP_PMTUDISC_DONT forces the MSS to the protocol
     // minimum which is what we want here. Linux doesn't do this (disabling PMTUD just avoids setting DF).
     if (dstaddr->ss_family == AF_INET) {
-        val = IP_PMTUDISC_DONT;
+        int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IP, IP_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
-            Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+            Limelog("setsockopt(IP_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", (int)LastSocketError());
         }
     }
     else {
-        val = IP_PMTUDISC_DONT;
+        int val = IP_PMTUDISC_DONT;
         if (setsockopt(s, IPPROTO_IPV6, IPV6_MTU_DISCOVER, (char*)&val, sizeof(val)) < 0) {
-            Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", val, (int)LastSocketError());
+            Limelog("setsockopt(IPV6_MTU_DISCOVER, IP_PMTUDISC_DONT) failed: %d\n", (int)LastSocketError());
         }
     }
 #elif defined(TCP_NOOPT)
@@ -491,12 +493,13 @@ SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, 
     // restrict MSS to the minimum. It strips all options out of the SYN packet which
     // forces the remote party to fall back to the minimum MSS. TCP_MAXSEG doesn't seem
     // to work correctly for outbound connections on macOS/iOS.
-    val = 1;
+    int val = 1;
     if (setsockopt(s, IPPROTO_TCP, TCP_NOOPT, (char*)&val, sizeof(val)) < 0) {
         Limelog("setsockopt(TCP_NOOPT, %d) failed: %d\n", val, (int)LastSocketError());
     }
 #elif defined(TCP_MAXSEG)
-    val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
+    int val = dstaddr->ss_family == AF_INET ? TCPv4_MSS : TCPv6_MSS;
+
     if (setsockopt(s, IPPROTO_TCP, TCP_MAXSEG, (char*)&val, sizeof(val)) < 0) {
         Limelog("setsockopt(TCP_MAXSEG, %d) failed: %d\n", val, (int)LastSocketError());
     }
@@ -566,6 +569,40 @@ Exit:
     }
 
     return s;
+}
+
+int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKADDR_LEN targetAddrLen, unsigned short targetPort,
+                                struct sockaddr_storage* localAddr, SOCKADDR_LEN* localAddrLen) {
+    SOCKET udpSocket;
+    LC_SOCKADDR connAddr;
+
+    LC_ASSERT(targetPort != 0);
+
+    udpSocket = createSocket(targetAddr->ss_family, SOCK_DGRAM, IPPROTO_UDP, false);
+    if (udpSocket == INVALID_SOCKET) {
+        return LastSocketError();
+    }
+
+    memcpy(&connAddr, targetAddr, targetAddrLen);
+    SET_PORT(&connAddr, targetPort);
+
+    if (connect(udpSocket, (struct sockaddr*)&connAddr, targetAddrLen) < 0) {
+        int err = LastSocketError();
+        Limelog("UDP connect() failed: %d\n", err);
+        closeSocket(udpSocket);
+        return err;
+    }
+
+    *localAddrLen = sizeof(*localAddr);
+    if (getsockname(udpSocket, (struct sockaddr*)localAddr, localAddrLen) < 0) {
+        int err = LastSocketError();
+        Limelog("getsockname() failed: %d\n", err);
+        closeSocket(udpSocket);
+        return err;
+    }
+
+    closeSocket(udpSocket);
+    return 0;
 }
 
 // See TCP_MAXSEG note in connectTcpSocket() above for more information.
@@ -970,7 +1007,7 @@ void exitLowLatencyMode(void) {
 }
 
 int initializePlatformSockets(void) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 0), &data);
 #elif defined(__vita__) || defined(__WIIU__) || defined(__3DS__)
@@ -993,7 +1030,7 @@ int initializePlatformSockets(void) {
 }
 
 void cleanupPlatformSockets(void) {
-#if defined(LC_WINDOWS)
+#if defined(LC_WINDOWS) && !defined(NXDK)
     WSACleanup();
 #else
 #endif

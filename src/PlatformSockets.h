@@ -18,9 +18,9 @@ extern in_port_t n3ds_udp_port;
 #endif
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(NXDK)
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#include <windows.h>
 #include <wlanapi.h>
 #ifndef __MINGW32__
 #include <timeapi.h>
@@ -42,17 +42,30 @@ extern in_port_t n3ds_udp_port;
 #endif
 #define EINTR WSAEINTR
 
-#ifdef __MINGW32__
+#ifdef EWOULDBLOCK
 #undef EWOULDBLOCK
+#endif
+#define EWOULDBLOCK WSAEWOULDBLOCK
+
+#ifdef EINPROGRESS
 #undef EINPROGRESS
+#endif
+#define EINPROGRESS WSAEINPROGRESS
+
+#ifdef ETIMEDOUT
 #undef ETIMEDOUT
+#endif
+#define ETIMEDOUT WSAETIMEDOUT
+
+#ifdef ECONNREFUSED
 #undef ECONNREFUSED
 #endif
-
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EINPROGRESS WSAEINPROGRESS
-#define ETIMEDOUT WSAETIMEDOUT
 #define ECONNREFUSED WSAECONNREFUSED
+
+#ifdef EMSGSIZE
+#undef EMSGSIZE
+#endif
+#define EMSGSIZE WSAEMSGSIZE
 
 typedef int SOCK_RET;
 typedef int SOCKADDR_LEN;
@@ -70,7 +83,9 @@ typedef int SOCKADDR_LEN;
 #include <signal.h>
 #include <poll.h>
 
+#ifndef ioctlsocket
 #define ioctlsocket ioctl
+#endif
 #define LastSocketError() errno
 #define SetLastSocketError(x) errno = x
 #define INVALID_SOCKET -1
@@ -107,11 +122,14 @@ void addrToUrlSafeString(struct sockaddr_storage* addr, char* string, size_t str
 
 SOCKET createSocket(int addressFamily, int socketType, int protocol, bool nonBlocking);
 SOCKET connectTcpSocket(struct sockaddr_storage* dstaddr, SOCKADDR_LEN addrlen, unsigned short port, int timeoutSec);
+int getLocalAddressByUdpConnect(const struct sockaddr_storage* targetAddr, SOCKADDR_LEN targetAddrLen,  unsigned short targetPort,
+                                struct sockaddr_storage* localAddr, SOCKADDR_LEN* localAddrLen);
 int sendMtuSafe(SOCKET s, char* buffer, int size);
 SOCKET bindUdpSocket(int addressFamily, struct sockaddr_storage* localAddr, SOCKADDR_LEN addrLen, int bufferSize, int socketQosType);
 int enableNoDelay(SOCKET s);
 int setSocketNonBlocking(SOCKET s, bool enabled);
-int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect);
+int recvUdpSocket(SOCKET s, char* buffer, int size, bool useSelect,
+                  struct sockaddr_storage* remoteAddr, SOCKADDR_LEN* addrLen);
 void shutdownTcpSocket(SOCKET s);
 int setNonFatalRecvTimeoutMs(SOCKET s, int timeoutMs);
 void closeSocket(SOCKET s);
