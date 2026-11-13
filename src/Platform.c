@@ -166,6 +166,18 @@ void PltLockMutex(PLT_MUTEX* mutex) {
 #endif
 }
 
+bool PltTryLockMutex(PLT_MUTEX* mutex) {
+#if defined(LC_WINDOWS)
+    return TryAcquireSRWLockExclusive(mutex);
+#elif defined(__WIIU__)
+    return OSFastMutex_TryLock(mutex);
+#elif defined(__3DS__)
+    return LightLock_TryLock(mutex) == 0;
+#else
+    return pthread_mutex_trylock(mutex) == 0;
+#endif
+}
+
 void PltUnlockMutex(PLT_MUTEX* mutex) {
 #if defined(LC_WINDOWS)
     ReleaseSRWLockExclusive(mutex);
