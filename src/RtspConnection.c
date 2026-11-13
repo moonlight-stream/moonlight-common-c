@@ -953,6 +953,7 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
     controlStreamId = APP_VERSION_AT_LEAST(7, 1, 431) ? "streamid=control/13/0" : "streamid=control/1/0";
     AudioEncryptionEnabled = false;
     encryptedRtspEnabled = serverInfo->rtspSessionUrl && strstr(serverInfo->rtspSessionUrl, "rtspenc://");
+    encryptionSequenceNumber = 0;
     encryptionCtx = PltCreateCryptoContext(0);
     decryptionCtx = PltCreateCryptoContext(1);
 
