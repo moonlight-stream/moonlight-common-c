@@ -753,7 +753,7 @@ bool isInSubnetV6(struct sockaddr_in6* sin6, unsigned char* subnet, int prefixLe
     int i;
 
     for (i = 0; i < prefixLength; i++) {
-        unsigned char mask = 1 << (i % 8);
+        unsigned char mask = 0x80 >> (i % 8);
         if ((sin6->sin6_addr.s6_addr[i / 8] & mask) != (subnet[i / 8] & mask)) {
             return false;
         }
