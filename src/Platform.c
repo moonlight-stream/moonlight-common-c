@@ -108,11 +108,15 @@ void PltSleepMs(int ms) {
 #if defined(LC_WINDOWS)
     SleepEx(ms, FALSE);
 #elif defined(__3DS__)
-    s64 nsecs = ms * 1000000;
+    s64 nsecs = (s64)ms * 1000000LL;
     svcSleepThread(nsecs);
 #else
-    useconds_t usecs = ms * 1000;
-    usleep(usecs);
+    struct timespec req;
+
+    req.tv_sec = (time_t)(ms / 1000);
+    req.tv_nsec = (long)(ms % 1000) * 1000000L;
+
+    while (nanosleep(&req, &req) == -1 && errno == EINTR);
 #endif
 }
 
