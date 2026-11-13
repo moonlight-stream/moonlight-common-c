@@ -1072,7 +1072,7 @@ int LiSendUtf8TextEvent(const char *text, unsigned int length) {
     return err;
 }
 
-static int sendControllerEventInternal(short controllerNumber, short activeGamepadMask,
+static int sendControllerEventInternal(uint8_t controllerNumber, uint16_t activeGamepadMask,
     int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
@@ -1262,7 +1262,7 @@ int LiSendControllerEvent(int buttonFlags, unsigned char leftTrigger, unsigned c
 }
 
 // Send a controller event to the streaming machine
-int LiSendMultiControllerEvent(short controllerNumber, short activeGamepadMask,
+int LiSendMultiControllerEvent(uint8_t controllerNumber, uint16_t activeGamepadMask,
     int buttonFlags, unsigned char leftTrigger, unsigned char rightTrigger,
     short leftStickX, short leftStickY, short rightStickX, short rightStickY)
 {
