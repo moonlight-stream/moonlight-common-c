@@ -508,9 +508,14 @@ uint64_t PltGetMicroseconds(void) {
     if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
         PltTicksInit();
     }
+
     LARGE_INTEGER now;
     QueryPerformanceCounter(&now);
-    return (uint64_t)(((now.QuadPart - start_ticks.QuadPart) * 1000000) / ticks_per_second.QuadPart);
+
+    int64_t elapsed = now.QuadPart - start_ticks.QuadPart;
+    int64_t freq = ticks_per_second.QuadPart;
+
+    return (uint64_t)((elapsed / freq) * 1000000 + ((elapsed % freq) * 1000000) / freq);
 }
 
 #elif defined(LC_DARWIN)
