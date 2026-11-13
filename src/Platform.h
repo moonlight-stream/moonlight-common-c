@@ -30,15 +30,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <fcntl.h>
-#elif defined(__APPLE__)
-#include <mach/mach_time.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <fcntl.h>
 #elif defined(__vita__)
 #include <unistd.h>
 #include <time.h>
