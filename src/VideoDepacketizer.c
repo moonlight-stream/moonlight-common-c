@@ -48,7 +48,8 @@ static uint64_t firstPacketReceiveTimeUs;
 static uint64_t firstPacketPresentationTime;
 static uint32_t firstPacketRtpTimestamp;
 static bool dropStatePending;
-static bool idrFrameProcessed;
+static atomic_bool idrFrameProcessed;
+static PLT_MUTEX stateLock;
 
 #define DR_CLEANUP -1000
 
@@ -85,6 +86,7 @@ typedef struct _LENTRY_INTERNAL {
 
 // Init
 void initializeVideoDepacketizer(int pktSize) {
+    PltCreateMutex(&stateLock);
     LbqInitializeLinkedBlockingQueue(&decodeUnitQueue, 15);
 
     nextFrameNumber = 1;
@@ -101,7 +103,7 @@ void initializeVideoDepacketizer(int pktSize) {
     firstPacketRtpTimestamp = 0;
     lastPacketPayloadLength = 0;
     dropStatePending = false;
-    idrFrameProcessed = false;
+    atomic_store_explicit(&idrFrameProcessed, false, memory_order_relaxed);
     strictIdrFrameWait = !isReferenceFrameInvalidationEnabled();
 }
 
@@ -129,7 +131,8 @@ static void dropFrameState(void) {
     // We're dropping frame state now
     dropStatePending = false;
 
-    if (strictIdrFrameWait || !idrFrameProcessed || waitingForIdrFrame || (nalChainHead && frameType == FRAME_TYPE_IDR)) {
+    if (strictIdrFrameWait || !atomic_load_explicit(&idrFrameProcessed, memory_order_acquire) ||
+            waitingForIdrFrame || (nalChainHead && frameType == FRAME_TYPE_IDR)) {
         // We'll need an IDR frame now if we're in non-RFI mode, if we've never
         // received an IDR frame, if we explicitly need an IDR frame, or if we
         // just dropped a partially processed IDR frame.
@@ -179,6 +182,7 @@ void stopVideoDepacketizer(void) {
 void destroyVideoDepacketizer(void) {
     freeDecodeUnitList(LbqDestroyLinkedBlockingQueue(&decodeUnitQueue));
     cleanupFrameState();
+    PltDeleteMutex(&stateLock);
 }
 
 // NB: This function also ensures an additional byte for the NALU type exists after the start sequence
@@ -256,7 +260,7 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
         LC_ASSERT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
 
         // We must not dequeue a P frame before an IDR frame has been successfully processed
-        LC_ASSERT(idrFrameProcessed);
+        LC_ASSERT(atomic_load_explicit(&idrFrameProcessed, memory_order_acquire));
     }
 }
 
@@ -306,7 +310,7 @@ void LiCompleteVideoFrame(VIDEO_FRAME_HANDLE handle, int drStatus) {
     else if (drStatus == DR_OK && qdu->decodeUnit.frameType == FRAME_TYPE_IDR) {
         // Remember that the IDR frame was processed. We can now use
         // reference frame invalidation.
-        idrFrameProcessed = true;
+        atomic_store_explicit(&idrFrameProcessed, true, memory_order_release);
     }
 
     while (qdu->decodeUnit.bufferList != NULL) {
@@ -478,7 +482,7 @@ static bool isIdrFrameStart(PBUFFER_DESC buffer) {
     }
 }
 
-// Reassemble the frame with the given frame number
+// Reassemble the frame with the given frame number (called with stateLock held)
 static void reassembleFrame(int frameNumber, bool frameIsLTR) {
     if (nalChainHead != NULL) {
         QUEUED_DECODE_UNIT qduDS;
@@ -554,21 +558,25 @@ static void reassembleFrame(int frameNumber, bool frameIsLTR) {
 
                     return;
                 }
+
+                // Clear frame drops and advance the RFI window
+                consecutiveFrameDrops = 0;
+                startFrameNumber = nextFrameNumber;
             }
             else {
-                // Submit the frame to the decoder
+                // Update frame tracking state before releasing stateLock
+                consecutiveFrameDrops = 0;
+                startFrameNumber = nextFrameNumber;
+
+                // Submit outside stateLock so DR_NEED_IDR -> requestDecoderRefresh() cannot deadlock
+                PltUnlockMutex(&stateLock);
                 validateDecodeUnitForPlayback(&qdu->decodeUnit);
                 LiCompleteVideoFrame(qdu, VideoCallbacks.submitDecodeUnit(&qdu->decodeUnit));
+                PltLockMutex(&stateLock);
             }
 
             // Notify the control connection
             connectionReceivedCompleteFrame(frameNumber, frameIsLTR);
-
-            // Clear frame drops
-            consecutiveFrameDrops = 0;
-
-            // Move the start of our (potential) RFI window to the next frame
-            startFrameNumber = nextFrameNumber;
         }
         else {
             // The queued decode-unit allocation failed. Do not keep this
@@ -769,19 +777,24 @@ static bool processAvcHevcRtpPayloadSlow(PBUFFER_DESC currentPos, PLENTRY_INTERN
 // Dumps the decode unit queue and ensures the next frame submitted to the decoder will be
 // an IDR frame
 void requestDecoderRefresh(void) {
+    PLINKED_BLOCKING_QUEUE_ENTRY flushedEntries;
+
+    PltLockMutex(&stateLock);
+
     // Wait for the next IDR frame
     waitingForIdrFrame = true;
 
     // Flush the decode unit queue
-    freeDecodeUnitList(LbqFlushQueueItems(&decodeUnitQueue));
+    flushedEntries = LbqFlushQueueItems(&decodeUnitQueue);
 
-    // Request the receive thread drop its state
-    // on the next call. We can't do it here because
-    // it may be trying to queue DUs and we'll nuke
-    // the state out from under it.
-    dropStatePending = true;
+    // If the receive thread is currently mid-frame, defer dropping its state
+    // until the frame boundary so continuation packets aren't invalidated.
+    dropStatePending = decodingFrame;
 
-    // Request the IDR frame
+    PltUnlockMutex(&stateLock);
+
+    // Free flushed decode units and request the IDR frame outside stateLock
+    freeDecodeUnitList(flushedEntries);
     LiRequestIdrFrame();
 }
 
@@ -808,11 +821,11 @@ static void discardCorruptFrame(uint32_t frameIndex) {
     }
 }
 
-// Process an RTP Payload
-// The caller will free *existingEntry unless we NULL it
-static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
-                       uint64_t receiveTimeUs, uint64_t presentationTimeUs, uint32_t rtpTimestamp,
-                       PLENTRY_INTERNAL* existingEntry) {
+// Process an RTP Payload with stateLock held.
+// The caller will free *existingEntry unless we NULL it.
+static void processRtpPayloadLocked(PNV_VIDEO_PACKET videoPacket, int length,
+                             uint64_t receiveTimeUs, uint64_t presentationTimeUs, uint32_t rtpTimestamp,
+                             PLENTRY_INTERNAL* existingEntry) {
     BUFFER_DESC currentPos;
     uint32_t frameIndex;
     uint8_t flags;
@@ -1150,6 +1163,14 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         decodingFrame = false;
         nextFrameNumber = frameIndex + 1;
 
+        // If this completed frame is itself an IDR frame, satisfy any concurrent
+        // refresh request rather than discarding this IDR frame.
+        if (dropStatePending && nalChainHead && frameType == FRAME_TYPE_IDR) {
+            dropStatePending = false;
+            waitingForIdrFrame = false;
+            waitingForRefInvalFrame = false;
+        }
+
         // If we can't submit this frame due to a discontinuity in the bitstream,
         // inform the host (if needed) and drop the data.
         if (waitingForIdrFrame || waitingForRefInvalFrame) {
@@ -1185,17 +1206,8 @@ static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
         // depacketizer will next try to process a non-SOF packet,
         // and cause it to assert.
         if (dropStatePending) {
-            if (nalChainHead && frameType == FRAME_TYPE_IDR) {
-                // Don't drop the frame state if this frame is an IDR frame itself,
-                // otherwise we'll lose this IDR frame without another in flight
-                // and have to wait until we hit our consecutive drop limit to
-                // request a new one (potentially several seconds).
-                dropStatePending = false;
-            }
-            else {
-                dropFrameState();
-                return;
-            }
+            dropFrameState();
+            return;
         }
 
         reassembleFrame(frameIndex, extraFlags & NV_VIDEO_PACKET_EXTRA_FLAG_LTR_FRAME);
@@ -1207,11 +1219,24 @@ corruptFrame:
     discardCorruptFrame(frameIndex);
 }
 
+// Process an RTP Payload
+// The caller will free *existingEntry unless we NULL it
+static void processRtpPayload(PNV_VIDEO_PACKET videoPacket, int length,
+                       uint64_t receiveTimeUs, uint64_t presentationTimeUs, uint32_t rtpTimestamp,
+                       PLENTRY_INTERNAL* existingEntry) {
+    PltLockMutex(&stateLock);
+    processRtpPayloadLocked(videoPacket, length, receiveTimeUs, presentationTimeUs,
+                            rtpTimestamp, existingEntry);
+    PltUnlockMutex(&stateLock);
+}
+
 // Called by the video RTP FEC queue to notify us of a lost frame
 // if it determines the frame to be unrecoverable. This lets us
 // avoid having to wait until the next received frame to determine
 // that we lost a frame and submit an RFI request.
 void notifyFrameLost(unsigned int frameNumber, bool speculative) {
+    PltLockMutex(&stateLock);
+
     // We may not invalidate frames that we've already received
     LC_ASSERT(frameNumber >= startFrameNumber);
 
@@ -1235,6 +1260,8 @@ void notifyFrameLost(unsigned int frameNumber, bool speculative) {
         // Notify the host that we lost this one
         connectionDetectedFrameLoss(startFrameNumber, frameNumber);
     }
+
+    PltUnlockMutex(&stateLock);
 }
 
 // Add an RTP Packet to the queue
