@@ -149,17 +149,21 @@ int pollSockets(struct pollfd* pollFds, int pollFdsCount, int timeoutMs) {
 
     return err;
 #elif defined(__3DS__)
-    int err;
-    u64 poll_start = osGetTime();
-    // seems like timeoutMs is never negative
-    for (u64 i = poll_start; (i - poll_start) < (u64)timeoutMs; i = osGetTime()) {
-        err = poll(pollFds, pollFdsCount, 0); // This is running for 14ms
-        if (err) {
-            break;
+    if (timeoutMs > 0) {
+        int err;
+        u64 poll_start = osGetTime();
+        for (u64 i = poll_start; (i - poll_start) < (u64)timeoutMs; i = osGetTime()) {
+            err = poll(pollFds, pollFdsCount, 0); // This is running for 14ms
+            if (err) {
+                break;
+            }
+            svcSleepThread(1000);
         }
-        svcSleepThread(1000);
+        return err;
     }
-    return err;
+    else {
+        return poll(pollFds, pollFdsCount, timeoutMs);
+    }
 #else
     return poll(pollFds, pollFdsCount, timeoutMs);
 #endif
