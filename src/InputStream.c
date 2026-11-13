@@ -1628,7 +1628,8 @@ int LiSendControllerMotionEvent(uint8_t controllerNumber, uint8_t motionType, fl
     }
 
     // Check for valid motion type values
-    if (motionType - 1 >= MAX_MOTION_EVENTS) {
+    if (motionType <= 0 || motionType - 1 >= MAX_MOTION_EVENTS) {
+        LC_ASSERT(motionType > 0);
         LC_ASSERT(motionType - 1 < MAX_MOTION_EVENTS);
         return -3;
     }
