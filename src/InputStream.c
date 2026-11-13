@@ -401,7 +401,7 @@ static void inputSendThreadProc(void* context) {
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
                 flushInputOnControlStream();
-                PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
+                PltSleepMs((uint32_t)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
@@ -471,7 +471,7 @@ static void inputSendThreadProc(void* context) {
             // Delay for batching if required
             if (now < lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS) {
                 flushInputOnControlStream();
-                PltSleepMs((int)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
+                PltSleepMs((uint32_t)(lastMousePacketTime + MOUSE_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
@@ -492,7 +492,7 @@ static void inputSendThreadProc(void* context) {
             // Delay for batching if required
             if (now < lastPenPacketTime + PEN_BATCHING_INTERVAL_MS) {
                 flushInputOnControlStream();
-                PltSleepMs((int)(lastPenPacketTime + PEN_BATCHING_INTERVAL_MS - now));
+                PltSleepMs((uint32_t)(lastPenPacketTime + PEN_BATCHING_INTERVAL_MS - now));
                 now = PltGetMillis();
             }
 
