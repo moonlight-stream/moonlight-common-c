@@ -5,6 +5,14 @@
 #include <psp2/kernel/processmgr.h>
 #endif
 
+#ifndef HAVE_CLOCK_GETTIME
+#ifdef CLOCK_MONOTONIC
+#define HAVE_CLOCK_GETTIME 1
+#else
+#define HAVE_CLOCK_GETTIME 0
+#endif
+#endif
+
 // The maximum amount of time before observing an interrupt
 // in PltSleepMsInterruptible().
 #define INTERRUPT_PERIOD_MS 50
@@ -518,22 +526,6 @@ uint64_t PltGetMicroseconds(void) {
     return (uint64_t)((elapsed / freq) * 1000000 + ((elapsed % freq) * 1000000) / freq);
 }
 
-#elif defined(LC_DARWIN)
-
-static uint64_t start_ns;
-
-static void PltTicksInitInternal(void) {
-    start_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
-}
-
-uint64_t PltGetMicroseconds(void) {
-    if (atomic_load_explicit(&ticks_init_state, memory_order_acquire) != TICKS_INIT_COMPLETED) {
-        PltTicksInit();
-    }
-    const uint64_t now_ns = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
-    return (now_ns - start_ns) / 1000;
-}
-
 #elif defined(__vita__)
 
 static uint64_t start;
@@ -569,7 +561,7 @@ uint64_t PltGetMicroseconds(void) {
 #else
 
 /* Use CLOCK_MONOTONIC_RAW, if available, which is not subject to adjustment by NTP */
-#ifdef HAVE_CLOCK_GETTIME
+#if HAVE_CLOCK_GETTIME
 static struct timespec start_ts;
 # ifdef CLOCK_MONOTONIC_RAW
 #  define PLT_MONOTONIC_CLOCK CLOCK_MONOTONIC_RAW
@@ -582,7 +574,7 @@ static bool has_monotonic_time = false;
 static struct timeval start_tv;
 
 static void PltTicksInitInternal(void) {
-#ifdef HAVE_CLOCK_GETTIME
+#if HAVE_CLOCK_GETTIME
     if (clock_gettime(PLT_MONOTONIC_CLOCK, &start_ts) == 0) {
         has_monotonic_time = true;
     } else
@@ -598,7 +590,7 @@ uint64_t PltGetMicroseconds(void) {
     }
 
     if (has_monotonic_time) {
-#ifdef HAVE_CLOCK_GETTIME
+#if HAVE_CLOCK_GETTIME
         struct timespec now;
         clock_gettime(PLT_MONOTONIC_CLOCK, &now);
         return (uint64_t)(((int64_t)(now.tv_sec - start_ts.tv_sec) * 1000000) + ((now.tv_nsec - start_ts.tv_nsec) / 1000));
