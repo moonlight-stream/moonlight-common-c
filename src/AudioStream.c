@@ -175,11 +175,11 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
 
     lastSeq = rtp->sequenceNumber;
 
+    int dataLength = packet->header.size - sizeof(*rtp);
     if (AudioEncryptionEnabled) {
         // We must have room for the AES padding which may be written to the buffer
         unsigned char decryptedOpusData[ROUND_TO_PKCS7_PADDED_LEN(MAX_PACKET_SIZE)];
         unsigned char iv[16] = { 0 };
-        int dataLength = packet->header.size - sizeof(*rtp);
 
         LC_ASSERT(dataLength <= MAX_PACKET_SIZE);
 
@@ -196,6 +196,11 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
                                (unsigned char*)(rtp + 1), dataLength,
                                decryptedOpusData, &dataLength)) {
             Limelog("Failed to decrypt audio packet (sequence number: %u)\n", rtp->sequenceNumber);
+            LC_ASSERT_VT(false);
+            return;
+        }
+
+        if (dataLength == 0) {
             LC_ASSERT_VT(false);
             return;
         }
@@ -218,6 +223,11 @@ static void decodeInputData(PQUEUED_AUDIO_PACKET packet) {
         AudioCallbacks.decodeAndPlaySample((char*)decryptedOpusData, dataLength);
     }
     else {
+        if (dataLength == 0) {
+            LC_ASSERT_VT(false);
+            return;
+        }
+
 #ifdef LC_DEBUG
         if (opusHeaderByte == INVALID_OPUS_HEADER) {
             opusHeaderByte = ((uint8_t*)(rtp + 1))[0];
