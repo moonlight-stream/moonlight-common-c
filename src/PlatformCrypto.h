@@ -38,7 +38,7 @@ typedef struct _PLT_CRYPTO_CONTEXT {
     REPLAY_WINDOW replayWindows[];
 } PLT_CRYPTO_CONTEXT, *PPLT_CRYPTO_CONTEXT;
 
-#define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) + 15) / 16) * 16)
+#define ROUND_TO_PKCS7_PADDED_LEN(x) ((((x) / 16) + 1) * 16)
 
 PPLT_CRYPTO_CONTEXT PltCreateCryptoContext(unsigned char replayWindowCount);
 void PltDestroyCryptoContext(PPLT_CRYPTO_CONTEXT ctx);
