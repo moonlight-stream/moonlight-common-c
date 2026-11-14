@@ -77,3 +77,9 @@ jobs:
           mkdir build_release
           cmake ${{ matrix.cmake_args }} -DCMAKE_BUILD_TYPE=Release -B build_release -S .
           cmake --build build_release --config Release
+
+      - name: Test microphone negotiation parsers
+        run: |
+          cmake -S tests -B build_mic_tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_mic_tests --config Release
+          ctest --test-dir build_mic_tests -C Release --output-on-failure

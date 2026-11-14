@@ -127,6 +127,7 @@ void flushInputOnControlStream(void);
 bool isControlDataInTransit(void);
 
 int performRtspHandshake(PSERVER_INFORMATION serverInfo);
+void resetNativeMicState(void);
 
 void initializeVideoDepacketizer(int pktSize);
 void destroyVideoDepacketizer(void);

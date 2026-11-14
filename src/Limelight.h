@@ -100,10 +100,48 @@ typedef struct _STREAM_CONFIGURATION {
     // in /launch and /resume requests.
     char remoteInputAesKey[16];
     char remoteInputAesIv[16];
+
+    // Experimental NVIDIA GameStream microphone SETUP negotiation only.
+    // Zero (the default) leaves the existing handshake unchanged. This does not
+    // capture/send audio or negotiate microphone encryption. A nonzero value
+    // requires explicit client opt-in; native SDP zero/absent may be resolved
+    // by optional SETUP on NVIDIA hosts. A valid returned port is still required.
+    int requestNativeMic;
 } STREAM_CONFIGURATION, *PSTREAM_CONFIGURATION;
 
 // Use this function to zero the stream configuration when allocated on the stack or heap
 void LiInitializeStreamConfiguration(PSTREAM_CONFIGURATION streamConfig);
+
+// Experimental native GameStream microphone destination for the current session.
+// Query only after LiStartConnection() succeeds and before LiStopConnection().
+// Returns zero if disabled, unsupported, rejected, or unavailable. A nonzero
+// port is not proof of a usable recording endpoint or encrypted microphone
+// transport. It must not be used as a Sunshine microphone capability flag.
+unsigned short LiGetNativeMicPort(void);
+
+// Native NVIDIA microphone packets follow the negotiated legacy audio CBC mode.
+// This is encryption only, not authenticated encryption. Returns 1 for legacy
+// CBC, or 0 when unavailable/unencrypted. No Sunshine protocol is implied.
+int LiIsNativeMicAudioEncrypted(void);
+
+// Copies the resolved IPv4 address used by this session into address.
+// Returns 1 on success, 0 if unavailable, unsupported, or buffer too small.
+int LiGetNativeMicAddress(char* address, int addressLength);
+
+// The client owns capture, permission and encoding. Create after successful
+// LiStartConnection(), on explicit opt-in. Only the negotiated encrypted native
+// NVIDIA endpoint on private IPv4 is accepted. Returns NULL on failure.
+typedef struct _NATIVE_MIC_SENDER NATIVE_MIC_SENDER;
+NATIVE_MIC_SENDER* LiCreateNativeMicSender(void);
+
+// Send one 20-byte CBR Opus frame (48 kHz mono, 240 samples, 32 kbps).
+// Returns 0 on success and -1 on failure. Stop capture on transport failure.
+// Create only one sender per connection. Reconnect before enabling it again.
+// Serialize calls for each sender. Stop capture and destroy the sender before
+// LiStopConnection(). Legacy CBC does not authenticate packets.
+int LiSendNativeMicFrame(NATIVE_MIC_SENDER* sender, const unsigned char* frame, int length);
+void LiDestroyNativeMicSender(NATIVE_MIC_SENDER* sender);
+
 
 // These identify codec configuration data in the buffer lists
 // of frames identified as IDR frames for H.264 and HEVC formats.
