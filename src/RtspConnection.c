@@ -1,5 +1,6 @@
 #include "Limelight-internal.h"
 #include "Rtsp.h"
+#include "VideoFormats.h"
 
 #define RTSP_CONNECT_TIMEOUT_SEC 10
 #define RTSP_RECEIVE_TIMEOUT_SEC 15
@@ -1088,52 +1089,17 @@ int performRtspHandshake(PSERVER_INFORMATION serverInfo) {
             goto Exit;
         }
 
-        if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_AV1) && strstr(response.payload, "AV1/90000")) {
-            if ((serverInfo->serverCodecModeSupport & SCM_AV1_HIGH10_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_AV1_HIGH10_444)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_HIGH10_444;
-            }
-            else if ((serverInfo->serverCodecModeSupport & SCM_AV1_MAIN10) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_AV1_MAIN10)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN10;
-            }
-            else if ((serverInfo->serverCodecModeSupport & SCM_AV1_HIGH8_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_AV1_HIGH8_444)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_HIGH8_444;
-            }
-            else {
-                NegotiatedVideoFormat = VIDEO_FORMAT_AV1_MAIN8;
-            }
+        NegotiatedVideoFormat = chooseVideoFormat(StreamConfig.supportedVideoFormats,
+                                                  serverInfo->serverCodecModeSupport, response.payload);
+        if (NegotiatedVideoFormat == 0) {
+            Limelog("No mutually supported video codec found in RTSP DESCRIBE response\n");
+            ret = -1;
+            goto Exit;
         }
-        else if ((StreamConfig.supportedVideoFormats & VIDEO_FORMAT_MASK_H265) && strstr(response.payload, "sprop-parameter-sets=AAAAAU")) {
-            // The RTSP DESCRIBE reply will contain a collection of SDP media attributes that
-            // describe the various supported video stream formats and include the SPS, PPS,
-            // and VPS (if applicable). We will use this information to determine whether the
-            // server can support HEVC. For some reason, they still set the MIME type of the HEVC
-            // format to H264, so we can't just look for the HEVC MIME type. What we'll do instead is
-            // look for the base 64 encoded VPS NALU prefix that is unique to the HEVC bitstream.
-            if ((serverInfo->serverCodecModeSupport & SCM_HEVC_REXT10_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_H265_REXT10_444)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H265_REXT10_444;
-            }
-            else if ((serverInfo->serverCodecModeSupport & SCM_HEVC_MAIN10) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_H265_MAIN10)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H265_MAIN10;
-            }
-            else if ((serverInfo->serverCodecModeSupport & SCM_HEVC_REXT8_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_H265_REXT8_444)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H265_REXT8_444;
-            }
-            else {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H265;
-            }
-        }
-        else {
-            if ((serverInfo->serverCodecModeSupport & SCM_H264_HIGH8_444) && (StreamConfig.supportedVideoFormats & VIDEO_FORMAT_H264_HIGH8_444)) {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H264_HIGH8_444;
-            }
-            else {
-                NegotiatedVideoFormat = VIDEO_FORMAT_H264;
-            }
 
-            // Dimensions over 4096 are only supported with HEVC on NVENC
-            if (StreamConfig.width > 4096 || StreamConfig.height > 4096) {
-                Limelog("WARNING: Host PC doesn't support HEVC. Streaming at resolutions above 4K using H.264 will likely fail!\n");
-            }
+        if ((NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H264) &&
+                (StreamConfig.width > 4096 || StreamConfig.height > 4096)) {
+            Limelog("WARNING: Streaming at resolutions above 4K using H.264 will likely fail!\n");
         }
 
         // Look for the SDP attribute that indicates we're dealing with a server that supports RFI

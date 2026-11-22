@@ -1,3 +1,4 @@
+#include "VideoFormats.h"
 #include "Limelight-internal.h"
 #include <inttypes.h>
 
@@ -438,8 +439,13 @@ static PSDP_OPTION getAttributesList(char*urlSafeAddr) {
         snprintf(payloadStr, sizeof(payloadStr), "%d", slicesPerFrame);
         err |= addAttributeString(&optionHead, "x-nv-video[0].videoEncoderSlicesPerFrame", payloadStr);
 
-        if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
-            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", "2");
+        if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_AV1 | VIDEO_FORMAT_MASK_MPEG2 | VIDEO_FORMAT_MASK_H263P)) {
+            // Sunshine codec extensions use GameStream framing and shared wire identifiers.
+            snprintf(payloadStr, sizeof(payloadStr), "%d", getVideoBitStreamFormat(NegotiatedVideoFormat));
+            if (NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_MPEG2 | VIDEO_FORMAT_MASK_H263P)) {
+                err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "0");
+            }
+            err |= addAttributeString(&optionHead, "x-nv-vqos[0].bitStreamFormat", payloadStr);
         }
         else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_H265) {
             err |= addAttributeString(&optionHead, "x-nv-clientSupportHevc", "1");

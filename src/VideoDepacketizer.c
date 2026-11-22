@@ -84,6 +84,10 @@ typedef struct _LENTRY_INTERNAL {
 #define HEVC_NAL_TYPE_FILLER 38
 #define HEVC_NAL_TYPE_SEI 39
 
+static bool isBitstreamPassthroughFormat(void) {
+    return NegotiatedVideoFormat & (VIDEO_FORMAT_MASK_AV1 | VIDEO_FORMAT_MASK_MPEG2 | VIDEO_FORMAT_MASK_H263P);
+}
+
 // Init
 void initializeVideoDepacketizer(int pktSize) {
     PltCreateMutex(&stateLock);
@@ -248,8 +252,8 @@ void validateDecodeUnitForPlayback(PDECODE_UNIT decodeUnit) {
             LC_ASSERT_VT(decodeUnit->bufferList->next->next->bufferType == BUFFER_TYPE_PPS);
             LC_ASSERT_VT(decodeUnit->bufferList->next->next->next != NULL);
         }
-        else if (NegotiatedVideoFormat & VIDEO_FORMAT_MASK_AV1) {
-            // We don't parse the AV1 bitstream
+        else if (isBitstreamPassthroughFormat()) {
+            // We forward AV1, MPEG-2, and H.263+ bitstreams without NAL parsing.
             LC_ASSERT_VT(decodeUnit->bufferList->bufferType == BUFFER_TYPE_PICDATA);
         }
         else {
