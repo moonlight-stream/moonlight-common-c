@@ -191,7 +191,7 @@ static bool parseRtspPortNumberFromUrl(const char* rtspSessionUrl, uint16_t* por
     }
 
     // Pick the last colon in the string to match the port number
-    char* portNumberStart = strrchr(rtspSessionUrl, ':');
+    const char* portNumberStart = strrchr(rtspSessionUrl, ':');
     if (portNumberStart == NULL) {
         return false;
     }

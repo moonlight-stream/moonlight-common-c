@@ -905,13 +905,13 @@ static bool parseUrlAddrFromRtspUrlString(const char* rtspUrlString, char* desti
 // a=x-nv-bwe.bwuSafeZoneLowLimit:70\r\n
 bool parseSdpAttributeToUInt(const char* payload, const char* name, uint32_t* val) {
     // Find the entry for the specified attribute name
-    char* attribute = strstr(payload, name);
+    const char* attribute = strstr(payload, name);
     if (!attribute) {
         return false;
     }
 
     // Locate the start of the value
-    char* valst = strstr(attribute, ":");
+    const char* valst = strstr(attribute, ":");
     if (!valst) {
         return false;
     }
@@ -924,13 +924,13 @@ bool parseSdpAttributeToUInt(const char* payload, const char* name, uint32_t* va
 
 bool parseSdpAttributeToInt(const char* payload, const char* name, int* val) {
     // Find the entry for the specified attribute name
-    char* attribute = strstr(payload, name);
+    const char* attribute = strstr(payload, name);
     if (!attribute) {
         return false;
     }
 
     // Locate the start of the value
-    char* valst = strstr(attribute, ":");
+    const char* valst = strstr(attribute, ":");
     if (!valst) {
         return false;
     }
