@@ -14,6 +14,7 @@ SOCKADDR_LEN AddrLen;
 int AppVersionQuad[4];
 STREAM_CONFIGURATION StreamConfig;
 CONNECTION_LISTENER_CALLBACKS ListenerCallbacks;
+ConnListenerRemoteTextContext RemoteTextContextCallback;
 DECODER_RENDERER_CALLBACKS VideoCallbacks;
 AUDIO_RENDERER_CALLBACKS AudioCallbacks;
 int NegotiatedVideoFormat;

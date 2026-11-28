@@ -87,3 +87,13 @@ target_include_directories(moonlight-common-c SYSTEM PRIVATE
 )
 
 target_compile_definitions(moonlight-common-c PRIVATE HAS_SOCKLEN_T)
+
+# Keep protocol tests out of client applications that embed this library.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+  include(CTest)
+  if(BUILD_TESTING)
+    add_executable(remote-text-context-test tests/RemoteTextContextStreamGoldenTest.c src/RemoteTextContextStream.c)
+    target_include_directories(remote-text-context-test PRIVATE src)
+    add_test(NAME remote-text-context COMMAND remote-text-context-test)
+  endif()
+endif()

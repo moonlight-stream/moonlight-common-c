@@ -1,4 +1,5 @@
 #include "Limelight-internal.h"
+#include "RemoteTextContextStream.h"
 
 // This is a private header, but it just contains some time macros
 #include <enet/time.h>
@@ -57,6 +58,7 @@ typedef struct _QUEUED_FRAME_FEC_STATUS {
 typedef struct _QUEUED_ASYNC_CALLBACK {
     int typeIndex;
     union {
+        LI_REMOTE_TEXT_CONTEXT textContext;
         struct {
             uint16_t controllerNumber;
             uint16_t lowFreqRumble;
@@ -155,6 +157,7 @@ static PPLT_CRYPTO_CONTEXT decryptionCtx;
 #define IDX_SET_MOTION_EVENT 10
 #define IDX_SET_RGB_LED 11
 #define IDX_DS_ADAPTIVE_TRIGGERS 12
+#define TEXT_CONTEXT_CALLBACK 0x550C // Receive-only Sunshine control message
 
 #define CONTROL_STREAM_TIMEOUT_SEC 10
 #define CONTROL_STREAM_LINGER_TIMEOUT_SEC 2
@@ -1185,6 +1188,9 @@ static void asyncCallbackThreadFunc(void* context) {
             ListenerCallbacks.setHdrMode(LiGetCurrentHostDisplayHdrMode());
             break;
 
+        case TEXT_CONTEXT_CALLBACK:
+            RemoteTextContextCallback(&queuedCb->data.textContext);
+            break;
         case IDX_SET_MOTION_EVENT:
             // These events are infrequent and cannot be batched
             ListenerCallbacks.setMotionEventState(queuedCb->data.setMotionEventState.controllerNumber,
@@ -1210,7 +1216,9 @@ static void asyncCallbackThreadFunc(void* context) {
 }
 
 static bool needsAsyncCallback(unsigned short packetType) {
-    return packetType == packetTypes[IDX_RUMBLE_DATA] ||
+    return (packetType == TEXT_CONTEXT_CALLBACK && encryptedControlStream && RemoteTextContextCallback != NULL &&
+            (SunshineFeatureFlags & LI_FF_REMOTE_TEXT_CONTEXT)) ||
+           packetType == packetTypes[IDX_RUMBLE_DATA] ||
            packetType == packetTypes[IDX_RUMBLE_TRIGGER_DATA] ||
            packetType == packetTypes[IDX_SET_MOTION_EVENT] ||
            packetType == packetTypes[IDX_SET_RGB_LED] ||
@@ -1232,7 +1240,16 @@ static void queueAsyncCallback(PNVCTL_ENET_PACKET_HEADER_V1 ctlHdr, int packetLe
 
     BbInitializeWrappedBuffer(&bb, (char*)ctlHdr, sizeof(*ctlHdr), packetLength - sizeof(*ctlHdr), BYTE_ORDER_LITTLE);
 
-    if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
+    if (ctlHdr->type == TEXT_CONTEXT_CALLBACK) {
+        if (packetLength < (int)sizeof(*ctlHdr) ||
+                !decodeRemoteTextContextPacket((const uint8_t*)(ctlHdr + 1), packetLength - sizeof(*ctlHdr),
+                                               &queuedCb->data.textContext)) {
+            free(queuedCb);
+            return;
+        }
+        queuedCb->typeIndex = TEXT_CONTEXT_CALLBACK;
+    }
+    else if (ctlHdr->type == packetTypes[IDX_RUMBLE_DATA]) {
         BbAdvanceBuffer(&bb, 4);
 
         BbGet16(&bb, &queuedCb->data.rumble.controllerNumber);
